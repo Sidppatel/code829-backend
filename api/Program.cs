@@ -230,7 +230,8 @@ static string ConvertPostgresUrl(string url)
 {
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};Trust Server Certificate=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+    // SSL Mode=Prefer gracefully falls back to non-SSL when PostgreSQL doesn't have SSL configured (e.g. alpine dev image)
+    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Prefer;Trust Server Certificate=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
 }
 
 /// <summary>
