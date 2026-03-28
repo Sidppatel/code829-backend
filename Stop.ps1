@@ -12,7 +12,7 @@ $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $root "backend"
 
-# ── Stop Native Backend (dotnet process) ──
+# -- Stop Native Backend (dotnet process) --
 Write-Host "`n[Stop] Stopping native backend process..." -ForegroundColor Cyan
 
 $dotnetProcs = Get-Process -Name "dotnet" -ErrorAction SilentlyContinue |
@@ -35,7 +35,7 @@ if ($stopped -gt 0) {
     Write-Host "  No backend processes found" -ForegroundColor DarkGray
 }
 
-# ── Stop Native Frontend (node/npm process) ──
+# -- Stop Native Frontend (node/npm process) --
 Write-Host "[Stop] Stopping native frontend process..." -ForegroundColor Cyan
 
 $nodeProcs = Get-Process -Name "node" -ErrorAction SilentlyContinue
@@ -54,7 +54,7 @@ if ($stopped -gt 0) {
     Write-Host "  No frontend processes found" -ForegroundColor DarkGray
 }
 
-# ── Stop Docker DB Containers (PostgreSQL + Redis) ──
+# -- Stop Docker DB Containers (PostgreSQL + Redis) --
 Write-Host "[Stop] Stopping Docker database containers..." -ForegroundColor Cyan
 
 Push-Location $backendPath

@@ -17,7 +17,7 @@ if (-not ($All -or $Docker -or $Backend -or $Frontend)) {
     $All = $true
 }
 
-# ── Docker DB Cleanup (PostgreSQL + Redis volumes only) ──
+# -- Docker DB Cleanup (PostgreSQL + Redis volumes only) --
 if ($All -or $Docker) {
     Write-Host "`n[Docker] Cleaning database volumes..." -ForegroundColor Cyan
 
@@ -30,7 +30,7 @@ if ($All -or $Docker) {
     }
 }
 
-# ── Backend Native Build Artifacts ──
+# -- Backend Native Build Artifacts --
 if ($All -or $Backend) {
     Write-Host "`n[Backend] Cleaning .NET build artifacts..." -ForegroundColor Cyan
 
@@ -52,7 +52,7 @@ if ($All -or $Backend) {
     }
 }
 
-# ── Frontend Native Build Artifacts ──
+# -- Frontend Native Build Artifacts --
 if ($All -or $Frontend) {
     Write-Host "`n[Frontend] Cleaning Node.js build artifacts..." -ForegroundColor Cyan
 

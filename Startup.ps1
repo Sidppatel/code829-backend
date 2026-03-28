@@ -13,7 +13,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $root "backend"
 $frontendPath = Join-Path $root "frontend"
 
-# ── Step 1: Verify Prerequisites ──
+# -- Step 1: Verify Prerequisites --
 Write-Host "`n[1/7] Checking prerequisites..." -ForegroundColor Cyan
 
 $dotnetVersion = & dotnet --version 2>$null
@@ -30,7 +30,7 @@ if (-not $SkipFrontend) {
     Write-Host "  Node: $nodeVersion" -ForegroundColor Green
 }
 
-# ── Step 2: Environment Files ──
+# -- Step 2: Environment Files --
 Write-Host "`n[2/7] Checking environment files..." -ForegroundColor Cyan
 
 $backendEnv = Join-Path $backendPath ".env"
@@ -58,7 +58,7 @@ if (-not $SkipFrontend) {
     Write-Host "  frontend\.env exists" -ForegroundColor Green
 }
 
-# ── Step 3: Docker Services (PostgreSQL + Redis ONLY) ──
+# -- Step 3: Docker Services (PostgreSQL + Redis ONLY) --
 Write-Host "`n[3/7] Starting Docker database services (PostgreSQL 16 + Redis 7)..." -ForegroundColor Cyan
 
 Push-Location $backendPath
@@ -80,7 +80,7 @@ while ($waited -lt $maxWait) {
 Write-Host "  PostgreSQL: healthy" -ForegroundColor Green
 Write-Host "  Redis: healthy" -ForegroundColor Green
 
-# ── Step 4: Backend — Native .NET Build ──
+# -- Step 4: Backend — Native .NET Build --
 if (-not $SkipBackend) {
     Write-Host "`n[4/7] Building backend (.NET — native)..." -ForegroundColor Cyan
 
@@ -92,7 +92,7 @@ if (-not $SkipBackend) {
     Write-Host "  Backend build succeeded" -ForegroundColor Green
 }
 
-# ── Step 5: Frontend — Native npm install ──
+# -- Step 5: Frontend — Native npm install --
 if (-not $SkipFrontend) {
     Write-Host "`n[5/7] Installing frontend dependencies (npm — native)..." -ForegroundColor Cyan
 
@@ -103,7 +103,7 @@ if (-not $SkipFrontend) {
     Write-Host "  Frontend dependencies installed" -ForegroundColor Green
 }
 
-# ── Step 6: Start Backend (native dotnet process) ──
+# -- Step 6: Start Backend (native dotnet process) --
 if (-not $SkipBackend) {
     Write-Host "`n[6/7] Starting backend API (native dotnet run on port 8000)..." -ForegroundColor Cyan
 
@@ -127,7 +127,7 @@ if (-not $SkipBackend) {
     Write-Host "  Scalar: http://localhost:8000/scalar" -ForegroundColor Green
 }
 
-# ── Step 7: Start Frontend (native Vite dev server) ──
+# -- Step 7: Start Frontend (native Vite dev server) --
 if (-not $SkipFrontend) {
     Write-Host "`n[7/7] Starting frontend dev server (native npm run dev on port 5173)..." -ForegroundColor Cyan
 
@@ -139,7 +139,7 @@ if (-not $SkipFrontend) {
     Write-Host "  Frontend: http://localhost:5173" -ForegroundColor Green
 }
 
-# ── Summary ──
+# -- Summary --
 Write-Host "`n========================================" -ForegroundColor Green
 Write-Host "  Development environment ready!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
