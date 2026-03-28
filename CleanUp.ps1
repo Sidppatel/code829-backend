@@ -10,7 +10,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$root = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$root = Split-Path -Parent $PSScriptRoot
 
 # If no flags, default to -All
 if (-not ($All -or $Docker -or $Backend -or $Frontend)) {

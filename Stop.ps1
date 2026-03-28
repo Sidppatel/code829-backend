@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$root = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$root = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $root "backend"
 
 # ── Stop Native Backend (dotnet process) ──

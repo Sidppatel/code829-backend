@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$root = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $root "backend"
 $frontendPath = Join-Path $root "frontend"
 

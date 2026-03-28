@@ -4,15 +4,14 @@
 # Usage: .\ClearDb.ps1
 
 $ErrorActionPreference = "Continue"
-$root = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$root = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $root "backend"
 
 Write-Host "`n[ClearDb] Destroying PostgreSQL and Redis..." -ForegroundColor Red
 
 # ── Step 1: Stop native processes that depend on the DB ──
 Write-Host "`n[1/4] Stopping native processes that depend on the database..." -ForegroundColor Cyan
-$scriptDir = Split-Path -Parent $PSScriptRoot
-& (Join-Path $PSScriptRoot "Stop.ps1")
+& "$PSScriptRoot\Stop.ps1"
 
 # ── Step 2: docker compose down -v (containers + volumes) ──
 Write-Host "[2/4] Running docker compose down -v (remove containers + named volumes)..." -ForegroundColor Cyan
