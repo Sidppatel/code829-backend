@@ -1,8 +1,4 @@
 # Startup.ps1 — Start the full development environment
-# Docker is ONLY used for PostgreSQL 16 + Redis 7.
-# Backend (.NET) and frontend (React/Vite) run natively on the host.
-# Usage: .\Startup.ps1
-
 param(
     [switch]$SkipFrontend,
     [switch]$SkipBackend
@@ -13,153 +9,125 @@ $root = Split-Path -Parent $PSScriptRoot
 $backendPath = Join-Path $root "backend"
 $frontendPath = Join-Path $root "frontend"
 
-# -- Step 1: Verify Prerequisites --
-Write-Host "`n[1/7] Checking prerequisites..." -ForegroundColor Cyan
-
-$dotnetVersion = & dotnet --version 2>$null
-if (-not $dotnetVersion) { Write-Host "  ERROR: dotnet SDK not found" -ForegroundColor Red; exit 1 }
-Write-Host "  dotnet: $dotnetVersion" -ForegroundColor Green
-
-$dockerVersion = & docker --version 2>$null
-if (-not $dockerVersion) { Write-Host "  ERROR: Docker not found" -ForegroundColor Red; exit 1 }
-Write-Host "  Docker: $dockerVersion" -ForegroundColor Green
-
+# Step 1: Prerequisites
+Write-Host ""
+Write-Host "[1/7] Checking prerequisites..." -ForegroundColor Cyan
+$dv = & dotnet --version 2>$null
+if (-not $dv) { Write-Host "  ERROR: dotnet not found" -ForegroundColor Red; exit 1 }
+Write-Host "  dotnet: $dv" -ForegroundColor Green
+$dk = & docker --version 2>$null
+if (-not $dk) { Write-Host "  ERROR: Docker not found" -ForegroundColor Red; exit 1 }
+Write-Host "  Docker: $dk" -ForegroundColor Green
 if (-not $SkipFrontend) {
-    $nodeVersion = & node --version 2>$null
-    if (-not $nodeVersion) { Write-Host "  ERROR: Node.js not found" -ForegroundColor Red; exit 1 }
-    Write-Host "  Node: $nodeVersion" -ForegroundColor Green
+    $nv = & node --version 2>$null
+    if (-not $nv) { Write-Host "  ERROR: Node not found" -ForegroundColor Red; exit 1 }
+    Write-Host "  Node: $nv" -ForegroundColor Green
 }
 
-# -- Step 2: Environment Files --
-Write-Host "`n[2/7] Checking environment files..." -ForegroundColor Cyan
-
-$backendEnv = Join-Path $backendPath ".env"
-if (-not (Test-Path $backendEnv)) {
-    Write-Host "  Creating backend\.env from .env.example..." -ForegroundColor Yellow
-    Copy-Item (Join-Path $backendPath ".env.example") $backendEnv
-
-    # Generate encryption key if placeholder
-    $content = Get-Content $backendEnv -Raw
-    if ($content -match "<64-char hex") {
+# Step 2: Environment files
+Write-Host ""
+Write-Host "[2/7] Checking environment files..." -ForegroundColor Cyan
+$beEnv = Join-Path $backendPath ".env"
+if (-not (Test-Path $beEnv)) {
+    Copy-Item (Join-Path $backendPath ".env.example") $beEnv
+    $c = Get-Content $beEnv -Raw
+    if ($c -match "<64-char hex") {
         $key = -join ((1..32) | ForEach-Object { "{0:x2}" -f (Get-Random -Maximum 256) })
-        $content = $content -replace "<64-char hex.*?>", $key
-        Set-Content $backendEnv $content
+        $c = $c -replace "<64-char hex.*?>", $key
+        Set-Content $beEnv $c
         Write-Host "  Generated SETTINGS_ENCRYPTION_KEY" -ForegroundColor Green
     }
 }
-Write-Host "  backend\.env exists" -ForegroundColor Green
-
+Write-Host "  backend .env OK" -ForegroundColor Green
 if (-not $SkipFrontend) {
-    $frontendEnv = Join-Path $frontendPath ".env"
-    if (-not (Test-Path $frontendEnv)) {
-        Copy-Item (Join-Path $frontendPath ".env.example") $frontendEnv
-        Write-Host "  Created frontend\.env from .env.example" -ForegroundColor Yellow
-    }
-    Write-Host "  frontend\.env exists" -ForegroundColor Green
+    $feEnv = Join-Path $frontendPath ".env"
+    if (-not (Test-Path $feEnv)) { Copy-Item (Join-Path $frontendPath ".env.example") $feEnv }
+    Write-Host "  frontend .env OK" -ForegroundColor Green
 }
 
-# -- Step 3: Docker Services (PostgreSQL + Redis ONLY) --
-Write-Host "`n[3/7] Starting Docker database services (PostgreSQL 16 + Redis 7)..." -ForegroundColor Cyan
-
+# Step 3: Docker DB (PostgreSQL + Redis only)
+Write-Host ""
+Write-Host "[3/7] Starting Docker DB services..." -ForegroundColor Cyan
 Push-Location $backendPath
 & docker compose up -d
 if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: docker compose failed" -ForegroundColor Red; Pop-Location; exit 1 }
 Pop-Location
+Write-Host "  Waiting for databases to initialize..." -ForegroundColor DarkGray
+Start-Sleep -Seconds 10
+Write-Host "  PostgreSQL: ready (port 5432)" -ForegroundColor Green
+Write-Host "  Redis: ready (port 6379)" -ForegroundColor Green
 
-# Wait for healthy
-Write-Host "  Waiting for databases to be healthy..." -ForegroundColor DarkGray
-$maxWait = 30
-$waited = 0
-while ($waited -lt $maxWait) {
-    $pgReady = & docker exec event-platform-db pg_isready -U ep_dev -d event_platform 2>$null
-    $redisReady = & docker exec event-platform-redis redis-cli ping 2>$null
-    if ($pgReady -match "accepting" -and $redisReady -match "PONG") { break }
-    Start-Sleep -Seconds 2
-    $waited += 2
-}
-Write-Host "  PostgreSQL: healthy" -ForegroundColor Green
-Write-Host "  Redis: healthy" -ForegroundColor Green
-
-# -- Step 4: Backend — Native .NET Build --
+# Step 4: Backend build
 if (-not $SkipBackend) {
-    Write-Host "`n[4/7] Building backend (.NET — native)..." -ForegroundColor Cyan
-
+    Write-Host ""
+    Write-Host "[4/7] Building backend (.NET native)..." -ForegroundColor Cyan
     Push-Location $backendPath
     & dotnet restore
     & dotnet build
-    if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: dotnet build failed" -ForegroundColor Red; Pop-Location; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: build failed" -ForegroundColor Red; Pop-Location; exit 1 }
     Pop-Location
-    Write-Host "  Backend build succeeded" -ForegroundColor Green
+    Write-Host "  Build succeeded" -ForegroundColor Green
 }
 
-# -- Step 5: Frontend — Native npm install --
+# Step 5: Frontend install
 if (-not $SkipFrontend) {
-    Write-Host "`n[5/7] Installing frontend dependencies (npm — native)..." -ForegroundColor Cyan
-
+    Write-Host ""
+    Write-Host "[5/7] Installing frontend deps (npm native)..." -ForegroundColor Cyan
     Push-Location $frontendPath
     & npm install
     if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: npm install failed" -ForegroundColor Red; Pop-Location; exit 1 }
     Pop-Location
-    Write-Host "  Frontend dependencies installed" -ForegroundColor Green
+    Write-Host "  Dependencies installed" -ForegroundColor Green
 }
 
-# -- Step 6: Start Backend (native dotnet process) --
+# Step 6: Start backend (hidden background process)
 if (-not $SkipBackend) {
-    Write-Host "`n[6/7] Starting backend API (native dotnet run on port 8000)..." -ForegroundColor Cyan
-
-    $apiLogFile = Join-Path $backendPath "api.log"
-    $env:ASPNETCORE_ENVIRONMENT = "Development"
-    # Run in background with output redirected to log file so the script continues
-    Start-Process -FilePath "dotnet" -ArgumentList "run","--project","api" `
-        -WorkingDirectory $backendPath `
-        -RedirectStandardOutput $apiLogFile `
-        -RedirectStandardError (Join-Path $backendPath "api.err.log") `
-        -WindowStyle Hidden
-
-    # Wait for health (first run applies migrations + seeds data, can take 30-60s)
-    Write-Host "  Waiting for API to start (migrations + seeding on first run)..." -ForegroundColor DarkGray
-    $maxWait = 90
-    $waited = 0
-    while ($waited -lt $maxWait) {
+    Write-Host ""
+    Write-Host "[6/7] Starting backend API on port 8000..." -ForegroundColor Cyan
+    $apiLog = Join-Path $backendPath "api.log"
+    $apiErr = Join-Path $backendPath "api.err.log"
+    Start-Process -FilePath (Join-Path $backendPath "start-api.cmd") -WorkingDirectory $backendPath -RedirectStandardOutput $apiLog -RedirectStandardError $apiErr -WindowStyle Hidden
+    Write-Host "  Waiting for API (first run: migrations + seeding)..." -ForegroundColor DarkGray
+    $w = 0
+    $ready = $false
+    while ($w -lt 120) {
         try {
-            $health = Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 2 -ErrorAction SilentlyContinue
-            if ($health.status -eq "healthy") { break }
-        } catch { }
+            $h = Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 2 -ErrorAction SilentlyContinue
+            if ($h.status -eq "healthy") { $ready = $true; break }
+        } catch {}
         Start-Sleep -Seconds 3
-        $waited += 3
+        $w += 3
     }
-    if ($waited -ge $maxWait) {
-        Write-Host "  WARNING: API did not respond within ${maxWait}s" -ForegroundColor Yellow
-        Write-Host "  Check logs: $apiLogFile" -ForegroundColor Yellow
+    if ($ready) {
+        Write-Host ("  API ready in " + $w + "s") -ForegroundColor Green
     } else {
-        Write-Host "  API: http://localhost:8000 (healthy) — started in ${waited}s" -ForegroundColor Green
+        Write-Host "  WARNING: API not ready in 120s" -ForegroundColor Yellow
+        Write-Host ("  Check log: " + $apiLog) -ForegroundColor Yellow
     }
+    Write-Host "  API:    http://localhost:8000" -ForegroundColor Green
     Write-Host "  Scalar: http://localhost:8000/scalar" -ForegroundColor Green
-    Write-Host "  Logs: $apiLogFile" -ForegroundColor DarkGray
+    Write-Host ("  Log: " + $apiLog) -ForegroundColor DarkGray
 }
 
-# -- Step 7: Start Frontend (native Vite dev server) --
+# Step 7: Start frontend (hidden background process)
 if (-not $SkipFrontend) {
-    Write-Host "`n[7/7] Starting frontend dev server (native npm run dev on port 5173)..." -ForegroundColor Cyan
-
-    $frontendLogFile = Join-Path $frontendPath "vite.log"
-    Start-Process -FilePath "npm" -ArgumentList "run","dev" `
-        -WorkingDirectory $frontendPath `
-        -RedirectStandardOutput $frontendLogFile `
-        -RedirectStandardError (Join-Path $frontendPath "vite.err.log") `
-        -WindowStyle Hidden
-
+    Write-Host ""
+    Write-Host "[7/7] Starting frontend on port 5173..." -ForegroundColor Cyan
+    $feLog = Join-Path $frontendPath "vite.log"
+    $feErr = Join-Path $frontendPath "vite.err.log"
+    Start-Process -FilePath "npm" -ArgumentList "run","dev" -WorkingDirectory $frontendPath -RedirectStandardOutput $feLog -RedirectStandardError $feErr -WindowStyle Hidden
     Start-Sleep -Seconds 3
     Write-Host "  Frontend: http://localhost:5173" -ForegroundColor Green
+    Write-Host ("  Log: " + $feLog) -ForegroundColor DarkGray
 }
 
-# -- Summary --
-Write-Host "`n========================================" -ForegroundColor Green
+# Summary
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Green
 Write-Host "  Development environment ready!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
-Write-Host "  Docker (DB only): PostgreSQL :5432, Redis :6379"
-Write-Host "  Backend (native): http://localhost:8000"
-Write-Host "  Frontend (native): http://localhost:5173"
-Write-Host "  Scalar docs: http://localhost:8000/scalar"
-Write-Host "  Dev login: POST http://localhost:8000/auth/dev-login"
+Write-Host "  Docker (DB): PostgreSQL :5432, Redis :6379"
+Write-Host "  Backend:     http://localhost:8000"
+Write-Host "  Frontend:    http://localhost:5173"
+Write-Host "  Scalar:      http://localhost:8000/scalar"
 Write-Host ""
