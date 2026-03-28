@@ -107,13 +107,18 @@ if (-not $SkipFrontend) {
 if (-not $SkipBackend) {
     Write-Host "`n[6/7] Starting backend API (native dotnet run on port 8000)..." -ForegroundColor Cyan
 
+    $apiLogFile = Join-Path $backendPath "api.log"
     $env:ASPNETCORE_ENVIRONMENT = "Development"
-    Push-Location $backendPath
-    Start-Process -FilePath "dotnet" -ArgumentList "run","--project","api" -NoNewWindow -PassThru | Out-Null
-    Pop-Location
+    # Run in background with output redirected to log file so the script continues
+    Start-Process -FilePath "dotnet" -ArgumentList "run","--project","api" `
+        -WorkingDirectory $backendPath `
+        -RedirectStandardOutput $apiLogFile `
+        -RedirectStandardError (Join-Path $backendPath "api.err.log") `
+        -WindowStyle Hidden
 
-    # Wait for health (first run applies migrations + seeds data, can take 30-45s)
-    $maxWait = 60
+    # Wait for health (first run applies migrations + seeds data, can take 30-60s)
+    Write-Host "  Waiting for API to start (migrations + seeding on first run)..." -ForegroundColor DarkGray
+    $maxWait = 90
     $waited = 0
     while ($waited -lt $maxWait) {
         try {
@@ -124,20 +129,25 @@ if (-not $SkipBackend) {
         $waited += 3
     }
     if ($waited -ge $maxWait) {
-        Write-Host "  WARNING: API did not respond within ${maxWait}s — check logs" -ForegroundColor Yellow
+        Write-Host "  WARNING: API did not respond within ${maxWait}s" -ForegroundColor Yellow
+        Write-Host "  Check logs: $apiLogFile" -ForegroundColor Yellow
     } else {
-        Write-Host "  API: http://localhost:8000 (healthy)" -ForegroundColor Green
+        Write-Host "  API: http://localhost:8000 (healthy) — started in ${waited}s" -ForegroundColor Green
     }
     Write-Host "  Scalar: http://localhost:8000/scalar" -ForegroundColor Green
+    Write-Host "  Logs: $apiLogFile" -ForegroundColor DarkGray
 }
 
 # -- Step 7: Start Frontend (native Vite dev server) --
 if (-not $SkipFrontend) {
     Write-Host "`n[7/7] Starting frontend dev server (native npm run dev on port 5173)..." -ForegroundColor Cyan
 
-    Push-Location $frontendPath
-    Start-Process -FilePath "npm" -ArgumentList "run","dev" -NoNewWindow -PassThru | Out-Null
-    Pop-Location
+    $frontendLogFile = Join-Path $frontendPath "vite.log"
+    Start-Process -FilePath "npm" -ArgumentList "run","dev" `
+        -WorkingDirectory $frontendPath `
+        -RedirectStandardOutput $frontendLogFile `
+        -RedirectStandardError (Join-Path $frontendPath "vite.err.log") `
+        -WindowStyle Hidden
 
     Start-Sleep -Seconds 3
     Write-Host "  Frontend: http://localhost:5173" -ForegroundColor Green
