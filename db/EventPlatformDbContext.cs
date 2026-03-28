@@ -256,8 +256,12 @@ public class EventPlatformDbContext(
         {
             entity.ToTable("pricing_rules");
             entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.EventId);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.Description).HasMaxLength(512);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
+            entity.HasOne(e => e.TableType).WithMany().HasForeignKey(e => e.TableTypeId).IsRequired(false);
         });
     }
 }
