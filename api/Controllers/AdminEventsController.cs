@@ -244,6 +244,87 @@ public class AdminEventsController(
         return NoContent();
     }
 
+    /// <summary>
+    /// Duplicate an event: copies settings, layout tables, and pricing rules.
+    /// Resets status to Draft, clears bookings/holds, requires new dates.
+    /// </summary>
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<IActionResult> Duplicate(Guid id, [FromBody] DuplicateEventRequest request)
+    {
+        var original = await context.Events
+            .Include(e => e.Venue)
+            .Include(e => e.TicketTypes)
+            .FirstOrDefaultAsync(e => e.Id == id);
+        if (original is null) return NotFound(new { message = "Event not found" });
+
+        var organizerId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var slug = GenerateSlug(original.Title + " copy");
+        var baseSlug = slug;
+        var counter = 1;
+        while (await context.Events.AnyAsync(e => e.Slug == slug))
+            slug = $"{baseSlug}-{counter++}";
+
+        var copy = new Event
+        {
+            Id = Guid.NewGuid(),
+            Title = original.Title + " (Copy)",
+            Slug = slug,
+            Description = original.Description,
+            Status = EventStatus.Draft,
+            Category = original.Category,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            ImagePath = original.ImagePath,
+            IsFeatured = false,
+            LayoutMode = original.LayoutMode,
+            MaxCapacity = original.MaxCapacity,
+            PlatformFeePercent = original.PlatformFeePercent,
+            EditorMode = original.EditorMode,
+            GridRows = original.GridRows,
+            GridCols = original.GridCols,
+            VenueId = original.VenueId,
+            OrganizerId = organizerId
+        };
+        context.Events.Add(copy);
+
+        // Copy layout tables
+        var tables = await context.Tables.Where(t => t.EventId == id).ToListAsync();
+        foreach (var t in tables)
+        {
+            context.Tables.Add(new Table
+            {
+                Id = Guid.NewGuid(), Label = t.Label, Capacity = t.Capacity, Shape = t.Shape,
+                Color = t.Color, Section = t.Section, PriceType = t.PriceType, PriceCents = t.PriceCents,
+                PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
+                GridRow = t.GridRow, GridCol = t.GridCol, PosX = t.PosX, PosY = t.PosY,
+                Width = t.Width, Height = t.Height, Rotation = t.Rotation, SortOrder = t.SortOrder,
+                TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
+            });
+        }
+
+        // Copy pricing rules (reset UsedCount)
+        var rules = await context.PricingRules.Where(r => r.EventId == id).ToListAsync();
+        foreach (var r in rules)
+        {
+            context.PricingRules.Add(new PricingRule
+            {
+                Id = Guid.NewGuid(), EventId = copy.Id, TableTypeId = r.TableTypeId,
+                Name = r.Name, Type = r.Type, PriceCents = r.PriceCents,
+                ValidFrom = r.ValidFrom, ValidUntil = r.ValidUntil,
+                MaxCount = r.MaxCount, UsedCount = 0, IsActive = r.IsActive,
+                SortOrder = r.SortOrder, FeePercent = r.FeePercent,
+                FeeFlatCents = r.FeeFlatCents, Description = r.Description
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var created = await context.Events
+            .Include(e => e.Venue).Include(e => e.TicketTypes)
+            .FirstAsync(e => e.Id == copy.Id);
+        return Created("", MapToDto(created));
+    }
+
     private EventDto MapToDto(Event e) => new(
         e.Id, e.Title, e.Slug, e.Description,
         e.Status.ToString(), e.Category.ToString(),

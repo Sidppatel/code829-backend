@@ -104,6 +104,7 @@ try
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
     builder.Services.AddHostedService<HoldCleanupWorker>();
+    builder.Services.AddHostedService<ScheduledPublishWorker>();
 
     // JWT Authentication — uses a temporary key at startup, replaced by DB-stored secret after seeding
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
