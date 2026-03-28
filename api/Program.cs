@@ -136,6 +136,7 @@ try
 
     // Seed data
     await DataSeeder.SeedAsync(app.Services);
+    await VenueEventSeeder.SeedAsync(app.Services);
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);

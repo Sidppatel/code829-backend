@@ -16,6 +16,9 @@ public class EventPlatformDbContext(
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
+    public DbSet<Venue> Venues => Set<Venue>();
+    public DbSet<Event> Events => Set<Event>();
+    public DbSet<TicketType> TicketTypes => Set<TicketType>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -109,6 +112,50 @@ public class EventPlatformDbContext(
             entity.HasIndex(e => e.ExpiresAt);
             entity.Property(e => e.TokenHash).HasMaxLength(128);
             entity.Property(e => e.Email).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<Venue>(entity =>
+        {
+            entity.ToTable("venues");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.City);
+            entity.Property(e => e.Name).HasMaxLength(256);
+            entity.Property(e => e.Address).HasMaxLength(512);
+            entity.Property(e => e.City).HasMaxLength(128);
+            entity.Property(e => e.State).HasMaxLength(2);
+            entity.Property(e => e.ZipCode).HasMaxLength(10);
+            entity.Property(e => e.Description).HasMaxLength(4096);
+            entity.Property(e => e.ImagePath).HasMaxLength(512);
+            entity.Property(e => e.Phone).HasMaxLength(20);
+            entity.Property(e => e.Website).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<Event>(entity =>
+        {
+            entity.ToTable("events");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.StartDate);
+            entity.Property(e => e.Title).HasMaxLength(256);
+            entity.Property(e => e.Slug).HasMaxLength(300);
+            entity.Property(e => e.Description).HasMaxLength(8192);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.ImagePath).HasMaxLength(512);
+            entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId);
+            entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId);
+        });
+
+        modelBuilder.Entity<TicketType>(entity =>
+        {
+            entity.ToTable("ticket_types");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.Description).HasMaxLength(512);
+            entity.HasOne(e => e.Event).WithMany(ev => ev.TicketTypes).HasForeignKey(e => e.EventId);
         });
     }
 }

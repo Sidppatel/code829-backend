@@ -26,8 +26,8 @@ redis-data/
 .DS_Store
 Thumbs.db
 
-# Logs
-logs/
+# Log files (not source directories named Logs)
+/logs/
 *.log
 
 # NuGet
