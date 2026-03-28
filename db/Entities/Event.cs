@@ -18,6 +18,9 @@ public class Event : BaseEntity
     public int? MaxCapacity { get; set; }
     public int? PlatformFeePercent { get; set; }
     public DateTime? PublishedAt { get; set; }
+    public EditorMode? EditorMode { get; set; }
+    public int? GridRows { get; set; }
+    public int? GridCols { get; set; }
 
     /// <summary>
     /// PostgreSQL tsvector column for full-text search.

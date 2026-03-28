@@ -1,5 +1,5 @@
 using Api.Middleware;
-using Contracts.DTOs.Seats;
+using Contracts.DTOs.Layout;
 using Contracts.Enums;
 using Db;
 using Db.Entities;
@@ -9,125 +9,178 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+/// <summary>
+/// Event-scoped layout editor endpoints for grid and canvas modes.
+/// Also serves global table type templates.
+/// </summary>
 [ApiController]
-[Route("admin/venues/{venueId:guid}/layout")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminLayoutController(EventPlatformDbContext context) : ControllerBase
 {
-    /// <summary>
-    /// List table types for a venue.
-    /// </summary>
-    [HttpGet("table-types")]
-    public async Task<IActionResult> GetTableTypes(Guid venueId)
+    [HttpGet("admin/table-types")]
+    public async Task<IActionResult> GetTableTypes()
     {
         var types = await context.TableTypes
-            .Where(tt => tt.VenueId == venueId)
-            .Select(tt => new TableTypeDto(tt.Id, tt.Name, tt.SeatsPerTable, tt.Shape, tt.WidthPx, tt.HeightPx))
+            .Where(tt => tt.IsActive)
+            .OrderBy(tt => tt.Name)
+            .Select(tt => new TableTypeResponse(
+                tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
+                tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive))
             .ToListAsync();
         return Ok(types);
     }
 
-    /// <summary>
-    /// Create a table type for a venue.
-    /// </summary>
-    [HttpPost("table-types")]
-    public async Task<IActionResult> CreateTableType(Guid venueId, [FromBody] CreateTableTypeRequest request)
+    [HttpPost("admin/table-types")]
+    public async Task<IActionResult> CreateTableType([FromBody] CreateTableTypeRequest request)
     {
-        var venue = await context.Venues.FindAsync(venueId);
-        if (venue is null) return NotFound(new { message = "Venue not found" });
+        if (!Enum.TryParse<TableShape>(request.DefaultShape, true, out var shape))
+            return BadRequest(new { message = "Invalid shape" });
 
         var tt = new TableType
         {
             Id = Guid.NewGuid(),
             Name = request.Name,
-            SeatsPerTable = request.SeatsPerTable,
-            Shape = request.Shape,
-            WidthPx = request.WidthPx,
-            HeightPx = request.HeightPx,
-            VenueId = venueId
+            DefaultCapacity = request.DefaultCapacity,
+            DefaultShape = shape,
+            DefaultColor = request.DefaultColor,
+            DefaultPriceCents = request.DefaultPriceCents,
+            IsActive = true
         };
         context.TableTypes.Add(tt);
         await context.SaveChangesAsync();
-        return Created("", new TableTypeDto(tt.Id, tt.Name, tt.SeatsPerTable, tt.Shape, tt.WidthPx, tt.HeightPx));
+        return Created("", new TableTypeResponse(
+            tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
+            tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive));
     }
 
-    /// <summary>
-    /// Create a table in a venue. Auto-generates seats based on the table type's SeatsPerTable.
-    /// </summary>
-    [HttpPost("tables")]
-    public async Task<IActionResult> CreateTable(Guid venueId, [FromBody] CreateTableRequest request)
+    [HttpGet("admin/events/{eventId:guid}/layout")]
+    public async Task<IActionResult> GetLayout(Guid eventId)
     {
-        var tableType = await context.TableTypes.FindAsync(request.TableTypeId);
-        if (tableType is null || tableType.VenueId != venueId)
-            return BadRequest(new { message = "Table type not found for this venue" });
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        var tables = await context.Tables
+            .Include(t => t.TableType)
+            .Where(t => t.EventId == eventId)
+            .OrderBy(t => t.SortOrder)
+            .ToListAsync();
+
+        return Ok(new EventLayoutResponse(
+            eventId, ev.EditorMode?.ToString(), ev.GridRows, ev.GridCols,
+            tables.Select(MapTable).ToList()));
+    }
+
+    [HttpPost("admin/events/{eventId:guid}/layout")]
+    public async Task<IActionResult> SaveLayout(Guid eventId, [FromBody] SaveLayoutRequest request)
+    {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        if (request.EditorMode is not null && Enum.TryParse<EditorMode>(request.EditorMode, true, out var mode))
+            ev.EditorMode = mode;
+        ev.GridRows = request.GridRows;
+        ev.GridCols = request.GridCols;
+
+        var existing = await context.Tables.Where(t => t.EventId == eventId).ToListAsync();
+        var requestIds = request.Tables.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToHashSet();
+
+        context.Tables.RemoveRange(existing.Where(t => !requestIds.Contains(t.Id)));
+
+        foreach (var rt in request.Tables)
+        {
+            Enum.TryParse<TableShape>(rt.Shape, true, out var shape);
+            Enum.TryParse<PriceType>(rt.PriceType, true, out var priceType);
+
+            if (rt.Id.HasValue && existing.FirstOrDefault(e => e.Id == rt.Id.Value) is { } ex)
+            {
+                ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
+                ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
+                ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
+                ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
+                ex.PosX = rt.PosX; ex.PosY = rt.PosY; ex.Width = rt.Width;
+                ex.Height = rt.Height; ex.Rotation = rt.Rotation; ex.SortOrder = rt.SortOrder;
+                ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                context.Tables.Add(new Table
+                {
+                    Id = rt.Id ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
+                    Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
+                    PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
+                    IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
+                    PosX = rt.PosX, PosY = rt.PosY, Width = rt.Width, Height = rt.Height,
+                    Rotation = rt.Rotation, SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
+                    EventId = eventId, VenueId = ev.VenueId
+                });
+            }
+        }
+
+        ev.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return Ok(await GetLayoutInternal(eventId));
+    }
+
+    [HttpPost("admin/events/{eventId:guid}/layout/table")]
+    public async Task<IActionResult> AddTable(Guid eventId, [FromBody] AddTableRequest request)
+    {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        Enum.TryParse<TableShape>(request.Shape, true, out var shape);
+        Enum.TryParse<PriceType>(request.PriceType, true, out var priceType);
 
         var table = new Table
         {
-            Id = Guid.NewGuid(),
-            Label = request.Label,
-            X = request.X,
-            Y = request.Y,
-            Rotation = request.Rotation,
-            TableTypeId = request.TableTypeId,
-            VenueId = venueId
+            Id = Guid.NewGuid(), Label = request.Label, Capacity = request.Capacity,
+            Shape = shape, Color = request.Color, Section = request.Section,
+            PriceType = priceType, PriceCents = request.PriceCents,
+            GridRow = request.GridRow, GridCol = request.GridCol,
+            PosX = request.PosX, PosY = request.PosY, Width = request.Width,
+            Height = request.Height, Rotation = request.Rotation,
+            TableTypeId = request.TableTypeId, EventId = eventId, VenueId = ev.VenueId
         };
+
         context.Tables.Add(table);
-
-        // Auto-generate seats
-        for (var i = 1; i <= tableType.SeatsPerTable; i++)
-        {
-            context.Seats.Add(new Seat
-            {
-                Id = Guid.NewGuid(),
-                Label = $"{request.Label}-S{i}",
-                SeatNumber = i,
-                TableId = table.Id
-            });
-        }
-
         await context.SaveChangesAsync();
-
-        var seats = await context.Seats
-            .Where(s => s.TableId == table.Id)
-            .OrderBy(s => s.SeatNumber)
-            .ToListAsync();
-
-        return Created("", new TableDto(
-            table.Id, table.Label, table.X, table.Y, table.Rotation,
-            tableType.Name, tableType.Shape, tableType.WidthPx, tableType.HeightPx,
-            seats.Select(s => new SeatDto(s.Id, s.Label, s.SeatNumber, table.Id, table.Label, false, null)).ToList()
-        ));
+        return Created("", MapTable(table));
     }
 
-    /// <summary>
-    /// Update a table's position/label.
-    /// </summary>
-    [HttpPut("tables/{tableId:guid}")]
-    public async Task<IActionResult> UpdateTable(Guid venueId, Guid tableId, [FromBody] UpdateTableRequest request)
+    [HttpPut("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
+    public async Task<IActionResult> UpdateTable(Guid eventId, Guid tableId, [FromBody] Contracts.DTOs.Layout.UpdateTableRequest request)
     {
-        var table = await context.Tables.FirstOrDefaultAsync(t => t.Id == tableId && t.VenueId == venueId);
+        var table = await context.Tables.FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
 
         if (request.Label is not null) table.Label = request.Label;
-        if (request.X.HasValue) table.X = request.X.Value;
-        if (request.Y.HasValue) table.Y = request.Y.Value;
+        if (request.Capacity.HasValue) table.Capacity = request.Capacity.Value;
+        if (request.Shape is not null && Enum.TryParse<TableShape>(request.Shape, true, out var s)) table.Shape = s;
+        if (request.Color is not null) table.Color = request.Color;
+        if (request.Section is not null) table.Section = request.Section;
+        if (request.PriceType is not null && Enum.TryParse<PriceType>(request.PriceType, true, out var pt)) table.PriceType = pt;
+        if (request.PriceCents.HasValue) table.PriceCents = request.PriceCents.Value;
+        if (request.IsActive.HasValue) table.IsActive = request.IsActive.Value;
+        if (request.GridRow.HasValue) table.GridRow = request.GridRow;
+        if (request.GridCol.HasValue) table.GridCol = request.GridCol;
+        if (request.PosX.HasValue) table.PosX = request.PosX;
+        if (request.PosY.HasValue) table.PosY = request.PosY;
+        if (request.Width.HasValue) table.Width = request.Width.Value;
+        if (request.Height.HasValue) table.Height = request.Height.Value;
         if (request.Rotation.HasValue) table.Rotation = request.Rotation.Value;
 
         table.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
-        return Ok(new { message = "Table updated" });
+        return Ok(MapTable(table));
     }
 
-    /// <summary>
-    /// Delete a table and its seats.
-    /// </summary>
-    [HttpDelete("tables/{tableId:guid}")]
-    public async Task<IActionResult> DeleteTable(Guid venueId, Guid tableId)
+    [HttpDelete("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
+    public async Task<IActionResult> DeleteTable(Guid eventId, Guid tableId)
     {
         var table = await context.Tables
             .Include(t => t.Seats)
-            .FirstOrDefaultAsync(t => t.Id == tableId && t.VenueId == venueId);
+            .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
 
         context.Seats.RemoveRange(table.Seats);
@@ -136,32 +189,22 @@ public class AdminLayoutController(EventPlatformDbContext context) : ControllerB
         return NoContent();
     }
 
-    /// <summary>
-    /// Get full layout for a venue (all tables + seats).
-    /// </summary>
-    [HttpGet]
-    public async Task<IActionResult> GetLayout(Guid venueId)
+    private async Task<EventLayoutResponse> GetLayoutInternal(Guid eventId)
     {
-        var venue = await context.Venues.FindAsync(venueId);
-        if (venue is null) return NotFound(new { message = "Venue not found" });
-
+        var ev = await context.Events.FindAsync(eventId);
         var tables = await context.Tables
             .Include(t => t.TableType)
-            .Include(t => t.Seats)
-            .Where(t => t.VenueId == venueId)
-            .OrderBy(t => t.Label)
+            .Where(t => t.EventId == eventId)
+            .OrderBy(t => t.SortOrder)
             .ToListAsync();
-
-        return Ok(new VenueLayoutDto(
-            venue.Id, venue.Name,
-            tables.Select(t => new TableDto(
-                t.Id, t.Label, t.X, t.Y, t.Rotation,
-                t.TableType.Name, t.TableType.Shape,
-                t.TableType.WidthPx, t.TableType.HeightPx,
-                t.Seats.OrderBy(s => s.SeatNumber).Select(s =>
-                    new SeatDto(s.Id, s.Label, s.SeatNumber, t.Id, t.Label, false, null)
-                ).ToList()
-            )).ToList()
-        ));
+        return new EventLayoutResponse(
+            eventId, ev?.EditorMode?.ToString(), ev?.GridRows, ev?.GridCols,
+            tables.Select(MapTable).ToList());
     }
+
+    private static LayoutTableResponse MapTable(Table t) => new(
+        t.Id, t.Label, t.Capacity, t.Shape.ToString(), t.Color, t.Section,
+        t.PriceType.ToString(), t.PriceCents, t.PriceOverrideCents, t.IsActive,
+        t.GridRow, t.GridCol, t.PosX, t.PosY, t.Width, t.Height, t.Rotation,
+        t.SortOrder, t.TableTypeId, t.TableType?.Name);
 }

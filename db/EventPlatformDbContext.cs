@@ -154,6 +154,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.ImagePath).HasMaxLength(512);
             entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.EditorMode).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId);
             entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId);
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, e.Description })
@@ -174,16 +175,23 @@ public class EventPlatformDbContext(
             entity.ToTable("table_types");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.Shape).HasMaxLength(20);
-            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId);
+            entity.Property(e => e.DefaultShape).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.DefaultColor).HasMaxLength(20);
+            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId).IsRequired(false);
         });
 
         modelBuilder.Entity<Table>(entity =>
         {
             entity.ToTable("tables");
             entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.EventId);
             entity.Property(e => e.Label).HasMaxLength(20);
-            entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId);
+            entity.Property(e => e.Shape).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Color).HasMaxLength(20);
+            entity.Property(e => e.Section).HasMaxLength(64);
+            entity.Property(e => e.PriceType).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId).IsRequired(false);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId).IsRequired(false);
             entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId);
         });
 

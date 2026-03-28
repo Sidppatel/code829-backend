@@ -22,6 +22,7 @@ public static class DataSeeder
 
         await SeedUsersAsync(context, encryption);
         await SeedSettingsAsync(settingsService);
+        await SeedTableTypesAsync(context);
     }
 
     private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption)
@@ -96,5 +97,23 @@ public static class DataSeeder
         }
 
         Log.Information("[Seed] App settings initialized");
+    }
+
+    private static async Task SeedTableTypesAsync(EventPlatformDbContext context)
+    {
+        if (await context.TableTypes.AnyAsync(tt => tt.VenueId == null))
+            return;
+
+        var types = new[]
+        {
+            new TableType { Id = Guid.NewGuid(), Name = "Standard Round (4)", DefaultCapacity = 4, DefaultShape = Contracts.Enums.TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 0, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "VIP Rectangle (6)", DefaultCapacity = 6, DefaultShape = Contracts.Enums.TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 0, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = Contracts.Enums.TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 0, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "Lounge Section (8)", DefaultCapacity = 8, DefaultShape = Contracts.Enums.TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 0, IsActive = true },
+        };
+
+        context.TableTypes.AddRange(types);
+        await context.SaveChangesAsync();
+        Log.Information("[Seed] Created {Count} default table types", types.Length);
     }
 }
