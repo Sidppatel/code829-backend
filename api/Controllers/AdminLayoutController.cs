@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Api.Middleware;
 using Contracts.DTOs.Layout;
 using Contracts.Enums;
@@ -6,17 +7,19 @@ using Db.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 namespace Api.Controllers;
 
 /// <summary>
 /// Event-scoped layout editor endpoints for grid and canvas modes.
-/// Also serves global table type templates.
+/// Layout drafts are cached in Redis for instant saves; DB writes happen
+/// on explicit save or page navigation (via the flush endpoint).
 /// </summary>
 [ApiController]
 [Authorize]
 [RequireRole(UserRole.Admin)]
-public class AdminLayoutController(EventPlatformDbContext context) : ControllerBase
+public class AdminLayoutController(EventPlatformDbContext context, IConnectionMultiplexer redis) : ControllerBase
 {
     [HttpGet("admin/table-types")]
     public async Task<IActionResult> GetTableTypes()
@@ -86,6 +89,110 @@ public class AdminLayoutController(EventPlatformDbContext context) : ControllerB
         tt.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return NoContent();
+    }
+
+    // ─── Redis Draft Endpoints ──────────────────────────────────────────
+
+    private static string DraftKey(Guid eventId) => $"layout:draft:{eventId}";
+    private static readonly TimeSpan DraftTtl = TimeSpan.FromHours(24);
+    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>
+    /// Save layout draft to Redis (instant, no DB write).
+    /// Called on every change in the editor.
+    /// </summary>
+    [HttpPost("admin/events/{eventId:guid}/layout/draft")]
+    public async Task<IActionResult> SaveDraft(Guid eventId, [FromBody] SaveLayoutRequest request)
+    {
+        var db = redis.GetDatabase();
+        var json = JsonSerializer.Serialize(request, JsonOpts);
+        await db.StringSetAsync(DraftKey(eventId), json, DraftTtl);
+        return Ok(new { message = "Draft saved" });
+    }
+
+    /// <summary>
+    /// Load layout draft from Redis. Falls back to DB if no draft exists.
+    /// </summary>
+    [HttpGet("admin/events/{eventId:guid}/layout/draft")]
+    public async Task<IActionResult> LoadDraft(Guid eventId)
+    {
+        var db = redis.GetDatabase();
+        var cached = await db.StringGetAsync(DraftKey(eventId));
+        if (cached.HasValue)
+        {
+            var draft = JsonSerializer.Deserialize<SaveLayoutRequest>(cached.ToString(), JsonOpts);
+            return Ok(new { source = "redis", data = draft });
+        }
+        // Fall back to DB
+        return Ok(new { source = "db", data = (SaveLayoutRequest?)null });
+    }
+
+    /// <summary>
+    /// Flush: write Redis draft to DB, then clear the draft.
+    /// Called when user navigates away from the editor.
+    /// </summary>
+    [HttpPost("admin/events/{eventId:guid}/layout/flush")]
+    public async Task<IActionResult> FlushDraft(Guid eventId)
+    {
+        var db = redis.GetDatabase();
+        var cached = await db.StringGetAsync(DraftKey(eventId));
+        if (!cached.HasValue)
+            return Ok(new { message = "No draft to flush" });
+
+        var request = JsonSerializer.Deserialize<SaveLayoutRequest>(cached.ToString(), JsonOpts);
+        if (request is null)
+            return Ok(new { message = "Invalid draft" });
+
+        // Write to DB using existing SaveLayout logic
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        if (request.EditorMode is not null && Enum.TryParse<EditorMode>(request.EditorMode, true, out var mode))
+            ev.EditorMode = mode;
+        ev.GridRows = request.GridRows;
+        ev.GridCols = request.GridCols;
+
+        var existing = await context.Tables.Where(t => t.EventId == eventId).ToListAsync();
+        var requestIds = request.Tables.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToHashSet();
+        context.Tables.RemoveRange(existing.Where(t => !requestIds.Contains(t.Id)));
+
+        foreach (var rt in request.Tables)
+        {
+            Enum.TryParse<TableShape>(rt.Shape, true, out var shape);
+            Enum.TryParse<PriceType>(rt.PriceType, true, out var priceType);
+
+            if (rt.Id.HasValue && existing.FirstOrDefault(e => e.Id == rt.Id.Value) is { } ex)
+            {
+                ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
+                ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
+                ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
+                ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
+                ex.PosX = rt.PosX; ex.PosY = rt.PosY; ex.Width = rt.Width;
+                ex.Height = rt.Height; ex.Rotation = rt.Rotation; ex.SortOrder = rt.SortOrder;
+                ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                context.Tables.Add(new Table
+                {
+                    Id = rt.Id ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
+                    Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
+                    PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
+                    IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
+                    PosX = rt.PosX, PosY = rt.PosY, Width = rt.Width, Height = rt.Height,
+                    Rotation = rt.Rotation, SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
+                    EventId = eventId, VenueId = ev.VenueId
+                });
+            }
+        }
+
+        ev.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        // Clear the Redis draft
+        await db.KeyDeleteAsync(DraftKey(eventId));
+
+        return Ok(new { message = "Flushed to DB" });
     }
 
     [HttpGet("admin/events/{eventId:guid}/layout")]
