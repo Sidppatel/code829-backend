@@ -153,6 +153,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.ImagePath).HasMaxLength(512);
+            entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId);
             entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId);
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, e.Description })

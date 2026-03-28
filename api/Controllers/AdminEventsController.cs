@@ -81,6 +81,10 @@ public class AdminEventsController(
             slug = $"{baseSlug}-{counter++}";
         }
 
+        var layoutMode = Contracts.Enums.LayoutMode.None;
+        if (request.LayoutMode is not null)
+            Enum.TryParse(request.LayoutMode, true, out layoutMode);
+
         var ev = new Event
         {
             Id = Guid.NewGuid(),
@@ -92,6 +96,10 @@ public class AdminEventsController(
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             IsFeatured = request.IsFeatured,
+            LayoutMode = layoutMode,
+            MaxCapacity = request.MaxCapacity,
+            PlatformFeePercent = request.PlatformFeePercent,
+            ImagePath = request.BannerImageUrl,
             VenueId = request.VenueId,
             OrganizerId = organizerId
         };
@@ -144,6 +152,11 @@ public class AdminEventsController(
         if (request.EndDate.HasValue) ev.EndDate = request.EndDate.Value;
         if (request.VenueId.HasValue) ev.VenueId = request.VenueId.Value;
         if (request.IsFeatured.HasValue) ev.IsFeatured = request.IsFeatured.Value;
+        if (request.LayoutMode is not null && Enum.TryParse<Contracts.Enums.LayoutMode>(request.LayoutMode, true, out var lm))
+            ev.LayoutMode = lm;
+        if (request.MaxCapacity.HasValue) ev.MaxCapacity = request.MaxCapacity.Value;
+        if (request.PlatformFeePercent.HasValue) ev.PlatformFeePercent = request.PlatformFeePercent.Value;
+        if (request.BannerImageUrl is not null) ev.ImagePath = request.BannerImageUrl;
 
         // Status transitions: Draft→Published, Published→Completed/Cancelled, Draft→Cancelled
         if (request.Status is not null && Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
@@ -151,6 +164,7 @@ public class AdminEventsController(
             if (!IsValidTransition(ev.Status, newStatus))
                 return BadRequest(new { message = $"Cannot transition from {ev.Status} to {newStatus}" });
             ev.Status = newStatus;
+            if (newStatus == EventStatus.Published) ev.PublishedAt = DateTime.UtcNow;
         }
 
         ev.UpdatedAt = DateTime.UtcNow;
@@ -172,12 +186,72 @@ public class AdminEventsController(
         return Ok(new { imageUrl = fileStorage.GetPublicUrl(path) });
     }
 
+    /// <summary>
+    /// Change event status with validation gates.
+    /// </summary>
+    [HttpPut("{id:guid}/status")]
+    public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeEventStatusRequest request)
+    {
+        var ev = await context.Events
+            .Include(e => e.Venue).Include(e => e.TicketTypes)
+            .FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        if (!Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
+            return BadRequest(new { message = "Invalid status" });
+
+        if (!IsValidTransition(ev.Status, newStatus))
+            return BadRequest(new { message = $"Cannot transition from {ev.Status} to {newStatus}" });
+
+        // Validation gates
+        if (newStatus == EventStatus.Published)
+        {
+            if (string.IsNullOrWhiteSpace(ev.Title))
+                return BadRequest(new { message = "Title is required to publish" });
+            if (ev.StartDate == default || ev.EndDate == default)
+                return BadRequest(new { message = "Dates are required to publish" });
+        }
+
+        if (newStatus == EventStatus.Completed && ev.EndDate > DateTime.UtcNow)
+            return BadRequest(new { message = "Cannot complete an event before its end date" });
+
+        ev.Status = newStatus;
+        if (newStatus == EventStatus.Published) ev.PublishedAt = DateTime.UtcNow;
+        ev.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return Ok(MapToDto(ev));
+    }
+
+    /// <summary>
+    /// Soft delete — only if Draft and no bookings.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var ev = await context.Events.FindAsync(id);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        if (ev.Status != EventStatus.Draft)
+            return BadRequest(new { message = "Only draft events can be deleted" });
+
+        var hasBookings = await context.Bookings.AnyAsync(b => b.EventId == id);
+        if (hasBookings)
+            return BadRequest(new { message = "Cannot delete an event with bookings" });
+
+        context.Events.Remove(ev);
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
+
     private EventDto MapToDto(Event e) => new(
         e.Id, e.Title, e.Slug, e.Description,
         e.Status.ToString(), e.Category.ToString(),
         e.StartDate, e.EndDate,
         e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
-        e.IsFeatured, e.VenueId,
+        e.IsFeatured,
+        e.LayoutMode.ToString(), e.MaxCapacity, e.PlatformFeePercent, e.PublishedAt,
+        e.VenueId,
         e.Venue is not null ? new VenueDto(
             e.Venue.Id, e.Venue.Name, e.Venue.Address, e.Venue.City, e.Venue.State,
             e.Venue.ZipCode, e.Venue.Capacity, e.Venue.Description,

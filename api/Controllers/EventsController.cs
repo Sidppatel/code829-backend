@@ -272,7 +272,9 @@ public class EventsController(
             ev.Status.ToString(), ev.Category.ToString(),
             ev.StartDate, ev.EndDate,
             ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
-            ev.IsFeatured, ev.VenueId,
+            ev.IsFeatured,
+            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
+            ev.VenueId,
             new VenueDto(
                 ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
                 ev.Venue.ZipCode, ev.Venue.Capacity, ev.Venue.Description,
@@ -308,7 +310,9 @@ public class EventsController(
             ev.Status.ToString(), ev.Category.ToString(),
             ev.StartDate, ev.EndDate,
             ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
-            ev.IsFeatured, ev.VenueId,
+            ev.IsFeatured,
+            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
+            ev.VenueId,
             new VenueDto(
                 ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
                 ev.Venue.ZipCode, ev.Venue.Capacity, ev.Venue.Description,

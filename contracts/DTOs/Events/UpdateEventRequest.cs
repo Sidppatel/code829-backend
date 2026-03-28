@@ -8,5 +8,9 @@ public record UpdateEventRequest(
     DateTime? EndDate = null,
     Guid? VenueId = null,
     bool? IsFeatured = null,
-    string? Status = null
+    string? Status = null,
+    string? LayoutMode = null,
+    int? MaxCapacity = null,
+    int? PlatformFeePercent = null,
+    string? BannerImageUrl = null
 );

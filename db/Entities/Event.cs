@@ -14,6 +14,10 @@ public class Event : BaseEntity
     public DateTime EndDate { get; set; }
     public string? ImagePath { get; set; }
     public bool IsFeatured { get; set; }
+    public LayoutMode LayoutMode { get; set; } = LayoutMode.None;
+    public int? MaxCapacity { get; set; }
+    public int? PlatformFeePercent { get; set; }
+    public DateTime? PublishedAt { get; set; }
 
     /// <summary>
     /// PostgreSQL tsvector column for full-text search.
