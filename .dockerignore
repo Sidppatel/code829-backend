@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.env
+**/.env.*
+!**/.env.example
+.git/
+.vs/
+.vscode/
+.idea/
+docker-data/
+uploads/
+*.user
+*.suo

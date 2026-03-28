@@ -95,7 +95,12 @@ try
         builder.Services.AddScoped<IPaymentService, MockPaymentService>();
         builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
     }
-    // Production implementations would be registered here in else block
+    else
+    {
+        builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+        builder.Services.AddScoped<IPaymentService, StripePaymentService>();
+        builder.Services.AddScoped<IFileStorageService, S3FileStorageService>();
+    }
 
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
@@ -138,37 +143,54 @@ try
         await db.Database.MigrateAsync();
     }
 
-    // Seed data
-    await DataSeeder.SeedAsync(app.Services);
-    await VenueEventSeeder.SeedAsync(app.Services);
-    await BookingSeeder.SeedAsync(app.Services);
+    // Seed data (development only)
+    if (app.Environment.IsDevelopment())
+    {
+        await DataSeeder.SeedAsync(app.Services);
+        await VenueEventSeeder.SeedAsync(app.Services);
+        await BookingSeeder.SeedAsync(app.Services);
+    }
+    else
+    {
+        // Production: only seed essential settings (jwt_secret etc.) if missing
+        await DataSeeder.SeedAsync(app.Services);
+    }
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);
 
     // Middleware pipeline
+    app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();
 
-    // CORS
+    // HTTPS redirect in production
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
+
+    // CORS — load allowed origins from DB settings
     app.UseCors(policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        using var scope = app.Services.CreateScope();
+        var settingsSvc = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+        var originsStr = settingsSvc.GetOrDefaultAsync("cors_origins", "http://localhost:5173").Result ?? "http://localhost:5173";
+        var origins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        policy.WithOrigins(origins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 
     // Static files for uploads
-    if (app.Environment.IsDevelopment())
+    var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+    Directory.CreateDirectory(uploadsPath);
+    app.UseStaticFiles(new StaticFileOptions
     {
-        var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
-        Directory.CreateDirectory(uploadsPath);
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
-            RequestPath = "/uploads"
-        });
-    }
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
+        RequestPath = "/uploads"
+    });
 
     app.UseAuthentication();
     app.UseAuthorization();
@@ -176,11 +198,16 @@ try
 
     app.MapControllers();
 
-    // OpenAPI + Scalar (dev only)
+    // OpenAPI + Scalar: always available but auth-protected in production
+    app.MapOpenApi();
     if (app.Environment.IsDevelopment())
     {
-        app.MapOpenApi();
         app.MapScalarApiReference();
+    }
+    else
+    {
+        // In production, Scalar requires authentication
+        app.MapScalarApiReference().RequireAuthorization();
     }
 
     Log.Information("Event Platform API starting on port {Port}", port);
@@ -203,7 +230,7 @@ static string ConvertPostgresUrl(string url)
 {
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};Trust Server Certificate=true";
+    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};Trust Server Certificate=true;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
 }
 
 /// <summary>
