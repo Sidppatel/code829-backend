@@ -1,0 +1,100 @@
+using Api.Services;
+using Contracts.Enums;
+using Db;
+using Db.Entities;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+
+namespace Api.Seeding;
+
+/// <summary>
+/// Seeds initial users and app settings on first run.
+/// Only seeds if the users table is empty to avoid duplicates.
+/// </summary>
+public static class DataSeeder
+{
+    public static async Task SeedAsync(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+
+        await SeedUsersAsync(context, encryption);
+        await SeedSettingsAsync(settingsService);
+    }
+
+    private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption)
+    {
+        if (await context.Users.AnyAsync())
+            return;
+
+        var users = new (string Email, string Name, UserRole Role)[]
+        {
+            ("developer@code829.local", "Dev Admin", UserRole.Developer),
+            ("admin@code829.local", "Sarah Mitchell", UserRole.Admin),
+            ("staff@code829.local", "Marcus Johnson", UserRole.Staff),
+            ("user@code829.local", "Jamie Rivera", UserRole.User),
+            ("user2@code829.local", "Taylor Brooks", UserRole.User),
+            ("user3@code829.local", "Alex Chen", UserRole.User),
+            ("organizer@code829.local", "Gulf Events Co.", UserRole.Admin),
+        };
+
+        foreach (var (email, name, role) in users)
+        {
+            context.Users.Add(new User
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                EmailHash = encryption.HashEmail(email),
+                Name = name,
+                Role = role,
+                IsActive = true
+            });
+        }
+
+        await context.SaveChangesAsync();
+        Log.Information("[Seed] Created {Count} users", users.Length);
+    }
+
+    private static async Task SeedSettingsAsync(ISettingsService settings)
+    {
+        var defaults = new Dictionary<string, (string Value, string Description)>
+        {
+            ["jwt_secret"] = (Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"), "JWT signing secret"),
+            ["magic_link_expiry_minutes"] = ("15", "Magic link token lifetime in minutes"),
+            ["hold_expiry_minutes"] = ("10", "Seat hold duration in minutes"),
+            ["stripe_secret_key"] = ("MOCK_DEV", "Stripe secret key (mocked in dev)"),
+            ["email_api_key"] = ("MOCK_DEV", "Email API key (mocked in dev)"),
+            ["email_from_address"] = ("noreply@code829.local", "Sender email address"),
+            ["platform_fee_percent"] = ("8", "Platform fee percentage on ticket price"),
+            ["platform_fee_flat_cents"] = ("0", "Flat fee per booking in cents"),
+            ["frontend_url"] = ("http://localhost:5173", "Frontend URL for magic link emails"),
+            ["cors_origins"] = ("http://localhost:5173", "Comma-separated allowed CORS origins"),
+            ["brand_name"] = ("Code829", "White-label brand name"),
+            ["brand_tagline"] = ("Where Great Events Come to Life", "Brand tagline"),
+            ["brand_primary_color"] = ("#4f46e5", "Primary brand color"),
+            ["brand_accent_color"] = ("#f97316", "CTA/accent color"),
+            ["default_theme"] = ("system", "Default theme: light, dark, or system"),
+            ["default_city"] = ("Mobile", "Default event city"),
+            ["default_state"] = ("AL", "Default state"),
+            ["default_timezone"] = ("America/Chicago", "Default timezone"),
+            ["search_results_per_page"] = ("20", "Search pagination page size"),
+            ["max_tickets_per_booking"] = ("10", "Maximum tickets per booking"),
+            ["dev_log_retention_days"] = ("90", "Developer log retention in days"),
+            ["admin_log_retention_days"] = ("365", "Admin log retention in days"),
+            ["system_log_retention_days"] = ("30", "System log retention in days"),
+        };
+
+        foreach (var (key, (value, description)) in defaults)
+        {
+            var existing = await settings.GetOrDefaultAsync(key);
+            if (existing is null)
+            {
+                await settings.SetAsync(key, value, description);
+            }
+        }
+
+        Log.Information("[Seed] App settings initialized");
+    }
+}

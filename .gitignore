@@ -1,0 +1,38 @@
+# .NET Build
+**/bin/
+**/obj/
+*.user
+*.suo
+*.sln.docstates
+
+# Environment
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE
+.vs/
+.vscode/
+*.swp
+*.swo
+.idea/
+
+# Docker volumes
+docker-data/
+postgres-data/
+redis-data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# NuGet
+*.nupkg
+**/packages/
+
+# Uploads (dev local storage)
+uploads/
