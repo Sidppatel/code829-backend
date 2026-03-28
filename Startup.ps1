@@ -91,10 +91,8 @@ if (-not $SkipBackend) {
     $w = 0
     $ready = $false
     while ($w -lt 120) {
-        try {
-            $h = Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 2 -ErrorAction SilentlyContinue
-            if ($h.status -eq "healthy") { $ready = $true; break }
-        } catch {}
+        $result = & curl.exe -s -o NUL -w "%{http_code}" http://localhost:8000/health 2>$null
+        if ($result -eq "200") { $ready = $true; break }
         Start-Sleep -Seconds 3
         $w += 3
     }
