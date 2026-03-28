@@ -112,18 +112,22 @@ if (-not $SkipBackend) {
     Start-Process -FilePath "dotnet" -ArgumentList "run","--project","api" -NoNewWindow -PassThru | Out-Null
     Pop-Location
 
-    # Wait for health
-    $maxWait = 30
+    # Wait for health (first run applies migrations + seeds data, can take 30-45s)
+    $maxWait = 60
     $waited = 0
     while ($waited -lt $maxWait) {
         try {
             $health = Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 2 -ErrorAction SilentlyContinue
             if ($health.status -eq "healthy") { break }
         } catch { }
-        Start-Sleep -Seconds 2
-        $waited += 2
+        Start-Sleep -Seconds 3
+        $waited += 3
     }
-    Write-Host "  API: http://localhost:8000 (healthy)" -ForegroundColor Green
+    if ($waited -ge $maxWait) {
+        Write-Host "  WARNING: API did not respond within ${maxWait}s — check logs" -ForegroundColor Yellow
+    } else {
+        Write-Host "  API: http://localhost:8000 (healthy)" -ForegroundColor Green
+    }
     Write-Host "  Scalar: http://localhost:8000/scalar" -ForegroundColor Green
 }
 
