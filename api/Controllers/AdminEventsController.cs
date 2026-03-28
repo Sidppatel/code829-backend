@@ -20,7 +20,8 @@ namespace Api.Controllers;
 [RequireRole(UserRole.Admin)]
 public class AdminEventsController(
     EventPlatformDbContext context,
-    IFileStorageService fileStorage
+    IFileStorageService fileStorage,
+    IAdminLogService adminLog
 ) : ControllerBase
 {
     [HttpGet]
@@ -130,6 +131,7 @@ public class AdminEventsController(
             .Include(e => e.Venue).Include(e => e.TicketTypes)
             .FirstAsync(e => e.Id == ev.Id);
 
+        await adminLog.LogAsync("event.created", "Event", ev.Id, $"Event '{ev.Title}' created");
         return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created));
     }
 
@@ -220,6 +222,8 @@ public class AdminEventsController(
         ev.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
+        await adminLog.LogAsync($"event.{newStatus.ToString().ToLower()}", "Event", ev.Id,
+            $"Event '{ev.Title}' status changed to {newStatus}");
         return Ok(MapToDto(ev));
     }
 
@@ -318,6 +322,9 @@ public class AdminEventsController(
         }
 
         await context.SaveChangesAsync();
+
+        await adminLog.LogAsync("event.duplicated", "Event", copy.Id,
+            $"Event '{copy.Title}' duplicated from '{original.Title}'");
 
         var created = await context.Events
             .Include(e => e.Venue).Include(e => e.TicketTypes)

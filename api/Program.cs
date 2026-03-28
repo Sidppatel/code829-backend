@@ -86,6 +86,7 @@ try
     builder.Services.AddScoped<ISeatService, SeatService>();
     builder.Services.AddScoped<IPricingEngine, PricingEngine>();
     builder.Services.AddScoped<IBookingService, BookingService>();
+    builder.Services.AddScoped<IAdminLogService, AdminLogService>();
 
     // Conditional service registration: mock in dev, real in prod
     if (builder.Environment.IsDevelopment())
@@ -148,6 +149,7 @@ try
     {
         await DataSeeder.SeedAsync(app.Services);
         await VenueEventSeeder.SeedAsync(app.Services);
+        await LayoutPricingSeeder.SeedAsync(app.Services);
         await BookingSeeder.SeedAsync(app.Services);
     }
     else
