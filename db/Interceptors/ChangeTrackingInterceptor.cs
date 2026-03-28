@@ -13,6 +13,11 @@ namespace Db.Interceptors;
 /// </summary>
 public class ChangeTrackingInterceptor : SaveChangesInterceptor
 {
+    /// <summary>
+    /// Set to true during seeding to skip audit logging (prevents exponential slowdown).
+    /// </summary>
+    public static bool IsSuspended { get; set; }
+
     private static readonly HashSet<Type> ExcludedTypes =
     [
         typeof(DeveloperLog),
@@ -32,7 +37,7 @@ public class ChangeTrackingInterceptor : SaveChangesInterceptor
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        if (eventData.Context is null)
+        if (eventData.Context is null || IsSuspended)
             return await base.SavingChangesAsync(eventData, result, cancellationToken);
 
         var entries = eventData.Context.ChangeTracker.Entries()

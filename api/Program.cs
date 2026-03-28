@@ -144,13 +144,15 @@ try
         await db.Database.MigrateAsync();
     }
 
-    // Seed data (development only)
+    // Seed data (development only) — suspend change tracking to avoid exponential slowdown
     if (app.Environment.IsDevelopment())
     {
+        ChangeTrackingInterceptor.IsSuspended = true;
         await DataSeeder.SeedAsync(app.Services);
         await VenueEventSeeder.SeedAsync(app.Services);
         await LayoutPricingSeeder.SeedAsync(app.Services);
         await BookingSeeder.SeedAsync(app.Services);
+        ChangeTrackingInterceptor.IsSuspended = false;
     }
     else
     {
