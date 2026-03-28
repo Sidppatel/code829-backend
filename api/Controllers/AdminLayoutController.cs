@@ -54,6 +54,40 @@ public class AdminLayoutController(EventPlatformDbContext context) : ControllerB
             tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive));
     }
 
+    [HttpPut("admin/table-types/{id:guid}")]
+    public async Task<IActionResult> UpdateTableType(Guid id, [FromBody] CreateTableTypeRequest request)
+    {
+        var tt = await context.TableTypes.FindAsync(id);
+        if (tt is null) return NotFound(new { message = "Table type not found" });
+
+        if (!Enum.TryParse<TableShape>(request.DefaultShape, true, out var shape))
+            return BadRequest(new { message = "Invalid shape" });
+
+        tt.Name = request.Name;
+        tt.DefaultCapacity = request.DefaultCapacity;
+        tt.DefaultShape = shape;
+        tt.DefaultColor = request.DefaultColor;
+        tt.DefaultPriceCents = request.DefaultPriceCents;
+        tt.UpdatedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        return Ok(new TableTypeResponse(
+            tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
+            tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive));
+    }
+
+    [HttpDelete("admin/table-types/{id:guid}")]
+    public async Task<IActionResult> DeleteTableType(Guid id)
+    {
+        var tt = await context.TableTypes.FindAsync(id);
+        if (tt is null) return NotFound(new { message = "Table type not found" });
+
+        tt.IsActive = false;
+        tt.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("admin/events/{eventId:guid}/layout")]
     public async Task<IActionResult> GetLayout(Guid eventId)
     {
