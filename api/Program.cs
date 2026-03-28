@@ -84,6 +84,7 @@ try
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<ISeatService, SeatService>();
 
     // Conditional service registration: mock in dev, real in prod
     if (builder.Environment.IsDevelopment())
@@ -96,6 +97,7 @@ try
 
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
+    builder.Services.AddHostedService<HoldCleanupWorker>();
 
     // JWT Authentication — uses a temporary key at startup, replaced by DB-stored secret after seeding
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

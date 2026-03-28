@@ -19,6 +19,10 @@ public class EventPlatformDbContext(
     public DbSet<Venue> Venues => Set<Venue>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<TicketType> TicketTypes => Set<TicketType>();
+    public DbSet<TableType> TableTypes => Set<TableType>();
+    public DbSet<Table> Tables => Set<Table>();
+    public DbSet<Seat> Seats => Set<Seat>();
+    public DbSet<SeatHold> SeatHolds => Set<SeatHold>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -156,6 +160,44 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.Description).HasMaxLength(512);
             entity.HasOne(e => e.Event).WithMany(ev => ev.TicketTypes).HasForeignKey(e => e.EventId);
+        });
+
+        modelBuilder.Entity<TableType>(entity =>
+        {
+            entity.ToTable("table_types");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.Shape).HasMaxLength(20);
+            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId);
+        });
+
+        modelBuilder.Entity<Table>(entity =>
+        {
+            entity.ToTable("tables");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Label).HasMaxLength(20);
+            entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId);
+            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId);
+        });
+
+        modelBuilder.Entity<Seat>(entity =>
+        {
+            entity.ToTable("seats");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Label).HasMaxLength(20);
+            entity.HasOne(e => e.Table).WithMany(t => t.Seats).HasForeignKey(e => e.TableId);
+        });
+
+        modelBuilder.Entity<SeatHold>(entity =>
+        {
+            entity.ToTable("seat_holds");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.SeatId, e.EventId, e.IsActive });
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.HasOne(e => e.Seat).WithMany(s => s.Holds).HasForeignKey(e => e.SeatId);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
+            entity.HasOne(e => e.TicketType).WithMany().HasForeignKey(e => e.TicketTypeId);
         });
     }
 }
