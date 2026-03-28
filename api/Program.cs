@@ -83,6 +83,7 @@ try
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
+    builder.Services.AddScoped<IAuthService, AuthService>();
 
     // Conditional service registration: mock in dev, real in prod
     if (builder.Environment.IsDevelopment())

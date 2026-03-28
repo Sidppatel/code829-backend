@@ -15,6 +15,7 @@ public class EventPlatformDbContext(
     public DbSet<AdminLog> AdminLogs => Set<AdminLog>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
+    public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -97,6 +98,17 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Recipient).HasMaxLength(256);
             entity.Property(e => e.Subject).HasMaxLength(512);
             entity.Property(e => e.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<MagicLinkToken>(entity =>
+        {
+            entity.ToTable("magic_link_tokens");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.Property(e => e.Email).HasMaxLength(256);
         });
     }
 }
