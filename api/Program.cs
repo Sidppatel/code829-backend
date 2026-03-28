@@ -21,10 +21,9 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    // Load .env file in development
-    if (builder.Environment.IsDevelopment())
+    // Load .env file — always attempt to load so env vars like ASPNETCORE_ENVIRONMENT are available
+    // even when launched via Start-Process which doesn't inherit parent shell env vars
     {
-        // Try multiple possible .env locations: parent of content root (backend/) and current dir
         var envCandidates = new[]
         {
             Path.Combine(builder.Environment.ContentRootPath, "..", ".env"),
@@ -230,8 +229,8 @@ static string ConvertPostgresUrl(string url)
 {
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
-    // SSL Mode=Disable: postgres:16-alpine doesn't have SSL configured; scram-sha-256 auth handles security
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Disable;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+    // Disable SSL for local Docker PostgreSQL (alpine image has no SSL configured)
+    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode=Disable;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
 }
 
 /// <summary>
