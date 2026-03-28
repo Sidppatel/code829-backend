@@ -85,6 +85,8 @@ try
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ISeatService, SeatService>();
+    builder.Services.AddScoped<IPricingEngine, PricingEngine>();
+    builder.Services.AddScoped<IBookingService, BookingService>();
 
     // Conditional service registration: mock in dev, real in prod
     if (builder.Environment.IsDevelopment())
@@ -139,6 +141,7 @@ try
     // Seed data
     await DataSeeder.SeedAsync(app.Services);
     await VenueEventSeeder.SeedAsync(app.Services);
+    await BookingSeeder.SeedAsync(app.Services);
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);

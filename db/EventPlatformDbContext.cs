@@ -23,6 +23,10 @@ public class EventPlatformDbContext(
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Seat> Seats => Set<Seat>();
     public DbSet<SeatHold> SeatHolds => Set<SeatHold>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingItem> BookingItems => Set<BookingItem>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PricingRule> PricingRules => Set<PricingRule>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -198,6 +202,51 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
             entity.HasOne(e => e.TicketType).WithMany().HasForeignKey(e => e.TicketTypeId);
+        });
+
+        modelBuilder.Entity<Booking>(entity =>
+        {
+            entity.ToTable("bookings");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.BookingNumber).IsUnique();
+            entity.HasIndex(e => e.QrToken).IsUnique().HasFilter("\"QrToken\" IS NOT NULL");
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.BookingNumber).HasMaxLength(20);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.QrToken).HasMaxLength(128);
+            entity.Property(e => e.Notes).HasMaxLength(1024);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
+        });
+
+        modelBuilder.Entity<BookingItem>(entity =>
+        {
+            entity.ToTable("booking_items");
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Booking).WithMany(b => b.Items).HasForeignKey(e => e.BookingId);
+            entity.HasOne(e => e.TicketType).WithMany().HasForeignKey(e => e.TicketTypeId);
+            entity.HasOne(e => e.Seat).WithMany().HasForeignKey(e => e.SeatId);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.ToTable("payments");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.PaymentIntentId).IsUnique();
+            entity.Property(e => e.PaymentIntentId).HasMaxLength(128);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.Property(e => e.RefundId).HasMaxLength(128);
+            entity.HasOne(e => e.Booking).WithOne(b => b.Payment).HasForeignKey<Payment>(e => e.BookingId);
+        });
+
+        modelBuilder.Entity<PricingRule>(entity =>
+        {
+            entity.ToTable("pricing_rules");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(512);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
         });
     }
 }
