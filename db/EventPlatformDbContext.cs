@@ -155,6 +155,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.ImagePath).HasMaxLength(512);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId);
             entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId);
+            entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, e.Description })
+                  .HasIndex(e => e.SearchVector).HasMethod("GIN");
         });
 
         modelBuilder.Entity<TicketType>(entity =>

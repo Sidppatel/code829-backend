@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Api.Services;
 using Contracts.DTOs;
 using Contracts.DTOs.Events;
@@ -6,6 +7,8 @@ using Contracts.Enums;
 using Db;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NpgsqlTypes;
+using StackExchange.Redis;
 
 namespace Api.Controllers;
 
@@ -14,12 +17,15 @@ namespace Api.Controllers;
 public class EventsController(
     EventPlatformDbContext context,
     IFileStorageService fileStorage,
-    ISettingsService settings
+    ISettingsService settings,
+    IConnectionMultiplexer redis
 ) : ControllerBase
 {
+    private static readonly TimeSpan ListCacheTtl = TimeSpan.FromSeconds(30);
+
     /// <summary>
-    /// Public event listing with search, filter by category/status/city, and pagination.
-    /// Only returns Published events by default.
+    /// Public event listing with full-text search (tsvector + trigram fallback for typo tolerance),
+    /// faceted filters (category, city, date, price range, venue), and Redis caching.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetEvents(
@@ -27,6 +33,9 @@ public class EventsController(
         [FromQuery] string? category = null,
         [FromQuery] string? city = null,
         [FromQuery] string? dateFilter = null,
+        [FromQuery] int? minPrice = null,
+        [FromQuery] int? maxPrice = null,
+        [FromQuery] Guid? venueId = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
@@ -34,33 +43,59 @@ public class EventsController(
         var maxPageSize = int.Parse(await settings.GetOrDefaultAsync("search_results_per_page", "20") ?? "20");
         if (pageSize < 1 || pageSize > maxPageSize) pageSize = maxPageSize;
 
+        // Redis cache for non-search requests (browsing)
+        var cacheKey = $"events:list:{search}:{category}:{city}:{dateFilter}:{minPrice}:{maxPrice}:{venueId}:{page}:{pageSize}";
+        var db = redis.GetDatabase();
+        var cached = await db.StringGetAsync(cacheKey);
+        if (cached.HasValue)
+        {
+            return Content(cached.ToString(), "application/json");
+        }
+
         var query = context.Events
             .Include(e => e.Venue)
             .Include(e => e.TicketTypes)
             .Where(e => e.Status == EventStatus.Published)
             .AsQueryable();
 
-        // Text search on title and description
+        // Full-text search: tsvector match + trigram similarity for typo tolerance
+        // Uses separate conditions to avoid client evaluation issues
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var searchLower = search.ToLower();
-            query = query.Where(e =>
-                e.Title.ToLower().Contains(searchLower) ||
-                (e.Description != null && e.Description.ToLower().Contains(searchLower)) ||
-                e.Venue.Name.ToLower().Contains(searchLower));
+            // Get IDs matching via tsvector full-text search
+            var ftsIds = await context.Events
+                .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery("english", search)))
+                .Select(e => e.Id)
+                .ToListAsync();
+
+            // Get IDs matching via trigram similarity (typo tolerance)
+            var trigramIds = await context.Events
+                .Where(e => e.Status == EventStatus.Published)
+                .Where(e => EF.Functions.TrigramsSimilarity(e.Title, search) > 0.1)
+                .Select(e => e.Id)
+                .ToListAsync();
+
+            var matchIds = ftsIds.Union(trigramIds).Distinct().ToList();
+            query = query.Where(e => matchIds.Contains(e.Id));
         }
 
         // Category filter
         if (!string.IsNullOrWhiteSpace(category) && Enum.TryParse<EventCategory>(category, true, out var cat))
-        {
             query = query.Where(e => e.Category == cat);
-        }
 
         // City filter
         if (!string.IsNullOrWhiteSpace(city))
-        {
             query = query.Where(e => e.Venue.City.ToLower() == city.ToLower());
-        }
+
+        // Venue filter
+        if (venueId.HasValue)
+            query = query.Where(e => e.VenueId == venueId.Value);
+
+        // Price range filter (in cents, based on min ticket price)
+        if (minPrice.HasValue)
+            query = query.Where(e => e.TicketTypes.Any(t => t.PriceCents >= minPrice.Value));
+        if (maxPrice.HasValue)
+            query = query.Where(e => e.TicketTypes.Any(t => t.PriceCents <= maxPrice.Value));
 
         // Date filter
         var now = DateTime.UtcNow;
@@ -76,11 +111,12 @@ public class EventsController(
         }
         else
         {
-            // Default: show upcoming events (not past)
             query = query.Where(e => e.EndDate >= now);
         }
 
         var totalCount = await query.CountAsync();
+
+        // Order by date (relevance is already handled by the ID filtering above)
         var items = await query
             .OrderBy(e => e.StartDate)
             .Skip((page - 1) * pageSize)
@@ -98,12 +134,128 @@ public class EventsController(
             ))
             .ToListAsync();
 
-        return Ok(new PagedResponse<EventSummaryDto>(items, totalCount, page, pageSize));
+        var result = new PagedResponse<EventSummaryDto>(items, totalCount, page, pageSize);
+        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await db.StringSetAsync(cacheKey, json, ListCacheTtl);
+
+        return Ok(result);
     }
 
     /// <summary>
-    /// Get a single published event by ID with full details and Schema.org JSON-LD.
+    /// Get available filter facets (categories, cities, price range).
     /// </summary>
+    [HttpGet("facets")]
+    public async Task<IActionResult> GetFacets()
+    {
+        var now = DateTime.UtcNow;
+        var published = context.Events
+            .Include(e => e.Venue)
+            .Include(e => e.TicketTypes)
+            .Where(e => e.Status == EventStatus.Published && e.EndDate >= now);
+
+        var categories = await published
+            .Select(e => e.Category.ToString())
+            .Distinct().ToListAsync();
+
+        var cities = await published
+            .Select(e => e.Venue.City)
+            .Distinct().OrderBy(c => c).ToListAsync();
+
+        var venues = await published
+            .Select(e => new { e.VenueId, e.Venue.Name })
+            .Distinct().ToListAsync();
+
+        var priceRange = await published
+            .SelectMany(e => e.TicketTypes)
+            .GroupBy(_ => 1)
+            .Select(g => new { Min = g.Min(t => t.PriceCents), Max = g.Max(t => t.PriceCents) })
+            .FirstOrDefaultAsync();
+
+        return Ok(new
+        {
+            categories,
+            cities,
+            venues = venues.Select(v => new { v.VenueId, v.Name }),
+            priceRange = new { min = priceRange?.Min ?? 0, max = priceRange?.Max ?? 0 }
+        });
+    }
+
+    /// <summary>
+    /// ItemList schema.org for events listing page (for SEO).
+    /// </summary>
+    [HttpGet("schema-list")]
+    public async Task<IActionResult> GetItemListSchema()
+    {
+        var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var now = DateTime.UtcNow;
+
+        var events = await context.Events
+            .Where(e => e.Status == EventStatus.Published && e.EndDate >= now)
+            .OrderBy(e => e.StartDate)
+            .Take(50)
+            .Select(e => new { e.Title, e.Slug })
+            .ToListAsync();
+
+        var schema = new Dictionary<string, object?>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "ItemList",
+            ["name"] = "Upcoming Events",
+            ["url"] = $"{frontendUrl}/events",
+            ["numberOfItems"] = events.Count,
+            ["itemListElement"] = events.Select((e, i) => new Dictionary<string, object?>
+            {
+                ["@type"] = "ListItem",
+                ["position"] = i + 1,
+                ["url"] = $"{frontendUrl}/events/{e.Slug}",
+                ["name"] = e.Title
+            }).ToList()
+        };
+
+        return Ok(schema);
+    }
+
+    /// <summary>
+    /// SEO metadata for a single event — OG tags, Twitter Card, canonical URL, Schema.org.
+    /// </summary>
+    [HttpGet("{id:guid}/seo")]
+    public async Task<IActionResult> GetSeoMeta(Guid id)
+    {
+        var ev = await context.Events
+            .Include(e => e.Venue)
+            .Include(e => e.TicketTypes)
+            .FirstOrDefaultAsync(e => e.Id == id);
+
+        if (ev is null) return NotFound();
+
+        var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
+        var dateStr = ev.StartDate.ToString("MMM d, yyyy");
+        var description = ev.Description?.Length > 160 ? ev.Description[..157] + "..." : ev.Description ?? "";
+        var canonicalUrl = $"{frontendUrl}/events/{ev.Slug}";
+
+        return Ok(new
+        {
+            title = $"{ev.Title} — {dateStr} — {ev.Venue.City} | {brandName}",
+            description,
+            canonicalUrl,
+            og = new
+            {
+                type = "website",
+                title = ev.Title,
+                description,
+                url = canonicalUrl,
+                site_name = brandName
+            },
+            twitter = new
+            {
+                card = "summary_large_image",
+                title = ev.Title,
+                description
+            }
+        });
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -140,9 +292,6 @@ public class EventsController(
         return Ok(dto);
     }
 
-    /// <summary>
-    /// Get a single event by slug (for frontend SEO-friendly URLs).
-    /// </summary>
     [HttpGet("by-slug/{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
     {
@@ -154,7 +303,6 @@ public class EventsController(
 
         if (ev is null) return NotFound(new { message = "Event not found" });
 
-        // Reuse the same DTO mapping as GetById
         return Ok(new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
             ev.Status.ToString(), ev.Category.ToString(),
@@ -178,9 +326,6 @@ public class EventsController(
         ));
     }
 
-    /// <summary>
-    /// Schema.org JSON-LD for a single event (used by frontend for SEO).
-    /// </summary>
     [HttpGet("{id:guid}/schema")]
     public async Task<IActionResult> GetSchemaOrg(Guid id)
     {
@@ -194,7 +339,6 @@ public class EventsController(
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
 
-        // Use Dictionary to preserve @ prefix in JSON-LD property names
         var schema = new Dictionary<string, object?>
         {
             ["@context"] = "https://schema.org",

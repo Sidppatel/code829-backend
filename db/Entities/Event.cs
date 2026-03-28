@@ -1,3 +1,4 @@
+using NpgsqlTypes;
 using Contracts.Enums;
 
 namespace Db.Entities;
@@ -13,6 +14,12 @@ public class Event : BaseEntity
     public DateTime EndDate { get; set; }
     public string? ImagePath { get; set; }
     public bool IsFeatured { get; set; }
+
+    /// <summary>
+    /// PostgreSQL tsvector column for full-text search.
+    /// Auto-populated via a database trigger on title + description.
+    /// </summary>
+    public NpgsqlTsVector? SearchVector { get; set; }
 
     public Guid VenueId { get; set; }
     public Venue Venue { get; set; } = null!;
