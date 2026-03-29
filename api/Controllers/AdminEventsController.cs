@@ -349,9 +349,9 @@ public class AdminEventsController(
         e.OrganizerId,
         e.Organizer?.Name,
         e.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
-            t.Id, t.Name, t.Description, t.PriceCents,
+            t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
             t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
-            t.PlatformFeeCents
+            t.PlatformFeeCents ?? 0
         )).ToList(),
         e.CreatedAt
     );

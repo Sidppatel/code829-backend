@@ -10,8 +10,8 @@ namespace Db.Entities;
 public class Table : BaseEntity
 {
     public required string Label { get; set; }
-    public int Capacity { get; set; }
-    public TableShape Shape { get; set; } = TableShape.Round;
+    public int? Capacity { get; set; }
+    public TableShape? Shape { get; set; }
     public string? Color { get; set; }
     public string? Section { get; set; }
     public PriceType PriceType { get; set; } = PriceType.PerSeat;
@@ -34,6 +34,9 @@ public class Table : BaseEntity
 
     public Guid VenueId { get; set; }
     public Venue Venue { get; set; } = null!;
+
+    public Guid? VenueLayoutTableId { get; set; }
+    public VenueLayoutTable? VenueLayoutTable { get; set; }
 
     public ICollection<Seat> Seats { get; set; } = [];
 }

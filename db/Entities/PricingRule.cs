@@ -15,9 +15,9 @@ public class PricingRule : BaseEntity
     public Guid? TableTypeId { get; set; }
     public TableType? TableType { get; set; }
 
-    public required string Name { get; set; }
-    public PricingRuleType Type { get; set; } = PricingRuleType.Standard;
-    public int PriceCents { get; set; }
+    public string? Name { get; set; }
+    public PricingRuleType? Type { get; set; }
+    public int? PriceCents { get; set; }
 
     public DateTime? ValidFrom { get; set; }
     public DateTime? ValidUntil { get; set; }
@@ -27,8 +27,10 @@ public class PricingRule : BaseEntity
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
 
-    // Legacy fields for backward compat with existing PricingEngine
     public int? FeePercent { get; set; }
     public int? FeeFlatCents { get; set; }
     public string? Description { get; set; }
+
+    public Guid? TemplateId { get; set; }
+    public PricingRuleTemplate? Template { get; set; }
 }

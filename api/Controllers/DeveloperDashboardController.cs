@@ -110,24 +110,24 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
             var tables = await context.Tables
                 .Where(t => t.EventId == ev.Id && t.IsActive)
                 .ToListAsync();
-            totalCapacity = tables.Sum(t => t.Capacity);
+            totalCapacity = tables.Sum(t => t.Capacity ?? 0);
             soldCount = paid + checkedInCount;
         }
 
         // Potential revenue based on ticket types
-        var potentialRevenue = ev.TicketTypes.Sum(tt => (long)tt.PriceCents * tt.QuantityTotal);
+        var potentialRevenue = ev.TicketTypes.Sum(tt => (long)(tt.PriceCents ?? 0) * tt.QuantityTotal);
         if (potentialRevenue == 0 && ev.LayoutMode == LayoutMode.Grid)
         {
             var tables = await context.Tables
                 .Where(t => t.EventId == ev.Id && t.IsActive)
                 .ToListAsync();
             potentialRevenue = tables.Sum(t => (long)t.PriceCents *
-                (t.PriceType == PriceType.PerSeat ? t.Capacity : 1));
+                (t.PriceType == PriceType.PerSeat ? (t.Capacity ?? 0) : 1));
         }
 
         var ticketTypes = ev.TicketTypes
             .OrderBy(tt => tt.SortOrder)
-            .Select(tt => new TicketTypeSummaryDto(tt.Id, tt.Name, tt.PriceCents, tt.QuantityTotal, tt.QuantitySold))
+            .Select(tt => new TicketTypeSummaryDto(tt.Id, tt.Name ?? "", tt.PriceCents ?? 0, tt.QuantityTotal, tt.QuantitySold))
             .ToList();
 
         var recentBookings = bookings

@@ -6,14 +6,17 @@ namespace Db.Entities;
 /// </summary>
 public class TicketType : BaseEntity
 {
-    public required string Name { get; set; }
+    public string? Name { get; set; }
     public string? Description { get; set; }
-    public int PriceCents { get; set; }
+    public int? PriceCents { get; set; }
     public int QuantityTotal { get; set; }
     public int QuantitySold { get; set; }
     public int SortOrder { get; set; }
-    public int PlatformFeeCents { get; set; }
+    public int? PlatformFeeCents { get; set; }
 
     public Guid EventId { get; set; }
     public Event Event { get; set; } = null!;
+
+    public Guid? TemplateId { get; set; }
+    public TicketTypeTemplate? Template { get; set; }
 }

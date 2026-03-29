@@ -69,7 +69,7 @@ public static class BookingSeeder
             var itemCount = rng.Next(1, Math.Min(4, ev.TicketTypes.Count + 1));
             var selectedTicketTypes = ev.TicketTypes.OrderBy(_ => rng.Next()).Take(itemCount).ToList();
 
-            var subtotal = selectedTicketTypes.Sum(tt => tt.PriceCents);
+            var subtotal = selectedTicketTypes.Sum(tt => tt.PriceCents ?? 0);
             var fee = (int)Math.Ceiling(subtotal * 0.08); // 8% platform fee
             var total = subtotal + fee;
 
@@ -88,7 +88,7 @@ public static class BookingSeeder
                 Status = status,
                 UserId = user.Id,
                 EventId = ev.Id,
-                SubtotalCents = subtotal,
+                SubtotalCents = (int)subtotal,
                 FeeCents = fee,
                 TotalCents = total,
                 QrToken = qrToken,
@@ -105,7 +105,7 @@ public static class BookingSeeder
                     Id = Guid.NewGuid(),
                     BookingId = booking.Id,
                     TicketTypeId = tt.Id,
-                    PriceCents = tt.PriceCents,
+                    PriceCents = tt.PriceCents ?? 0,
                     CreatedAt = createdAt,
                     UpdatedAt = createdAt
                 });

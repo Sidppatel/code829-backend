@@ -122,13 +122,13 @@ public class EventsController(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(e => new EventSummaryDto(
-                e.Id, e.Title, e.Slug, e.Status.ToString(), e.Category.ToString(),
+                e.Id, e.Title, e.Slug, e.Status.ToString(), e.Category.HasValue ? e.Category.Value.ToString() : "",
                 e.StartDate, e.EndDate,
                 e.ImagePath != null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
                 e.IsFeatured,
                 e.Venue.Name, e.Venue.City, e.Venue.State,
-                e.TicketTypes.Any() ? e.TicketTypes.Min(t => t.PriceCents) : null,
-                e.TicketTypes.Any() ? e.TicketTypes.Max(t => t.PriceCents) : null,
+                e.TicketTypes.Any() ? e.TicketTypes.Min(t => t.PriceCents ?? 0) : null,
+                e.TicketTypes.Any() ? e.TicketTypes.Max(t => t.PriceCents ?? 0) : null,
                 e.TicketTypes.Sum(t => t.QuantityTotal),
                 e.TicketTypes.Sum(t => t.QuantitySold)
             ))
@@ -285,8 +285,9 @@ public class EventsController(
             ev.OrganizerId,
             ev.Organizer?.Name,
             ev.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
-                t.Id, t.Name, t.Description, t.PriceCents,
-                t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder
+                t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
+                t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
+                t.PlatformFeeCents ?? 0
             )).ToList(),
             ev.CreatedAt
         );
@@ -323,8 +324,9 @@ public class EventsController(
             ev.OrganizerId,
             ev.Organizer?.Name,
             ev.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
-                t.Id, t.Name, t.Description, t.PriceCents,
-                t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder
+                t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
+                t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
+                t.PlatformFeeCents ?? 0
             )).ToList(),
             ev.CreatedAt
         ));
@@ -376,8 +378,8 @@ public class EventsController(
             ["offers"] = ev.TicketTypes.Select(t => new Dictionary<string, object?>
             {
                 ["@type"] = "Offer",
-                ["name"] = t.Name,
-                ["price"] = (t.PriceCents / 100.0).ToString("F2"),
+                ["name"] = t.Name ?? "",
+                ["price"] = ((t.PriceCents ?? 0) / 100.0).ToString("F2"),
                 ["priceCurrency"] = "USD",
                 ["availability"] = t.QuantityTotal - t.QuantitySold > 0
                     ? "https://schema.org/InStock"

@@ -27,6 +27,8 @@ public static class VenueEventSeeder
         await context.SaveChangesAsync();
         Log.Information("[Seed] Created {Count} venues", venues.Count);
 
+        await SeedVenueLayoutsAsync(context, venues);
+
         SeedEvents(context, venues, organizer.Id, admin.Id);
         await context.SaveChangesAsync();
 
@@ -205,6 +207,67 @@ public static class VenueEventSeeder
                 });
             }
         }
+    }
+
+    private static async Task SeedVenueLayoutsAsync(EventPlatformDbContext context, List<Venue> venues)
+    {
+        var tableTypes = await context.TableTypes.Where(tt => tt.VenueId == null).ToListAsync();
+        if (tableTypes.Count == 0) return;
+
+        var roundType = tableTypes.First(t => t.DefaultShape == TableShape.Round);
+        var rectType = tableTypes.First(t => t.DefaultShape == TableShape.Rectangle);
+
+        // Create default layouts for the first 3 venues (theatre, convention center, blind mule)
+        var layoutConfigs = new (int VenueIdx, string Name, LayoutMode Mode, int Rows, int Cols)[]
+        {
+            (0, "Main Theatre Grid", LayoutMode.Grid, 6, 8),
+            (1, "Convention Hall Grid", LayoutMode.Grid, 8, 10),
+            (2, "Bar Floor Plan", LayoutMode.Grid, 4, 5),
+        };
+
+        foreach (var (venueIdx, name, mode, rows, cols) in layoutConfigs)
+        {
+            var layout = new VenueLayout
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                LayoutMode = mode,
+                EditorMode = EditorMode.Grid,
+                GridRows = rows,
+                GridCols = cols,
+                IsDefault = true,
+                IsActive = true,
+                VenueId = venues[venueIdx].Id
+            };
+            context.VenueLayouts.Add(layout);
+
+            // Seed a few default tables per layout
+            for (var i = 0; i < Math.Min(6, rows * cols); i++)
+            {
+                var row = i / cols;
+                var col = i % cols;
+                var isVip = i < 2;
+                var colLetter = (char)('A' + col);
+
+                context.VenueLayoutTables.Add(new VenueLayoutTable
+                {
+                    Id = Guid.NewGuid(),
+                    Label = $"{colLetter}{row + 1}",
+                    Section = isVip ? "VIP" : "Standard",
+                    GridRow = row,
+                    GridCol = col,
+                    SortOrder = i,
+                    PriceType = PriceType.PerSeat,
+                    PriceCents = isVip ? 7500 : 3500,
+                    IsActive = true,
+                    VenueLayoutId = layout.Id,
+                    TableTypeId = isVip ? rectType.Id : roundType.Id
+                });
+            }
+        }
+
+        await context.SaveChangesAsync();
+        Log.Information("[Seed] Created {Count} venue layouts", layoutConfigs.Length);
     }
 
     private static string GenerateSlug(string title)

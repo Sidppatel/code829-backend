@@ -44,8 +44,8 @@ public class BookingService(
             if (tt.QuantitySold >= tt.QuantityTotal)
                 throw new InvalidOperationException($"Ticket type '{tt.Name}' is sold out");
 
-            var price = tt.PriceCents;
-            var feePerItem = tt.PlatformFeeCents;
+            var price = tt.PriceCents ?? 0;
+            var feePerItem = tt.PlatformFeeCents ?? 0;
 
             // If it's a seated booking, we might have table-specific fees
             if (item.SeatId.HasValue)

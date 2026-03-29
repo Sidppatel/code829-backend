@@ -1,4 +1,5 @@
 using Db.Entities;
+using Db.Entities.Views;
 using Db.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,17 +10,23 @@ public class EventPlatformDbContext(
     ChangeTrackingInterceptor changeTrackingInterceptor
 ) : DbContext(options)
 {
+    // Core entities
     public DbSet<User> Users => Set<User>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
-    public DbSet<DeveloperLog> DeveloperLogs => Set<DeveloperLog>();
-    public DbSet<AdminLog> AdminLogs => Set<AdminLog>();
-    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
-    public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
+
+    // Template/parent entities
     public DbSet<Venue> Venues => Set<Venue>();
+    public DbSet<TableType> TableTypes => Set<TableType>();
+    public DbSet<TicketTypeTemplate> TicketTypeTemplates => Set<TicketTypeTemplate>();
+    public DbSet<VenueLayout> VenueLayouts => Set<VenueLayout>();
+    public DbSet<VenueLayoutTable> VenueLayoutTables => Set<VenueLayoutTable>();
+    public DbSet<PricingRuleTemplate> PricingRuleTemplates => Set<PricingRuleTemplate>();
+    public DbSet<EventTemplate> EventTemplates => Set<EventTemplate>();
+
+    // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
     public DbSet<TicketType> TicketTypes => Set<TicketType>();
-    public DbSet<TableType> TableTypes => Set<TableType>();
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Seat> Seats => Set<Seat>();
     public DbSet<SeatHold> SeatHolds => Set<SeatHold>();
@@ -27,6 +34,19 @@ public class EventPlatformDbContext(
     public DbSet<BookingItem> BookingItems => Set<BookingItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PricingRule> PricingRules => Set<PricingRule>();
+
+    // Logging
+    public DbSet<DeveloperLog> DeveloperLogs => Set<DeveloperLog>();
+    public DbSet<AdminLog> AdminLogs => Set<AdminLog>();
+    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
+    public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
+
+    // Read-only views
+    public DbSet<EventView> EventViews => Set<EventView>();
+    public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
+    public DbSet<TicketTypeView> TicketTypeViews => Set<TicketTypeView>();
+    public DbSet<TableView> TableViews => Set<TableView>();
+    public DbSet<PricingRuleView> PricingRuleViews => Set<PricingRuleView>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -36,6 +56,8 @@ public class EventPlatformDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // ─── Core entities ───────────────────────────────────────
 
         modelBuilder.Entity<User>(entity =>
         {
@@ -59,58 +81,6 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Description).HasMaxLength(512);
         });
 
-        modelBuilder.Entity<DeveloperLog>(entity =>
-        {
-            entity.ToTable("developer_logs");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => e.Severity);
-            entity.Property(e => e.Severity).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Message).HasMaxLength(4096);
-            entity.Property(e => e.ExceptionType).HasMaxLength(512);
-            entity.Property(e => e.RequestPath).HasMaxLength(512);
-            entity.Property(e => e.RequestMethod).HasMaxLength(10);
-            entity.Property(e => e.IpAddress).HasMaxLength(45);
-            entity.Property(e => e.CorrelationId).HasMaxLength(64);
-        });
-
-        modelBuilder.Entity<AdminLog>(entity =>
-        {
-            entity.ToTable("admin_logs");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => e.Action);
-            entity.Property(e => e.Action).HasMaxLength(128);
-            entity.Property(e => e.ActorEmail).HasMaxLength(256);
-            entity.Property(e => e.ActorRole).HasMaxLength(20);
-            entity.Property(e => e.EntityType).HasMaxLength(64);
-            entity.Property(e => e.Description).HasMaxLength(2048);
-            entity.Property(e => e.IpAddress).HasMaxLength(45);
-        });
-
-        modelBuilder.Entity<SystemLog>(entity =>
-        {
-            entity.ToTable("system_logs");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => e.Category);
-            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(30);
-            entity.Property(e => e.Action).HasMaxLength(64);
-            entity.Property(e => e.Source).HasMaxLength(256);
-            entity.Property(e => e.EntityType).HasMaxLength(64);
-            entity.Property(e => e.CorrelationId).HasMaxLength(64);
-        });
-
-        modelBuilder.Entity<EmailLog>(entity =>
-        {
-            entity.ToTable("email_logs");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Timestamp);
-            entity.Property(e => e.Recipient).HasMaxLength(256);
-            entity.Property(e => e.Subject).HasMaxLength(512);
-            entity.Property(e => e.Status).HasMaxLength(20);
-        });
-
         modelBuilder.Entity<MagicLinkToken>(entity =>
         {
             entity.ToTable("magic_link_tokens");
@@ -121,6 +91,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.TokenHash).HasMaxLength(128);
             entity.Property(e => e.Email).HasMaxLength(256);
         });
+
+        // ─── Template/parent entities ────────────────────────────
 
         modelBuilder.Entity<Venue>(entity =>
         {
@@ -138,6 +110,66 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Phone).HasMaxLength(20);
             entity.Property(e => e.Website).HasMaxLength(512);
         });
+
+        modelBuilder.Entity<TableType>(entity =>
+        {
+            entity.ToTable("table_types");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.DefaultShape).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.DefaultColor).HasMaxLength(20);
+            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId).IsRequired(false);
+        });
+
+        modelBuilder.Entity<TicketTypeTemplate>(entity =>
+        {
+            entity.ToTable("ticket_type_templates");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.Description).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<VenueLayout>(entity =>
+        {
+            entity.ToTable("venue_layouts");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.EditorMode).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId);
+        });
+
+        modelBuilder.Entity<VenueLayoutTable>(entity =>
+        {
+            entity.ToTable("venue_layout_tables");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Label).HasMaxLength(20);
+            entity.Property(e => e.Section).HasMaxLength(64);
+            entity.Property(e => e.PriceType).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.VenueLayout).WithMany(vl => vl.Tables).HasForeignKey(e => e.VenueLayoutId);
+            entity.HasOne(e => e.TableType).WithMany().HasForeignKey(e => e.TableTypeId).IsRequired(false);
+        });
+
+        modelBuilder.Entity<PricingRuleTemplate>(entity =>
+        {
+            entity.ToTable("pricing_rule_templates");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Description).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<EventTemplate>(entity =>
+        {
+            entity.ToTable("event_templates");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.Description).HasMaxLength(512);
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
+        });
+
+        // ─── Instance/child entities ─────────────────────────────
 
         modelBuilder.Entity<Event>(entity =>
         {
@@ -157,6 +189,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.EditorMode).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId);
             entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId);
+            entity.HasOne(e => e.EventTemplate).WithMany(et => et.Events).HasForeignKey(e => e.EventTemplateId).IsRequired(false);
+            entity.HasOne(e => e.VenueLayout).WithMany(vl => vl.Events).HasForeignKey(e => e.VenueLayoutId).IsRequired(false);
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, e.Description })
                   .HasIndex(e => e.SearchVector).HasMethod("GIN");
         });
@@ -168,16 +202,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.Description).HasMaxLength(512);
             entity.HasOne(e => e.Event).WithMany(ev => ev.TicketTypes).HasForeignKey(e => e.EventId);
-        });
-
-        modelBuilder.Entity<TableType>(entity =>
-        {
-            entity.ToTable("table_types");
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.DefaultShape).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.DefaultColor).HasMaxLength(20);
-            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId).IsRequired(false);
+            entity.HasOne(e => e.Template).WithMany(t => t.TicketTypes).HasForeignKey(e => e.TemplateId).IsRequired(false);
         });
 
         modelBuilder.Entity<Table>(entity =>
@@ -193,6 +218,7 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId).IsRequired(false);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId).IsRequired(false);
             entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId);
+            entity.HasOne(e => e.VenueLayoutTable).WithMany(vlt => vlt.Tables).HasForeignKey(e => e.VenueLayoutTableId).IsRequired(false);
         });
 
         modelBuilder.Entity<Seat>(entity =>
@@ -262,6 +288,93 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Description).HasMaxLength(512);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
             entity.HasOne(e => e.TableType).WithMany().HasForeignKey(e => e.TableTypeId).IsRequired(false);
+            entity.HasOne(e => e.Template).WithMany(t => t.PricingRules).HasForeignKey(e => e.TemplateId).IsRequired(false);
+        });
+
+        // ─── Logging ─────────────────────────────────────────────
+
+        modelBuilder.Entity<DeveloperLog>(entity =>
+        {
+            entity.ToTable("developer_logs");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.Severity);
+            entity.Property(e => e.Severity).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Message).HasMaxLength(4096);
+            entity.Property(e => e.ExceptionType).HasMaxLength(512);
+            entity.Property(e => e.RequestPath).HasMaxLength(512);
+            entity.Property(e => e.RequestMethod).HasMaxLength(10);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.Property(e => e.CorrelationId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<AdminLog>(entity =>
+        {
+            entity.ToTable("admin_logs");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.Action);
+            entity.Property(e => e.Action).HasMaxLength(128);
+            entity.Property(e => e.ActorEmail).HasMaxLength(256);
+            entity.Property(e => e.ActorRole).HasMaxLength(20);
+            entity.Property(e => e.EntityType).HasMaxLength(64);
+            entity.Property(e => e.Description).HasMaxLength(2048);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+        });
+
+        modelBuilder.Entity<SystemLog>(entity =>
+        {
+            entity.ToTable("system_logs");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.Category);
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Action).HasMaxLength(64);
+            entity.Property(e => e.Source).HasMaxLength(256);
+            entity.Property(e => e.EntityType).HasMaxLength(64);
+            entity.Property(e => e.CorrelationId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<EmailLog>(entity =>
+        {
+            entity.ToTable("email_logs");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Timestamp);
+            entity.Property(e => e.Recipient).HasMaxLength(256);
+            entity.Property(e => e.Subject).HasMaxLength(512);
+            entity.Property(e => e.Status).HasMaxLength(20);
+        });
+
+        // ─── Read-only views ─────────────────────────────────────
+
+        modelBuilder.Entity<EventView>(entity =>
+        {
+            entity.ToView("v_events");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<EventSummaryView>(entity =>
+        {
+            entity.ToView("v_event_summary");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<TicketTypeView>(entity =>
+        {
+            entity.ToView("v_ticket_types");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<TableView>(entity =>
+        {
+            entity.ToView("v_tables");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<PricingRuleView>(entity =>
+        {
+            entity.ToView("v_pricing_rules");
+            entity.HasKey(e => e.Id);
         });
     }
 }

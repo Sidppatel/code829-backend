@@ -137,13 +137,13 @@ public class AdminPricingController(EventPlatformDbContext context) : Controller
         if (applicable.Count == 0)
             return Ok(new { priceCents = 0, ruleName = "No active rules", ruleType = "None", ruleId = (Guid?)null });
 
-        var best = applicable.OrderBy(r => r.PriceCents).First();
-        return Ok(new ResolvedPriceResponse(best.PriceCents, best.Name, best.Type.ToString(), best.Id));
+        var best = applicable.OrderBy(r => r.PriceCents ?? 0).First();
+        return Ok(new ResolvedPriceResponse(best.PriceCents ?? 0, best.Name ?? "", (best.Type ?? Contracts.Enums.PricingRuleType.Standard).ToString(), best.Id));
     }
 
     private static PricingRuleResponse MapRule(PricingRule r) => new(
         r.Id, r.EventId, r.TableTypeId, r.TableType?.Name,
-        r.Name, r.Type.ToString(), r.PriceCents,
+        r.Name ?? "", (r.Type ?? Contracts.Enums.PricingRuleType.Standard).ToString(), r.PriceCents ?? 0,
         r.ValidFrom, r.ValidUntil, r.MaxCount, r.UsedCount,
         r.IsActive, r.SortOrder, r.CreatedAt);
 }

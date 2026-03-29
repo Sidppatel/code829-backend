@@ -9,12 +9,12 @@ public class Event : BaseEntity
     public required string Slug { get; set; }
     public string? Description { get; set; }
     public EventStatus Status { get; set; } = EventStatus.Draft;
-    public EventCategory Category { get; set; }
+    public EventCategory? Category { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public string? ImagePath { get; set; }
     public bool IsFeatured { get; set; }
-    public LayoutMode LayoutMode { get; set; } = LayoutMode.None;
+    public LayoutMode? LayoutMode { get; set; }
     public int? MaxCapacity { get; set; }
     public int? PlatformFeePercent { get; set; }
     public DateTime? PublishedAt { get; set; }
@@ -34,6 +34,12 @@ public class Event : BaseEntity
 
     public Guid OrganizerId { get; set; }
     public User Organizer { get; set; } = null!;
+
+    public Guid? EventTemplateId { get; set; }
+    public EventTemplate? EventTemplate { get; set; }
+
+    public Guid? VenueLayoutId { get; set; }
+    public VenueLayout? VenueLayout { get; set; }
 
     public ICollection<TicketType> TicketTypes { get; set; } = [];
 }

@@ -36,6 +36,7 @@ public class SeatService(
                 t.Id, t.Label, 0, 0, 0,
                 t.TableType?.Name ?? "Unknown", t.TableType?.DefaultShape.ToString() ?? "Round",
                 80, 80,
+                t.PriceCents, t.PlatformFeeCents,
                 t.Seats.OrderBy(s => s.SeatNumber).Select(s =>
                 {
                     // A seat is held if there's an active, non-expired hold for this event
@@ -126,7 +127,7 @@ public class SeatService(
 
             return new SeatHoldDto(
                 hold.Id, seatId, seat.Label, eventId, userId,
-                ticketTypeId, ticketType.Name, ticketType.PriceCents, hold.ExpiresAt
+                ticketTypeId, ticketType.Name ?? "", ticketType.PriceCents ?? 0, hold.ExpiresAt
             );
         }
         catch (InvalidOperationException)
@@ -171,7 +172,7 @@ public class SeatService(
             .Where(h => h.UserId == userId && h.EventId == eventId && h.IsActive && h.ExpiresAt > now)
             .Select(h => new SeatHoldDto(
                 h.Id, h.SeatId, h.Seat.Label, h.EventId, h.UserId,
-                h.TicketTypeId, h.TicketType.Name, h.TicketType.PriceCents, h.ExpiresAt
+                h.TicketTypeId, h.TicketType.Name ?? "", h.TicketType.PriceCents ?? 0, h.ExpiresAt
             ))
             .ToListAsync();
     }

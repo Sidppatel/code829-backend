@@ -346,7 +346,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     }
 
     private static LayoutTableResponse MapTable(Table t) => new(
-        t.Id, t.Label, t.Capacity, t.Shape.ToString(), t.Color, t.Section,
+        t.Id, t.Label, t.Capacity ?? 0, (t.Shape ?? Contracts.Enums.TableShape.Round).ToString(), t.Color, t.Section,
         t.PriceType.ToString(), t.PriceCents, t.PriceOverrideCents, t.IsActive,
         t.GridRow, t.GridCol,
         t.SortOrder, t.TableTypeId, t.TableType?.Name);

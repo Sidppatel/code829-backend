@@ -13,8 +13,8 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260328201744_UpdateTableAndTableTypeForLayoutEditors")]
-    partial class UpdateTableAndTableTypeForLayoutEditors
+    [Migration("20260329171319_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -311,7 +311,6 @@ namespace db.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Category")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
@@ -329,6 +328,9 @@ namespace db.Migrations
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("EventTemplateId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("GridCols")
                         .HasColumnType("integer");
 
@@ -343,7 +345,6 @@ namespace db.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("LayoutMode")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
@@ -357,6 +358,9 @@ namespace db.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ScheduledPublishAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<NpgsqlTsVector>("SearchVector")
@@ -389,9 +393,14 @@ namespace db.Migrations
                     b.Property<Guid>("VenueId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("VenueLayoutId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Category");
+
+                    b.HasIndex("EventTemplateId");
 
                     b.HasIndex("OrganizerId");
 
@@ -408,7 +417,52 @@ namespace db.Migrations
 
                     b.HasIndex("VenueId");
 
+                    b.HasIndex("VenueLayoutId");
+
                     b.ToTable("events", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.EventTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DefaultMaxCapacity")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultPlatformFeePercent")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LayoutMode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("event_templates", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.MagicLinkToken", b =>
@@ -530,14 +584,99 @@ namespace db.Migrations
                     b.Property<int?>("FeePercent")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("PriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TableTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ValidUntil")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("EventId");
 
+                    b.HasIndex("TableTypeId");
+
+                    b.HasIndex("TemplateId");
+
                     b.ToTable("pricing_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.PricingRuleTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DefaultFeeFlatCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultFeePercent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DefaultPriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("pricing_rule_templates", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Seat", b =>
@@ -679,7 +818,7 @@ namespace db.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Capacity")
+                    b.Property<int?>("Capacity")
                         .HasColumnType("integer");
 
                     b.Property<string>("Color")
@@ -698,9 +837,6 @@ namespace db.Migrations
                     b.Property<int?>("GridRow")
                         .HasColumnType("integer");
 
-                    b.Property<double>("Height")
-                        .HasColumnType("double precision");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -709,11 +845,8 @@ namespace db.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<double?>("PosX")
-                        .HasColumnType("double precision");
-
-                    b.Property<double?>("PosY")
-                        .HasColumnType("double precision");
+                    b.Property<int>("PlatformFeeCents")
+                        .HasColumnType("integer");
 
                     b.Property<int>("PriceCents")
                         .HasColumnType("integer");
@@ -726,15 +859,11 @@ namespace db.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<double>("Rotation")
-                        .HasColumnType("double precision");
-
                     b.Property<string>("Section")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
                     b.Property<string>("Shape")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
@@ -750,8 +879,8 @@ namespace db.Migrations
                     b.Property<Guid>("VenueId")
                         .HasColumnType("uuid");
 
-                    b.Property<double>("Width")
-                        .HasColumnType("double precision");
+                    b.Property<Guid?>("VenueLayoutTableId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -760,6 +889,8 @@ namespace db.Migrations
                     b.HasIndex("TableTypeId");
 
                     b.HasIndex("VenueId");
+
+                    b.HasIndex("VenueLayoutTableId");
 
                     b.ToTable("tables", (string)null);
                 });
@@ -826,11 +957,13 @@ namespace db.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Name")
-                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<int>("PriceCents")
+                    b.Property<int?>("PlatformFeeCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PriceCents")
                         .HasColumnType("integer");
 
                     b.Property<int>("QuantitySold")
@@ -842,6 +975,9 @@ namespace db.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -849,7 +985,47 @@ namespace db.Migrations
 
                     b.HasIndex("EventId");
 
+                    b.HasIndex("TemplateId");
+
                     b.ToTable("ticket_types", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.TicketTypeTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DefaultPlatformFeeCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DefaultPriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ticket_type_templates", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.User", b =>
@@ -857,6 +1033,12 @@ namespace db.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasColumnType("text");
+
+                    b.Property<string>("City")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -871,6 +1053,9 @@ namespace db.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<bool>("HasCompletedOnboarding")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -882,13 +1067,25 @@ namespace db.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<bool>("OptInLocationEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("State")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ZipCode")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -912,9 +1109,6 @@ namespace db.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<int>("Capacity")
-                        .HasColumnType("integer");
-
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -933,12 +1127,6 @@ namespace db.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
-
-                    b.Property<double?>("Latitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<double?>("Longitude")
-                        .HasColumnType("double precision");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -973,6 +1161,460 @@ namespace db.Migrations
                     b.HasIndex("Name");
 
                     b.ToTable("venues", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueLayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditorMode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("GridCols")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GridRows")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LayoutMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VenueId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VenueId");
+
+                    b.ToTable("venue_layouts", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueLayoutTable", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("GridCol")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GridRow")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("PriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PriceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Section")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TableTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VenueLayoutId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TableTypeId");
+
+                    b.HasIndex("VenueLayoutId");
+
+                    b.ToTable("venue_layout_tables", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.EventSummaryView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImagePath")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsFeatured")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OrganizerName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TicketTypeCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("TotalCapacity")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("TotalSold")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("VenueCity")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VenueName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_event_summary", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.EventView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EditorMode")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EventTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("GridCols")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GridRows")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ImagePath")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsFeatured")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LayoutMode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("MaxCapacity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrganizerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PlatformFeePercent")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ScheduledPublishAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VenueAddress")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VenueCity")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("VenueId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VenueImagePath")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("VenueLayoutId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VenueName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VenueState")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VenueZipCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_events", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.PricingRuleView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("FeeFlatCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FeePercent")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TableTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_pricing_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.TableView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Color")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EffectivePriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("GridCol")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GridRow")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PlatformFeeCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PriceType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Section")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Shape")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TableTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VenueId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_tables", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.TicketTypeView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PlatformFeeCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantitySold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityTotal")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_ticket_types", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Booking", b =>
@@ -1021,6 +1663,10 @@ namespace db.Migrations
 
             modelBuilder.Entity("Db.Entities.Event", b =>
                 {
+                    b.HasOne("Db.Entities.EventTemplate", "EventTemplate")
+                        .WithMany("Events")
+                        .HasForeignKey("EventTemplateId");
+
                     b.HasOne("Db.Entities.User", "Organizer")
                         .WithMany()
                         .HasForeignKey("OrganizerId")
@@ -1033,9 +1679,17 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Db.Entities.VenueLayout", "VenueLayout")
+                        .WithMany("Events")
+                        .HasForeignKey("VenueLayoutId");
+
+                    b.Navigation("EventTemplate");
+
                     b.Navigation("Organizer");
 
                     b.Navigation("Venue");
+
+                    b.Navigation("VenueLayout");
                 });
 
             modelBuilder.Entity("Db.Entities.Payment", b =>
@@ -1057,7 +1711,19 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Db.Entities.TableType", "TableType")
+                        .WithMany()
+                        .HasForeignKey("TableTypeId");
+
+                    b.HasOne("Db.Entities.PricingRuleTemplate", "Template")
+                        .WithMany("PricingRules")
+                        .HasForeignKey("TemplateId");
+
                     b.Navigation("Event");
+
+                    b.Navigation("TableType");
+
+                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("Db.Entities.Seat", b =>
@@ -1122,11 +1788,17 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Db.Entities.VenueLayoutTable", "VenueLayoutTable")
+                        .WithMany("Tables")
+                        .HasForeignKey("VenueLayoutTableId");
+
                     b.Navigation("Event");
 
                     b.Navigation("TableType");
 
                     b.Navigation("Venue");
+
+                    b.Navigation("VenueLayoutTable");
                 });
 
             modelBuilder.Entity("Db.Entities.TableType", b =>
@@ -1146,7 +1818,41 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Db.Entities.TicketTypeTemplate", "Template")
+                        .WithMany("TicketTypes")
+                        .HasForeignKey("TemplateId");
+
                     b.Navigation("Event");
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueLayout", b =>
+                {
+                    b.HasOne("Db.Entities.Venue", "Venue")
+                        .WithMany()
+                        .HasForeignKey("VenueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Venue");
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueLayoutTable", b =>
+                {
+                    b.HasOne("Db.Entities.TableType", "TableType")
+                        .WithMany()
+                        .HasForeignKey("TableTypeId");
+
+                    b.HasOne("Db.Entities.VenueLayout", "VenueLayout")
+                        .WithMany("Tables")
+                        .HasForeignKey("VenueLayoutId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TableType");
+
+                    b.Navigation("VenueLayout");
                 });
 
             modelBuilder.Entity("Db.Entities.Booking", b =>
@@ -1159,6 +1865,16 @@ namespace db.Migrations
             modelBuilder.Entity("Db.Entities.Event", b =>
                 {
                     b.Navigation("TicketTypes");
+                });
+
+            modelBuilder.Entity("Db.Entities.EventTemplate", b =>
+                {
+                    b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("Db.Entities.PricingRuleTemplate", b =>
+                {
+                    b.Navigation("PricingRules");
                 });
 
             modelBuilder.Entity("Db.Entities.Seat", b =>
@@ -1176,9 +1892,26 @@ namespace db.Migrations
                     b.Navigation("Tables");
                 });
 
+            modelBuilder.Entity("Db.Entities.TicketTypeTemplate", b =>
+                {
+                    b.Navigation("TicketTypes");
+                });
+
             modelBuilder.Entity("Db.Entities.Venue", b =>
                 {
                     b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueLayout", b =>
+                {
+                    b.Navigation("Events");
+
+                    b.Navigation("Tables");
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueLayoutTable", b =>
+                {
+                    b.Navigation("Tables");
                 });
 #pragma warning restore 612, 618
         }
