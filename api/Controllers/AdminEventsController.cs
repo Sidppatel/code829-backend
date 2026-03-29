@@ -119,7 +119,7 @@ public class AdminEventsController(
                     QuantityTotal = tt.QuantityTotal,
                     QuantitySold = 0,
                     SortOrder = tt.SortOrder,
-                    PlatformFeeCents = tt.PlatformFeeCents,
+                    PlatformFeeCents = 0, // Admin cannot set fees
                     EventId = ev.Id
                 });
             }
@@ -300,7 +300,7 @@ public class AdminEventsController(
                 PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
                 GridRow = t.GridRow, GridCol = t.GridCol,
                 SortOrder = t.SortOrder,
-                PlatformFeeCents = t.PlatformFeeCents,
+                PlatformFeeCents = 0, // Admin cannot set fees
                 TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
             });
         }
@@ -315,8 +315,8 @@ public class AdminEventsController(
                 Name = r.Name, Type = r.Type, PriceCents = r.PriceCents,
                 ValidFrom = r.ValidFrom, ValidUntil = r.ValidUntil,
                 MaxCount = r.MaxCount, UsedCount = 0, IsActive = r.IsActive,
-                SortOrder = r.SortOrder, FeePercent = r.FeePercent,
-                FeeFlatCents = r.FeeFlatCents, Description = r.Description
+                SortOrder = r.SortOrder, FeePercent = null,
+                FeeFlatCents = null, Description = r.Description
             });
         }
 
