@@ -39,11 +39,6 @@ public record LayoutTableResponse(
     bool IsActive,
     int? GridRow,
     int? GridCol,
-    double? PosX,
-    double? PosY,
-    double Width,
-    double Height,
-    double Rotation,
     int SortOrder,
     Guid? TableTypeId,
     string? TableTypeName
@@ -69,11 +64,6 @@ public record SaveLayoutTableRequest(
     bool IsActive,
     int? GridRow,
     int? GridCol,
-    double? PosX,
-    double? PosY,
-    double Width,
-    double Height,
-    double Rotation,
     int SortOrder,
     Guid? TableTypeId
 );
@@ -88,11 +78,6 @@ public record AddTableRequest(
     int PriceCents = 0,
     int? GridRow = null,
     int? GridCol = null,
-    double? PosX = null,
-    double? PosY = null,
-    double Width = 80,
-    double Height = 80,
-    double Rotation = 0,
     Guid? TableTypeId = null
 );
 
@@ -108,10 +93,5 @@ public record UpdateTableRequest(
     bool? IsActive = null,
     int? GridRow = null,
     int? GridCol = null,
-    double? PosX = null,
-    double? PosY = null,
-    double? Width = null,
-    double? Height = null,
-    double? Rotation = null,
     int? SortOrder = null
 );

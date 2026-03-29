@@ -96,8 +96,6 @@ public static class LayoutPricingSeeder
                 IsActive = true,
                 GridRow = row,
                 GridCol = col,
-                Width = 80,
-                Height = 80,
                 SortOrder = i,
                 TableTypeId = tableType.Id,
                 EventId = ev.Id,

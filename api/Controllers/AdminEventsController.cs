@@ -300,8 +300,8 @@ public class AdminEventsController(
                 Id = Guid.NewGuid(), Label = t.Label, Capacity = t.Capacity, Shape = t.Shape,
                 Color = t.Color, Section = t.Section, PriceType = t.PriceType, PriceCents = t.PriceCents,
                 PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
-                GridRow = t.GridRow, GridCol = t.GridCol, PosX = t.PosX, PosY = t.PosY,
-                Width = t.Width, Height = t.Height, Rotation = t.Rotation, SortOrder = t.SortOrder,
+                GridRow = t.GridRow, GridCol = t.GridCol,
+                SortOrder = t.SortOrder,
                 TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
             });
         }

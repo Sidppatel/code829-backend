@@ -33,9 +33,9 @@ public class SeatService(
             venue.Id,
             venue.Name,
             tables.Select(t => new TableDto(
-                t.Id, t.Label, t.PosX ?? 0, t.PosY ?? 0, t.Rotation,
+                t.Id, t.Label, 0, 0, 0,
                 t.TableType?.Name ?? "Unknown", t.TableType?.DefaultShape.ToString() ?? "Round",
-                (int)t.Width, (int)t.Height,
+                80, 80,
                 t.Seats.OrderBy(s => s.SeatNumber).Select(s =>
                 {
                     // A seat is held if there's an active, non-expired hold for this event

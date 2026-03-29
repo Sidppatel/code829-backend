@@ -170,8 +170,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                 ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
                 ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
                 ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
-                ex.PosX = rt.PosX; ex.PosY = rt.PosY; ex.Width = rt.Width;
-                ex.Height = rt.Height; ex.Rotation = rt.Rotation; ex.SortOrder = rt.SortOrder;
+                
+                ex.SortOrder = rt.SortOrder;
                 ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
             }
             else
@@ -182,8 +182,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                     Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
                     PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
                     IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
-                    PosX = rt.PosX, PosY = rt.PosY, Width = rt.Width, Height = rt.Height,
-                    Rotation = rt.Rotation, SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
+                    
+                    SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
                     EventId = eventId, VenueId = ev.VenueId
                 });
             }
@@ -246,8 +246,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                 ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
                 ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
                 ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
-                ex.PosX = rt.PosX; ex.PosY = rt.PosY; ex.Width = rt.Width;
-                ex.Height = rt.Height; ex.Rotation = rt.Rotation; ex.SortOrder = rt.SortOrder;
+                
+                ex.SortOrder = rt.SortOrder;
                 ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
             }
             else
@@ -258,8 +258,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                     Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
                     PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
                     IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
-                    PosX = rt.PosX, PosY = rt.PosY, Width = rt.Width, Height = rt.Height,
-                    Rotation = rt.Rotation, SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
+                    
+                    SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
                     EventId = eventId, VenueId = ev.VenueId
                 });
             }
@@ -286,8 +286,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             Shape = shape, Color = request.Color, Section = request.Section,
             PriceType = priceType, PriceCents = request.PriceCents,
             GridRow = request.GridRow, GridCol = request.GridCol,
-            PosX = request.PosX, PosY = request.PosY, Width = request.Width,
-            Height = request.Height, Rotation = request.Rotation,
+            
+            
             TableTypeId = request.TableTypeId, EventId = eventId, VenueId = ev.VenueId
         };
 
@@ -312,11 +312,6 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         if (request.IsActive.HasValue) table.IsActive = request.IsActive.Value;
         if (request.GridRow.HasValue) table.GridRow = request.GridRow;
         if (request.GridCol.HasValue) table.GridCol = request.GridCol;
-        if (request.PosX.HasValue) table.PosX = request.PosX;
-        if (request.PosY.HasValue) table.PosY = request.PosY;
-        if (request.Width.HasValue) table.Width = request.Width.Value;
-        if (request.Height.HasValue) table.Height = request.Height.Value;
-        if (request.Rotation.HasValue) table.Rotation = request.Rotation.Value;
 
         table.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
@@ -353,6 +348,6 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     private static LayoutTableResponse MapTable(Table t) => new(
         t.Id, t.Label, t.Capacity, t.Shape.ToString(), t.Color, t.Section,
         t.PriceType.ToString(), t.PriceCents, t.PriceOverrideCents, t.IsActive,
-        t.GridRow, t.GridCol, t.PosX, t.PosY, t.Width, t.Height, t.Rotation,
+        t.GridRow, t.GridCol,
         t.SortOrder, t.TableTypeId, t.TableType?.Name);
 }

@@ -23,12 +23,6 @@ public class Table : BaseEntity
     public int? GridRow { get; set; }
     public int? GridCol { get; set; }
 
-    // Canvas mode positioning
-    public double? PosX { get; set; }
-    public double? PosY { get; set; }
-    public double Width { get; set; } = 80;
-    public double Height { get; set; } = 80;
-    public double Rotation { get; set; }
     public int SortOrder { get; set; }
 
     public Guid? TableTypeId { get; set; }
