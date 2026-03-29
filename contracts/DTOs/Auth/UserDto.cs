@@ -5,5 +5,12 @@ public record UserDto(
     string Email,
     string Name,
     string Role,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string? Address,
+    string? City,
+    string? State,
+    string? ZipCode,
+    string? Phone,
+    bool OptInLocationEmail,
+    bool HasCompletedOnboarding
 );

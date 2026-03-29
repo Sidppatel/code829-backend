@@ -128,7 +128,14 @@ public class AuthService(
             Email: user.Email,
             Name: user.Name,
             Role: user.Role.ToString(),
-            CreatedAt: user.CreatedAt
+            CreatedAt: user.CreatedAt,
+            Address: user.Address,
+            City: user.City,
+            State: user.State,
+            ZipCode: user.ZipCode,
+            Phone: user.Phone,
+            OptInLocationEmail: user.OptInLocationEmail,
+            HasCompletedOnboarding: user.HasCompletedOnboarding
         );
     }
 
@@ -160,7 +167,8 @@ public class AuthService(
             Email: user.Email,
             Name: user.Name,
             Role: user.Role.ToString(),
-            ExpiresAt: expiresAt
+            ExpiresAt: expiresAt,
+            HasCompletedOnboarding: user.HasCompletedOnboarding
         );
     }
 

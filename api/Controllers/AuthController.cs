@@ -89,4 +89,50 @@ public class AuthController(
 
         return Ok(user);
     }
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(new { message = "Invalid token" });
+
+        // Retrieve user via dependency parsing (IUserRepository authService doesn't expose it directly, so let's use the DB Context... wait, AuthController doesn't inject DbContext! I need to inject it or use an IAuthService method). 
+        // Let's add UpdateProfileAsync to IAuthService! Actually, we can inject EventPlatformDbContext directly into the method.
+        var context = HttpContext.RequestServices.GetRequiredService<Db.EventPlatformDbContext>();
+        var user = await context.Users.FindAsync(userId);
+        
+        if (user is null)
+            return NotFound(new { message = "User not found" });
+
+        if (!string.IsNullOrWhiteSpace(request.Name))
+            user.Name = request.Name;
+
+        user.Address = request.Address;
+        user.City = request.City;
+        user.State = request.State;
+        user.ZipCode = request.ZipCode;
+        user.Phone = request.Phone;
+        
+        if (request.OptInLocationEmail.HasValue)
+            user.OptInLocationEmail = request.OptInLocationEmail.Value;
+
+        user.HasCompletedOnboarding = true; // Mark as true!
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+
+        return Ok(new { message = "Profile updated successfully" });
+    }
 }
+
+public record UpdateProfileRequest(
+    string? Name,
+    string? Address,
+    string? City,
+    string? State,
+    string? ZipCode,
+    string? Phone,
+    bool? OptInLocationEmail
+);

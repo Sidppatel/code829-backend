@@ -5,5 +5,6 @@ public record AuthResponse(
     string Email,
     string Name,
     string Role,
-    DateTime ExpiresAt
+    DateTime ExpiresAt,
+    bool HasCompletedOnboarding
 );
