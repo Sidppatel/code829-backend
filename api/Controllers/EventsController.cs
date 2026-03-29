@@ -269,11 +269,11 @@ public class EventsController(
 
         var dto = new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
-            ev.Status.ToString(), ev.Category.ToString(),
+            ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
             ev.StartDate, ev.EndDate,
             ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
             ev.IsFeatured,
-            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
+            (ev.LayoutMode?.ToString() ?? "None"), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
             ev.VenueId,
             new VenueDto(
                 ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
@@ -308,11 +308,11 @@ public class EventsController(
 
         return Ok(new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
-            ev.Status.ToString(), ev.Category.ToString(),
+            ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
             ev.StartDate, ev.EndDate,
             ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
             ev.IsFeatured,
-            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
+            (ev.LayoutMode?.ToString() ?? "None"), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
             ev.VenueId,
             new VenueDto(
                 ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,

@@ -47,7 +47,7 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
 
         var eventsByCategory = await context.Events
             .GroupBy(e => e.Category)
-            .Select(g => new { Category = g.Key.ToString(), Count = g.Count() })
+            .Select(g => new { Category = g.Key != null ? g.Key.ToString()! : "Unknown", Count = g.Count() })
             .ToDictionaryAsync(x => x.Category, x => x.Count);
 
         return Ok(new DashboardStatsDto(
@@ -143,9 +143,9 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
         {
             hasUpcoming = true,
             data = new NextEventDashboardDto(
-                ev.Id, ev.Title, ev.Slug, ev.Status.ToString(), ev.Category.ToString(),
+                ev.Id, ev.Title, ev.Slug, ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
                 ev.StartDate, ev.EndDate, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
-                ev.ImagePath, ev.LayoutMode.ToString(), daysUntil,
+                ev.ImagePath, (ev.LayoutMode?.ToString() ?? "None"), daysUntil,
                 bookings.Count, paid, checkedInCount, pending, cancelled, refunded,
                 revenue, potentialRevenue, totalCapacity, soldCount,
                 ticketTypes, recentBookings

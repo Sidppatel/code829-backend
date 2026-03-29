@@ -128,7 +128,7 @@ public class BookingsController(
             b.UserId, b.User.Name, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(
-                i.Id, i.TicketTypeId, i.TicketType.Name, i.SeatId, null, i.PriceCents
+                i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, null, i.PriceCents
             )).ToList(),
             b.Payment is not null ? new PaymentDto(
                 b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(),

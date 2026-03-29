@@ -333,11 +333,11 @@ public class AdminEventsController(
 
     private EventDto MapToDto(Event e) => new(
         e.Id, e.Title, e.Slug, e.Description,
-        e.Status.ToString(), e.Category.ToString(),
+        e.Status.ToString(), (e.Category?.ToString() ?? ""),
         e.StartDate, e.EndDate,
         e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
         e.IsFeatured,
-        e.LayoutMode.ToString(), e.MaxCapacity, e.PlatformFeePercent, e.PublishedAt,
+        (e.LayoutMode?.ToString() ?? "None"), e.MaxCapacity, e.PlatformFeePercent, e.PublishedAt,
         e.VenueId,
         e.Venue is not null ? new VenueDto(
             e.Venue.Id, e.Venue.Name, e.Venue.Address, e.Venue.City, e.Venue.State,

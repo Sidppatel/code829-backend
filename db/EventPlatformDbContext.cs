@@ -191,8 +191,10 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId);
             entity.HasOne(e => e.EventTemplate).WithMany(et => et.Events).HasForeignKey(e => e.EventTemplateId).IsRequired(false);
             entity.HasOne(e => e.VenueLayout).WithMany(vl => vl.Events).HasForeignKey(e => e.VenueLayoutId).IsRequired(false);
-            entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, e.Description })
+#pragma warning disable CS8603
+            entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, Description = e.Description! })
                   .HasIndex(e => e.SearchVector).HasMethod("GIN");
+#pragma warning restore CS8603
         });
 
         modelBuilder.Entity<TicketType>(entity =>

@@ -162,7 +162,7 @@ public class BookingService(
         );
 
         Log.Information("[Booking] Confirmed {BookingNumber}, QR: {QrToken}", booking.BookingNumber, booking.QrToken);
-        return await GetByIdAsync(bookingId)!;
+        return (await GetByIdAsync(bookingId))!;
     }
 
     public async Task<BookingDto> CancelAsync(Guid bookingId, Guid userId)
@@ -182,7 +182,7 @@ public class BookingService(
         booking.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
-        return await GetByIdAsync(bookingId)!;
+        return (await GetByIdAsync(bookingId))!;
     }
 
     public async Task<BookingDto> RefundAsync(Guid bookingId)
@@ -208,7 +208,7 @@ public class BookingService(
         }
 
         await context.SaveChangesAsync();
-        return await GetByIdAsync(bookingId)!;
+        return (await GetByIdAsync(bookingId))!;
     }
 
     public async Task<BookingDto?> GetByIdAsync(Guid bookingId)
@@ -228,7 +228,7 @@ public class BookingService(
             b.UserId, b.User.Name, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(
-                i.Id, i.TicketTypeId, i.TicketType.Name,
+                i.Id, i.TicketTypeId, i.TicketType.Name ?? "",
                 i.SeatId, i.Seat?.Label, i.PriceCents
             )).ToList(),
             b.Payment is not null ? new PaymentDto(
