@@ -20,5 +20,6 @@ public record CreateTicketTypeRequest(
     string? Description,
     int PriceCents,
     int QuantityTotal,
-    int SortOrder = 0
+    int SortOrder = 0,
+    int PlatformFeeCents = 0
 );

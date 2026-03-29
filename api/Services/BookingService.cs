@@ -30,8 +30,8 @@ public class BookingService(
         if (request.Items.Count > maxTickets)
             throw new InvalidOperationException($"Maximum {maxTickets} tickets per booking");
 
-        // Resolve ticket prices
-        var itemPrices = new List<int>();
+        // Resolve ticket prices and fees
+        var items = new List<(int Price, int Fee)>();
         var bookingItems = new List<BookingItem>();
         foreach (var item in request.Items)
         {
@@ -44,17 +44,32 @@ public class BookingService(
             if (tt.QuantitySold >= tt.QuantityTotal)
                 throw new InvalidOperationException($"Ticket type '{tt.Name}' is sold out");
 
-            itemPrices.Add(tt.PriceCents);
+            var price = tt.PriceCents;
+            var feePerItem = tt.PlatformFeeCents;
+
+            // If it's a seated booking, we might have table-specific fees
+            if (item.SeatId.HasValue)
+            {
+                var seat = await context.Seats
+                    .Include(s => s.Table)
+                    .FirstOrDefaultAsync(s => s.Id == item.SeatId.Value);
+                if (seat?.Table != null && seat.Table.PlatformFeeCents > 0)
+                {
+                    feePerItem = seat.Table.PlatformFeeCents;
+                }
+            }
+
+            items.Add((price, feePerItem));
             bookingItems.Add(new BookingItem
             {
                 Id = Guid.NewGuid(),
                 TicketTypeId = item.TicketTypeId,
                 SeatId = item.SeatId,
-                PriceCents = tt.PriceCents
+                PriceCents = price
             });
         }
 
-        var (subtotal, fee, total) = await pricingEngine.CalculateAsync(request.EventId, itemPrices);
+        var (subtotal, fee, total) = await pricingEngine.CalculateAsync(request.EventId, items);
 
         // Create payment intent
         var (intentId, _) = await paymentService.CreatePaymentIntentAsync(total);

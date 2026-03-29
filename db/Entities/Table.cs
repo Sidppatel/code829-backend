@@ -17,6 +17,7 @@ public class Table : BaseEntity
     public PriceType PriceType { get; set; } = PriceType.PerSeat;
     public int PriceCents { get; set; }
     public int? PriceOverrideCents { get; set; }
+    public int PlatformFeeCents { get; set; }
     public bool IsActive { get; set; } = true;
 
     // Grid mode positioning

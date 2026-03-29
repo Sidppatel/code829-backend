@@ -120,6 +120,7 @@ public class DeveloperEventsController(
                     QuantityTotal = tt.QuantityTotal,
                     QuantitySold = 0,
                     SortOrder = tt.SortOrder,
+                    PlatformFeeCents = tt.PlatformFeeCents,
                     EventId = ev.Id
                 });
             }
@@ -248,6 +249,40 @@ public class DeveloperEventsController(
         return NoContent();
     }
 
+    [HttpPut("{id:guid}/platform-fees")]
+    public async Task<IActionResult> UpdatePlatformFees(Guid id, [FromBody] Contracts.DTOs.Developer.UpdateEventPlatformFeesRequest request)
+    {
+        var ev = await context.Events
+            .Include(e => e.TicketTypes)
+            .FirstOrDefaultAsync(e => e.Id == id);
+        
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        if (request.TicketFees is not null)
+        {
+            foreach (var fee in request.TicketFees)
+            {
+                var tt = ev.TicketTypes.FirstOrDefault(t => t.Id == fee.TicketTypeId);
+                if (tt is not null) tt.PlatformFeeCents = fee.PlatformFeeCents;
+            }
+        }
+
+        if (request.TableFees is not null)
+        {
+            var tables = await context.Tables.Where(t => t.EventId == id).ToListAsync();
+            foreach (var fee in request.TableFees)
+            {
+                var table = tables.FirstOrDefault(t => t.Id == fee.TableId);
+                if (table is not null) table.PlatformFeeCents = fee.PlatformFeeCents;
+            }
+        }
+
+        await context.SaveChangesAsync();
+        await adminLog.LogAsync("event.platform_fees_updated", "Event", ev.Id, $"Platform fees updated by developer for event '{ev.Title}'");
+
+        return Ok(new { message = "Platform fees updated successfully" });
+    }
+
     /// <summary>
     /// Duplicate an event: copies settings, layout tables, and pricing rules.
     /// Resets status to Draft, clears bookings/holds, requires new dates.
@@ -302,6 +337,7 @@ public class DeveloperEventsController(
                 PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
                 GridRow = t.GridRow, GridCol = t.GridCol,
                 SortOrder = t.SortOrder,
+                PlatformFeeCents = t.PlatformFeeCents,
                 TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
             });
         }
@@ -351,7 +387,8 @@ public class DeveloperEventsController(
         e.Organizer?.Name,
         e.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
             t.Id, t.Name, t.Description, t.PriceCents,
-            t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder
+            t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
+            t.PlatformFeeCents
         )).ToList(),
         e.CreatedAt
     );

@@ -119,6 +119,7 @@ public class AdminEventsController(
                     QuantityTotal = tt.QuantityTotal,
                     QuantitySold = 0,
                     SortOrder = tt.SortOrder,
+                    PlatformFeeCents = tt.PlatformFeeCents,
                     EventId = ev.Id
                 });
             }
@@ -299,6 +300,7 @@ public class AdminEventsController(
                 PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
                 GridRow = t.GridRow, GridCol = t.GridCol,
                 SortOrder = t.SortOrder,
+                PlatformFeeCents = t.PlatformFeeCents,
                 TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
             });
         }
@@ -348,7 +350,8 @@ public class AdminEventsController(
         e.Organizer?.Name,
         e.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
             t.Id, t.Name, t.Description, t.PriceCents,
-            t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder
+            t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
+            t.PlatformFeeCents
         )).ToList(),
         e.CreatedAt
     );

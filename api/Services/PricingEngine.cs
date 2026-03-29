@@ -14,9 +14,16 @@ public class PricingEngine(
 ) : IPricingEngine
 {
     public async Task<(int SubtotalCents, int FeeCents, int TotalCents)> CalculateAsync(
-        Guid eventId, List<int> itemPricesCents)
+        Guid eventId, List<(int BasePrice, int Fee)> items)
     {
-        var subtotal = itemPricesCents.Sum();
+        var subtotal = items.Sum(i => i.BasePrice);
+        var granularFee = items.Sum(i => i.Fee);
+
+        // If all items have 0 granular fee, fallback to global percentage/flat fee logic
+        if (granularFee > 0)
+        {
+            return (subtotal, granularFee, subtotal + granularFee);
+        }
 
         // Check for event-specific pricing rule override
         var rule = await context.PricingRules
@@ -40,7 +47,7 @@ public class PricingEngine(
                 await settings.GetOrDefaultAsync("platform_fee_flat_cents", "0") ?? "0");
         }
 
-        var fee = (int)Math.Ceiling(subtotal * feePercent / 100.0) + feeFlatCents;
+        var fee = (int)Math.Ceiling(subtotal * feePercent / 100.0) + (feeFlatCents * items.Count);
         var total = subtotal + fee;
 
         return (subtotal, fee, total);

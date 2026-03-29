@@ -20,6 +20,8 @@ public record TableDto(
     string Shape,
     int WidthPx,
     int HeightPx,
+    int PriceCents,
+    int PlatformFeeCents,
     List<SeatDto> Seats
 );
 

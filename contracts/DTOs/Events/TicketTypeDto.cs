@@ -8,5 +8,6 @@ public record TicketTypeDto(
     int QuantityTotal,
     int QuantitySold,
     int QuantityRemaining,
-    int SortOrder
+    int SortOrder,
+    int PlatformFeeCents
 );

@@ -12,6 +12,7 @@ public class TicketType : BaseEntity
     public int QuantityTotal { get; set; }
     public int QuantitySold { get; set; }
     public int SortOrder { get; set; }
+    public int PlatformFeeCents { get; set; }
 
     public Guid EventId { get; set; }
     public Event Event { get; set; } = null!;
