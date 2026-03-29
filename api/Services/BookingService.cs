@@ -47,15 +47,16 @@ public class BookingService(
             var price = tt.PriceCents ?? 0;
             var feePerItem = tt.PlatformFeeCents ?? 0;
 
-            // If it's a seated booking, we might have table-specific fees
+            // If it's a seated booking, use the table type's platform fee
             if (item.SeatId.HasValue)
             {
                 var seat = await context.Seats
                     .Include(s => s.Table)
+                        .ThenInclude(t => t!.TableType)
                     .FirstOrDefaultAsync(s => s.Id == item.SeatId.Value);
-                if (seat?.Table != null && seat.Table.PlatformFeeCents > 0)
+                if (seat?.Table?.TableType != null && seat.Table.TableType.PlatformFeeCents > 0)
                 {
-                    feePerItem = seat.Table.PlatformFeeCents;
+                    feePerItem = seat.Table.TableType.PlatformFeeCents;
                 }
             }
 
@@ -219,7 +220,7 @@ public class BookingService(
             .Include(x => x.User)
             .Include(x => x.Event)
             .Include(x => x.Items).ThenInclude(i => i.TicketType)
-            .Include(x => x.Items).ThenInclude(i => i.Seat)
+            .Include(x => x.Items).ThenInclude(i => i.Seat).ThenInclude(s => s!.Table)
             .Include(x => x.Payment)
             .FirstOrDefaultAsync(x => x.Id == bookingId);
 
@@ -232,7 +233,8 @@ public class BookingService(
             b.Items.Select(i => new BookingItemDto(
                 i.Id, i.TicketTypeId, i.TicketType.Name ?? "",
                 i.SeatId, i.Seat?.Label, i.PriceCents,
-                i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn
+                i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn,
+                i.Seat?.Table?.Label
             )).ToList(),
             b.Payment is not null ? new PaymentDto(
                 b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(),

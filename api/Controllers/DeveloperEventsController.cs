@@ -49,13 +49,21 @@ public class DeveloperEventsController : AdminEventsController
             }
         }
 
-        if (request.TableFees is not null)
+        if (request.TableTypeFees is not null)
         {
-            var tables = await _context.Tables.Where(t => t.EventId == id).ToListAsync();
-            foreach (var fee in request.TableFees)
+            // Get all table type IDs used by this event's tables
+            var tableTypeIds = await _context.Tables
+                .Where(t => t.EventId == id && t.TableTypeId.HasValue)
+                .Select(t => t.TableTypeId!.Value)
+                .Distinct()
+                .ToListAsync();
+            var tableTypes = await _context.TableTypes
+                .Where(tt => tableTypeIds.Contains(tt.Id))
+                .ToListAsync();
+            foreach (var fee in request.TableTypeFees)
             {
-                var table = tables.FirstOrDefault(t => t.Id == fee.TableId);
-                if (table is not null) table.PlatformFeeCents = fee.PlatformFeeCents;
+                var tt = tableTypes.FirstOrDefault(t => t.Id == fee.TableTypeId);
+                if (tt is not null) tt.PlatformFeeCents = fee.PlatformFeeCents;
             }
         }
 

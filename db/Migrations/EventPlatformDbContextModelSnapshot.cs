@@ -913,9 +913,6 @@ namespace db.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<int>("PlatformFeeCents")
-                        .HasColumnType("integer");
-
                     b.Property<int>("PriceCents")
                         .HasColumnType("integer");
 
@@ -994,6 +991,9 @@ namespace db.Migrations
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<int>("PlatformFeeCents")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

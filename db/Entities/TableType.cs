@@ -13,6 +13,7 @@ public class TableType : BaseEntity
     public TableShape DefaultShape { get; set; } = TableShape.Round;
     public string? DefaultColor { get; set; }
     public int DefaultPriceCents { get; set; }
+    public int PlatformFeeCents { get; set; }
     public bool IsActive { get; set; } = true;
 
     // Keep VenueId nullable for backward compat (Phase 4 created venue-scoped types)

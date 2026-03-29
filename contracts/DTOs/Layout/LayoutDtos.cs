@@ -7,6 +7,7 @@ public record TableTypeResponse(
     string DefaultShape,
     string? DefaultColor,
     int DefaultPriceCents,
+    int PlatformFeeCents,
     bool IsActive
 );
 
@@ -36,6 +37,7 @@ public record LayoutTableResponse(
     string PriceType,
     int PriceCents,
     int? PriceOverrideCents,
+    int PlatformFeeCents,
     bool IsActive,
     int? GridRow,
     int? GridCol,

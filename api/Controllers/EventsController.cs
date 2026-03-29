@@ -408,6 +408,7 @@ public class EventsController(
         if (userClaim is not null && Guid.TryParse(userClaim.Value, out var uid)) userId = uid;
 
         var tables = await context.Tables
+            .Include(t => t.TableType)
             .Include(t => t.Seats).ThenInclude(s => s.Holds)
             .Where(t => t.EventId == id && t.IsActive)
             .OrderBy(t => t.SortOrder)
@@ -448,7 +449,7 @@ public class EventsController(
             {
                 return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
                     (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
-                    t.PriceType.ToString(), t.PriceCents, t.PlatformFeeCents, t.GridRow, t.GridCol,
+                    t.PriceType.ToString(), t.PriceCents, t.TableType?.PlatformFeeCents ?? 0, t.GridRow, t.GridCol,
                     t.SortOrder, "Booked", null);
             }
 
@@ -463,13 +464,13 @@ public class EventsController(
                 var expiresAt = heldByMe && userId.HasValue ? activeHolds.Where(h => h.UserId == userId.Value).Min(h => h.ExpiresAt) : (DateTime?)null;
                 return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
                     (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
-                    t.PriceType.ToString(), t.PriceCents, t.PlatformFeeCents, t.GridRow, t.GridCol,
+                    t.PriceType.ToString(), t.PriceCents, t.TableType?.PlatformFeeCents ?? 0, t.GridRow, t.GridCol,
                     t.SortOrder, heldByMe ? "HeldByYou" : "Held", expiresAt);
             }
 
             return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
                 (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
-                t.PriceType.ToString(), t.PriceCents, t.PlatformFeeCents, t.GridRow, t.GridCol,
+                t.PriceType.ToString(), t.PriceCents, t.TableType?.PlatformFeeCents ?? 0, t.GridRow, t.GridCol,
                 t.SortOrder, "Available", null);
         }).ToList();
 

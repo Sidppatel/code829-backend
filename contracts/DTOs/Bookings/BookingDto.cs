@@ -28,7 +28,8 @@ public record BookingItemDto(
     string? GuestName = null,
     string? GuestEmail = null,
     string? InvitationToken = null,
-    bool IsCheckedIn = false
+    bool IsCheckedIn = false,
+    string? TableLabel = null
 );
 
 public record PaymentDto(

@@ -28,7 +28,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .OrderBy(tt => tt.Name)
             .Select(tt => new TableTypeResponse(
                 tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
-                tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive))
+                tt.DefaultColor, tt.DefaultPriceCents, tt.PlatformFeeCents, tt.IsActive))
             .ToListAsync();
         return Ok(types);
     }
@@ -53,7 +53,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         await context.SaveChangesAsync();
         return Created("", new TableTypeResponse(
             tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
-            tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive));
+            tt.DefaultColor, tt.DefaultPriceCents, tt.PlatformFeeCents, tt.IsActive));
     }
 
     [HttpPut("admin/table-types/{id:guid}")]
@@ -75,7 +75,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         await context.SaveChangesAsync();
         return Ok(new TableTypeResponse(
             tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
-            tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive));
+            tt.DefaultColor, tt.DefaultPriceCents, tt.PlatformFeeCents, tt.IsActive));
     }
 
     [HttpDelete("admin/table-types/{id:guid}")]
@@ -368,6 +368,94 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         return NoContent();
     }
 
+    /// <summary>
+    /// Returns layout tables with booking status for admin overview.
+    /// Each table has: status (Available/Held/Booked), seatsSold count, and booking count.
+    /// </summary>
+    [HttpGet("admin/events/{eventId:guid}/layout/status")]
+    public async Task<IActionResult> GetLayoutWithStatus(Guid eventId)
+    {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        var now = DateTime.UtcNow;
+
+        var tables = await context.Tables
+            .Include(t => t.TableType)
+            .Include(t => t.Seats)
+            .Where(t => t.EventId == eventId && t.IsActive)
+            .OrderBy(t => t.SortOrder)
+            .ToListAsync();
+
+        // Get booked seat IDs
+        var bookedSeatIds = await context.BookingItems
+            .Where(bi => bi.SeatId.HasValue
+                && bi.Booking.EventId == eventId
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
+            .Select(bi => bi.SeatId!.Value)
+            .ToHashSetAsync();
+
+        // Get held seat IDs
+        var heldSeatIds = await context.SeatHolds
+            .Where(h => h.EventId == eventId && h.IsActive && h.ExpiresAt > now)
+            .Select(h => h.SeatId)
+            .ToHashSetAsync();
+
+        // Get booking info per table (which bookings reference seats on each table)
+        var tableBookingMap = await context.BookingItems
+            .Where(bi => bi.SeatId.HasValue
+                && bi.Booking.EventId == eventId
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
+            .Include(bi => bi.Seat)
+            .Include(bi => bi.Booking).ThenInclude(b => b.User)
+            .GroupBy(bi => bi.Seat!.TableId)
+            .Select(g => new {
+                TableId = g.Key,
+                BookingCount = g.Select(bi => bi.BookingId).Distinct().Count(),
+                SeatsSold = g.Count(),
+                Bookers = g.Select(bi => new { bi.Booking.UserId, Name = bi.Booking.User.FirstName + " " + bi.Booking.User.LastName })
+                    .DistinctBy(x => x.UserId)
+                    .Select(x => x.Name)
+                    .ToList()
+            })
+            .ToListAsync();
+
+        var bookingLookup = tableBookingMap.ToDictionary(x => x.TableId);
+
+        var result = tables.Select(t =>
+        {
+            var seatIds = t.Seats.Select(s => s.Id).ToList();
+            var isBooked = seatIds.Any(sid => bookedSeatIds.Contains(sid));
+            var isHeld = seatIds.Any(sid => heldSeatIds.Contains(sid));
+            var status = isBooked ? "Booked" : isHeld ? "Held" : "Available";
+
+            bookingLookup.TryGetValue(t.Id, out var info);
+
+            return new
+            {
+                t.Id,
+                t.Label,
+                Capacity = t.Capacity ?? 0,
+                Shape = (t.Shape ?? Contracts.Enums.TableShape.Round).ToString(),
+                t.Color,
+                t.GridRow,
+                t.GridCol,
+                Status = status,
+                SeatsSold = info?.SeatsSold ?? 0,
+                BookingCount = info?.BookingCount ?? 0,
+                Bookers = info?.Bookers ?? []
+            };
+        }).ToList();
+
+        return Ok(new
+        {
+            eventId,
+            ev.GridRows,
+            ev.GridCols,
+            Tables = result
+        });
+    }
+
     private async Task<EventLayoutResponse> GetLayoutInternal(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);
@@ -453,7 +541,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
     private static LayoutTableResponse MapTable(Table t) => new(
         t.Id, t.Label, t.Capacity ?? 0, (t.Shape ?? Contracts.Enums.TableShape.Round).ToString(), t.Color, t.Section,
-        t.PriceType.ToString(), t.PriceCents, t.PriceOverrideCents, t.IsActive,
+        t.PriceType.ToString(), t.PriceCents, t.PriceOverrideCents, t.TableType?.PlatformFeeCents ?? 0, t.IsActive,
         t.GridRow, t.GridCol,
         t.SortOrder, t.TableTypeId, t.TableType?.Name);
 }

@@ -2,7 +2,7 @@ namespace Contracts.DTOs.Developer;
 
 public record UpdateEventPlatformFeesRequest(
     List<TicketTypeFeeUpdate>? TicketFees,
-    List<TableFeeUpdate>? TableFees
+    List<TableTypeFeeUpdate>? TableTypeFees
 );
 
 public record TicketTypeFeeUpdate(
@@ -10,7 +10,7 @@ public record TicketTypeFeeUpdate(
     int PlatformFeeCents
 );
 
-public record TableFeeUpdate(
-    Guid TableId,
+public record TableTypeFeeUpdate(
+    Guid TableTypeId,
     int PlatformFeeCents
 );

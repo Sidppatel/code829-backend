@@ -49,6 +49,7 @@ public class AdminBookingsController(
         var query = context.Bookings
             .Include(b => b.User).Include(b => b.Event)
             .Include(b => b.Items).ThenInclude(i => i.TicketType)
+            .Include(b => b.Items).ThenInclude(i => i.Seat).ThenInclude(s => s!.Table)
             .Include(b => b.Payment)
             .AsQueryable();
 
@@ -77,7 +78,7 @@ public class AdminBookingsController(
             b.Id, b.BookingNumber, b.Status.ToString(),
             b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
-            b.Items.Select(i => new BookingItemDto(i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, null, i.PriceCents, i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn)).ToList(),
+            b.Items.Select(i => new BookingItemDto(i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, i.Seat?.Label, i.PriceCents, i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn, i.Seat?.Table?.Label)).ToList(),
             b.Payment is not null ? new PaymentDto(b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(), b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt) : null,
             b.CreatedAt
         )).ToList();

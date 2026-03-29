@@ -110,10 +110,10 @@ public static class DataSeeder
 
         var types = new[]
         {
-            new TableType { Id = Guid.NewGuid(), Name = "Standard Round (4)", DefaultCapacity = 4, DefaultShape = Contracts.Enums.TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 0, IsActive = true },
-            new TableType { Id = Guid.NewGuid(), Name = "VIP Rectangle (6)", DefaultCapacity = 6, DefaultShape = Contracts.Enums.TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 0, IsActive = true },
-            new TableType { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = Contracts.Enums.TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 0, IsActive = true },
-            new TableType { Id = Guid.NewGuid(), Name = "Lounge Section (8)", DefaultCapacity = 8, DefaultShape = Contracts.Enums.TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 0, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "Standard Round (4)", DefaultCapacity = 4, DefaultShape = Contracts.Enums.TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 0, PlatformFeeCents = 500, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "VIP Rectangle (6)", DefaultCapacity = 6, DefaultShape = Contracts.Enums.TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 0, PlatformFeeCents = 1000, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = Contracts.Enums.TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 0, PlatformFeeCents = 300, IsActive = true },
+            new TableType { Id = Guid.NewGuid(), Name = "Lounge Section (8)", DefaultCapacity = 8, DefaultShape = Contracts.Enums.TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 0, PlatformFeeCents = 1500, IsActive = true },
         };
 
         context.TableTypes.AddRange(types);

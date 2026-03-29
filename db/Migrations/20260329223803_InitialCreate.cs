@@ -272,6 +272,7 @@ namespace db.Migrations
                     DefaultShape = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     DefaultColor = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     DefaultPriceCents = table.Column<int>(type: "integer", nullable: false),
+                    PlatformFeeCents = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     VenueId = table.Column<Guid>(type: "uuid", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -531,7 +532,6 @@ namespace db.Migrations
                     PriceType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     PriceCents = table.Column<int>(type: "integer", nullable: false),
                     PriceOverrideCents = table.Column<int>(type: "integer", nullable: true),
-                    PlatformFeeCents = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     GridRow = table.Column<int>(type: "integer", nullable: true),
                     GridCol = table.Column<int>(type: "integer", nullable: true),
@@ -996,29 +996,26 @@ namespace db.Migrations
                 table: "venues",
                 column: "Name");
 
-            // ─── SQL Views ───────────────────────────────────────────
+            // ─── SQL Views ───────────────────────────────────────────────────────
 
             migrationBuilder.Sql(@"
 CREATE VIEW v_events AS
-SELECT
-    e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status"",
-    COALESCE(e.""Category"", et.""Category"", 'Music') AS ""Category"",
-    e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
-    COALESCE(e.""LayoutMode"", vl.""LayoutMode"", 'None') AS ""LayoutMode"",
-    COALESCE(e.""EditorMode"", vl.""EditorMode"") AS ""EditorMode"",
-    COALESCE(e.""GridRows"", vl.""GridRows"") AS ""GridRows"",
-    COALESCE(e.""GridCols"", vl.""GridCols"") AS ""GridCols"",
-    COALESCE(e.""MaxCapacity"", et.""DefaultMaxCapacity"") AS ""MaxCapacity"",
-    COALESCE(e.""PlatformFeePercent"", et.""DefaultPlatformFeePercent"") AS ""PlatformFeePercent"",
-    e.""PublishedAt"", e.""ScheduledPublishAt"",
-    e.""VenueId"", e.""OrganizerId"", e.""VenueLayoutId"", e.""EventTemplateId"",
-    e.""SearchVector"", e.""CreatedAt"", e.""UpdatedAt"",
-    v.""Name"" AS ""VenueName"",
-    a.""Line1"" AS ""VenueAddress"",
-    a.""City"" AS ""VenueCity"",
-    a.""State"" AS ""VenueState"",
-    a.""ZipCode"" AS ""VenueZipCode"",
-    v.""ImagePath"" AS ""VenueImagePath""
+SELECT e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status"",
+  COALESCE(e.""Category"", et.""Category"") AS ""Category"",
+  e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
+  COALESCE(e.""LayoutMode"", vl.""LayoutMode"", 'None') AS ""LayoutMode"",
+  COALESCE(e.""EditorMode"", vl.""EditorMode"") AS ""EditorMode"",
+  COALESCE(e.""GridRows"", vl.""GridRows"") AS ""GridRows"",
+  COALESCE(e.""GridCols"", vl.""GridCols"") AS ""GridCols"",
+  COALESCE(e.""MaxCapacity"", et.""DefaultMaxCapacity"") AS ""MaxCapacity"",
+  COALESCE(e.""PlatformFeePercent"", et.""DefaultPlatformFeePercent"") AS ""PlatformFeePercent"",
+  e.""PublishedAt"", e.""ScheduledPublishAt"",
+  e.""VenueId"", e.""OrganizerId"", e.""SearchVector"", e.""CreatedAt"", e.""UpdatedAt"",
+  v.""Name"" AS ""VenueName"",
+  a.""Line1"" AS ""VenueAddress"",
+  a.""City"" AS ""VenueCity"",
+  a.""State"" AS ""VenueState"",
+  a.""ZipCode"" AS ""VenueZipCode""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
 LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
@@ -1028,14 +1025,13 @@ LEFT JOIN event_templates et ON e.""EventTemplateId"" = et.""Id"";
 
             migrationBuilder.Sql(@"
 CREATE VIEW v_ticket_types AS
-SELECT
-    tt.""Id"", tt.""EventId"",
-    COALESCE(tt.""Name"", tpl.""Name"") AS ""Name"",
-    COALESCE(tt.""Description"", tpl.""Description"") AS ""Description"",
-    COALESCE(tt.""PriceCents"", tpl.""DefaultPriceCents"", 0) AS ""PriceCents"",
-    COALESCE(tt.""PlatformFeeCents"", tpl.""DefaultPlatformFeeCents"", 0) AS ""PlatformFeeCents"",
-    tt.""QuantityTotal"", tt.""QuantitySold"", tt.""SortOrder"",
-    tt.""TemplateId"", tt.""CreatedAt"", tt.""UpdatedAt""
+SELECT tt.""Id"", tt.""EventId"",
+  COALESCE(tt.""Name"", tpl.""Name"") AS ""Name"",
+  COALESCE(tt.""Description"", tpl.""Description"") AS ""Description"",
+  COALESCE(tt.""PriceCents"", tpl.""DefaultPriceCents"", 0) AS ""PriceCents"",
+  COALESCE(tt.""PlatformFeeCents"", tpl.""DefaultPlatformFeeCents"", 0) AS ""PlatformFeeCents"",
+  tt.""QuantityTotal"", tt.""QuantitySold"", tt.""SortOrder"",
+  tt.""TemplateId"", tt.""CreatedAt"", tt.""UpdatedAt""
 FROM ticket_types tt
 LEFT JOIN ticket_type_templates tpl ON tt.""TemplateId"" = tpl.""Id"";
 ");
@@ -1050,7 +1046,8 @@ SELECT
     COALESCE(t.""Color"", ttype.""DefaultColor"") AS ""Color"",
     t.""Section"", t.""PriceType"",
     COALESCE(t.""PriceOverrideCents"", t.""PriceCents"", ttype.""DefaultPriceCents"", 0) AS ""EffectivePriceCents"",
-    t.""PlatformFeeCents"", t.""IsActive"",
+    COALESCE(ttype.""PlatformFeeCents"", 0) AS ""PlatformFeeCents"",
+    t.""IsActive"",
     t.""GridRow"", t.""GridCol"", t.""SortOrder"",
     t.""CreatedAt"", t.""UpdatedAt""
 FROM tables t
@@ -1059,41 +1056,37 @@ LEFT JOIN table_types ttype ON t.""TableTypeId"" = ttype.""Id"";
 
             migrationBuilder.Sql(@"
 CREATE VIEW v_pricing_rules AS
-SELECT
-    pr.""Id"", pr.""EventId"", pr.""TableTypeId"",
-    COALESCE(pr.""Name"", prt.""Name"") AS ""Name"",
-    COALESCE(pr.""Type"", prt.""Type"", 'Standard') AS ""Type"",
-    COALESCE(pr.""PriceCents"", prt.""DefaultPriceCents"", 0) AS ""PriceCents"",
-    pr.""ValidFrom"", pr.""ValidUntil"", pr.""MaxCount"", pr.""UsedCount"",
-    pr.""IsActive"", pr.""SortOrder"",
-    COALESCE(pr.""FeePercent"", prt.""DefaultFeePercent"") AS ""FeePercent"",
-    COALESCE(pr.""FeeFlatCents"", prt.""DefaultFeeFlatCents"") AS ""FeeFlatCents"",
-    COALESCE(pr.""Description"", prt.""Description"") AS ""Description"",
-    pr.""TemplateId"", pr.""CreatedAt"", pr.""UpdatedAt""
+SELECT pr.""Id"", pr.""EventId"", pr.""TableTypeId"",
+  COALESCE(pr.""Name"", prt.""Name"") AS ""Name"",
+  COALESCE(pr.""Type"", prt.""Type"") AS ""Type"",
+  COALESCE(pr.""PriceCents"", prt.""DefaultPriceCents"", 0) AS ""PriceCents"",
+  pr.""ValidFrom"", pr.""ValidUntil"", pr.""MaxCount"", pr.""UsedCount"", pr.""IsActive"", pr.""SortOrder"",
+  COALESCE(pr.""FeePercent"", prt.""DefaultFeePercent"") AS ""FeePercent"",
+  COALESCE(pr.""FeeFlatCents"", prt.""DefaultFeeFlatCents"") AS ""FeeFlatCents"",
+  COALESCE(pr.""Description"", prt.""Description"") AS ""Description"",
+  pr.""TemplateId"", pr.""CreatedAt"", pr.""UpdatedAt""
 FROM pricing_rules pr
 LEFT JOIN pricing_rule_templates prt ON pr.""TemplateId"" = prt.""Id"";
 ");
 
             migrationBuilder.Sql(@"
 CREATE VIEW v_event_summary AS
-SELECT
-    e.""Id"", e.""Title"", e.""Slug"", e.""Status"",
-    COALESCE(e.""Category"", 'Music') AS ""Category"",
-    e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
-    v.""Name"" AS ""VenueName"",
-    a.""City"" AS ""VenueCity"",
-    CONCAT(u.""FirstName"", ' ', u.""LastName"") AS ""OrganizerName"",
-    COUNT(DISTINCT tt.""Id"")::int AS ""TicketTypeCount"",
-    COALESCE(SUM(tt.""QuantityTotal""), 0) AS ""TotalCapacity"",
-    COALESCE(SUM(tt.""QuantitySold""), 0) AS ""TotalSold""
+SELECT e.""Id"", e.""Title"", e.""Slug"", e.""Status"", e.""Category"",
+  e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
+  v.""Name"" AS ""VenueName"",
+  a.""City"" AS ""VenueCity"",
+  CONCAT(u.""FirstName"", ' ', u.""LastName"") AS ""OrganizerName"",
+  COUNT(DISTINCT tt.""Id"") AS ""TicketTypeCount"",
+  COALESCE(SUM(tt.""QuantityTotal""), 0) AS ""TotalCapacity"",
+  COALESCE(SUM(tt.""QuantitySold""), 0) AS ""TotalSold""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
 LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
 JOIN users u ON e.""OrganizerId"" = u.""Id""
 LEFT JOIN ticket_types tt ON tt.""EventId"" = e.""Id""
 GROUP BY e.""Id"", e.""Title"", e.""Slug"", e.""Status"", e.""Category"",
-    e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
-    v.""Name"", a.""City"", u.""FirstName"", u.""LastName"";
+  e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
+  v.""Name"", a.""City"", u.""FirstName"", u.""LastName"";
 ");
         }
 

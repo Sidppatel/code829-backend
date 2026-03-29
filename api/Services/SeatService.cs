@@ -36,7 +36,7 @@ public class SeatService(
                 t.Id, t.Label, 0, 0, 0,
                 t.TableType?.Name ?? "Unknown", t.TableType?.DefaultShape.ToString() ?? "Round",
                 80, 80,
-                t.PriceCents, t.PlatformFeeCents,
+                t.PriceCents, t.TableType?.PlatformFeeCents ?? 0,
                 t.Seats.OrderBy(s => s.SeatNumber).Select(s =>
                 {
                     // A seat is held if there's an active, non-expired hold for this event

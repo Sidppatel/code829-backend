@@ -316,7 +316,6 @@ public class AdminEventsController(
                 PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
                 GridRow = t.GridRow, GridCol = t.GridCol,
                 SortOrder = t.SortOrder,
-                PlatformFeeCents = 0, // Admin cannot set fees
                 TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
             });
         }
