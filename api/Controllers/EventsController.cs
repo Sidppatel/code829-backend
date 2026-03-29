@@ -405,7 +405,6 @@ public class EventsController(
         var now = DateTime.UtcNow;
         Guid? userId = null;
         var userClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userClaim is not null) Guid.TryParse(userClaim.Value, out var parsed);
         if (userClaim is not null && Guid.TryParse(userClaim.Value, out var uid)) userId = uid;
 
         var tables = await context.Tables
@@ -413,6 +412,24 @@ public class EventsController(
             .Where(t => t.EventId == id && t.IsActive)
             .OrderBy(t => t.SortOrder)
             .ToListAsync();
+
+        // Auto-generate seats for tables that don't have them
+        var needsSync = false;
+        foreach (var t in tables)
+        {
+            var capacity = t.Capacity ?? 0;
+            if (t.Seats.Count < capacity)
+            {
+                for (var i = t.Seats.Count + 1; i <= capacity; i++)
+                {
+                    var seat = new Db.Entities.Seat { Id = Guid.NewGuid(), Label = $"S{i}", SeatNumber = i, TableId = t.Id };
+                    context.Seats.Add(seat);
+                    t.Seats.Add(seat);
+                }
+                needsSync = true;
+            }
+        }
+        if (needsSync) await context.SaveChangesAsync();
 
         // Get booked seat IDs (Paid or CheckedIn bookings)
         var bookedSeatIds = await context.BookingItems

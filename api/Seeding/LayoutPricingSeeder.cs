@@ -48,6 +48,7 @@ public static class LayoutPricingSeeder
                 ev.GridRows = 5 + (idx % 3);
                 ev.GridCols = 5 + (idx % 4);
                 SeedGridTables(context, ev, roundType, rectType, cocktailType, idx);
+                SeedSeatsForTables(context, ev.Id);
             }
             else if (idx < 12)
             {
@@ -101,6 +102,25 @@ public static class LayoutPricingSeeder
                 EventId = ev.Id,
                 VenueId = ev.VenueId
             });
+        }
+    }
+
+    private static void SeedSeatsForTables(EventPlatformDbContext context, Guid eventId)
+    {
+        var tables = context.Tables.Local.Where(t => t.EventId == eventId).ToList();
+        foreach (var table in tables)
+        {
+            var capacity = table.Capacity ?? 0;
+            for (var i = 1; i <= capacity; i++)
+            {
+                context.Seats.Add(new Seat
+                {
+                    Id = Guid.NewGuid(),
+                    Label = $"S{i}",
+                    SeatNumber = i,
+                    TableId = table.Id
+                });
+            }
         }
     }
 
