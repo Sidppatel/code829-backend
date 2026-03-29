@@ -13,10 +13,11 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("bookings")]
-[Authorize]
 public class BookingsController(
     IBookingService bookingService,
-    EventPlatformDbContext context
+    EventPlatformDbContext context,
+    IEmailService emailService,
+    ISettingsService settingsService
 ) : ControllerBase
 {
     /// <summary>
@@ -128,7 +129,8 @@ public class BookingsController(
             b.UserId, b.User.Name, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(
-                i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, null, i.PriceCents
+                i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, null, i.PriceCents,
+                i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn
             )).ToList(),
             b.Payment is not null ? new PaymentDto(
                 b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(),
@@ -155,4 +157,75 @@ public class BookingsController(
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }
+
+    /// <summary>
+    /// Public — view seat QR code via secure invitation token (no login needed).
+    /// </summary>
+    [HttpGet("invitation/{token}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetInvitation(string token)
+    {
+        var item = await context.BookingItems
+            .Include(i => i.Booking).ThenInclude(b => b.Event)
+            .Include(i => i.TicketType)
+            .Include(i => i.Seat)
+            .FirstOrDefaultAsync(i => i.InvitationToken == token);
+
+        if (item is null) return NotFound(new { message = "Invalid invitation link" });
+        if (item.Booking.Status != BookingStatus.Paid && item.Booking.Status != BookingStatus.CheckedIn)
+            return BadRequest(new { message = "This booking is no longer valid" });
+
+        return Ok(new
+        {
+            eventTitle = item.Booking.Event.Title,
+            eventDate = item.Booking.Event.StartDate,
+            seatLabel = item.Seat?.Label,
+            ticketType = item.TicketType.Name ?? "",
+            guestName = item.GuestName,
+            qrToken = item.QrToken,
+            isCheckedIn = item.IsCheckedIn,
+            bookingNumber = item.Booking.BookingNumber
+        });
+    }
+
+    /// <summary>
+    /// Update guest info for a booking item and optionally send invitation email.
+    /// </summary>
+    [HttpPut("{bookingId:guid}/items/{itemId:guid}/guest")]
+    [Authorize]
+    public async Task<IActionResult> UpdateGuestInfo(Guid bookingId, Guid itemId, [FromBody] UpdateGuestRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var item = await context.BookingItems
+            .Include(i => i.Booking).ThenInclude(b => b.Event)
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.BookingId == bookingId && i.Booking.UserId == userId);
+
+        if (item is null) return NotFound(new { message = "Booking item not found" });
+
+        if (request.GuestName is not null) item.GuestName = request.GuestName;
+        if (request.GuestEmail is not null) item.GuestEmail = request.GuestEmail;
+
+        if (request.SendInvitation && !string.IsNullOrWhiteSpace(item.GuestEmail) && item.InvitationToken is not null)
+        {
+            var frontendUrl = await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+            var brandName = await settingsService.GetOrDefaultAsync("brand_name", "Code829");
+            var inviteUrl = $"{frontendUrl}/invitation/{item.InvitationToken}";
+
+            await emailService.SendAsync(
+                item.GuestEmail,
+                $"You're Invited — {item.Booking.Event.Title} | {brandName}",
+                $"Hi {item.GuestName ?? "Guest"},\n\n" +
+                $"You've been invited to {item.Booking.Event.Title}!\n\n" +
+                $"View your QR code and ticket details here:\n{inviteUrl}\n\n" +
+                $"— {brandName}"
+            );
+            item.InvitationSent = true;
+        }
+
+        item.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+        return Ok(new { message = "Guest info updated" });
+    }
 }
+
+public record UpdateGuestRequest(string? GuestName, string? GuestEmail, bool SendInvitation = false);

@@ -130,9 +130,11 @@ public class BookingService(
         booking.Status = BookingStatus.Paid;
         booking.QrToken = GenerateQrToken();
 
-        // Increment sold counts
+        // Generate per-item QR tokens and invitation tokens, increment sold counts
         foreach (var item in booking.Items)
         {
+            item.QrToken = GenerateQrToken();
+            item.InvitationToken = GenerateInvitationToken();
             item.TicketType.QuantitySold++;
         }
 
@@ -229,7 +231,8 @@ public class BookingService(
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(
                 i.Id, i.TicketTypeId, i.TicketType.Name ?? "",
-                i.SeatId, i.Seat?.Label, i.PriceCents
+                i.SeatId, i.Seat?.Label, i.PriceCents,
+                i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn
             )).ToList(),
             b.Payment is not null ? new PaymentDto(
                 b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(),
@@ -264,5 +267,11 @@ public class BookingService(
     {
         var bytes = RandomNumberGenerator.GetBytes(24);
         return $"QR-{Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')}";
+    }
+
+    private static string GenerateInvitationToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
     }
 }

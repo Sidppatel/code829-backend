@@ -603,6 +603,12 @@ namespace db.Migrations
                     TicketTypeId = table.Column<Guid>(type: "uuid", nullable: false),
                     SeatId = table.Column<Guid>(type: "uuid", nullable: true),
                     PriceCents = table.Column<int>(type: "integer", nullable: false),
+                    QrToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    GuestName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    GuestEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    InvitationToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    InvitationSent = table.Column<bool>(type: "boolean", nullable: false),
+                    IsCheckedIn = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
@@ -691,6 +697,20 @@ namespace db.Migrations
                 name: "IX_booking_items_BookingId",
                 table: "booking_items",
                 column: "BookingId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_booking_items_InvitationToken",
+                table: "booking_items",
+                column: "InvitationToken",
+                unique: true,
+                filter: "\"InvitationToken\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_booking_items_QrToken",
+                table: "booking_items",
+                column: "QrToken",
+                unique: true,
+                filter: "\"QrToken\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_booking_items_SeatId",

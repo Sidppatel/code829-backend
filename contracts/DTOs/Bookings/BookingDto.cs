@@ -23,7 +23,12 @@ public record BookingItemDto(
     string TicketTypeName,
     Guid? SeatId,
     string? SeatLabel,
-    int PriceCents
+    int PriceCents,
+    string? QrToken = null,
+    string? GuestName = null,
+    string? GuestEmail = null,
+    string? InvitationToken = null,
+    bool IsCheckedIn = false
 );
 
 public record PaymentDto(

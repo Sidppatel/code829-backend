@@ -13,7 +13,7 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260329171319_InitialCreate")]
+    [Migration("20260329210927_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -187,8 +187,30 @@ namespace db.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("GuestEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("GuestName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("InvitationSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("InvitationToken")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("IsCheckedIn")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("PriceCents")
                         .HasColumnType("integer");
+
+                    b.Property<string>("QrToken")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<Guid?>("SeatId")
                         .HasColumnType("uuid");
@@ -202,6 +224,14 @@ namespace db.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BookingId");
+
+                    b.HasIndex("InvitationToken")
+                        .IsUnique()
+                        .HasFilter("\"InvitationToken\" IS NOT NULL");
+
+                    b.HasIndex("QrToken")
+                        .IsUnique()
+                        .HasFilter("\"QrToken\" IS NOT NULL");
 
                     b.HasIndex("SeatId");
 

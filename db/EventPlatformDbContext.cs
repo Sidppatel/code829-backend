@@ -263,6 +263,12 @@ public class EventPlatformDbContext(
         {
             entity.ToTable("booking_items");
             entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.QrToken).IsUnique().HasFilter("\"QrToken\" IS NOT NULL");
+            entity.HasIndex(e => e.InvitationToken).IsUnique().HasFilter("\"InvitationToken\" IS NOT NULL");
+            entity.Property(e => e.QrToken).HasMaxLength(128);
+            entity.Property(e => e.GuestName).HasMaxLength(256);
+            entity.Property(e => e.GuestEmail).HasMaxLength(256);
+            entity.Property(e => e.InvitationToken).HasMaxLength(128);
             entity.HasOne(e => e.Booking).WithMany(b => b.Items).HasForeignKey(e => e.BookingId);
             entity.HasOne(e => e.TicketType).WithMany().HasForeignKey(e => e.TicketTypeId);
             entity.HasOne(e => e.Seat).WithMany().HasForeignKey(e => e.SeatId);
