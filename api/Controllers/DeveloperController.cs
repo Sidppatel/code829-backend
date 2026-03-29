@@ -159,7 +159,7 @@ public class DeveloperController(
             .Select(u => new
             {
                 u.Id,
-                u.Name,
+                Name = u.FirstName + " " + u.LastName,
                 u.Email,
                 Role = u.Role.ToString(),
                 u.CreatedAt

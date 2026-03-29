@@ -27,7 +27,7 @@ public class AdminVenuesController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var query = context.Venues.AsQueryable();
+        var query = context.Venues.Include(v => v.Address).AsQueryable();
         var totalCount = await query.CountAsync();
         var items = await query
             .OrderBy(v => v.Name)
@@ -42,7 +42,7 @@ public class AdminVenuesController(
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var venue = await context.Venues.FindAsync(id);
+        var venue = await context.Venues.Include(v => v.Address).FirstOrDefaultAsync(v => v.Id == id);
         if (venue is null) return NotFound(new { message = "Venue not found" });
         return Ok(MapToDto(venue, fileStorage));
     }
@@ -50,16 +50,25 @@ public class AdminVenuesController(
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateVenueRequest request)
     {
+        var address = new Address
+        {
+            Id = Guid.NewGuid(),
+            Line1 = request.Address,
+            City = request.City,
+            State = request.State,
+            ZipCode = request.ZipCode
+        };
+        context.Addresses.Add(address);
+
         var venue = new Venue
         {
             Id = Guid.NewGuid(),
             Name = request.Name,
-            Address = request.Address,
-            City = request.City,
-            State = request.State,
-            ZipCode = request.ZipCode,
+            AddressId = address.Id,
+            Address = address,
             Description = request.Description,
             Phone = request.Phone,
+            Email = request.Email,
             Website = request.Website
         };
 
@@ -71,18 +80,41 @@ public class AdminVenuesController(
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVenueRequest request)
     {
-        var venue = await context.Venues.FindAsync(id);
+        var venue = await context.Venues.Include(v => v.Address).FirstOrDefaultAsync(v => v.Id == id);
         if (venue is null) return NotFound(new { message = "Venue not found" });
 
         if (request.Name is not null) venue.Name = request.Name;
-        if (request.Address is not null) venue.Address = request.Address;
-        if (request.City is not null) venue.City = request.City;
-        if (request.State is not null) venue.State = request.State;
-        if (request.ZipCode is not null) venue.ZipCode = request.ZipCode;
         if (request.Description is not null) venue.Description = request.Description;
         if (request.Phone is not null) venue.Phone = request.Phone;
+        if (request.Email is not null) venue.Email = request.Email;
         if (request.Website is not null) venue.Website = request.Website;
         if (request.IsActive.HasValue) venue.IsActive = request.IsActive.Value;
+
+        // Update address fields
+        if (request.Address is not null || request.City is not null || request.State is not null || request.ZipCode is not null)
+        {
+            if (venue.Address is null)
+            {
+                var address = new Address
+                {
+                    Id = Guid.NewGuid(),
+                    Line1 = request.Address ?? "",
+                    City = request.City ?? "",
+                    State = request.State ?? "",
+                    ZipCode = request.ZipCode ?? ""
+                };
+                context.Addresses.Add(address);
+                venue.AddressId = address.Id;
+                venue.Address = address;
+            }
+            else
+            {
+                if (request.Address is not null) venue.Address.Line1 = request.Address;
+                if (request.City is not null) venue.Address.City = request.City;
+                if (request.State is not null) venue.Address.State = request.State;
+                if (request.ZipCode is not null) venue.Address.ZipCode = request.ZipCode;
+            }
+        }
 
         venue.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
@@ -116,9 +148,9 @@ public class AdminVenuesController(
     }
 
     private static VenueDto MapToDto(Venue v, IFileStorageService fs) => new(
-        v.Id, v.Name, v.Address, v.City, v.State, v.ZipCode,
+        v.Id, v.Name, v.Address?.Line1 ?? "", v.Address?.City ?? "", v.Address?.State ?? "", v.Address?.ZipCode ?? "",
         v.Description,
         v.ImagePath is not null ? fs.GetPublicUrl(v.ImagePath) : null,
-        v.Phone, v.Website, v.IsActive, v.CreatedAt
+        v.Phone, v.Email, v.Website, v.IsActive, v.CreatedAt
     );
 }

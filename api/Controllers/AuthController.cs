@@ -5,6 +5,7 @@ using Contracts.DTOs.Auth;
 using Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
@@ -101,24 +102,48 @@ public class AuthController(
         // Retrieve user via dependency parsing (IUserRepository authService doesn't expose it directly, so let's use the DB Context... wait, AuthController doesn't inject DbContext! I need to inject it or use an IAuthService method). 
         // Let's add UpdateProfileAsync to IAuthService! Actually, we can inject EventPlatformDbContext directly into the method.
         var context = HttpContext.RequestServices.GetRequiredService<Db.EventPlatformDbContext>();
-        var user = await context.Users.FindAsync(userId);
-        
+        var user = await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == userId);
+
         if (user is null)
             return NotFound(new { message = "User not found" });
 
-        if (!string.IsNullOrWhiteSpace(request.Name))
-            user.Name = request.Name;
+        if (!string.IsNullOrWhiteSpace(request.FirstName))
+            user.FirstName = request.FirstName;
+        if (!string.IsNullOrWhiteSpace(request.LastName))
+            user.LastName = request.LastName;
 
-        user.Address = request.Address;
-        user.City = request.City;
-        user.State = request.State;
-        user.ZipCode = request.ZipCode;
+        // Update address fields
+        if (request.Address is not null || request.City is not null || request.State is not null || request.ZipCode is not null)
+        {
+            if (user.Address is null)
+            {
+                var address = new Db.Entities.Address
+                {
+                    Id = Guid.NewGuid(),
+                    Line1 = request.Address ?? "",
+                    City = request.City ?? "",
+                    State = request.State ?? "",
+                    ZipCode = request.ZipCode ?? ""
+                };
+                context.Set<Db.Entities.Address>().Add(address);
+                user.AddressId = address.Id;
+                user.Address = address;
+            }
+            else
+            {
+                if (request.Address is not null) user.Address.Line1 = request.Address;
+                if (request.City is not null) user.Address.City = request.City;
+                if (request.State is not null) user.Address.State = request.State;
+                if (request.ZipCode is not null) user.Address.ZipCode = request.ZipCode;
+            }
+        }
+
         user.Phone = request.Phone;
-        
+
         if (request.OptInLocationEmail.HasValue)
             user.OptInLocationEmail = request.OptInLocationEmail.Value;
 
-        user.HasCompletedOnboarding = true; // Mark as true!
+        user.HasCompletedOnboarding = true;
         user.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
@@ -128,7 +153,8 @@ public class AuthController(
 }
 
 public record UpdateProfileRequest(
-    string? Name,
+    string? FirstName,
+    string? LastName,
     string? Address,
     string? City,
     string? State,

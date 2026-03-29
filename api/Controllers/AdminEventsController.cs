@@ -35,7 +35,7 @@ public class AdminEventsController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var query = context.Events.Include(e => e.Venue).Include(e => e.TicketTypes).AsQueryable();
+        var query = context.Events.Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes).AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<EventStatus>(status, true, out var s))
             query = query.Where(e => e.Status == s);
@@ -50,7 +50,7 @@ public class AdminEventsController(
                 e.Title.ToLower().Contains(term) ||
                 e.Slug.ToLower().Contains(term) ||
                 e.Venue.Name.ToLower().Contains(term) ||
-                e.Venue.City.ToLower().Contains(term)
+                (e.Venue.Address != null && e.Venue.Address.City.ToLower().Contains(term))
             );
         }
 
@@ -69,7 +69,7 @@ public class AdminEventsController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var ev = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.Organizer)
             .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -144,7 +144,7 @@ public class AdminEventsController(
         await context.SaveChangesAsync();
 
         var created = await context.Events
-            .Include(e => e.Venue).Include(e => e.TicketTypes)
+            .Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
             .FirstAsync(e => e.Id == ev.Id);
 
         await adminLog.LogAsync("event.created", "Event", ev.Id, $"Event '{ev.Title}' created");
@@ -154,7 +154,7 @@ public class AdminEventsController(
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
-        var ev = await context.Events.Include(e => e.Venue).Include(e => e.TicketTypes)
+        var ev = await context.Events.Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -210,7 +210,7 @@ public class AdminEventsController(
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeEventStatusRequest request)
     {
         var ev = await context.Events
-            .Include(e => e.Venue).Include(e => e.TicketTypes)
+            .Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -271,7 +271,7 @@ public class AdminEventsController(
     public async Task<IActionResult> Duplicate(Guid id, [FromBody] DuplicateEventRequest request)
     {
         var original = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (original is null) return NotFound(new { message = "Event not found" });
@@ -342,7 +342,7 @@ public class AdminEventsController(
             $"Event '{copy.Title}' duplicated from '{original.Title}'");
 
         var created = await context.Events
-            .Include(e => e.Venue).Include(e => e.TicketTypes)
+            .Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
             .FirstAsync(e => e.Id == copy.Id);
         return Created("", MapToDto(created));
     }
@@ -356,14 +356,14 @@ public class AdminEventsController(
         (e.LayoutMode?.ToString() ?? "None"), e.MaxCapacity, e.PlatformFeePercent, e.PublishedAt,
         e.VenueId,
         e.Venue is not null ? new VenueDto(
-            e.Venue.Id, e.Venue.Name, e.Venue.Address, e.Venue.City, e.Venue.State,
-            e.Venue.ZipCode, e.Venue.Description,
+            e.Venue.Id, e.Venue.Name, e.Venue.Address?.Line1 ?? "", e.Venue.Address?.City ?? "", e.Venue.Address?.State ?? "",
+            e.Venue.Address?.ZipCode ?? "", e.Venue.Description,
             e.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(e.Venue.ImagePath) : null,
-            e.Venue.Phone, e.Venue.Website,
+            e.Venue.Phone, e.Venue.Email, e.Venue.Website,
             e.Venue.IsActive, e.Venue.CreatedAt
         ) : null,
         e.OrganizerId,
-        e.Organizer?.Name,
+        e.Organizer is not null ? $"{e.Organizer.FirstName} {e.Organizer.LastName}" : null,
         e.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
             t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
             t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,

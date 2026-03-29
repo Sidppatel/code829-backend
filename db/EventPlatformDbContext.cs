@@ -12,6 +12,7 @@ public class EventPlatformDbContext(
 {
     // Core entities
     public DbSet<User> Users => Set<User>();
+    public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
 
@@ -59,6 +60,17 @@ public class EventPlatformDbContext(
 
         // ─── Core entities ───────────────────────────────────────
 
+        modelBuilder.Entity<Address>(entity =>
+        {
+            entity.ToTable("addresses");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Line1).HasMaxLength(512);
+            entity.Property(e => e.Line2).HasMaxLength(512);
+            entity.Property(e => e.City).HasMaxLength(128);
+            entity.Property(e => e.State).HasMaxLength(2);
+            entity.Property(e => e.ZipCode).HasMaxLength(10);
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("users");
@@ -67,8 +79,10 @@ public class EventPlatformDbContext(
             entity.HasIndex(e => e.Email).IsUnique();
             entity.Property(e => e.Email).HasMaxLength(256);
             entity.Property(e => e.EmailHash).HasMaxLength(128);
-            entity.Property(e => e.Name).HasMaxLength(256);
+            entity.Property(e => e.FirstName).HasMaxLength(128);
+            entity.Property(e => e.LastName).HasMaxLength(128);
             entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId).IsRequired(false);
         });
 
         modelBuilder.Entity<AppSetting>(entity =>
@@ -99,16 +113,13 @@ public class EventPlatformDbContext(
             entity.ToTable("venues");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Name);
-            entity.HasIndex(e => e.City);
             entity.Property(e => e.Name).HasMaxLength(256);
-            entity.Property(e => e.Address).HasMaxLength(512);
-            entity.Property(e => e.City).HasMaxLength(128);
-            entity.Property(e => e.State).HasMaxLength(2);
-            entity.Property(e => e.ZipCode).HasMaxLength(10);
             entity.Property(e => e.Description).HasMaxLength(4096);
             entity.Property(e => e.ImagePath).HasMaxLength(512);
             entity.Property(e => e.Phone).HasMaxLength(20);
+            entity.Property(e => e.Email).HasMaxLength(256);
             entity.Property(e => e.Website).HasMaxLength(512);
+            entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId).IsRequired(false);
         });
 
         modelBuilder.Entity<TableType>(entity =>

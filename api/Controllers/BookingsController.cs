@@ -126,7 +126,7 @@ public class BookingsController(
 
         var dtos = items.Select(b => new BookingDto(
             b.Id, b.BookingNumber, b.Status.ToString(),
-            b.UserId, b.User.Name, b.EventId, b.Event.Title,
+            b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(
                 i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, null, i.PriceCents,

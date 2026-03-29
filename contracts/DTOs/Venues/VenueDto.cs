@@ -10,6 +10,7 @@ public record VenueDto(
     string? Description,
     string? ImageUrl,
     string? Phone,
+    string? Email,
     string? Website,
     bool IsActive,
     DateTime CreatedAt

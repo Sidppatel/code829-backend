@@ -23,6 +23,47 @@ namespace db.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Db.Entities.Address", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Line2")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ZipCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("addresses", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.AdminLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1061,11 +1102,8 @@ namespace db.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Address")
-                        .HasColumnType("text");
-
-                    b.Property<string>("City")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("AddressId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1080,6 +1118,11 @@ namespace db.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<bool>("HasCompletedOnboarding")
                         .HasColumnType("boolean");
 
@@ -1089,10 +1132,10 @@ namespace db.Migrations
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("LastName")
                         .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<bool>("OptInLocationEmail")
                         .HasColumnType("boolean");
@@ -1105,16 +1148,12 @@ namespace db.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("State")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ZipCode")
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("AddressId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -1131,15 +1170,8 @@ namespace db.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Address")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                    b.Property<Guid?>("AddressId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1147,6 +1179,10 @@ namespace db.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(4096)
                         .HasColumnType("character varying(4096)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("ImagePath")
                         .HasMaxLength(512)
@@ -1164,11 +1200,6 @@ namespace db.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1176,14 +1207,9 @@ namespace db.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<string>("ZipCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("City");
+                    b.HasIndex("AddressId");
 
                     b.HasIndex("Name");
 
@@ -1852,6 +1878,24 @@ namespace db.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("Db.Entities.User", b =>
+                {
+                    b.HasOne("Db.Entities.Address", "Address")
+                        .WithMany()
+                        .HasForeignKey("AddressId");
+
+                    b.Navigation("Address");
+                });
+
+            modelBuilder.Entity("Db.Entities.Venue", b =>
+                {
+                    b.HasOne("Db.Entities.Address", "Address")
+                        .WithMany()
+                        .HasForeignKey("AddressId");
+
+                    b.Navigation("Address");
                 });
 
             modelBuilder.Entity("Db.Entities.VenueLayout", b =>

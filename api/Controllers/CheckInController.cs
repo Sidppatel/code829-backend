@@ -42,7 +42,7 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
             Log.Warning("[CheckIn] Double scan attempt for {BookingNumber}", booking.BookingNumber);
             return Conflict(new ScanResponse(
                 false, "Already checked in",
-                booking.BookingNumber, booking.User.Name, booking.Event.Title,
+                booking.BookingNumber, $"{booking.User.FirstName} {booking.User.LastName}", booking.Event.Title,
                 booking.Status.ToString(), booking.Items.Count, booking.UpdatedAt
             ));
         }
@@ -51,7 +51,7 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         {
             return BadRequest(new ScanResponse(
                 false, $"Booking is {booking.Status} — cannot check in",
-                booking.BookingNumber, booking.User.Name, booking.Event.Title,
+                booking.BookingNumber, $"{booking.User.FirstName} {booking.User.LastName}", booking.Event.Title,
                 booking.Status.ToString(), booking.Items.Count, null
             ));
         }
@@ -64,7 +64,7 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
 
         return Ok(new ScanResponse(
             true, "Check-in successful",
-            booking.BookingNumber, booking.User.Name, booking.Event.Title,
+            booking.BookingNumber, $"{booking.User.FirstName} {booking.User.LastName}", booking.Event.Title,
             booking.Status.ToString(), booking.Items.Count, DateTime.UtcNow
         ));
     }

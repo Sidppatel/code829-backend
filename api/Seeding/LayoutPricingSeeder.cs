@@ -23,7 +23,7 @@ public static class LayoutPricingSeeder
             return;
 
         var events = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .OrderBy(e => e.StartDate)
             .ToListAsync();
 

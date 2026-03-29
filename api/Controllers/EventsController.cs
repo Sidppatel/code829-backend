@@ -54,7 +54,7 @@ public class EventsController(
         }
 
         var query = context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.TicketTypes)
             .Where(e => e.Status == EventStatus.Published)
             .AsQueryable();
@@ -86,7 +86,7 @@ public class EventsController(
 
         // City filter
         if (!string.IsNullOrWhiteSpace(city))
-            query = query.Where(e => e.Venue.City.ToLower() == city.ToLower());
+            query = query.Where(e => e.Venue.Address!.City.ToLower() == city.ToLower());
 
         // Venue filter
         if (venueId.HasValue)
@@ -127,7 +127,7 @@ public class EventsController(
                 e.StartDate, e.EndDate,
                 e.ImagePath != null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
                 e.IsFeatured,
-                e.Venue.Name, e.Venue.City, e.Venue.State,
+                e.Venue.Name, e.Venue.Address!.City, e.Venue.Address!.State,
                 e.TicketTypes.Any() ? e.TicketTypes.Min(t => t.PriceCents ?? 0) : null,
                 e.TicketTypes.Any() ? e.TicketTypes.Max(t => t.PriceCents ?? 0) : null,
                 e.TicketTypes.Sum(t => t.QuantityTotal),
@@ -150,7 +150,7 @@ public class EventsController(
     {
         var now = DateTime.UtcNow;
         var published = context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.TicketTypes)
             .Where(e => e.Status == EventStatus.Published && e.EndDate >= now);
 
@@ -159,7 +159,7 @@ public class EventsController(
             .Distinct().ToListAsync();
 
         var cities = await published
-            .Select(e => e.Venue.City)
+            .Select(e => e.Venue.Address!.City)
             .Distinct().OrderBy(c => c).ToListAsync();
 
         var venues = await published
@@ -223,7 +223,7 @@ public class EventsController(
     public async Task<IActionResult> GetSeoMeta(Guid id)
     {
         var ev = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
 
@@ -237,7 +237,7 @@ public class EventsController(
 
         return Ok(new
         {
-            title = $"{ev.Title} — {dateStr} — {ev.Venue.City} | {brandName}",
+            title = $"{ev.Title} — {dateStr} — {ev.Venue.Address?.City ?? ""} | {brandName}",
             description,
             canonicalUrl,
             og = new
@@ -261,7 +261,7 @@ public class EventsController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var ev = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.Organizer)
             .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -277,14 +277,14 @@ public class EventsController(
             (ev.LayoutMode?.ToString() ?? "None"), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
             ev.VenueId,
             new VenueDto(
-                ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
-                ev.Venue.ZipCode, ev.Venue.Description,
+                ev.Venue.Id, ev.Venue.Name, ev.Venue.Address?.Line1 ?? "", ev.Venue.Address?.City ?? "", ev.Venue.Address?.State ?? "",
+                ev.Venue.Address?.ZipCode ?? "", ev.Venue.Description,
                 ev.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(ev.Venue.ImagePath) : null,
-                ev.Venue.Phone, ev.Venue.Website,
+                ev.Venue.Phone, ev.Venue.Email, ev.Venue.Website,
                 ev.Venue.IsActive, ev.Venue.CreatedAt
             ),
             ev.OrganizerId,
-            ev.Organizer?.Name,
+            ev.Organizer is not null ? $"{ev.Organizer.FirstName} {ev.Organizer.LastName}" : null,
             ev.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
                 t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
                 t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
@@ -300,7 +300,7 @@ public class EventsController(
     public async Task<IActionResult> GetBySlug(string slug)
     {
         var ev = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.Organizer)
             .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Slug == slug);
@@ -316,14 +316,14 @@ public class EventsController(
             (ev.LayoutMode?.ToString() ?? "None"), ev.MaxCapacity, ev.PlatformFeePercent, ev.PublishedAt,
             ev.VenueId,
             new VenueDto(
-                ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
-                ev.Venue.ZipCode, ev.Venue.Description,
+                ev.Venue.Id, ev.Venue.Name, ev.Venue.Address?.Line1 ?? "", ev.Venue.Address?.City ?? "", ev.Venue.Address?.State ?? "",
+                ev.Venue.Address?.ZipCode ?? "", ev.Venue.Description,
                 ev.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(ev.Venue.ImagePath) : null,
-                ev.Venue.Phone, ev.Venue.Website,
+                ev.Venue.Phone, ev.Venue.Email, ev.Venue.Website,
                 ev.Venue.IsActive, ev.Venue.CreatedAt
             ),
             ev.OrganizerId,
-            ev.Organizer?.Name,
+            ev.Organizer is not null ? $"{ev.Organizer.FirstName} {ev.Organizer.LastName}" : null,
             ev.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
                 t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
                 t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
@@ -337,7 +337,7 @@ public class EventsController(
     public async Task<IActionResult> GetSchemaOrg(Guid id)
     {
         var ev = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id && e.Status == EventStatus.Published);
 
@@ -364,10 +364,10 @@ public class EventsController(
                 ["address"] = new Dictionary<string, object?>
                 {
                     ["@type"] = "PostalAddress",
-                    ["streetAddress"] = ev.Venue.Address,
-                    ["addressLocality"] = ev.Venue.City,
-                    ["addressRegion"] = ev.Venue.State,
-                    ["postalCode"] = ev.Venue.ZipCode,
+                    ["streetAddress"] = ev.Venue.Address?.Line1 ?? "",
+                    ["addressLocality"] = ev.Venue.Address?.City ?? "",
+                    ["addressRegion"] = ev.Venue.Address?.State ?? "",
+                    ["postalCode"] = ev.Venue.Address?.ZipCode ?? "",
                     ["addressCountry"] = "US"
                 }
             },

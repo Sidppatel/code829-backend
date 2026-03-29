@@ -13,6 +13,24 @@ namespace db.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "addresses",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Line1 = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    Line2 = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    City = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    State = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: false),
+                    ZipCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_addresses", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "admin_logs",
                 columns: table => new
                 {
@@ -196,14 +214,12 @@ namespace db.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Address = table.Column<string>(type: "text", nullable: true),
-                    City = table.Column<string>(type: "text", nullable: true),
-                    State = table.Column<string>(type: "text", nullable: true),
-                    ZipCode = table.Column<string>(type: "text", nullable: true),
+                    AddressId = table.Column<Guid>(type: "uuid", nullable: true),
                     Phone = table.Column<string>(type: "text", nullable: true),
                     OptInLocationEmail = table.Column<bool>(type: "boolean", nullable: false),
                     HasCompletedOnboarding = table.Column<bool>(type: "boolean", nullable: false),
@@ -213,6 +229,11 @@ namespace db.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_users", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_users_addresses_AddressId",
+                        column: x => x.AddressId,
+                        principalTable: "addresses",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -221,21 +242,24 @@ namespace db.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Address = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    City = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    State = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: false),
-                    ZipCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     Description = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: true),
                     ImagePath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     Website = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    AddressId = table.Column<Guid>(type: "uuid", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_venues", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_venues_addresses_AddressId",
+                        column: x => x.AddressId,
+                        principalTable: "addresses",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -931,6 +955,11 @@ namespace db.Migrations
                 column: "TemplateId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_users_AddressId",
+                table: "users",
+                column: "AddressId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_users_Email",
                 table: "users",
                 column: "Email",
@@ -958,9 +987,9 @@ namespace db.Migrations
                 column: "VenueId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_venues_City",
+                name: "IX_venues_AddressId",
                 table: "venues",
-                column: "City");
+                column: "AddressId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_venues_Name",
@@ -984,11 +1013,15 @@ SELECT
     e.""PublishedAt"", e.""ScheduledPublishAt"",
     e.""VenueId"", e.""OrganizerId"", e.""VenueLayoutId"", e.""EventTemplateId"",
     e.""SearchVector"", e.""CreatedAt"", e.""UpdatedAt"",
-    v.""Name"" AS ""VenueName"", v.""Address"" AS ""VenueAddress"",
-    v.""City"" AS ""VenueCity"", v.""State"" AS ""VenueState"",
-    v.""ZipCode"" AS ""VenueZipCode"", v.""ImagePath"" AS ""VenueImagePath""
+    v.""Name"" AS ""VenueName"",
+    a.""Line1"" AS ""VenueAddress"",
+    a.""City"" AS ""VenueCity"",
+    a.""State"" AS ""VenueState"",
+    a.""ZipCode"" AS ""VenueZipCode"",
+    v.""ImagePath"" AS ""VenueImagePath""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
+LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
 LEFT JOIN venue_layouts vl ON e.""VenueLayoutId"" = vl.""Id""
 LEFT JOIN event_templates et ON e.""EventTemplateId"" = et.""Id"";
 ");
@@ -1015,8 +1048,7 @@ SELECT
     COALESCE(t.""Capacity"", ttype.""DefaultCapacity"", 0) AS ""Capacity"",
     COALESCE(t.""Shape"", ttype.""DefaultShape"", 'Round') AS ""Shape"",
     COALESCE(t.""Color"", ttype.""DefaultColor"") AS ""Color"",
-    t.""Section"",
-    t.""PriceType"",
+    t.""Section"", t.""PriceType"",
     COALESCE(t.""PriceOverrideCents"", t.""PriceCents"", ttype.""DefaultPriceCents"", 0) AS ""EffectivePriceCents"",
     t.""PlatformFeeCents"", t.""IsActive"",
     t.""GridRow"", t.""GridCol"", t.""SortOrder"",
@@ -1048,18 +1080,20 @@ SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Status"",
     COALESCE(e.""Category"", 'Music') AS ""Category"",
     e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
-    v.""Name"" AS ""VenueName"", v.""City"" AS ""VenueCity"",
-    u.""Name"" AS ""OrganizerName"",
+    v.""Name"" AS ""VenueName"",
+    a.""City"" AS ""VenueCity"",
+    CONCAT(u.""FirstName"", ' ', u.""LastName"") AS ""OrganizerName"",
     COUNT(DISTINCT tt.""Id"")::int AS ""TicketTypeCount"",
     COALESCE(SUM(tt.""QuantityTotal""), 0) AS ""TotalCapacity"",
     COALESCE(SUM(tt.""QuantitySold""), 0) AS ""TotalSold""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
+LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
 JOIN users u ON e.""OrganizerId"" = u.""Id""
 LEFT JOIN ticket_types tt ON tt.""EventId"" = e.""Id""
 GROUP BY e.""Id"", e.""Title"", e.""Slug"", e.""Status"", e.""Category"",
     e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
-    v.""Name"", v.""City"", u.""Name"";
+    v.""Name"", a.""City"", u.""FirstName"", u.""LastName"";
 ");
         }
 
@@ -1140,6 +1174,9 @@ GROUP BY e.""Id"", e.""Title"", e.""Slug"", e.""Status"", e.""Category"",
 
             migrationBuilder.DropTable(
                 name: "venues");
+
+            migrationBuilder.DropTable(
+                name: "addresses");
         }
     }
 }

@@ -6,16 +6,16 @@ namespace Db.Repositories;
 public class UserRepository(EventPlatformDbContext context) : IUserRepository
 {
     public async Task<User?> GetByIdAsync(Guid id)
-        => await context.Users.FirstOrDefaultAsync(u => u.Id == id);
+        => await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == id);
 
     public async Task<User?> GetByEmailAsync(string email)
-        => await context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        => await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Email == email);
 
     public async Task<User?> GetByEmailHashAsync(string emailHash)
-        => await context.Users.FirstOrDefaultAsync(u => u.EmailHash == emailHash);
+        => await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.EmailHash == emailHash);
 
     public async Task<List<User>> GetAllAsync()
-        => await context.Users.OrderBy(u => u.CreatedAt).ToListAsync();
+        => await context.Users.Include(u => u.Address).OrderBy(u => u.CreatedAt).ToListAsync();
 
     public async Task<User> CreateAsync(User user)
     {

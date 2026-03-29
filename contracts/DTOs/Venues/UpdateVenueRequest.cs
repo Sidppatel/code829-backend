@@ -8,6 +8,7 @@ public record UpdateVenueRequest(
     string? ZipCode = null,
     string? Description = null,
     string? Phone = null,
+    string? Email = null,
     string? Website = null,
     bool? IsActive = null
 );

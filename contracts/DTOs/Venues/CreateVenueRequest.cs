@@ -8,5 +8,6 @@ public record CreateVenueRequest(
     string ZipCode,
     string? Description = null,
     string? Phone = null,
+    string? Email = null,
     string? Website = null
 );

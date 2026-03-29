@@ -65,7 +65,7 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
     {
         var now = DateTime.UtcNow;
         var ev = await context.Events
-            .Include(e => e.Venue)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.TicketTypes)
             .Where(e => e.Status == EventStatus.Published && e.StartDate > now)
             .OrderBy(e => e.StartDate)
@@ -75,7 +75,7 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
         {
             // Fall back to any upcoming event (Draft included)
             ev = await context.Events
-                .Include(e => e.Venue)
+                .Include(e => e.Venue).ThenInclude(v => v.Address)
                 .Include(e => e.TicketTypes)
                 .Where(e => e.StartDate > now && e.Status != EventStatus.Cancelled)
                 .OrderBy(e => e.StartDate)
@@ -88,7 +88,7 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
         var bookings = await context.Bookings
             .Where(b => b.EventId == ev.Id)
             .Select(b => new { b.Id, b.BookingNumber, b.Status, b.TotalCents, b.CreatedAt,
-                               UserName = b.User.Name, UserEmail = b.User.Email })
+                               UserName = b.User.FirstName + " " + b.User.LastName, UserEmail = b.User.Email })
             .ToListAsync();
 
         var paid = bookings.Count(b => b.Status == BookingStatus.Paid);
@@ -144,7 +144,7 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
             hasUpcoming = true,
             data = new NextEventDashboardDto(
                 ev.Id, ev.Title, ev.Slug, ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
-                ev.StartDate, ev.EndDate, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
+                ev.StartDate, ev.EndDate, ev.Venue.Name, ev.Venue.Address?.Line1 ?? "", ev.Venue.Address?.City ?? "", ev.Venue.Address?.State ?? "",
                 ev.ImagePath, (ev.LayoutMode?.ToString() ?? "None"), daysUntil,
                 bookings.Count, paid, checkedInCount, pending, cancelled, refunded,
                 revenue, potentialRevenue, totalCapacity, soldCount,

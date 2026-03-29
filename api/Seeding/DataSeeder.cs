@@ -33,25 +33,26 @@ public static class DataSeeder
         if (await context.Users.AnyAsync())
             return;
 
-        var users = new (string Email, string Name, UserRole Role)[]
+        var users = new (string Email, string FirstName, string LastName, UserRole Role)[]
         {
-            ("developer@code829.local", "Dev Admin", UserRole.Developer),
-            ("admin@code829.local", "Sarah Mitchell", UserRole.Admin),
-            ("staff@code829.local", "Marcus Johnson", UserRole.Staff),
-            ("user@code829.local", "Jamie Rivera", UserRole.User),
-            ("user2@code829.local", "Taylor Brooks", UserRole.User),
-            ("user3@code829.local", "Alex Chen", UserRole.User),
-            ("organizer@code829.local", "Gulf Events Co.", UserRole.Admin),
+            ("developer@code829.local", "Dev", "Admin", UserRole.Developer),
+            ("admin@code829.local", "Sarah", "Mitchell", UserRole.Admin),
+            ("staff@code829.local", "Marcus", "Johnson", UserRole.Staff),
+            ("user@code829.local", "Jamie", "Rivera", UserRole.User),
+            ("user2@code829.local", "Taylor", "Brooks", UserRole.User),
+            ("user3@code829.local", "Alex", "Chen", UserRole.User),
+            ("organizer@code829.local", "Gulf Events", "Co.", UserRole.Admin),
         };
 
-        foreach (var (email, name, role) in users)
+        foreach (var (email, firstName, lastName, role) in users)
         {
             context.Users.Add(new User
             {
                 Id = Guid.NewGuid(),
                 Email = email,
                 EmailHash = encryption.HashEmail(email),
-                Name = name,
+                FirstName = firstName,
+                LastName = lastName,
                 Role = role,
                 IsActive = true
             });

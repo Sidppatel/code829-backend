@@ -39,69 +39,53 @@ public static class VenueEventSeeder
 
     private static List<Venue> SeedVenues(EventPlatformDbContext context)
     {
-        var venues = new List<Venue>
+        var venueData = new (string Name, string Line1, string City, string State, string Zip, string Desc)[]
         {
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "The Saenger Theatre",
-                Address = "6 S Joachim St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Description = "Historic 1927 theatre featuring Spanish Baroque architecture, hosting concerts, Broadway shows, and special events in downtown Mobile.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "Mobile Convention Center",
-                Address = "1 S Water St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Description = "Premier convention facility on the waterfront with flexible event spaces for conferences, expos, and large gatherings.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "The Blind Mule",
-                Address = "57 N Claiborne St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Description = "Intimate downtown venue and gastropub known for craft cocktails, local music, and a vibrant nightlife atmosphere.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "Moe's Original BBQ",
-                Address = "6423 Old Shell Rd", City = "Mobile", State = "AL", ZipCode = "36608",
-                Description = "Alabama-style BBQ joint with a laid-back patio and stage for live blues, country, and Americana acts.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "The Soul Kitchen",
-                Address = "219 Dauphin St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Description = "Eclectic Dauphin Street venue combining Southern cuisine with live music, poetry nights, and community events.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "Hank Aaron Stadium Area",
-                Address = "755 Bolling Brothers Blvd", City = "Mobile", State = "AL", ZipCode = "36606",
-                Description = "Open-air stadium complex hosting sporting events, festivals, and large outdoor concerts in Mobile.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "Bellingrath Gardens",
-                Address = "12401 Bellingrath Gardens Rd", City = "Theodore", State = "AL", ZipCode = "36582",
-                Description = "Stunning 65-acre garden estate south of Mobile offering outdoor events surrounded by azaleas, roses, and live oaks.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "OWA Amusement Park",
-                Address = "1501 S OWA Blvd", City = "Foley", State = "AL", ZipCode = "36535",
-                Description = "Family entertainment destination on the Gulf Coast with rides, dining, and a bustling downtown district for events.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "The Wharf Amphitheatre",
-                Address = "4830 Main St", City = "Orange Beach", State = "AL", ZipCode = "36561",
-                Description = "Premier outdoor amphitheatre on the Alabama Gulf Coast hosting national touring acts and major festivals.",
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), Name = "Fairhope Civic Center",
-                Address = "161 N Section St", City = "Fairhope", State = "AL", ZipCode = "36532",
-                Description = "Charming civic center in the arts community of Fairhope, hosting lectures, dances, and cultural events on Mobile Bay.",
-            }
+            ("The Saenger Theatre", "6 S Joachim St", "Mobile", "AL", "36602",
+                "Historic 1927 theatre featuring Spanish Baroque architecture, hosting concerts, Broadway shows, and special events in downtown Mobile."),
+            ("Mobile Convention Center", "1 S Water St", "Mobile", "AL", "36602",
+                "Premier convention facility on the waterfront with flexible event spaces for conferences, expos, and large gatherings."),
+            ("The Blind Mule", "57 N Claiborne St", "Mobile", "AL", "36602",
+                "Intimate downtown venue and gastropub known for craft cocktails, local music, and a vibrant nightlife atmosphere."),
+            ("Moe's Original BBQ", "6423 Old Shell Rd", "Mobile", "AL", "36608",
+                "Alabama-style BBQ joint with a laid-back patio and stage for live blues, country, and Americana acts."),
+            ("The Soul Kitchen", "219 Dauphin St", "Mobile", "AL", "36602",
+                "Eclectic Dauphin Street venue combining Southern cuisine with live music, poetry nights, and community events."),
+            ("Hank Aaron Stadium Area", "755 Bolling Brothers Blvd", "Mobile", "AL", "36606",
+                "Open-air stadium complex hosting sporting events, festivals, and large outdoor concerts in Mobile."),
+            ("Bellingrath Gardens", "12401 Bellingrath Gardens Rd", "Theodore", "AL", "36582",
+                "Stunning 65-acre garden estate south of Mobile offering outdoor events surrounded by azaleas, roses, and live oaks."),
+            ("OWA Amusement Park", "1501 S OWA Blvd", "Foley", "AL", "36535",
+                "Family entertainment destination on the Gulf Coast with rides, dining, and a bustling downtown district for events."),
+            ("The Wharf Amphitheatre", "4830 Main St", "Orange Beach", "AL", "36561",
+                "Premier outdoor amphitheatre on the Alabama Gulf Coast hosting national touring acts and major festivals."),
+            ("Fairhope Civic Center", "161 N Section St", "Fairhope", "AL", "36532",
+                "Charming civic center in the arts community of Fairhope, hosting lectures, dances, and cultural events on Mobile Bay."),
         };
+
+        var venues = new List<Venue>();
+        foreach (var (name, line1, city, state, zip, desc) in venueData)
+        {
+            var address = new Address
+            {
+                Id = Guid.NewGuid(),
+                Line1 = line1,
+                City = city,
+                State = state,
+                ZipCode = zip
+            };
+            context.Addresses.Add(address);
+
+            var venue = new Venue
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                AddressId = address.Id,
+                Address = address,
+                Description = desc,
+            };
+            venues.Add(venue);
+        }
 
         context.Venues.AddRange(venues);
         return venues;

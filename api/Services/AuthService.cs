@@ -89,7 +89,8 @@ public class AuthService(
                 Id = Guid.NewGuid(),
                 Email = magicLink.Email,
                 EmailHash = encryptionService.HashEmail(magicLink.Email),
-                Name = magicLink.Email.Split('@')[0],
+                FirstName = magicLink.Email.Split('@')[0],
+                LastName = "",
                 Role = UserRole.User,
                 IsActive = true
             };
@@ -126,13 +127,14 @@ public class AuthService(
         return new UserDto(
             Id: user.Id,
             Email: user.Email,
-            Name: user.Name,
+            FirstName: user.FirstName,
+            LastName: user.LastName,
             Role: user.Role.ToString(),
             CreatedAt: user.CreatedAt,
-            Address: user.Address,
-            City: user.City,
-            State: user.State,
-            ZipCode: user.ZipCode,
+            Address: user.Address?.Line1,
+            City: user.Address?.City,
+            State: user.Address?.State,
+            ZipCode: user.Address?.ZipCode,
             Phone: user.Phone,
             OptInLocationEmail: user.OptInLocationEmail,
             HasCompletedOnboarding: user.HasCompletedOnboarding
@@ -150,7 +152,7 @@ public class AuthService(
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.Name),
+            new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}".Trim()),
             new Claim(ClaimTypes.Role, user.Role.ToString())
         };
 
@@ -165,7 +167,8 @@ public class AuthService(
         return new AuthResponse(
             Token: tokenString,
             Email: user.Email,
-            Name: user.Name,
+            FirstName: user.FirstName,
+            LastName: user.LastName,
             Role: user.Role.ToString(),
             ExpiresAt: expiresAt,
             HasCompletedOnboarding: user.HasCompletedOnboarding

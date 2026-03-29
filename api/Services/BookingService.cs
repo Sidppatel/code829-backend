@@ -155,7 +155,7 @@ public class BookingService(
         await emailService.SendAsync(
             booking.User.Email,
             $"Booking Confirmed — {booking.Event.Title} | {brandName}",
-            $"Hi {booking.User.Name},\n\n" +
+            $"Hi {booking.User.FirstName},\n\n" +
             $"Your booking {booking.BookingNumber} for {booking.Event.Title} is confirmed!\n" +
             $"Total: ${booking.TotalCents / 100.0:F2}\n" +
             $"QR Token: {booking.QrToken}\n\n" +
@@ -227,7 +227,7 @@ public class BookingService(
 
         return new BookingDto(
             b.Id, b.BookingNumber, b.Status.ToString(),
-            b.UserId, b.User.Name, b.EventId, b.Event.Title,
+            b.UserId, $"{b.User.FirstName} {b.User.LastName}", b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(
                 i.Id, i.TicketTypeId, i.TicketType.Name ?? "",

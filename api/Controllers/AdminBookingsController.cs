@@ -63,7 +63,7 @@ public class AdminBookingsController(
             var term = search.Trim().ToLower();
             query = query.Where(b =>
                 b.BookingNumber.ToLower().Contains(term) ||
-                b.User.Name.ToLower().Contains(term) ||
+                (b.User.FirstName + " " + b.User.LastName).ToLower().Contains(term) ||
                 b.User.Email.ToLower().Contains(term) ||
                 b.Event.Title.ToLower().Contains(term)
             );
@@ -75,7 +75,7 @@ public class AdminBookingsController(
 
         var dtos = items.Select(b => new BookingDto(
             b.Id, b.BookingNumber, b.Status.ToString(),
-            b.UserId, b.User.Name, b.EventId, b.Event.Title,
+            b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.Items.Select(i => new BookingItemDto(i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, null, i.PriceCents, i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn)).ToList(),
             b.Payment is not null ? new PaymentDto(b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(), b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt) : null,
@@ -194,7 +194,7 @@ public class AdminBookingsController(
 
         return await query.OrderByDescending(b => b.CreatedAt)
             .Select(b => new BookingExportRow(
-                b.BookingNumber, b.Status.ToString(), b.User.Name, b.Event.Title,
+                b.BookingNumber, b.Status.ToString(), b.User.FirstName + " " + b.User.LastName, b.Event.Title,
                 $"${b.SubtotalCents / 100.0:F2}", $"${b.FeeCents / 100.0:F2}",
                 $"${b.TotalCents / 100.0:F2}", b.Items.Count,
                 b.CreatedAt.ToString("yyyy-MM-dd HH:mm")
