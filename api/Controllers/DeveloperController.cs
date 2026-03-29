@@ -148,4 +148,48 @@ public class DeveloperController(
         await settingsService.SetAsync(request.Key, request.Value);
         return Ok(new { message = $"Setting '{request.Key}' updated" });
     }
+
+    /// <summary>
+    /// Get all users.
+    /// </summary>
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        var users = await context.Users
+            .Select(u => new
+            {
+                u.Id,
+                u.Name,
+                u.Email,
+                Role = u.Role.ToString(),
+                u.CreatedAt
+            })
+            .OrderByDescending(u => u.CreatedAt)
+            .ToListAsync();
+        return Ok(users);
+    }
+
+    /// <summary>
+    /// Update a user's role (e.g. promoting them to Admin).
+    /// </summary>
+    [HttpPut("users/{id:guid}/role")]
+    public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
+    {
+        if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
+            return BadRequest(new { message = "Invalid role" });
+
+        var user = await context.Users.FindAsync(id);
+        if (user is null) return NotFound(new { message = "User not found" });
+
+        // Ensure developers cannot demote or duplicate the master developer via this endpoint
+        // (Assuming developer is highest role, but let's just make sure they don't break themselves)
+        if (user.Role == UserRole.Developer && role != UserRole.Developer)
+            return BadRequest(new { message = "Cannot demote a Developer" });
+
+        user.Role = role;
+        user.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return Ok(new { message = $"User updated to {role}" });
+    }
 }

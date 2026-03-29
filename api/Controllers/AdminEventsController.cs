@@ -99,7 +99,6 @@ public class AdminEventsController(
             IsFeatured = request.IsFeatured,
             LayoutMode = layoutMode,
             MaxCapacity = request.MaxCapacity,
-            PlatformFeePercent = request.PlatformFeePercent,
             ImagePath = request.BannerImageUrl,
             VenueId = request.VenueId,
             OrganizerId = organizerId
@@ -157,7 +156,6 @@ public class AdminEventsController(
         if (request.LayoutMode is not null && Enum.TryParse<Contracts.Enums.LayoutMode>(request.LayoutMode, true, out var lm))
             ev.LayoutMode = lm;
         if (request.MaxCapacity.HasValue) ev.MaxCapacity = request.MaxCapacity.Value;
-        if (request.PlatformFeePercent.HasValue) ev.PlatformFeePercent = request.PlatformFeePercent.Value;
         if (request.BannerImageUrl is not null) ev.ImagePath = request.BannerImageUrl;
 
         // Status transitions: Draft→Published, Published→Completed/Cancelled, Draft→Cancelled
@@ -282,7 +280,6 @@ public class AdminEventsController(
             IsFeatured = false,
             LayoutMode = original.LayoutMode,
             MaxCapacity = original.MaxCapacity,
-            PlatformFeePercent = original.PlatformFeePercent,
             EditorMode = original.EditorMode,
             GridRows = original.GridRows,
             GridCols = original.GridCols,
