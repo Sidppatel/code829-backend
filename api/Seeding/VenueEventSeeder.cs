@@ -43,71 +43,61 @@ public static class VenueEventSeeder
             {
                 Id = Guid.NewGuid(), Name = "The Saenger Theatre",
                 Address = "6 S Joachim St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Capacity = 1800, Description = "Historic 1927 theatre featuring Spanish Baroque architecture, hosting concerts, Broadway shows, and special events in downtown Mobile.",
-                Latitude = 30.6895, Longitude = -88.0431
+                Description = "Historic 1927 theatre featuring Spanish Baroque architecture, hosting concerts, Broadway shows, and special events in downtown Mobile.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "Mobile Convention Center",
                 Address = "1 S Water St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Capacity = 3000, Description = "Premier convention facility on the waterfront with flexible event spaces for conferences, expos, and large gatherings.",
-                Latitude = 30.6872, Longitude = -88.0417
+                Description = "Premier convention facility on the waterfront with flexible event spaces for conferences, expos, and large gatherings.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "The Blind Mule",
                 Address = "57 N Claiborne St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Capacity = 150, Description = "Intimate downtown venue and gastropub known for craft cocktails, local music, and a vibrant nightlife atmosphere.",
-                Latitude = 30.6935, Longitude = -88.0432
+                Description = "Intimate downtown venue and gastropub known for craft cocktails, local music, and a vibrant nightlife atmosphere.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "Moe's Original BBQ",
                 Address = "6423 Old Shell Rd", City = "Mobile", State = "AL", ZipCode = "36608",
-                Capacity = 200, Description = "Alabama-style BBQ joint with a laid-back patio and stage for live blues, country, and Americana acts.",
-                Latitude = 30.6777, Longitude = -88.1350
+                Description = "Alabama-style BBQ joint with a laid-back patio and stage for live blues, country, and Americana acts.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "The Soul Kitchen",
                 Address = "219 Dauphin St", City = "Mobile", State = "AL", ZipCode = "36602",
-                Capacity = 120, Description = "Eclectic Dauphin Street venue combining Southern cuisine with live music, poetry nights, and community events.",
-                Latitude = 30.6909, Longitude = -88.0460
+                Description = "Eclectic Dauphin Street venue combining Southern cuisine with live music, poetry nights, and community events.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "Hank Aaron Stadium Area",
                 Address = "755 Bolling Brothers Blvd", City = "Mobile", State = "AL", ZipCode = "36606",
-                Capacity = 6000, Description = "Open-air stadium complex hosting sporting events, festivals, and large outdoor concerts in Mobile.",
-                Latitude = 30.6780, Longitude = -88.0712
+                Description = "Open-air stadium complex hosting sporting events, festivals, and large outdoor concerts in Mobile.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "Bellingrath Gardens",
                 Address = "12401 Bellingrath Gardens Rd", City = "Theodore", State = "AL", ZipCode = "36582",
-                Capacity = 500, Description = "Stunning 65-acre garden estate south of Mobile offering outdoor events surrounded by azaleas, roses, and live oaks.",
-                Latitude = 30.4927, Longitude = -88.1458
+                Description = "Stunning 65-acre garden estate south of Mobile offering outdoor events surrounded by azaleas, roses, and live oaks.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "OWA Amusement Park",
                 Address = "1501 S OWA Blvd", City = "Foley", State = "AL", ZipCode = "36535",
-                Capacity = 2000, Description = "Family entertainment destination on the Gulf Coast with rides, dining, and a bustling downtown district for events.",
-                Latitude = 30.3975, Longitude = -87.6836
+                Description = "Family entertainment destination on the Gulf Coast with rides, dining, and a bustling downtown district for events.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "The Wharf Amphitheatre",
                 Address = "4830 Main St", City = "Orange Beach", State = "AL", ZipCode = "36561",
-                Capacity = 10000, Description = "Premier outdoor amphitheatre on the Alabama Gulf Coast hosting national touring acts and major festivals.",
-                Latitude = 30.2830, Longitude = -87.5837
+                Description = "Premier outdoor amphitheatre on the Alabama Gulf Coast hosting national touring acts and major festivals.",
             },
             new()
             {
                 Id = Guid.NewGuid(), Name = "Fairhope Civic Center",
                 Address = "161 N Section St", City = "Fairhope", State = "AL", ZipCode = "36532",
-                Capacity = 400, Description = "Charming civic center in the arts community of Fairhope, hosting lectures, dances, and cultural events on Mobile Bay.",
-                Latitude = 30.5230, Longitude = -87.9033
+                Description = "Charming civic center in the arts community of Fairhope, hosting lectures, dances, and cultural events on Mobile Bay.",
             }
         };
 

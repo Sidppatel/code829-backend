@@ -7,13 +7,10 @@ public record VenueDto(
     string City,
     string State,
     string ZipCode,
-    int Capacity,
     string? Description,
     string? ImageUrl,
     string? Phone,
     string? Website,
-    double? Latitude,
-    double? Longitude,
     bool IsActive,
     DateTime CreatedAt
 );

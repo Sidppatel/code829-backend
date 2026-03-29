@@ -58,12 +58,9 @@ public class AdminVenuesController(
             City = request.City,
             State = request.State,
             ZipCode = request.ZipCode,
-            Capacity = request.Capacity,
             Description = request.Description,
             Phone = request.Phone,
-            Website = request.Website,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude
+            Website = request.Website
         };
 
         context.Venues.Add(venue);
@@ -82,12 +79,9 @@ public class AdminVenuesController(
         if (request.City is not null) venue.City = request.City;
         if (request.State is not null) venue.State = request.State;
         if (request.ZipCode is not null) venue.ZipCode = request.ZipCode;
-        if (request.Capacity.HasValue) venue.Capacity = request.Capacity.Value;
         if (request.Description is not null) venue.Description = request.Description;
         if (request.Phone is not null) venue.Phone = request.Phone;
         if (request.Website is not null) venue.Website = request.Website;
-        if (request.Latitude.HasValue) venue.Latitude = request.Latitude.Value;
-        if (request.Longitude.HasValue) venue.Longitude = request.Longitude.Value;
         if (request.IsActive.HasValue) venue.IsActive = request.IsActive.Value;
 
         venue.UpdatedAt = DateTime.UtcNow;
@@ -123,8 +117,8 @@ public class AdminVenuesController(
 
     private static VenueDto MapToDto(Venue v, IFileStorageService fs) => new(
         v.Id, v.Name, v.Address, v.City, v.State, v.ZipCode,
-        v.Capacity, v.Description,
+        v.Description,
         v.ImagePath is not null ? fs.GetPublicUrl(v.ImagePath) : null,
-        v.Phone, v.Website, v.Latitude, v.Longitude, v.IsActive, v.CreatedAt
+        v.Phone, v.Website, v.IsActive, v.CreatedAt
     );
 }

@@ -277,9 +277,9 @@ public class EventsController(
             ev.VenueId,
             new VenueDto(
                 ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
-                ev.Venue.ZipCode, ev.Venue.Capacity, ev.Venue.Description,
+                ev.Venue.ZipCode, ev.Venue.Description,
                 ev.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(ev.Venue.ImagePath) : null,
-                ev.Venue.Phone, ev.Venue.Website, ev.Venue.Latitude, ev.Venue.Longitude,
+                ev.Venue.Phone, ev.Venue.Website,
                 ev.Venue.IsActive, ev.Venue.CreatedAt
             ),
             ev.OrganizerId,
@@ -315,9 +315,9 @@ public class EventsController(
             ev.VenueId,
             new VenueDto(
                 ev.Venue.Id, ev.Venue.Name, ev.Venue.Address, ev.Venue.City, ev.Venue.State,
-                ev.Venue.ZipCode, ev.Venue.Capacity, ev.Venue.Description,
+                ev.Venue.ZipCode, ev.Venue.Description,
                 ev.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(ev.Venue.ImagePath) : null,
-                ev.Venue.Phone, ev.Venue.Website, ev.Venue.Latitude, ev.Venue.Longitude,
+                ev.Venue.Phone, ev.Venue.Website,
                 ev.Venue.IsActive, ev.Venue.CreatedAt
             ),
             ev.OrganizerId,

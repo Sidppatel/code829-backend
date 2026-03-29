@@ -342,9 +342,9 @@ public class AdminEventsController(
         e.VenueId,
         e.Venue is not null ? new VenueDto(
             e.Venue.Id, e.Venue.Name, e.Venue.Address, e.Venue.City, e.Venue.State,
-            e.Venue.ZipCode, e.Venue.Capacity, e.Venue.Description,
+            e.Venue.ZipCode, e.Venue.Description,
             e.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(e.Venue.ImagePath) : null,
-            e.Venue.Phone, e.Venue.Website, e.Venue.Latitude, e.Venue.Longitude,
+            e.Venue.Phone, e.Venue.Website,
             e.Venue.IsActive, e.Venue.CreatedAt
         ) : null,
         e.OrganizerId,
