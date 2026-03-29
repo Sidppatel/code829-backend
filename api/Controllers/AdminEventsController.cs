@@ -25,10 +25,12 @@ public class AdminEventsController(
 ) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll(
+    public virtual async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] string? status = null)
+        [FromQuery] string? status = null,
+        [FromQuery] string? search = null,
+        [FromQuery] string? category = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
@@ -37,6 +39,20 @@ public class AdminEventsController(
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<EventStatus>(status, true, out var s))
             query = query.Where(e => e.Status == s);
+
+        if (!string.IsNullOrWhiteSpace(category) && Enum.TryParse<EventCategory>(category, true, out var cat))
+            query = query.Where(e => e.Category == cat);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(e =>
+                e.Title.ToLower().Contains(term) ||
+                e.Slug.ToLower().Contains(term) ||
+                e.Venue.Name.ToLower().Contains(term) ||
+                e.Venue.City.ToLower().Contains(term)
+            );
+        }
 
         var totalCount = await query.CountAsync();
         var items = await query
