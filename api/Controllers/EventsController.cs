@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Api.Services;
 using Contracts.DTOs;
@@ -389,5 +390,72 @@ public class EventsController(
         };
 
         return Ok(schema);
+    }
+
+    /// <summary>
+    /// Public table availability for assigned-seating events.
+    /// Returns table status: Available, Held, HeldByYou, Booked.
+    /// </summary>
+    [HttpGet("{id:guid}/tables")]
+    public async Task<IActionResult> GetTables(Guid id)
+    {
+        var ev = await context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        var now = DateTime.UtcNow;
+        Guid? userId = null;
+        var userClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userClaim is not null) Guid.TryParse(userClaim.Value, out var parsed);
+        if (userClaim is not null && Guid.TryParse(userClaim.Value, out var uid)) userId = uid;
+
+        var tables = await context.Tables
+            .Include(t => t.Seats).ThenInclude(s => s.Holds)
+            .Where(t => t.EventId == id && t.IsActive)
+            .OrderBy(t => t.SortOrder)
+            .ToListAsync();
+
+        // Get booked seat IDs (Paid or CheckedIn bookings)
+        var bookedSeatIds = await context.BookingItems
+            .Where(bi => bi.SeatId.HasValue
+                && bi.Booking.EventId == id
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
+            .Select(bi => bi.SeatId!.Value)
+            .ToHashSetAsync();
+
+        var dtos = tables.Select(t =>
+        {
+            var seatIds = t.Seats.Select(s => s.Id).ToList();
+            var isBooked = seatIds.Any(sid => bookedSeatIds.Contains(sid));
+
+            if (isBooked)
+            {
+                return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
+                    (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
+                    t.PriceType.ToString(), t.PriceCents, t.PlatformFeeCents, t.GridRow, t.GridCol,
+                    t.SortOrder, "Booked", null);
+            }
+
+            var activeHolds = t.Seats
+                .SelectMany(s => s.Holds)
+                .Where(h => h.IsActive && h.ExpiresAt > now)
+                .ToList();
+
+            if (activeHolds.Count > 0)
+            {
+                var heldByMe = userId.HasValue && activeHolds.Any(h => h.UserId == userId.Value);
+                var expiresAt = heldByMe && userId.HasValue ? activeHolds.Where(h => h.UserId == userId.Value).Min(h => h.ExpiresAt) : (DateTime?)null;
+                return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
+                    (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
+                    t.PriceType.ToString(), t.PriceCents, t.PlatformFeeCents, t.GridRow, t.GridCol,
+                    t.SortOrder, heldByMe ? "HeldByYou" : "Held", expiresAt);
+            }
+
+            return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
+                (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
+                t.PriceType.ToString(), t.PriceCents, t.PlatformFeeCents, t.GridRow, t.GridCol,
+                t.SortOrder, "Available", null);
+        }).ToList();
+
+        return Ok(new EventTablesResponse(id, ev.GridRows ?? 0, ev.GridCols ?? 0, dtos));
     }
 }

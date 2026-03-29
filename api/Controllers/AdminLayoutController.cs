@@ -195,6 +195,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         // Clear the Redis draft
         await db.KeyDeleteAsync(DraftKey(eventId));
 
+        await SyncSeatsForEvent(eventId);
         return Ok(new { message = "Flushed to DB" });
     }
 
@@ -267,6 +268,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
         ev.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
+        await SyncSeatsForEvent(eventId);
 
         return Ok(await GetLayoutInternal(eventId));
     }
@@ -293,6 +295,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
         context.Tables.Add(table);
         await context.SaveChangesAsync();
+        await SyncSeatsForEvent(eventId);
         return Created("", MapTable(table));
     }
 
@@ -343,6 +346,49 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         return new EventLayoutResponse(
             eventId, ev?.EditorMode?.ToString(), ev?.GridRows, ev?.GridCols,
             tables.Select(MapTable).ToList());
+    }
+
+    /// <summary>
+    /// Ensures each table has exactly Capacity seat rows. Adds missing seats, removes excess
+    /// (only if they have no active holds or booking items).
+    /// </summary>
+    protected async Task SyncSeatsForEvent(Guid eventId)
+    {
+        var tables = await context.Tables
+            .Include(t => t.Seats)
+            .Where(t => t.EventId == eventId && t.IsActive)
+            .ToListAsync();
+
+        foreach (var table in tables)
+        {
+            var capacity = table.Capacity ?? 0;
+            var existing = table.Seats.OrderBy(s => s.SeatNumber).ToList();
+
+            if (existing.Count < capacity)
+            {
+                for (var i = existing.Count + 1; i <= capacity; i++)
+                {
+                    context.Seats.Add(new Seat
+                    {
+                        Id = Guid.NewGuid(),
+                        Label = $"S{i}",
+                        SeatNumber = i,
+                        TableId = table.Id
+                    });
+                }
+            }
+            else if (existing.Count > capacity)
+            {
+                var excess = existing.Skip(capacity).ToList();
+                var excessIds = excess.Select(s => s.Id).ToHashSet();
+                var hasHolds = await context.SeatHolds.AnyAsync(h => excessIds.Contains(h.SeatId) && h.IsActive);
+                var hasBookings = await context.BookingItems.AnyAsync(bi => bi.SeatId.HasValue && excessIds.Contains(bi.SeatId.Value));
+                if (!hasHolds && !hasBookings)
+                    context.Seats.RemoveRange(excess);
+            }
+        }
+
+        await context.SaveChangesAsync();
     }
 
     private static LayoutTableResponse MapTable(Table t) => new(

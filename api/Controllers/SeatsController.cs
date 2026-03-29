@@ -85,4 +85,35 @@ public class SeatsController(ISeatService seatService) : ControllerBase
         var holds = await seatService.GetUserHoldsAsync(userId, eventId);
         return Ok(holds);
     }
+
+    /// <summary>
+    /// Hold all seats at a table atomically. Uses SELECT FOR UPDATE.
+    /// </summary>
+    [HttpPost("hold-table")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> HoldTable([FromBody] HoldTableRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        try
+        {
+            var holds = await seatService.HoldTableAsync(userId, request.EventId, request.TableId, request.TicketTypeId);
+            return Ok(holds);
+        }
+        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+    }
+
+    /// <summary>
+    /// Release all seats at a table for the current user.
+    /// </summary>
+    [HttpPost("release-table")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> ReleaseTable([FromBody] ReleaseTableRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        await seatService.ReleaseTableAsync(userId, request.EventId, request.TableId);
+        return Ok(new { message = "Table released" });
+    }
 }

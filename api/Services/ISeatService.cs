@@ -8,5 +8,7 @@ public interface ISeatService
     Task<SeatHoldDto> HoldSeatAsync(Guid userId, Guid eventId, Guid seatId, Guid ticketTypeId);
     Task ReleaseSeatAsync(Guid userId, Guid eventId, Guid seatId);
     Task<List<SeatHoldDto>> GetUserHoldsAsync(Guid userId, Guid eventId);
+    Task<List<SeatHoldDto>> HoldTableAsync(Guid userId, Guid eventId, Guid tableId, Guid ticketTypeId);
+    Task ReleaseTableAsync(Guid userId, Guid eventId, Guid tableId);
     Task<int> CleanupExpiredHoldsAsync();
 }
