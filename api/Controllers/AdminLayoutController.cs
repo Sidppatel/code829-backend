@@ -146,6 +146,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
+        var locked = await GetLockedTableIdsAsync(eventId);
+
         if (request.EditorMode is not null && Enum.TryParse<EditorMode>(request.EditorMode, true, out var mode))
             ev.EditorMode = mode;
         ev.GridRows = request.GridRows;
@@ -156,7 +158,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .Where(t => !string.IsNullOrEmpty(t.Id) && Guid.TryParse(t.Id, out _))
             .Select(t => Guid.Parse(t.Id!))
             .ToHashSet();
-        context.Tables.RemoveRange(existing.Where(t => !requestIds.Contains(t.Id)));
+
+        // Never delete locked tables
+        var toRemove = existing.Where(t => !requestIds.Contains(t.Id) && !locked.Contains(t.Id));
+        context.Tables.RemoveRange(toRemove);
 
         foreach (var rt in request.Tables)
         {
@@ -166,11 +171,14 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             var rtGuid = !string.IsNullOrEmpty(rt.Id) && Guid.TryParse(rt.Id, out var parsed) ? parsed : (Guid?)null;
             if (rtGuid.HasValue && existing.FirstOrDefault(e => e.Id == rtGuid.Value) is { } ex)
             {
+                // Skip locked tables — no modifications allowed
+                if (locked.Contains(ex.Id)) continue;
+
                 ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
                 ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
                 ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
                 ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
-                
+
                 ex.SortOrder = rt.SortOrder;
                 ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
             }
@@ -182,7 +190,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                     Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
                     PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
                     IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
-                    
+
                     SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
                     EventId = eventId, VenueId = ev.VenueId
                 });
@@ -197,6 +205,16 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
         await SyncSeatsForEvent(eventId);
         return Ok(new { message = "Flushed to DB" });
+    }
+
+    /// <summary>
+    /// Returns table IDs that have active holds or bookings — these cannot be modified/deleted.
+    /// </summary>
+    [HttpGet("admin/events/{eventId:guid}/layout/locked")]
+    public async Task<IActionResult> GetLockedTables(Guid eventId)
+    {
+        var locked = await GetLockedTableIdsAsync(eventId);
+        return Ok(new { lockedTableIds = locked });
     }
 
     [HttpGet("admin/events/{eventId:guid}/layout")]
@@ -222,6 +240,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
+        var locked = await GetLockedTableIdsAsync(eventId);
+
         if (request.EditorMode is not null && Enum.TryParse<EditorMode>(request.EditorMode, true, out var mode))
             ev.EditorMode = mode;
         ev.GridRows = request.GridRows;
@@ -233,7 +253,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .Select(t => Guid.Parse(t.Id!))
             .ToHashSet();
 
-        context.Tables.RemoveRange(existing.Where(t => !requestIds.Contains(t.Id)));
+        // Never delete locked tables
+        var toRemove = existing.Where(t => !requestIds.Contains(t.Id) && !locked.Contains(t.Id));
+        context.Tables.RemoveRange(toRemove);
 
         foreach (var rt in request.Tables)
         {
@@ -243,11 +265,14 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             var rtGuid = !string.IsNullOrEmpty(rt.Id) && Guid.TryParse(rt.Id, out var parsed) ? parsed : (Guid?)null;
             if (rtGuid.HasValue && existing.FirstOrDefault(e => e.Id == rtGuid.Value) is { } ex)
             {
+                // Skip locked tables — no modifications allowed
+                if (locked.Contains(ex.Id)) continue;
+
                 ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
                 ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
                 ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
                 ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
-                
+
                 ex.SortOrder = rt.SortOrder;
                 ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
             }
@@ -259,7 +284,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                     Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
                     PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
                     IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
-                    
+
                     SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
                     EventId = eventId, VenueId = ev.VenueId
                 });
@@ -305,6 +330,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var table = await context.Tables.FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
 
+        var locked = await GetLockedTableIdsAsync(eventId);
+        if (locked.Contains(tableId))
+            return BadRequest(new { message = "This table has active holds or bookings and cannot be modified" });
+
         if (request.Label is not null) table.Label = request.Label;
         if (request.Capacity.HasValue) table.Capacity = request.Capacity.Value;
         if (request.Shape is not null && Enum.TryParse<TableShape>(request.Shape, true, out var s)) table.Shape = s;
@@ -329,6 +358,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
 
+        var locked = await GetLockedTableIdsAsync(eventId);
+        if (locked.Contains(tableId))
+            return BadRequest(new { message = "This table has active holds or bookings and cannot be deleted" });
+
         context.Seats.RemoveRange(table.Seats);
         context.Tables.Remove(table);
         await context.SaveChangesAsync();
@@ -346,6 +379,33 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         return new EventLayoutResponse(
             eventId, ev?.EditorMode?.ToString(), ev?.GridRows, ev?.GridCols,
             tables.Select(MapTable).ToList());
+    }
+
+    /// <summary>
+    /// Returns table IDs that are locked: have active seat holds OR booked/checked-in booking items.
+    /// These tables MUST NOT be modified or deleted.
+    /// </summary>
+    protected async Task<HashSet<Guid>> GetLockedTableIdsAsync(Guid eventId)
+    {
+        var now = DateTime.UtcNow;
+
+        // Tables with active (non-expired) holds
+        var heldTableIds = await context.SeatHolds
+            .Where(h => h.EventId == eventId && h.IsActive && h.ExpiresAt > now)
+            .Select(h => h.Seat.TableId)
+            .Distinct()
+            .ToListAsync();
+
+        // Tables with booked seats (Paid or CheckedIn bookings)
+        var bookedTableIds = await context.BookingItems
+            .Where(bi => bi.SeatId.HasValue
+                && bi.Booking.EventId == eventId
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
+            .Select(bi => bi.Seat!.TableId)
+            .Distinct()
+            .ToListAsync();
+
+        return heldTableIds.Concat(bookedTableIds).ToHashSet();
     }
 
     /// <summary>
