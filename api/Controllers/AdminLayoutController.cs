@@ -401,26 +401,28 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .Select(h => h.SeatId)
             .ToHashSetAsync();
 
-        // Get booking info per table (which bookings reference seats on each table)
-        var tableBookingMap = await context.BookingItems
+        // Get booking info per table — materialize first, then group in memory
+        var bookedItems = await context.BookingItems
             .Where(bi => bi.SeatId.HasValue
                 && bi.Booking.EventId == eventId
                 && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
-            .Include(bi => bi.Seat)
-            .Include(bi => bi.Booking).ThenInclude(b => b.User)
-            .GroupBy(bi => bi.Seat!.TableId)
-            .Select(g => new {
-                TableId = g.Key,
-                BookingCount = g.Select(bi => bi.BookingId).Distinct().Count(),
-                SeatsSold = g.Count(),
-                Bookers = g.Select(bi => new { bi.Booking.UserId, Name = bi.Booking.User.FirstName + " " + bi.Booking.User.LastName })
-                    .DistinctBy(x => x.UserId)
-                    .Select(x => x.Name)
-                    .ToList()
+            .Select(bi => new {
+                TableId = bi.Seat!.TableId,
+                bi.BookingId,
+                bi.Booking.UserId,
+                BookerName = bi.Booking.User.FirstName + " " + bi.Booking.User.LastName
             })
             .ToListAsync();
 
-        var bookingLookup = tableBookingMap.ToDictionary(x => x.TableId);
+        var bookingLookup = bookedItems
+            .GroupBy(x => x.TableId)
+            .ToDictionary(
+                g => g.Key,
+                g => new {
+                    BookingCount = g.Select(x => x.BookingId).Distinct().Count(),
+                    SeatsSold = g.Count(),
+                    Bookers = g.DistinctBy(x => x.UserId).Select(x => x.BookerName).ToList()
+                });
 
         var result = tables.Select(t =>
         {
