@@ -25,7 +25,6 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> GetTableTypes()
     {
         var types = await context.TableTypes
-            .Where(tt => tt.IsActive)
             .OrderBy(tt => tt.Name)
             .Select(tt => new TableTypeResponse(
                 tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
