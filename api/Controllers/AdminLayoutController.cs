@@ -153,7 +153,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         ev.GridCols = request.GridCols;
 
         var existing = await context.Tables.Where(t => t.EventId == eventId).ToListAsync();
-        var requestIds = request.Tables.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToHashSet();
+        var requestIds = request.Tables
+            .Where(t => !string.IsNullOrEmpty(t.Id) && Guid.TryParse(t.Id, out _))
+            .Select(t => Guid.Parse(t.Id!))
+            .ToHashSet();
         context.Tables.RemoveRange(existing.Where(t => !requestIds.Contains(t.Id)));
 
         foreach (var rt in request.Tables)
@@ -161,7 +164,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             Enum.TryParse<TableShape>(rt.Shape, true, out var shape);
             Enum.TryParse<PriceType>(rt.PriceType, true, out var priceType);
 
-            if (rt.Id.HasValue && existing.FirstOrDefault(e => e.Id == rt.Id.Value) is { } ex)
+            var rtGuid = !string.IsNullOrEmpty(rt.Id) && Guid.TryParse(rt.Id, out var parsed) ? parsed : (Guid?)null;
+            if (rtGuid.HasValue && existing.FirstOrDefault(e => e.Id == rtGuid.Value) is { } ex)
             {
                 ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
                 ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
@@ -175,7 +179,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             {
                 context.Tables.Add(new Table
                 {
-                    Id = rt.Id ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
+                    Id = rtGuid ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
                     Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
                     PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
                     IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
@@ -224,7 +228,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         ev.GridCols = request.GridCols;
 
         var existing = await context.Tables.Where(t => t.EventId == eventId).ToListAsync();
-        var requestIds = request.Tables.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToHashSet();
+        var requestIds = request.Tables
+            .Where(t => !string.IsNullOrEmpty(t.Id) && Guid.TryParse(t.Id, out _))
+            .Select(t => Guid.Parse(t.Id!))
+            .ToHashSet();
 
         context.Tables.RemoveRange(existing.Where(t => !requestIds.Contains(t.Id)));
 
@@ -233,7 +240,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             Enum.TryParse<TableShape>(rt.Shape, true, out var shape);
             Enum.TryParse<PriceType>(rt.PriceType, true, out var priceType);
 
-            if (rt.Id.HasValue && existing.FirstOrDefault(e => e.Id == rt.Id.Value) is { } ex)
+            var rtGuid = !string.IsNullOrEmpty(rt.Id) && Guid.TryParse(rt.Id, out var parsed) ? parsed : (Guid?)null;
+            if (rtGuid.HasValue && existing.FirstOrDefault(e => e.Id == rtGuid.Value) is { } ex)
             {
                 ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
                 ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
@@ -247,7 +255,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             {
                 context.Tables.Add(new Table
                 {
-                    Id = rt.Id ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
+                    Id = rtGuid ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
                     Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
                     PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
                     IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,

@@ -57,7 +57,7 @@ public record SaveLayoutRequest(
 );
 
 public record SaveLayoutTableRequest(
-    Guid? Id,
+    string? Id,
     string Label,
     int Capacity,
     string Shape,
