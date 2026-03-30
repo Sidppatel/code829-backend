@@ -7,9 +7,9 @@ using Serilog;
 namespace Api.Seeding;
 
 /// <summary>
-/// Seeds layout tables and pricing rules for existing events.
-/// Runs after VenueEventSeeder. Assigns layout modes, places tables,
-/// and creates pricing rules for the 18 seeded events.
+/// Seeds tables + seats for Grid events, and pricing rules for all events.
+/// Runs after VenueEventSeeder. Respects each event's existing LayoutMode —
+/// only Grid events get tables and seats.
 /// </summary>
 public static class LayoutPricingSeeder
 {
@@ -18,12 +18,11 @@ public static class LayoutPricingSeeder
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
 
-        // Skip if pricing rules already exist
         if (await context.PricingRules.AnyAsync(r => r.Name != null))
             return;
 
         var events = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
+            .Include(e => e.TicketTypes)
             .OrderBy(e => e.StartDate)
             .ToListAsync();
 
@@ -35,73 +34,102 @@ public static class LayoutPricingSeeder
         var roundType = tableTypes.First(t => t.DefaultShape == TableShape.Round);
         var rectType = tableTypes.First(t => t.DefaultShape == TableShape.Rectangle);
         var cocktailType = tableTypes.First(t => t.DefaultShape == TableShape.Cocktail);
-        var squareType = tableTypes.First(t => t.DefaultShape == TableShape.Square);
 
-        var idx = 0;
         foreach (var ev in events)
         {
-            // Assign layout modes in a pattern: first 6 = Grid, next 6 = CapacityOnly, rest = None
-            if (idx < 6)
+            if (ev.LayoutMode == LayoutMode.Grid)
             {
-                ev.LayoutMode = LayoutMode.Grid;
-                ev.EditorMode = EditorMode.Grid;
-                ev.GridRows = 5 + (idx % 3);
-                ev.GridCols = 5 + (idx % 4);
-                SeedGridTables(context, ev, roundType, rectType, cocktailType, idx);
+                SeedGridTables(context, ev, roundType, rectType, cocktailType);
                 SeedSeatsForTables(context, ev.Id);
             }
-            else if (idx < 12)
-            {
-                ev.LayoutMode = LayoutMode.CapacityOnly;
-                ev.MaxCapacity = new[] { 100, 200, 500, 1500, 2000, 5000 }[idx - 6];
-            }
-            else
-            {
-                ev.LayoutMode = LayoutMode.None;
-            }
 
-            SeedPricingRules(context, ev, idx);
-            idx++;
+            SeedPricingRules(context, ev);
         }
 
         await context.SaveChangesAsync();
         Log.Information("[Seed] Configured layouts and pricing for {Count} events", events.Count);
     }
 
+    /// <summary>
+    /// Creates tables on a grid for assigned-seating events.
+    /// Uses PerTable pricing — the table price is for the whole table.
+    /// </summary>
     private static void SeedGridTables(
         EventPlatformDbContext context, Event ev,
-        TableType round, TableType rect, TableType cocktail, int eventIdx)
+        TableType round, TableType rect, TableType cocktail)
     {
-        var tableCount = 8 + (eventIdx * 2);
-        var sections = new[] { "VIP", "Standard", "Premium" };
-
-        for (var i = 0; i < tableCount && i < (ev.GridRows ?? 5) * (ev.GridCols ?? 5); i++)
+        // Grid dimensions based on event — set here if not already set
+        var (rows, cols, tableConfigs) = ev.Title switch
         {
-            var row = i / (ev.GridCols ?? 5);
-            var col = i % (ev.GridCols ?? 5);
-            var section = sections[i % sections.Length];
-            var isVip = section == "VIP";
-            var tableType = isVip ? rect : (i % 3 == 2 ? cocktail : round);
-            var colLetter = (char)('A' + col);
-
-            context.Tables.Add(new Table
+            var t when t.Contains("Gala") => (6, 8, new TableConfig[]
             {
-                Id = Guid.NewGuid(),
-                Label = $"{colLetter}{row + 1}",
-                Capacity = tableType.DefaultCapacity,
-                Shape = tableType.DefaultShape,
-                Color = isVip ? "#7c3aed" : (section == "Premium" ? "#f97316" : "#4f46e5"),
-                Section = section,
-                PriceType = PriceType.PerSeat,
-                PriceCents = isVip ? 7500 : (section == "Premium" ? 5000 : 3500),
-                IsActive = true,
-                GridRow = row,
-                GridCol = col,
-                SortOrder = i,
-                TableTypeId = tableType.Id,
-                EventId = ev.Id,
-                VenueId = ev.VenueId
-            });
+                new("VIP", rect, 15000, 6),
+                new("VIP", rect, 15000, 4),
+                new("Standard", round, 7500, 12),
+                new("Standard", round, 7500, 10),
+                new("Premium", cocktail, 5000, 4),
+            }),
+            var t when t.Contains("Farm-to-Table") => (4, 6, new TableConfig[]
+            {
+                new("Chef's Table", rect, 12000, 2),
+                new("Garden", round, 8500, 6),
+                new("Patio", round, 8500, 4),
+                new("Intimate", cocktail, 4500, 3),
+            }),
+            var t when t.Contains("Luncheon") => (5, 8, new TableConfig[]
+            {
+                new("Head Table", rect, 10000, 2),
+                new("Standard", round, 3500, 14),
+                new("Standard", round, 3500, 6),
+            }),
+            var t when t.Contains("Comedy") => (4, 5, new TableConfig[]
+            {
+                new("Front Row", rect, 5000, 3),
+                new("Standard", round, 2000, 8),
+                new("Bar Side", cocktail, 1500, 4),
+            }),
+            _ => (5, 6, new TableConfig[]
+            {
+                new("VIP", rect, 10000, 4),
+                new("Standard", round, 5000, 8),
+            }),
+        };
+
+        ev.GridRows = rows;
+        ev.GridCols = cols;
+
+        var tableIdx = 0;
+        foreach (var config in tableConfigs)
+        {
+            for (var i = 0; i < config.Count; i++)
+            {
+                var gridPos = tableIdx;
+                if (gridPos >= rows * cols) break;
+
+                var row = gridPos / cols;
+                var col = gridPos % cols;
+                var colLetter = (char)('A' + col);
+
+                context.Tables.Add(new Table
+                {
+                    Id = Guid.NewGuid(),
+                    Label = $"{colLetter}{row + 1}",
+                    Capacity = config.TableType.DefaultCapacity,
+                    Shape = config.TableType.DefaultShape,
+                    Color = config.TableType.DefaultColor,
+                    Section = config.Section,
+                    PriceType = PriceType.PerTable,
+                    PriceCents = config.PriceCents,
+                    IsActive = true,
+                    GridRow = row,
+                    GridCol = col,
+                    SortOrder = tableIdx,
+                    TableTypeId = config.TableType.Id,
+                    EventId = ev.Id,
+                    VenueId = ev.VenueId
+                });
+                tableIdx++;
+            }
         }
     }
 
@@ -124,52 +152,21 @@ public static class LayoutPricingSeeder
         }
     }
 
-    private static void SeedPricingRules(EventPlatformDbContext context, Event ev, int idx)
+    private static void SeedPricingRules(EventPlatformDbContext context, Event ev)
     {
-        // Standard rule for all events
+        // Standard pricing rule for every event
+        var basePrice = ev.TicketTypes.FirstOrDefault()?.PriceCents ?? 2500;
         context.PricingRules.Add(new PricingRule
         {
             Id = Guid.NewGuid(),
             EventId = ev.Id,
             Name = "Standard",
             Type = PricingRuleType.Standard,
-            PriceCents = 2500 + (idx * 500),
+            PriceCents = basePrice,
             IsActive = true,
             SortOrder = 0
         });
-
-        // EarlyBird for even-indexed events
-        if (idx % 2 == 0)
-        {
-            context.PricingRules.Add(new PricingRule
-            {
-                Id = Guid.NewGuid(),
-                EventId = ev.Id,
-                Name = "Early Bird",
-                Type = PricingRuleType.EarlyBird,
-                PriceCents = 1500 + (idx * 300),
-                ValidFrom = DateTime.UtcNow,
-                ValidUntil = DateTime.UtcNow.AddDays(14),
-                IsActive = true,
-                SortOrder = 1
-            });
-        }
-
-        // FirstN for every 3rd event
-        if (idx % 3 == 0)
-        {
-            context.PricingRules.Add(new PricingRule
-            {
-                Id = Guid.NewGuid(),
-                EventId = ev.Id,
-                Name = "First 50 Tickets",
-                Type = PricingRuleType.FirstN,
-                PriceCents = 1000 + (idx * 200),
-                MaxCount = 50,
-                UsedCount = idx * 3,
-                IsActive = true,
-                SortOrder = 2
-            });
-        }
     }
+
+    private record TableConfig(string Section, TableType TableType, int PriceCents, int Count);
 }
