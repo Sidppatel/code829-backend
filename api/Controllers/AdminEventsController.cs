@@ -171,7 +171,19 @@ public class AdminEventsController(
         if (request.VenueId.HasValue) ev.VenueId = request.VenueId.Value;
         if (request.IsFeatured.HasValue) ev.IsFeatured = request.IsFeatured.Value;
         if (request.LayoutMode is not null && Enum.TryParse<Contracts.Enums.LayoutMode>(request.LayoutMode, true, out var lm))
+        {
+            if (lm != ev.LayoutMode)
+            {
+                // Block layout mode change if any bookings or active seat holds exist
+                var hasBookings = await context.Bookings
+                    .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
+                var hasHolds = await context.SeatHolds
+                    .AnyAsync(h => h.EventId == id && h.IsActive && h.ExpiresAt > DateTime.UtcNow);
+                if (hasBookings || hasHolds)
+                    return BadRequest(new { message = "Cannot change layout mode — active bookings or seat holds exist for this event" });
+            }
             ev.LayoutMode = lm;
+        }
         if (request.MaxCapacity.HasValue) ev.MaxCapacity = request.MaxCapacity.Value;
         if (request.BannerImageUrl is not null) ev.ImagePath = request.BannerImageUrl;
 
@@ -187,6 +199,23 @@ public class AdminEventsController(
         ev.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return Ok(MapToDto(ev));
+    }
+
+    /// <summary>
+    /// Check if the event's layout mode is locked (has bookings or active holds).
+    /// </summary>
+    [HttpGet("{id:guid}/layout-locked")]
+    public async Task<IActionResult> IsLayoutModeLocked(Guid id)
+    {
+        var ev = await context.Events.FindAsync(id);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        var hasBookings = await context.Bookings
+            .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
+        var hasHolds = await context.SeatHolds
+            .AnyAsync(h => h.EventId == id && h.IsActive && h.ExpiresAt > DateTime.UtcNow);
+
+        return Ok(new { locked = hasBookings || hasHolds });
     }
 
     [HttpPost("{id:guid}/image")]
