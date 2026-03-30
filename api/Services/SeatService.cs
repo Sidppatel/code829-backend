@@ -1,4 +1,5 @@
 using Contracts.DTOs.Seats;
+using Contracts.Enums;
 using Db;
 using Db.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -70,6 +71,14 @@ public class SeatService(
 
         var ticketType = await context.TicketTypes.FindAsync(ticketTypeId)
             ?? throw new KeyNotFoundException("Ticket type not found");
+
+        // Check if seat is already booked (Paid or CheckedIn)
+        var isBooked = await context.BookingItems
+            .AnyAsync(bi => bi.SeatId == seatId
+                && bi.Booking.EventId == eventId
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn));
+        if (isBooked)
+            throw new InvalidOperationException("This seat is already booked");
 
         // Use a transaction with row-level locking via FOR UPDATE
         await using var transaction = await context.Database.BeginTransactionAsync();
@@ -195,6 +204,16 @@ public class SeatService(
 
         var ticketType = await context.TicketTypes.FindAsync(ticketTypeId)
             ?? throw new KeyNotFoundException("Ticket type not found");
+
+        // Check if any seat in this table is already booked
+        var tableSeatIds = table.Seats.Select(s => s.Id).ToList();
+        var anyBooked = await context.BookingItems
+            .AnyAsync(bi => bi.SeatId.HasValue
+                && tableSeatIds.Contains(bi.SeatId.Value)
+                && bi.Booking.EventId == eventId
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn));
+        if (anyBooked)
+            throw new InvalidOperationException("This table is already booked");
 
         await using var transaction = await context.Database.BeginTransactionAsync();
         try

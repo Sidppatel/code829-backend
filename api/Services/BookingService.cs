@@ -47,9 +47,17 @@ public class BookingService(
             var price = tt.PriceCents ?? 0;
             var feePerItem = tt.PlatformFeeCents ?? 0;
 
-            // If it's a seated booking, use the table type's platform fee
+            // If it's a seated booking, validate seat and use the table type's platform fee
             if (item.SeatId.HasValue)
             {
+                // Check if seat is already booked by another booking
+                var seatAlreadyBooked = await context.BookingItems
+                    .AnyAsync(bi => bi.SeatId == item.SeatId.Value
+                        && bi.Booking.EventId == request.EventId
+                        && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn));
+                if (seatAlreadyBooked)
+                    throw new InvalidOperationException("One or more selected seats are already booked");
+
                 var seat = await context.Seats
                     .Include(s => s.Table)
                         .ThenInclude(t => t!.TableType)
