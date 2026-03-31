@@ -114,8 +114,10 @@ try
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                ValidateIssuer = false,
-                ValidateAudience = false,
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidIssuer = "code829-api",
+                ValidAudience = "code829-client",
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromMinutes(1)
             };
@@ -165,6 +167,7 @@ try
 
     // Middleware pipeline
     app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseMiddleware<RateLimitingMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();
 
     // HTTPS redirect in production

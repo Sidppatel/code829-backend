@@ -157,6 +157,8 @@ public class AuthService(
         };
 
         var token = new JwtSecurityToken(
+            issuer: "code829-api",
+            audience: "code829-client",
             claims: claims,
             expires: expiresAt,
             signingCredentials: credentials
