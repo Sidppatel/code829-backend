@@ -132,6 +132,8 @@ public static class VenueEventSeeder
                 IsFeatured = featured,
                 LayoutMode = LayoutMode.Grid,
                 EditorMode = EditorMode.Grid,
+                PublishedAt = status == EventStatus.Published || status == EventStatus.Completed
+                    ? DateTime.UtcNow.AddDays(-7) : null,
                 VenueId = venues[venueIdx].Id,
                 OrganizerId = orgId
             };
@@ -190,6 +192,8 @@ public static class VenueEventSeeder
                 IsFeatured = featured,
                 LayoutMode = LayoutMode.CapacityOnly,
                 MaxCapacity = maxCap,
+                PublishedAt = status == EventStatus.Published || status == EventStatus.Completed
+                    ? DateTime.UtcNow.AddDays(-7) : null,
                 VenueId = venues[venueIdx].Id,
                 OrganizerId = orgId
             };
@@ -259,6 +263,8 @@ public static class VenueEventSeeder
                 EndDate = DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
                 IsFeatured = featured,
                 LayoutMode = LayoutMode.None,
+                PublishedAt = status == EventStatus.Published || status == EventStatus.Completed
+                    ? DateTime.UtcNow.AddDays(-7) : null,
                 VenueId = venues[venueIdx].Id,
                 OrganizerId = orgId
             };

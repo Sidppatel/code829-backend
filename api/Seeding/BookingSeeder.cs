@@ -213,7 +213,8 @@ public static class BookingSeeder
             PaymentIntentId = $"pi_seed_{Guid.NewGuid():N}",
             Status = paymentStatus,
             AmountCents = booking.TotalCents,
-            PaidAt = paymentStatus == PaymentStatus.Succeeded ? createdAt.AddMinutes(1) : null,
+            PaidAt = paymentStatus is PaymentStatus.Succeeded or PaymentStatus.Refunded
+                ? createdAt.AddMinutes(1) : null,
             RefundedAt = paymentStatus == PaymentStatus.Refunded ? createdAt.AddDays(1) : null,
             CreatedAt = createdAt,
             UpdatedAt = createdAt

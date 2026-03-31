@@ -116,7 +116,11 @@ public class EventPlatformDbContext(
 
         modelBuilder.Entity<MagicLinkToken>(entity =>
         {
-            entity.ToTable("magic_link_tokens");
+            entity.ToTable("magic_link_tokens", t =>
+            {
+                t.HasCheckConstraint("CK_magic_link_tokens_Usage",
+                    "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
+            });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => e.Email);
@@ -190,6 +194,9 @@ public class EventPlatformDbContext(
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.VenueId, e.Name }).IsUnique();
+            entity.HasIndex(e => e.VenueId).IsUnique()
+                .HasFilter("\"IsDefault\" = true")
+                .HasDatabaseName("IX_venue_layouts_OneDefaultPerVenue");
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.EditorMode).HasConversion<string>().HasMaxLength(20);
@@ -273,6 +280,8 @@ public class EventPlatformDbContext(
                     "\"PlatformFeePercent\" IS NULL OR (\"PlatformFeePercent\" >= 0 AND \"PlatformFeePercent\" <= 100)");
                 t.HasCheckConstraint("CK_events_GridDimensions",
                     "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
+                t.HasCheckConstraint("CK_events_PublishLifecycle",
+                    "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Slug).IsUnique();
@@ -370,7 +379,11 @@ public class EventPlatformDbContext(
 
         modelBuilder.Entity<SeatHold>(entity =>
         {
-            entity.ToTable("seat_holds");
+            entity.ToTable("seat_holds", t =>
+            {
+                t.HasCheckConstraint("CK_seat_holds_ExpiresAfterCreate",
+                    "\"ExpiresAt\" > \"CreatedAt\"");
+            });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.SeatId, e.EventId })
                 .IsUnique().HasFilter("\"IsActive\" = true");
@@ -449,6 +462,10 @@ public class EventPlatformDbContext(
                     "\"AmountCents\" >= 0");
                 t.HasCheckConstraint("CK_payments_Currency",
                     "\"Currency\" IN ('usd')");
+                t.HasCheckConstraint("CK_payments_RefundLifecycle",
+                    "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
+                t.HasCheckConstraint("CK_payments_PaidLifecycle",
+                    "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.PaymentIntentId).IsUnique();
