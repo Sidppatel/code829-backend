@@ -63,21 +63,34 @@ public class EventsController(
         // Uses separate conditions to avoid client evaluation issues
         if (!string.IsNullOrWhiteSpace(search))
         {
-            // Get IDs matching via tsvector full-text search
-            var ftsIds = await context.Events
-                .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery("english", search)))
-                .Select(e => e.Id)
-                .ToListAsync();
+            var trimmedSearch = search.Trim();
 
-            // Get IDs matching via trigram similarity (typo tolerance)
-            var trigramIds = await context.Events
-                .Where(e => e.Status == EventStatus.Published)
-                .Where(e => EF.Functions.TrigramsSimilarity(e.Title, search) > 0.1)
-                .Select(e => e.Id)
-                .ToListAsync();
+            if (trimmedSearch.Length < 2)
+            {
+                // Single-character queries: plainto_tsquery produces an empty lexeme and throws.
+                // Fall back to a simple case-insensitive title/category prefix match.
+                query = query.Where(e =>
+                    EF.Functions.ILike(e.Title, $"%{trimmedSearch}%") ||
+                    EF.Functions.ILike(e.Venue.Name, $"%{trimmedSearch}%"));
+            }
+            else
+            {
+                // Get IDs matching via tsvector full-text search
+                var ftsIds = await context.Events
+                    .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery("english", trimmedSearch)))
+                    .Select(e => e.Id)
+                    .ToListAsync();
 
-            var matchIds = ftsIds.Union(trigramIds).Distinct().ToList();
-            query = query.Where(e => matchIds.Contains(e.Id));
+                // Get IDs matching via trigram similarity (typo tolerance)
+                var trigramIds = await context.Events
+                    .Where(e => e.Status == EventStatus.Published)
+                    .Where(e => EF.Functions.TrigramsSimilarity(e.Title, trimmedSearch) > 0.1)
+                    .Select(e => e.Id)
+                    .ToListAsync();
+
+                var matchIds = ftsIds.Union(trigramIds).Distinct().ToList();
+                query = query.Where(e => matchIds.Contains(e.Id));
+            }
         }
 
         // Category filter
