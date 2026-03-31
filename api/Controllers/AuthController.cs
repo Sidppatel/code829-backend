@@ -13,7 +13,8 @@ namespace Api.Controllers;
 [Route("auth")]
 public class AuthController(
     IAuthService authService,
-    IWebHostEnvironment environment
+    IWebHostEnvironment environment,
+    Db.EventPlatformDbContext context
 ) : ControllerBase
 {
     /// <summary>
@@ -93,15 +94,13 @@ public class AuthController(
 
     [HttpPut("profile")]
     [Authorize]
+    [RequireRole(UserRole.User)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized(new { message = "Invalid token" });
 
-        // Retrieve user via dependency parsing (IUserRepository authService doesn't expose it directly, so let's use the DB Context... wait, AuthController doesn't inject DbContext! I need to inject it or use an IAuthService method). 
-        // Let's add UpdateProfileAsync to IAuthService! Actually, we can inject EventPlatformDbContext directly into the method.
-        var context = HttpContext.RequestServices.GetRequiredService<Db.EventPlatformDbContext>();
         var user = await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user is null)

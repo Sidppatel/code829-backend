@@ -44,13 +44,15 @@ public class BookingsController(
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> ConfirmPayment(Guid id)
     {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         try
         {
-            var booking = await bookingService.ConfirmPaymentAsync(id);
+            var booking = await bookingService.ConfirmPaymentAsync(id, userId);
             return Ok(booking);
         }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
     }
 
     /// <summary>
@@ -94,8 +96,15 @@ public class BookingsController(
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> GetById(Guid id)
     {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var userRole = Enum.Parse<UserRole>(User.FindFirst(ClaimTypes.Role)!.Value);
         var booking = await bookingService.GetByIdAsync(id);
         if (booking is null) return NotFound(new { message = "Booking not found" });
+
+        // Non-admin users can only view their own bookings
+        if (userRole < UserRole.Staff && booking.UserId != userId)
+            return Forbid("Not your booking");
+
         return Ok(booking);
     }
 
@@ -149,13 +158,15 @@ public class BookingsController(
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> GetQrCode(Guid id)
     {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         try
         {
-            var png = await bookingService.GetQrImageAsync(id);
+            var png = await bookingService.GetQrImageAsync(id, userId);
             return File(png, "image/png");
         }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
     }
 
     /// <summary>

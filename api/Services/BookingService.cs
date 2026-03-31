@@ -100,25 +100,36 @@ public class BookingService(
             bi.BookingId = booking.Id;
         }
 
-        context.Bookings.Add(booking);
-        context.BookingItems.AddRange(bookingItems);
-        context.Payments.Add(new Payment
+        // Use explicit transaction to prevent partial writes
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
         {
-            Id = Guid.NewGuid(),
-            BookingId = booking.Id,
-            PaymentIntentId = intentId,
-            Status = PaymentStatus.RequiresConfirmation,
-            AmountCents = total
-        });
+            context.Bookings.Add(booking);
+            context.BookingItems.AddRange(bookingItems);
+            context.Payments.Add(new Payment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                PaymentIntentId = intentId,
+                Status = PaymentStatus.RequiresConfirmation,
+                AmountCents = total
+            });
 
-        await context.SaveChangesAsync();
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
         Log.Information("[Booking] Created {BookingNumber} for event {EventId}, total ${Total}",
             booking.BookingNumber, request.EventId, total / 100.0);
 
         return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
     }
 
-    public async Task<BookingDto> ConfirmPaymentAsync(Guid bookingId)
+    public async Task<BookingDto> ConfirmPaymentAsync(Guid bookingId, Guid userId)
     {
         var booking = await context.Bookings
             .Include(b => b.Payment)
@@ -128,36 +139,50 @@ public class BookingService(
             .FirstOrDefaultAsync(b => b.Id == bookingId)
             ?? throw new KeyNotFoundException("Booking not found");
 
+        if (booking.UserId != userId)
+            throw new UnauthorizedAccessException("Not your booking");
+
         if (booking.Status != BookingStatus.Pending)
             throw new InvalidOperationException($"Cannot confirm booking in {booking.Status} status");
 
-        // Confirm mock payment
-        var paymentResult = await paymentService.ConfirmPaymentAsync(booking.Payment!.PaymentIntentId);
-        booking.Payment.Status = PaymentStatus.Succeeded;
-        booking.Payment.PaidAt = DateTime.UtcNow;
-
-        booking.Status = BookingStatus.Paid;
-        booking.QrToken = GenerateQrToken();
-
-        // Generate per-item QR tokens and invitation tokens, increment sold counts
-        foreach (var item in booking.Items)
+        // Use explicit transaction for atomicity
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
         {
-            item.QrToken = GenerateQrToken();
-            item.InvitationToken = GenerateInvitationToken();
-            item.TicketType.QuantitySold++;
-        }
+            // Confirm mock payment
+            var paymentResult = await paymentService.ConfirmPaymentAsync(booking.Payment!.PaymentIntentId);
+            booking.Payment.Status = PaymentStatus.Succeeded;
+            booking.Payment.PaidAt = DateTime.UtcNow;
 
-        // Release any seat holds for this user+event
-        var holds = await context.SeatHolds
-            .Where(h => h.UserId == booking.UserId && h.EventId == booking.EventId && h.IsActive)
-            .ToListAsync();
-        foreach (var hold in holds)
+            booking.Status = BookingStatus.Paid;
+            booking.QrToken = GenerateQrToken();
+
+            // Generate per-item QR tokens and invitation tokens, increment sold counts
+            foreach (var item in booking.Items)
+            {
+                item.QrToken = GenerateQrToken();
+                item.InvitationToken = GenerateInvitationToken();
+                item.TicketType.QuantitySold++;
+            }
+
+            // Release any seat holds for this user+event
+            var holds = await context.SeatHolds
+                .Where(h => h.UserId == booking.UserId && h.EventId == booking.EventId && h.IsActive)
+                .ToListAsync();
+            foreach (var hold in holds)
+            {
+                hold.IsActive = false;
+                hold.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
         {
-            hold.IsActive = false;
-            hold.UpdatedAt = DateTime.UtcNow;
+            await transaction.RollbackAsync();
+            throw;
         }
-
-        await context.SaveChangesAsync();
 
         // Send confirmation email
         var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
@@ -252,10 +277,13 @@ public class BookingService(
         );
     }
 
-    public async Task<byte[]> GetQrImageAsync(Guid bookingId)
+    public async Task<byte[]> GetQrImageAsync(Guid bookingId, Guid userId)
     {
         var booking = await context.Bookings.FindAsync(bookingId)
             ?? throw new KeyNotFoundException("Booking not found");
+
+        if (booking.UserId != userId)
+            throw new UnauthorizedAccessException("Not your booking");
 
         if (string.IsNullOrEmpty(booking.QrToken))
             throw new InvalidOperationException("No QR token — booking not yet confirmed");
