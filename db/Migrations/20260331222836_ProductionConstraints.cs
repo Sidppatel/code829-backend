@@ -11,8 +11,8 @@ namespace db.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // pgcrypto extension for gen_random_uuid()
-            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
+            // pgcrypto extension is installed at Docker infrastructure level
+            // via docker-init/01-extensions-and-roles.sql, not in app migrations.
 
             // Drop views before altering underlying tables
             migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary;");

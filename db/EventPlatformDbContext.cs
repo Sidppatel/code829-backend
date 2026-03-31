@@ -282,6 +282,10 @@ public class EventPlatformDbContext(
                     "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
                 t.HasCheckConstraint("CK_events_PublishLifecycle",
                     "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
+                t.HasCheckConstraint("CK_events_DraftNoPublishDate",
+                    "\"Status\" <> 'Draft' OR \"PublishedAt\" IS NULL");
+                t.HasCheckConstraint("CK_events_CompletedRequiresPublish",
+                    "\"Status\" <> 'Completed' OR \"PublishedAt\" IS NOT NULL");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Slug).IsUnique();
@@ -466,6 +470,10 @@ public class EventPlatformDbContext(
                     "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
                 t.HasCheckConstraint("CK_payments_PaidLifecycle",
                     "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
+                t.HasCheckConstraint("CK_payments_PendingNoPaidDate",
+                    "\"Status\" NOT IN ('RequiresConfirmation','Failed') OR \"PaidAt\" IS NULL");
+                t.HasCheckConstraint("CK_payments_NotRefundedNoRefundDate",
+                    "\"Status\" = 'Refunded' OR \"RefundedAt\" IS NULL");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.PaymentIntentId).IsUnique();
