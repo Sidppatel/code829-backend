@@ -8,6 +8,7 @@ using Db.Interceptors;
 using Db.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -139,13 +140,6 @@ try
 
     var app = builder.Build();
 
-    // Apply migrations
-    using (var scope = app.Services.CreateScope())
-    {
-        var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-        await db.Database.MigrateAsync();
-    }
-
     // Seed data (development only) — suspend change tracking to avoid exponential slowdown
     if (app.Environment.IsDevelopment())
     {
@@ -167,16 +161,8 @@ try
 
     // Middleware pipeline
     app.UseMiddleware<SecurityHeadersMiddleware>();
-    app.UseMiddleware<RateLimitingMiddleware>();
-    app.UseMiddleware<ErrorHandlingMiddleware>();
 
-    // HTTPS redirect in production
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseHttpsRedirection();
-    }
-
-    // CORS — load allowed origins from DB settings
+    // CORS must run before rate limiting so that 429 responses still include CORS headers
     app.UseCors(policy =>
     {
         using var scope = app.Services.CreateScope();
@@ -189,6 +175,15 @@ try
               .AllowAnyMethod()
               .AllowCredentials();
     });
+
+    app.UseMiddleware<RateLimitingMiddleware>();
+    app.UseMiddleware<ErrorHandlingMiddleware>();
+
+    // HTTPS redirect in production
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
     // Static files for uploads
     var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
@@ -219,6 +214,10 @@ try
 
     Log.Information("Event Platform API starting on port {Port}", port);
     await app.RunAsync();
+}
+catch (HostAbortedException)
+{
+    // Expected when dotnet-ef spins up the host to resolve the DbContext then aborts it — not an error
 }
 catch (Exception ex)
 {

@@ -29,9 +29,17 @@ public class RateLimitingMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // Skip rate limiting for loopback — React StrictMode double-invokes effects in dev
+        var remoteIp = context.Connection.RemoteIpAddress;
+        if (remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp))
+        {
+            await next(context);
+            return;
+        }
+
         CleanupExpiredEntries();
 
-        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = remoteIp?.ToString() ?? "unknown";
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "/";
 
         var (limit, window) = GetLimitForPath(path);
