@@ -155,6 +155,14 @@ try
 
     var app = builder.Build();
 
+    // Apply pending migrations on every startup (dev and prod)
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        await db.Database.MigrateAsync();
+        Log.Information("Database migrations applied");
+    }
+
     // Seed data (development only) — suspend change tracking to avoid exponential slowdown
     if (app.Environment.IsDevelopment())
     {
@@ -167,13 +175,6 @@ try
     }
     else
     {
-        // Production: apply pending migrations then seed essential settings
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-            await db.Database.MigrateAsync();
-            Log.Information("Database migrations applied");
-        }
         await DataSeeder.SeedAsync(app.Services);
     }
 
