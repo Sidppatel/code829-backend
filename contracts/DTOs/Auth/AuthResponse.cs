@@ -7,5 +7,6 @@ public record AuthResponse(
     string LastName,
     string Role,
     DateTime ExpiresAt,
-    bool HasCompletedOnboarding
+    bool HasCompletedOnboarding,
+    string? RefreshToken = null
 );

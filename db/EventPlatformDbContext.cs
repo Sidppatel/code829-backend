@@ -15,6 +15,7 @@ public class EventPlatformDbContext(
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     // Template/parent entities
     public DbSet<Venue> Venues => Set<Venue>();
@@ -127,6 +128,16 @@ public class EventPlatformDbContext(
             entity.HasIndex(e => e.ExpiresAt);
             entity.Property(e => e.TokenHash).HasMaxLength(128);
             entity.Property(e => e.Email).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // ─── Template/parent entities ────────────────────────────

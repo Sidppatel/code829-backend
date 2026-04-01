@@ -6,6 +6,8 @@ using Api.Workers;
 using Db;
 using Db.Interceptors;
 using Db.Repositories;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -22,8 +24,8 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    // Load .env file — always attempt to load so env vars like ASPNETCORE_ENVIRONMENT are available
-    // even when launched via Start-Process which doesn't inherit parent shell env vars
+    // Load .env file — only in Development to prevent stale env files overriding production secrets
+    if (builder.Environment.IsDevelopment())
     {
         var envCandidates = new[]
         {
@@ -49,9 +51,20 @@ try
     }
 
     // Serilog
-    builder.Host.UseSerilog((ctx, lc) => lc
-        .ReadFrom.Configuration(ctx.Configuration)
-        .WriteTo.Console());
+    builder.Host.UseSerilog((ctx, lc) =>
+    {
+        lc.ReadFrom.Configuration(ctx.Configuration)
+          .Enrich.WithMachineName()
+          .WriteTo.Console();
+
+        if (!ctx.HostingEnvironment.IsDevelopment())
+        {
+            lc.WriteTo.File("logs/api-.log",
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 30,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{MachineName}] {Message:lj}{NewLine}{Exception}");
+        }
+    });
 
     // Kestrel on configurable port
     var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
@@ -131,9 +144,11 @@ try
         });
     builder.Services.AddAuthorization();
 
-    // Controllers + OpenAPI
+    // Controllers + OpenAPI + Validation
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
+    builder.Services.AddFluentValidationAutoValidation();
+    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();
@@ -152,12 +167,27 @@ try
     }
     else
     {
-        // Production: only seed essential settings (jwt_secret etc.) if missing
+        // Production: apply pending migrations then seed essential settings
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+            await db.Database.MigrateAsync();
+            Log.Information("Database migrations applied");
+        }
         await DataSeeder.SeedAsync(app.Services);
     }
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);
+
+    // Pre-load CORS origins to avoid async deadlock (.Result anti-pattern)
+    string[] corsOrigins;
+    {
+        using var scope = app.Services.CreateScope();
+        var settingsSvc = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+        var originsStr = await settingsSvc.GetOrDefaultAsync("cors_origins", "http://localhost:5173") ?? "http://localhost:5173";
+        corsOrigins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
 
     // Middleware pipeline
     app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -165,12 +195,7 @@ try
     // CORS must run before rate limiting so that 429 responses still include CORS headers
     app.UseCors(policy =>
     {
-        using var scope = app.Services.CreateScope();
-        var settingsSvc = scope.ServiceProvider.GetRequiredService<ISettingsService>();
-        var originsStr = settingsSvc.GetOrDefaultAsync("cors_origins", "http://localhost:5173").Result ?? "http://localhost:5173";
-        var origins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        policy.WithOrigins(origins)
+        policy.WithOrigins(corsOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -236,8 +261,9 @@ static string ConvertPostgresUrl(string url)
 {
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
-    // Disable SSL for local Docker PostgreSQL (alpine image has no SSL configured)
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode=Disable;Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+    var sslMode = Environment.GetEnvironmentVariable("DATABASE_SSL_MODE")
+        ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ? "Disable" : "VerifyFull");
+    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
 }
 
 /// <summary>

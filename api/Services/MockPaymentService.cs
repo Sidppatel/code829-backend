@@ -8,11 +8,12 @@ namespace Api.Services;
 /// </summary>
 public class MockPaymentService : IPaymentService
 {
-    public Task<(string PaymentIntentId, string Status)> CreatePaymentIntentAsync(int amountCents, string currency = "usd")
+    public Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(int amountCents, string currency = "usd")
     {
         var intentId = $"pi_mock_{Guid.NewGuid():N}";
+        var clientSecret = $"{intentId}_secret_mock";
         Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents", intentId, amountCents);
-        return Task.FromResult((intentId, "requires_confirmation"));
+        return Task.FromResult((intentId, clientSecret, "requires_confirmation"));
     }
 
     public Task<string> ConfirmPaymentAsync(string paymentIntentId)

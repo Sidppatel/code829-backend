@@ -6,6 +6,7 @@ using Db.Entities;
 using Microsoft.EntityFrameworkCore;
 using QRCoder;
 using Serilog;
+using StackExchange.Redis;
 
 namespace Api.Services;
 
@@ -14,7 +15,8 @@ public class BookingService(
     IPricingEngine pricingEngine,
     IPaymentService paymentService,
     IEmailService emailService,
-    ISettingsService settings
+    ISettingsService settings,
+    IConnectionMultiplexer redis
 ) : IBookingService
 {
     public async Task<BookingDto> CreateAsync(Guid userId, CreateBookingRequest request)
@@ -30,63 +32,75 @@ public class BookingService(
         if (request.Items.Count > maxTickets)
             throw new InvalidOperationException($"Maximum {maxTickets} tickets per booking");
 
-        // Resolve ticket prices and fees
-        var items = new List<(int Price, int Fee)>();
-        var bookingItems = new List<BookingItem>();
-        foreach (var item in request.Items)
+        // Acquire distributed locks for seated bookings to prevent TOCTOU race conditions
+        var db = redis.GetDatabase();
+        var acquiredLocks = new List<(string Key, string Token)>();
+        try
         {
-            var tt = await context.TicketTypes.FindAsync(item.TicketTypeId)
-                ?? throw new KeyNotFoundException($"Ticket type {item.TicketTypeId} not found");
-
-            if (tt.EventId != request.EventId)
-                throw new InvalidOperationException("Ticket type does not belong to this event");
-
-            if (tt.QuantitySold >= tt.QuantityTotal)
-                throw new InvalidOperationException($"Ticket type '{tt.Name}' is sold out");
-
-            var price = tt.PriceCents ?? 0;
-            var feePerItem = tt.PlatformFeeCents ?? 0;
-
-            // If it's a seated booking, validate seat and use the table type's platform fee
-            if (item.SeatId.HasValue)
+            // Resolve ticket prices and fees
+            var items = new List<(int Price, int Fee)>();
+            var bookingItems = new List<BookingItem>();
+            foreach (var item in request.Items)
             {
-                // Check if seat is already booked by another booking
-                var seatAlreadyBooked = await context.BookingItems
-                    .AnyAsync(bi => bi.SeatId == item.SeatId.Value
-                        && bi.Booking.EventId == request.EventId
-                        && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn));
-                if (seatAlreadyBooked)
-                    throw new InvalidOperationException("One or more selected seats are already booked");
+                var tt = await context.TicketTypes.FindAsync(item.TicketTypeId)
+                    ?? throw new KeyNotFoundException($"Ticket type {item.TicketTypeId} not found");
 
-                var seat = await context.Seats
-                    .Include(s => s.Table)
-                        .ThenInclude(t => t!.TableType)
-                    .FirstOrDefaultAsync(s => s.Id == item.SeatId.Value);
-                if (seat?.Table?.TableType != null && seat.Table.TableType.PlatformFeeCents > 0)
+                if (tt.EventId != request.EventId)
+                    throw new InvalidOperationException("Ticket type does not belong to this event");
+
+                if (tt.QuantitySold >= tt.QuantityTotal)
+                    throw new InvalidOperationException($"Ticket type '{tt.Name}' is sold out");
+
+                var price = tt.PriceCents ?? 0;
+                var feePerItem = tt.PlatformFeeCents ?? 0;
+
+                // If it's a seated booking, acquire lock and validate seat
+                if (item.SeatId.HasValue)
                 {
-                    feePerItem = seat.Table.TableType.PlatformFeeCents;
-                }
-            }
+                    var lockKey = $"seat-lock:{item.SeatId.Value}";
+                    var lockToken = Guid.NewGuid().ToString();
+                    var acquired = await db.StringSetAsync(lockKey, lockToken, TimeSpan.FromSeconds(30), When.NotExists);
+                    if (!acquired)
+                        throw new InvalidOperationException("One or more selected seats are being reserved by another user. Please try again.");
+                    acquiredLocks.Add((lockKey, lockToken));
 
-            items.Add((price, feePerItem));
-            bookingItems.Add(new BookingItem
-            {
-                Id = Guid.NewGuid(),
-                TicketTypeId = item.TicketTypeId,
-                SeatId = item.SeatId,
-                PriceCents = price
-            });
-        }
+                    // Check if seat is already booked by another booking
+                    var seatAlreadyBooked = await context.BookingItems
+                        .AnyAsync(bi => bi.SeatId == item.SeatId.Value
+                            && bi.Booking.EventId == request.EventId
+                            && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn));
+                    if (seatAlreadyBooked)
+                        throw new InvalidOperationException("One or more selected seats are already booked");
+
+                    var seat = await context.Seats
+                        .Include(s => s.Table)
+                            .ThenInclude(t => t!.TableType)
+                        .FirstOrDefaultAsync(s => s.Id == item.SeatId.Value);
+                    if (seat?.Table?.TableType != null && seat.Table.TableType.PlatformFeeCents > 0)
+                    {
+                        feePerItem = seat.Table.TableType.PlatformFeeCents;
+                    }
+                }
+
+                items.Add((price, feePerItem));
+                bookingItems.Add(new BookingItem
+                {
+                    Id = Guid.NewGuid(),
+                    TicketTypeId = item.TicketTypeId,
+                    SeatId = item.SeatId,
+                    PriceCents = price
+                });
+            }
 
         var (subtotal, fee, total) = await pricingEngine.CalculateAsync(request.EventId, items);
 
         // Create payment intent
-        var (intentId, _) = await paymentService.CreatePaymentIntentAsync(total);
+        var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);
 
         var booking = new Booking
         {
             Id = Guid.NewGuid(),
-            BookingNumber = GenerateBookingNumber(),
+            BookingNumber = await GenerateBookingNumberAsync(),
             Status = BookingStatus.Pending,
             UserId = userId,
             EventId = request.EventId,
@@ -123,10 +137,20 @@ public class BookingService(
             await transaction.RollbackAsync();
             throw;
         }
-        Log.Information("[Booking] Created {BookingNumber} for event {EventId}, total ${Total}",
-            booking.BookingNumber, request.EventId, total / 100.0);
+            Log.Information("[Booking] Created {BookingNumber} for event {EventId}, total ${Total}",
+                booking.BookingNumber, request.EventId, total / 100.0);
 
-        return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+            return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+        }
+        finally
+        {
+            // Release all acquired seat locks
+            foreach (var (lockKey, lockToken) in acquiredLocks)
+            {
+                var script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+                await db.ScriptEvaluateAsync(script, [(RedisKey)lockKey], [(RedisValue)lockToken]);
+            }
+        }
     }
 
     public async Task<BookingDto> ConfirmPaymentAsync(Guid bookingId, Guid userId)
@@ -157,12 +181,20 @@ public class BookingService(
             booking.Status = BookingStatus.Paid;
             booking.QrToken = GenerateQrToken();
 
-            // Generate per-item QR tokens and invitation tokens, increment sold counts
+            // Generate per-item QR tokens and invitation tokens
             foreach (var item in booking.Items)
             {
                 item.QrToken = GenerateQrToken();
                 item.InvitationToken = GenerateInvitationToken();
-                item.TicketType.QuantitySold++;
+            }
+
+            // Atomically increment sold counts to prevent lost-update race condition
+            foreach (var item in booking.Items)
+            {
+                await context.TicketTypes
+                    .Where(t => t.Id == item.TicketTypeId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(t => t.QuantitySold, t => t.QuantitySold + 1));
             }
 
             // Release any seat holds for this user+event
@@ -184,15 +216,17 @@ public class BookingService(
             throw;
         }
 
-        // Send confirmation email
+        // Send confirmation email — QR token is never sent in plaintext
         var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
+        var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var checkinLink = $"{frontendUrl}/booking/{booking.Id}/checkin";
         await emailService.SendAsync(
             booking.User.Email,
             $"Booking Confirmed — {booking.Event.Title} | {brandName}",
             $"Hi {booking.User.FirstName},\n\n" +
             $"Your booking {booking.BookingNumber} for {booking.Event.Title} is confirmed!\n" +
-            $"Total: ${booking.TotalCents / 100.0:F2}\n" +
-            $"QR Token: {booking.QrToken}\n\n" +
+            $"Total: ${booking.TotalCents / 100.0:F2}\n\n" +
+            $"View your check-in QR code: {checkinLink}\n\n" +
             $"Show your QR code at the venue for check-in.\n\n" +
             $"— {brandName}"
         );
@@ -237,13 +271,16 @@ public class BookingService(
         booking.Payment.RefundedAt = DateTime.UtcNow;
         booking.Status = BookingStatus.Refunded;
 
-        // Decrement sold counts
+        await context.SaveChangesAsync();
+
+        // Atomically decrement sold counts to prevent lost-update race condition
         foreach (var item in booking.Items)
         {
-            item.TicketType.QuantitySold = Math.Max(0, item.TicketType.QuantitySold - 1);
+            await context.TicketTypes
+                .Where(t => t.Id == item.TicketTypeId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.QuantitySold, t => t.QuantitySold - 1 < 0 ? 0 : t.QuantitySold - 1));
         }
-
-        await context.SaveChangesAsync();
         return (await GetByIdAsync(bookingId))!;
     }
 
@@ -294,11 +331,19 @@ public class BookingService(
         return qrCode.GetGraphic(10);
     }
 
-    private static string GenerateBookingNumber()
+    private async Task<string> GenerateBookingNumberAsync()
     {
         var timestamp = DateTime.UtcNow.ToString("yyMMdd");
-        var random = RandomNumberGenerator.GetInt32(100000, 999999);
-        return $"BK-{timestamp}-{random}";
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var random = RandomNumberGenerator.GetInt32(100000, 999999);
+            var candidate = $"BK-{timestamp}-{random}";
+            var exists = await context.Bookings.AnyAsync(b => b.BookingNumber == candidate);
+            if (!exists) return candidate;
+        }
+        // Fallback: use a longer random segment for guaranteed uniqueness
+        var fallbackRandom = RandomNumberGenerator.GetInt32(100000000, 999999999);
+        return $"BK-{timestamp}-{fallbackRandom}";
     }
 
     private static string GenerateQrToken()

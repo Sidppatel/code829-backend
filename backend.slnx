@@ -2,4 +2,5 @@
   <Project Path="api/api.csproj" />
   <Project Path="contracts/contracts.csproj" />
   <Project Path="db/db.csproj" />
+  <Project Path="tests/Api.Tests/Api.Tests.csproj" />
 </Solution>

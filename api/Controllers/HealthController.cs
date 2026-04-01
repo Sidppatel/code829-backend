@@ -12,8 +12,20 @@ public class HealthController(
     IConnectionMultiplexer redis
 ) : ControllerBase
 {
+    /// <summary>
+    /// Liveness probe — returns 200 if the process is running.
+    /// Used by load balancers to detect crashed instances.
+    /// </summary>
+    [HttpGet("health/live")]
+    public IActionResult Live() => Ok(new { status = "alive" });
+
+    /// <summary>
+    /// Readiness probe — checks all dependencies (Postgres, Redis).
+    /// Returns 503 if any dependency is down. Load balancers use this to route traffic away.
+    /// </summary>
+    [HttpGet("health/ready")]
     [HttpGet("health")]
-    public async Task<IActionResult> GetHealth()
+    public async Task<IActionResult> Ready()
     {
         var services = new Dictionary<string, string>();
 

@@ -74,6 +74,26 @@ public class AuthController(
     }
 
     /// <summary>
+    /// Refresh an expired JWT using a valid refresh token. Returns new JWT + new refresh token (rotation).
+    /// </summary>
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            return BadRequest(new { message = "Refresh token is required" });
+
+        try
+        {
+            var response = await authService.RefreshTokenAsync(request.RefreshToken);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get the current authenticated user's profile.
     /// </summary>
     [HttpGet("me")]
@@ -150,6 +170,8 @@ public class AuthController(
         return Ok(new { message = "Profile updated successfully" });
     }
 }
+
+public record RefreshTokenRequest(string RefreshToken);
 
 public record UpdateProfileRequest(
     string? FirstName,

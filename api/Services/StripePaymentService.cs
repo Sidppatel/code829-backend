@@ -1,46 +1,97 @@
 using Serilog;
+using Stripe;
 
 namespace Api.Services;
 
 /// <summary>
-/// Production Stripe payment service. Requires stripe_secret_key from DB settings.
-/// In a real deployment, this would use the Stripe SDK. Currently validates config
-/// and throws if misconfigured, ensuring mock services are not used in production.
+/// Production Stripe payment service using the Stripe.net SDK.
+/// Reads stripe_secret_key from DB settings.
 /// </summary>
 public class StripePaymentService(ISettingsService settings) : IPaymentService
 {
-    public async Task<(string PaymentIntentId, string Status)> CreatePaymentIntentAsync(int amountCents, string currency = "usd")
+    public async Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(int amountCents, string currency = "usd")
     {
-        var key = await settings.GetAsync("stripe_secret_key");
-        if (key == "MOCK_DEV")
-            throw new InvalidOperationException("Stripe is not configured — stripe_secret_key is still MOCK_DEV");
+        var client = await GetClientAsync();
 
-        // Production implementation would call Stripe SDK here:
-        // var options = new PaymentIntentCreateOptions { Amount = amountCents, Currency = currency };
-        // var service = new PaymentIntentService();
-        // var intent = await service.CreateAsync(options);
-        // return (intent.Id, intent.Status);
-        Log.Information("[Stripe] CreatePaymentIntent: {Amount} {Currency}", amountCents, currency);
-        throw new NotImplementedException("Stripe SDK integration pending — configure stripe_secret_key");
+        var options = new PaymentIntentCreateOptions
+        {
+            Amount = amountCents,
+            Currency = currency,
+            AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true }
+        };
+
+        try
+        {
+            var service = new PaymentIntentService(client);
+            var intent = await service.CreateAsync(options);
+            Log.Information("[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}",
+                intent.Id, amountCents, currency);
+            return (intent.Id, intent.ClientSecret, intent.Status);
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Stripe] Failed to create PaymentIntent");
+            throw MapStripeException(ex);
+        }
     }
 
     public async Task<string> ConfirmPaymentAsync(string paymentIntentId)
     {
-        var key = await settings.GetAsync("stripe_secret_key");
-        if (key == "MOCK_DEV")
-            throw new InvalidOperationException("Stripe is not configured");
+        var client = await GetClientAsync();
 
-        Log.Information("[Stripe] ConfirmPayment: {IntentId}", paymentIntentId);
-        throw new NotImplementedException("Stripe SDK integration pending");
+        try
+        {
+            var service = new PaymentIntentService(client);
+            var intent = await service.GetAsync(paymentIntentId);
+            Log.Information("[Stripe] Retrieved PaymentIntent {IntentId}, status: {Status}",
+                paymentIntentId, intent.Status);
+            return intent.Status;
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Stripe] Failed to confirm PaymentIntent {IntentId}", paymentIntentId);
+            throw MapStripeException(ex);
+        }
     }
 
     public async Task<string> RefundPaymentAsync(string paymentIntentId)
     {
-        var key = await settings.GetAsync("stripe_secret_key");
-        if (key == "MOCK_DEV")
-            throw new InvalidOperationException("Stripe is not configured");
+        var client = await GetClientAsync();
 
-        Log.Information("[Stripe] RefundPayment: {IntentId}", paymentIntentId);
-        throw new NotImplementedException("Stripe SDK integration pending");
+        try
+        {
+            var service = new RefundService(client);
+            var refund = await service.CreateAsync(new RefundCreateOptions
+            {
+                PaymentIntent = paymentIntentId
+            });
+            Log.Information("[Stripe] Refund {RefundId} created for PaymentIntent {IntentId}",
+                refund.Id, paymentIntentId);
+            return refund.Status;
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Stripe] Failed to refund PaymentIntent {IntentId}", paymentIntentId);
+            throw MapStripeException(ex);
+        }
+    }
+
+    private async Task<StripeClient> GetClientAsync()
+    {
+        var key = await settings.GetAsync("stripe_secret_key");
+        if (string.IsNullOrEmpty(key) || key == "MOCK_DEV")
+            throw new InvalidOperationException("Stripe is not configured — set stripe_secret_key in settings");
+
+        return new StripeClient(key);
+    }
+
+    private static Exception MapStripeException(StripeException ex)
+    {
+        return ex.StripeError?.Type switch
+        {
+            "card_error" => new InvalidOperationException($"Payment declined: {ex.StripeError.Message}", ex),
+            "invalid_request_error" => new ArgumentException($"Invalid payment request: {ex.StripeError.Message}", ex),
+            _ => new InvalidOperationException($"Payment processing error: {ex.Message}", ex)
+        };
     }
 }
