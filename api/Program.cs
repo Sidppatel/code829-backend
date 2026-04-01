@@ -196,7 +196,10 @@ try
     {
         using var scope = app.Services.CreateScope();
         var settingsSvc = scope.ServiceProvider.GetRequiredService<ISettingsService>();
-        var originsStr = await settingsSvc.GetOrDefaultAsync("cors_origins", "http://localhost:5173") ?? "http://localhost:5173";
+        var defaultOrigins = app.Environment.IsDevelopment()
+            ? "http://localhost:5173,http://localhost:5174"  // Dev: support both default and Vite ports
+            : "http://localhost:5173";
+        var originsStr = await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins) ?? defaultOrigins;
         corsOrigins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
