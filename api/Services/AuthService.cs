@@ -204,14 +204,26 @@ public class AuthService(
         });
         await context.SaveChangesAsync();
 
-        return new AuthResponse(
-            Token: tokenString,
+        var userDto = new UserDto(
+            Id: user.Id,
             Email: user.Email,
             FirstName: user.FirstName,
             LastName: user.LastName,
             Role: user.Role.ToString(),
+            CreatedAt: user.CreatedAt,
+            Address: user.Address?.Line1,
+            City: user.Address?.City,
+            State: user.Address?.State,
+            ZipCode: user.Address?.ZipCode,
+            Phone: user.Phone,
+            OptInLocationEmail: user.OptInLocationEmail,
+            HasCompletedOnboarding: user.HasCompletedOnboarding
+        );
+
+        return new AuthResponse(
+            Token: tokenString,
+            User: userDto,
             ExpiresAt: expiresAt,
-            HasCompletedOnboarding: user.HasCompletedOnboarding,
             RefreshToken: rawRefreshToken
         );
     }

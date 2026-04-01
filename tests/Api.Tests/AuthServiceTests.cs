@@ -127,7 +127,7 @@ public class AuthServiceTests : IDisposable
         var result = await _service.VerifyMagicLinkAsync(rawToken);
 
         result.Should().NotBeNull();
-        result.Email.Should().Be("newuser@example.com");
+        result.User.Email.Should().Be("newuser@example.com");
         result.RefreshToken.Should().NotBeNullOrEmpty();
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == "newuser@example.com");
@@ -178,7 +178,7 @@ public class AuthServiceTests : IDisposable
         var result = await _service.RefreshTokenAsync(rawRefreshToken);
 
         result.Should().NotBeNull();
-        result.Email.Should().Be("refresh@example.com");
+        result.User.Email.Should().Be("refresh@example.com");
         result.Token.Should().NotBeNullOrEmpty();
         result.RefreshToken.Should().NotBeNullOrEmpty();
         result.RefreshToken.Should().NotBe(rawRefreshToken); // rotated
