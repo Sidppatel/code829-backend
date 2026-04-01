@@ -50,20 +50,30 @@ try
         }
     }
 
-    // Serilog
+    // Serilog — all output to files, not console (for clean automation)
     builder.Host.UseSerilog((ctx, lc) =>
     {
         lc.ReadFrom.Configuration(ctx.Configuration)
           .Enrich.WithMachineName()
-          .WriteTo.Console();
+          .Enrich.FromLogContext();
 
-        if (!ctx.HostingEnvironment.IsDevelopment())
-        {
-            lc.WriteTo.File("logs/api-.log",
+        // Main API log file
+        lc.WriteTo.File("logs/api-.log",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 30,
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+
+        // Separate file for seeding operations (easy to tail during create-db)
+        lc.WriteTo.Logger(lc2 => lc2
+            .Filter.ByIncludingOnly(le => le.MessageTemplate.Text.Contains("[Seed]"))
+            .WriteTo.File("logs/seeding-.log",
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 30,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{MachineName}] {Message:lj}{NewLine}{Exception}");
-        }
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
+
+        // Minimal console: only errors and above (startup message still shows via bootstrapper)
+        lc.WriteTo.Console(
+            restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Error);
     });
 
     // Kestrel on configurable port
