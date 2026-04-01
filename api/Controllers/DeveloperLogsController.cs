@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Controllers;
 
 [ApiController]
-[Route("developer/logs")]
+[Route("developer/admin-logs")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
 public class DeveloperLogsController(EventPlatformDbContext context) : ControllerBase
