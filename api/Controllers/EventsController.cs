@@ -77,7 +77,7 @@ public class EventsController(
             {
                 // Get IDs matching via tsvector full-text search
                 var ftsIds = await context.Events
-                    .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery("english", trimmedSearch)))
+                    .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery(trimmedSearch)))
                     .Select(e => e.Id)
                     .ToListAsync();
 
