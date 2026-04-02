@@ -240,62 +240,90 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
-        var locked = await GetLockedTableIdsAsync(eventId);
-
-        if (request.EditorMode is not null && Enum.TryParse<EditorMode>(request.EditorMode, true, out var mode))
-            ev.EditorMode = mode;
-        ev.GridRows = request.GridRows;
-        ev.GridCols = request.GridCols;
-
-        var existing = await context.Tables.Where(t => t.EventId == eventId).ToListAsync();
-        var requestIds = request.Tables
-            .Where(t => !string.IsNullOrEmpty(t.Id) && Guid.TryParse(t.Id, out _))
-            .Select(t => Guid.Parse(t.Id!))
-            .ToHashSet();
-
-        // Never delete locked tables
-        var toRemove = existing.Where(t => !requestIds.Contains(t.Id) && !locked.Contains(t.Id));
-        context.Tables.RemoveRange(toRemove);
-
-        foreach (var rt in request.Tables)
+        try
         {
-            Enum.TryParse<TableShape>(rt.Shape, true, out var shape);
-            Enum.TryParse<PriceType>(rt.PriceType, true, out var priceType);
+            var locked = await GetLockedTableIdsAsync(eventId);
 
-            var rtGuid = !string.IsNullOrEmpty(rt.Id) && Guid.TryParse(rt.Id, out var parsed) ? parsed : (Guid?)null;
-            if (rtGuid.HasValue && existing.FirstOrDefault(e => e.Id == rtGuid.Value) is { } ex)
+            if (request.EditorMode is not null && Enum.TryParse<EditorMode>(request.EditorMode, true, out var mode))
+                ev.EditorMode = mode;
+            ev.GridRows = request.GridRows;
+            ev.GridCols = request.GridCols;
+
+            var existing = await context.Tables.Where(t => t.EventId == eventId).ToListAsync();
+            var requestIds = request.Tables
+                .Where(t => !string.IsNullOrEmpty(t.Id) && Guid.TryParse(t.Id, out _))
+                .Select(t => Guid.Parse(t.Id!))
+                .ToHashSet();
+
+            // Collect labels to enforce uniqueness in-memory before hitting the DB
+            var usedLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Locked tables that stay keep their labels reserved
+            foreach (var lt in existing.Where(t => locked.Contains(t.Id) && requestIds.Contains(t.Id)))
+                usedLabels.Add(lt.Label);
+
+            // Never delete locked tables
+            var toRemove = existing.Where(t => !requestIds.Contains(t.Id) && !locked.Contains(t.Id));
+            context.Tables.RemoveRange(toRemove);
+
+            foreach (var rt in request.Tables)
             {
-                // Skip locked tables — no modifications allowed
-                if (locked.Contains(ex.Id)) continue;
+                Enum.TryParse<TableShape>(rt.Shape, true, out var shape);
+                Enum.TryParse<PriceType>(rt.PriceType, true, out var priceType);
 
-                ex.Label = rt.Label; ex.Capacity = rt.Capacity; ex.Shape = shape;
-                ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
-                ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
-                ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
-
-                ex.SortOrder = rt.SortOrder;
-                ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                context.Tables.Add(new Table
+                // Ensure label uniqueness — truncate to 20 chars and auto-number if needed
+                var rawLabel = (rt.Label ?? "Table").Length > 20 ? rt.Label![..20] : rt.Label ?? "Table";
+                var label = rawLabel;
+                var counter = 1;
+                while (usedLabels.Contains(label))
                 {
-                    Id = rtGuid ?? Guid.NewGuid(), Label = rt.Label, Capacity = rt.Capacity,
-                    Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
-                    PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
-                    IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
+                    counter++;
+                    var suffix = $" {counter}";
+                    var maxBase = 20 - suffix.Length;
+                    var basePart = rawLabel.Length > maxBase ? rawLabel[..maxBase] : rawLabel;
+                    label = basePart + suffix;
+                }
+                usedLabels.Add(label);
 
-                    SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
-                    EventId = eventId, VenueId = ev.VenueId
-                });
+                var rtGuid = !string.IsNullOrEmpty(rt.Id) && Guid.TryParse(rt.Id, out var parsed) ? parsed : (Guid?)null;
+                if (rtGuid.HasValue && existing.FirstOrDefault(e => e.Id == rtGuid.Value) is { } ex)
+                {
+                    // Skip locked tables — no modifications allowed
+                    if (locked.Contains(ex.Id)) continue;
+
+                    ex.Label = label; ex.Capacity = rt.Capacity; ex.Shape = shape;
+                    ex.Color = rt.Color; ex.Section = rt.Section; ex.PriceType = priceType;
+                    ex.PriceCents = rt.PriceCents; ex.PriceOverrideCents = rt.PriceOverrideCents;
+                    ex.IsActive = rt.IsActive; ex.GridRow = rt.GridRow; ex.GridCol = rt.GridCol;
+
+                    ex.SortOrder = rt.SortOrder;
+                    ex.TableTypeId = rt.TableTypeId; ex.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    context.Tables.Add(new Table
+                    {
+                        Id = rtGuid ?? Guid.NewGuid(), Label = label, Capacity = rt.Capacity,
+                        Shape = shape, Color = rt.Color, Section = rt.Section, PriceType = priceType,
+                        PriceCents = rt.PriceCents, PriceOverrideCents = rt.PriceOverrideCents,
+                        IsActive = rt.IsActive, GridRow = rt.GridRow, GridCol = rt.GridCol,
+
+                        SortOrder = rt.SortOrder, TableTypeId = rt.TableTypeId,
+                        EventId = eventId, VenueId = ev.VenueId
+                    });
+                }
             }
+
+            ev.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+            await SyncSeatsForEvent(eventId);
+
+            return Ok(await GetLayoutInternal(eventId));
         }
-
-        ev.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
-        await SyncSeatsForEvent(eventId);
-
-        return Ok(await GetLayoutInternal(eventId));
+        catch (Exception ex)
+        {
+            var innerMsg = ex.InnerException?.Message ?? ex.Message;
+            return StatusCode(500, new { message = $"Save failed: {innerMsg}" });
+        }
     }
 
     [HttpPost("admin/events/{eventId:guid}/layout/table")]
