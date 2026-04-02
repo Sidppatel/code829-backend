@@ -458,6 +458,120 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         });
     }
 
+    [HttpGet("admin/events/{eventId:guid}/layout/stats")]
+    public async Task<IActionResult> GetLayoutStats(Guid eventId)
+    {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        var tables = await context.Tables
+            .Where(t => t.EventId == eventId && t.IsActive)
+            .Select(t => new { t.Capacity, t.PriceType, t.PriceCents })
+            .ToListAsync();
+
+        var totalTables = tables.Count;
+        var totalCapacity = tables.Sum(t => t.Capacity ?? 0);
+        var totalPotentialRevenueCents = tables.Sum(t =>
+            t.PriceType == PriceType.PerSeat
+                ? (long)t.PriceCents * (t.Capacity ?? 0)
+                : (long)t.PriceCents);
+
+        var totalBookedRevenueCents = await context.BookingItems
+            .Where(bi => bi.SeatId.HasValue
+                && bi.Seat!.Table.EventId == eventId
+                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
+            .SumAsync(bi => (long)bi.PriceCents);
+
+        return Ok(new LayoutStatsResponse(
+            totalTables, totalCapacity, totalPotentialRevenueCents, totalBookedRevenueCents));
+    }
+
+    [HttpPost("admin/events/{eventId:guid}/layout/bulk-insert")]
+    public async Task<IActionResult> BulkInsertTables(Guid eventId, [FromBody] BulkInsertRequest request)
+    {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new { message = "Event not found" });
+
+        if ((ev.GridRows ?? 0) < 1 || (ev.GridCols ?? 0) < 1)
+            return BadRequest(new { message = "Grid dimensions must be configured before bulk insert" });
+
+        var rows = ev.GridRows!.Value;
+        var cols = ev.GridCols!.Value;
+
+        // Build occupation map
+        var occupied = await context.Tables
+            .Where(t => t.EventId == eventId && t.GridRow.HasValue && t.GridCol.HasValue)
+            .Select(t => new { t.GridRow, t.GridCol })
+            .ToListAsync();
+        var occupiedSet = occupied.Select(o => (o.GridRow!.Value, o.GridCol!.Value)).ToHashSet();
+
+        // Get already-placed type IDs for this event
+        var placedTypeIds = await context.Tables
+            .Where(t => t.EventId == eventId && t.TableTypeId.HasValue)
+            .Select(t => t.TableTypeId!.Value)
+            .Distinct()
+            .ToListAsync();
+        var placedSet = placedTypeIds.ToHashSet();
+
+        // Filter to unlinked, active types
+        var uniqueIds = request.TableTypeIds.Distinct().ToList();
+        var types = await context.TableTypes
+            .Where(tt => uniqueIds.Contains(tt.Id) && tt.IsActive)
+            .ToListAsync();
+        var unlinked = types.Where(tt => !placedSet.Contains(tt.Id)).ToList();
+
+        // Find empty cells in row-major order
+        var emptyCells = new Queue<(int row, int col)>();
+        for (var r = 0; r < rows; r++)
+            for (var c = 0; c < cols; c++)
+                if (!occupiedSet.Contains((r, c)))
+                    emptyCells.Enqueue((r, c));
+
+        var inserted = new List<Table>();
+        foreach (var tt in unlinked)
+        {
+            if (emptyCells.Count == 0) break;
+            var (row, col) = emptyCells.Dequeue();
+
+            var table = new Table
+            {
+                Id = Guid.NewGuid(),
+                Label = tt.Name,
+                Capacity = tt.DefaultCapacity,
+                Shape = tt.DefaultShape,
+                Color = tt.DefaultColor,
+                PriceType = PriceType.PerSeat,
+                PriceCents = tt.DefaultPriceCents,
+                IsActive = true,
+                GridRow = row,
+                GridCol = col,
+                SortOrder = row * cols + col,
+                TableTypeId = tt.Id,
+                EventId = eventId,
+                VenueId = ev.VenueId
+            };
+            context.Tables.Add(table);
+            inserted.Add(table);
+        }
+
+        if (inserted.Count > 0)
+        {
+            await context.SaveChangesAsync();
+            await SyncSeatsForEvent(eventId);
+
+            // Reload with TableType nav prop for mapping
+            var insertedIds = inserted.Select(t => t.Id).ToHashSet();
+            var reloaded = await context.Tables
+                .Include(t => t.TableType)
+                .Where(t => insertedIds.Contains(t.Id))
+                .ToListAsync();
+
+            return Ok(new BulkInsertResponse(reloaded.Count, reloaded.Select(MapTable).ToList()));
+        }
+
+        return Ok(new BulkInsertResponse(0, []));
+    }
+
     private async Task<EventLayoutResponse> GetLayoutInternal(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);

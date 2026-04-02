@@ -97,3 +97,17 @@ public record UpdateTableRequest(
     int? GridCol = null,
     int? SortOrder = null
 );
+
+public record LayoutStatsResponse(
+    int TotalTables,
+    int TotalCapacity,
+    long TotalPotentialRevenueCents,
+    long TotalBookedRevenueCents
+);
+
+public record BulkInsertRequest(List<Guid> TableTypeIds);
+
+public record BulkInsertResponse(
+    int InsertedCount,
+    List<LayoutTableResponse> Tables
+);
