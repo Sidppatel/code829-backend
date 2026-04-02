@@ -527,20 +527,37 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                 if (!occupiedSet.Contains((r, c)))
                     emptyCells.Enqueue((r, c));
 
+        // Collect existing labels to avoid unique constraint on (EventId, Label)
+        var existingLabels = await context.Tables
+            .Where(t => t.EventId == eventId)
+            .Select(t => t.Label)
+            .ToHashSetAsync();
+
         var inserted = new List<Table>();
         foreach (var tt in unlinked)
         {
             if (emptyCells.Count == 0) break;
             var (row, col) = emptyCells.Dequeue();
 
+            // Auto-number label if duplicate
+            var baseName = tt.Name.Length > 16 ? tt.Name[..16] : tt.Name;
+            var label = baseName;
+            var counter = 1;
+            while (existingLabels.Contains(label))
+            {
+                counter++;
+                label = $"{baseName} {counter}";
+            }
+            existingLabels.Add(label);
+
             var table = new Table
             {
                 Id = Guid.NewGuid(),
-                Label = tt.Name,
+                Label = label,
                 Capacity = tt.DefaultCapacity,
                 Shape = tt.DefaultShape,
                 Color = tt.DefaultColor,
-                PriceType = PriceType.PerSeat,
+                PriceType = PriceType.PerTable,
                 PriceCents = tt.DefaultPriceCents,
                 IsActive = true,
                 GridRow = row,
