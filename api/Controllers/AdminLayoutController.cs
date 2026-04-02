@@ -322,7 +322,17 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         catch (Exception ex)
         {
             var innerMsg = ex.InnerException?.Message ?? ex.Message;
-            return StatusCode(500, new { message = $"Save failed: {innerMsg}" });
+            var trace = ex.InnerException?.StackTrace ?? ex.StackTrace;
+            Console.Error.WriteLine($"[SaveLayout ERROR] {ex.GetType().Name}: {ex.Message}");
+            if (ex.InnerException is not null)
+                Console.Error.WriteLine($"[SaveLayout INNER] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            return StatusCode(500, new
+            {
+                message = $"Save failed: {innerMsg}",
+                exceptionType = ex.GetType().FullName,
+                innerExceptionType = ex.InnerException?.GetType().FullName,
+                stackTrace = trace?[..Math.Min(trace.Length, 500)]
+            });
         }
     }
 

@@ -3,6 +3,7 @@ using Contracts.DTOs;
 using Contracts.Enums;
 using Db.Entities;
 using Db.Repositories;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 
 namespace Api.Middleware;
@@ -24,6 +25,9 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
             var correlationId = context.TraceIdentifier;
 
             Log.Error(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+            Console.Error.WriteLine($"[ERROR] {context.Request.Method} {context.Request.Path}: {ex.GetType().Name}: {ex.Message}");
+            if (ex.InnerException is not null)
+                Console.Error.WriteLine($"[ERROR] Inner: {ex.InnerException.Message}");
 
             try
             {
@@ -48,8 +52,24 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
 
             context.Response.StatusCode = 500;
             context.Response.ContentType = "application/json";
-            var error = new ApiError(500, "An internal error occurred", CorrelationId: correlationId);
-            await context.Response.WriteAsJsonAsync(error);
+            var env = context.RequestServices.GetService<IWebHostEnvironment>();
+            if (env?.IsDevelopment() == true)
+            {
+                var innerMsg = ex.InnerException?.Message;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    statusCode = 500,
+                    message = ex.Message,
+                    innerMessage = innerMsg,
+                    exceptionType = ex.GetType().FullName,
+                    correlationId
+                });
+            }
+            else
+            {
+                var error = new ApiError(500, "An internal error occurred", CorrelationId: correlationId);
+                await context.Response.WriteAsJsonAsync(error);
+            }
         }
     }
 }
