@@ -14,7 +14,7 @@ namespace Api.Controllers;
 [ApiController]
 [Authorize]
 [RequireRole(UserRole.Admin)]
-[Route("api")]
+[Route("")]
 public class AdminLayoutController(EventPlatformDbContext context, IConnectionMultiplexer redis) : ControllerBase
 {
     // ═══════════════════════════════════════════════════════════
