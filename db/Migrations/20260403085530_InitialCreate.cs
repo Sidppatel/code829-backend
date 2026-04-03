@@ -12,6 +12,9 @@ namespace db.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AlterDatabase()
+                .Annotation("Npgsql:PostgresExtension:pg_trgm", ",,");
+
             migrationBuilder.CreateTable(
                 name: "addresses",
                 columns: table => new
@@ -709,114 +712,73 @@ namespace db.Migrations
                 table: "venues",
                 column: "Name");
 
-            // ── Create Views ────────────────────────────────────────
-            migrationBuilder.Sql("""
-                CREATE OR REPLACE VIEW v_events AS
-                SELECT
-                    e."Id",
-                    e."Title",
-                    e."Slug",
-                    e."Description",
-                    e."Status"::text AS "Status",
-                    COALESCE(e."Category"::text, '') AS "Category",
-                    e."StartDate",
-                    e."EndDate",
-                    e."ImagePath",
-                    e."IsFeatured",
-                    e."LayoutMode"::text AS "LayoutMode",
-                    e."MaxCapacity",
-                    e."PricePerPersonCents",
-                    e."PlatformFeePercent",
-                    e."GridRows",
-                    e."GridCols",
-                    e."PublishedAt",
-                    e."ScheduledPublishAt",
-                    e."VenueId",
-                    e."OrganizerId",
-                    e."SearchVector",
-                    e."CreatedAt",
-                    e."UpdatedAt",
-                    v."Name" AS "VenueName",
-                    COALESCE(a."Line1", '') AS "VenueAddress",
-                    COALESCE(a."City", '') AS "VenueCity",
-                    COALESCE(a."State", '') AS "VenueState",
-                    COALESCE(a."ZipCode", '') AS "VenueZipCode",
-                    v."ImagePath" AS "VenueImagePath"
-                FROM events e
-                JOIN venues v ON e."VenueId" = v."Id"
-                LEFT JOIN addresses a ON v."AddressId" = a."Id";
-                """);
+            // ─── Create Views ───────────────────────────────────
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_events AS
+SELECT
+    e.""Id"", e.""Title"", e.""Slug"", e.""Status"", e.""Category"",
+    e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
+    e.""LayoutMode"", e.""GridRows"", e.""GridCols"",
+    e.""PricePerPersonCents"", e.""MaxCapacity"",
+    e.""Description"",
+    e.""VenueId"", v.""Name"" AS ""VenueName"",
+    a.""Line1"" AS ""VenueAddress"", a.""City"" AS ""VenueCity"",
+    a.""State"" AS ""VenueState"", a.""ZipCode"" AS ""VenueZipCode"",
+    v.""ImagePath"" AS ""VenueImagePath"",
+    e.""OrganizerId"",
+    CONCAT(u.""FirstName"", ' ', u.""LastName"") AS ""OrganizerName"",
+    e.""SearchVector"",
+    e.""CreatedAt"", e.""UpdatedAt""
+FROM events e
+JOIN venues v ON e.""VenueId"" = v.""Id""
+JOIN addresses a ON v.""AddressId"" = a.""Id""
+LEFT JOIN users u ON e.""OrganizerId"" = u.""Id"";
+");
 
-            migrationBuilder.Sql("""
-                CREATE OR REPLACE VIEW v_event_summary AS
-                SELECT
-                    e."Id",
-                    e."Title",
-                    e."Slug",
-                    e."Status"::text AS "Status",
-                    COALESCE(e."Category"::text, '') AS "Category",
-                    e."StartDate",
-                    e."EndDate",
-                    e."ImagePath",
-                    e."IsFeatured",
-                    e."LayoutMode"::text AS "LayoutMode",
-                    v."Name" AS "VenueName",
-                    COALESCE(a."City", '') AS "VenueCity",
-                    COALESCE(u."FirstName" || ' ' || u."LastName", '') AS "OrganizerName",
-                    CASE
-                        WHEN e."LayoutMode" = 'Open' THEN COALESCE(e."MaxCapacity", 0)
-                        ELSE COALESCE((
-                            SELECT SUM(et."Capacity" * (SELECT COUNT(*) FROM tables t2 WHERE t2."EventTableId" = et."Id" AND t2."IsActive" = true))
-                            FROM event_tables et WHERE et."EventId" = e."Id" AND et."IsActive" = true
-                        ), 0)
-                    END AS "TotalCapacity",
-                    CASE
-                        WHEN e."LayoutMode" = 'Open' THEN (
-                            SELECT COALESCE(SUM(b."SeatsReserved"), 0) FROM bookings b
-                            WHERE b."EventId" = e."Id" AND b."Status" IN ('Paid', 'CheckedIn')
-                        )
-                        ELSE (
-                            SELECT COUNT(*) FROM tables t
-                            JOIN event_tables et ON t."EventTableId" = et."Id"
-                            WHERE t."EventId" = e."Id" AND t."Status" = 'Booked'
-                        )
-                    END AS "TotalSold"
-                FROM events e
-                JOIN venues v ON e."VenueId" = v."Id"
-                LEFT JOIN addresses a ON v."AddressId" = a."Id"
-                LEFT JOIN users u ON e."OrganizerId" = u."Id";
-                """);
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_event_summary AS
+SELECT
+    e.""Id"", e.""Title"", e.""Slug"", e.""Status"", e.""Category"",
+    e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
+    e.""LayoutMode"",
+    v.""Name"" AS ""VenueName"",
+    a.""City"" AS ""VenueCity"", a.""State"" AS ""VenueState"",
+    CONCAT(u.""FirstName"", ' ', u.""LastName"") AS ""OrganizerName"",
+    e.""PricePerPersonCents"",
+    CASE
+        WHEN e.""LayoutMode"" = 'Open' THEN COALESCE(e.""MaxCapacity"", 0)
+        ELSE COALESCE((SELECT SUM(et.""Capacity"" * (SELECT COUNT(*) FROM tables t WHERE t.""EventTableId"" = et.""Id"" AND t.""IsActive"" = true))
+                       FROM event_tables et WHERE et.""EventId"" = e.""Id"" AND et.""IsActive"" = true), 0)
+    END AS ""TotalCapacity"",
+    (SELECT COUNT(*) FROM bookings b WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid', 'CheckedIn')) AS ""BookedCount""
+FROM events e
+JOIN venues v ON e.""VenueId"" = v.""Id""
+JOIN addresses a ON v.""AddressId"" = a.""Id""
+LEFT JOIN users u ON e.""OrganizerId"" = u.""Id"";
+");
 
-            migrationBuilder.Sql("""
-                CREATE OR REPLACE VIEW v_tables AS
-                SELECT
-                    t."Id",
-                    t."EventId",
-                    t."EventTableId",
-                    t."Label",
-                    t."GridRow",
-                    t."GridCol",
-                    t."IsActive",
-                    t."SortOrder",
-                    t."Status"::text AS "Status",
-                    t."CreatedAt",
-                    t."UpdatedAt",
-                    et."Capacity",
-                    et."Shape"::text AS "Shape",
-                    et."Color",
-                    et."PriceCents",
-                    et."Label" AS "EventTableLabel"
-                FROM tables t
-                JOIN event_tables et ON t."EventTableId" = et."Id";
-                """);
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_tables AS
+SELECT
+    t.""Id"", t.""Label"", t.""GridRow"", t.""GridCol"",
+    t.""IsActive"", t.""SortOrder"", t.""Status"",
+    t.""LockedByUserId"", t.""LockExpiresAt"",
+    t.""EventId"", t.""EventTableId"",
+    et.""Label"" AS ""EventTableLabel"",
+    et.""Capacity"", et.""Shape"", et.""Color"", et.""PriceCents"",
+    et.""TableTemplateId"",
+    t.""CreatedAt"", t.""UpdatedAt""
+FROM tables t
+JOIN event_tables et ON t.""EventTableId"" = et.""Id"";
+");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP VIEW IF EXISTS v_tables CASCADE;");
-            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary CASCADE;");
-            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events CASCADE;");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_tables;");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary;");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events;");
 
             migrationBuilder.DropTable(
                 name: "admin_logs");
