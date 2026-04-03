@@ -50,30 +50,41 @@ try
         }
     }
 
-    // Serilog — all output to files, not console (for clean automation)
+    // Serilog — structured logging to console + files with timestamps
     builder.Host.UseSerilog((ctx, lc) =>
     {
         lc.ReadFrom.Configuration(ctx.Configuration)
           .Enrich.WithMachineName()
-          .Enrich.FromLogContext();
+          .Enrich.FromLogContext()
+          .MinimumLevel.Information()
+          .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+          .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning);
+
+        // Console: all info, warnings, and errors with timestamps
+        lc.WriteTo.Console(
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
 
         // Main API log file
         lc.WriteTo.File("logs/api-.log",
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 30,
-            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}");
 
-        // Separate file for seeding operations (easy to tail during create-db)
+        // Error-only log file for quick triage
+        lc.WriteTo.Logger(lc2 => lc2
+            .Filter.ByIncludingOnly(le => le.Level >= Serilog.Events.LogEventLevel.Error)
+            .WriteTo.File("logs/errors-.log",
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 30,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
+
+        // Separate file for seeding operations
         lc.WriteTo.Logger(lc2 => lc2
             .Filter.ByIncludingOnly(le => le.MessageTemplate.Text.Contains("[Seed]"))
             .WriteTo.File("logs/seeding-.log",
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 30,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
-
-        // Minimal console: only errors and above (startup message still shows via bootstrapper)
-        lc.WriteTo.Console(
-            restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Error);
     });
 
     // Kestrel on configurable port
@@ -164,12 +175,25 @@ try
 
     var app = builder.Build();
 
-    // Apply pending migrations on every startup (dev and prod)
-    using (var scope = app.Services.CreateScope())
+    // Apply pending migrations on every startup — with retry for slow DB startup
+    const int maxRetries = 5;
+    for (var attempt = 1; attempt <= maxRetries; attempt++)
     {
-        var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-        await db.Database.MigrateAsync();
-        Log.Information("Database migrations applied");
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+            await db.Database.MigrateAsync();
+            Log.Information("Database migrations applied");
+            break;
+        }
+        catch (Npgsql.NpgsqlException ex) when (attempt < maxRetries)
+        {
+            var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+            Log.Warning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in {Delay}s...",
+                attempt, maxRetries, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
     }
 
     // Seed data (development only) — suspend change tracking to avoid exponential slowdown
