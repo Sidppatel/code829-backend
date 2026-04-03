@@ -35,7 +35,7 @@ public class AdminEventsController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var query = context.Events.Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes).AsQueryable();
+        var query = context.Events.Include(e => e.Venue).ThenInclude(v => v.Address).AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<EventStatus>(status, true, out var s))
             query = query.Where(e => e.Status == s);
@@ -71,7 +71,6 @@ public class AdminEventsController(
         var ev = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.Organizer)
-            .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (ev is null) return NotFound(new { message = "Event not found" });
@@ -87,20 +86,18 @@ public class AdminEventsController(
         if (!Enum.TryParse<EventCategory>(request.Category, true, out var category))
             return BadRequest(new { message = "Invalid category" });
 
+        if (!Enum.TryParse<LayoutMode>(request.LayoutMode, true, out var layoutMode))
+            return BadRequest(new { message = "Invalid layout mode" });
+
         var organizerId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var slug = GenerateSlug(request.Title);
 
-        // Ensure slug uniqueness
         var baseSlug = slug;
         var counter = 1;
         while (await context.Events.AnyAsync(e => e.Slug == slug))
         {
             slug = $"{baseSlug}-{counter++}";
         }
-
-        var layoutMode = Contracts.Enums.LayoutMode.None;
-        if (request.LayoutMode is not null)
-            Enum.TryParse(request.LayoutMode, true, out layoutMode);
 
         var ev = new Event
         {
@@ -115,36 +112,18 @@ public class AdminEventsController(
             IsFeatured = request.IsFeatured,
             LayoutMode = layoutMode,
             MaxCapacity = request.MaxCapacity,
+            PricePerPersonCents = layoutMode == LayoutMode.Open ? request.PricePerPersonCents : null,
+            PlatformFeePercent = request.PlatformFeePercent,
             ImagePath = request.BannerImageUrl,
             VenueId = request.VenueId,
             OrganizerId = organizerId
         };
 
         context.Events.Add(ev);
-
-        if (request.TicketTypes is not null)
-        {
-            foreach (var tt in request.TicketTypes)
-            {
-                context.TicketTypes.Add(new TicketType
-                {
-                    Id = Guid.NewGuid(),
-                    Name = tt.Name,
-                    Description = tt.Description,
-                    PriceCents = tt.PriceCents,
-                    QuantityTotal = tt.QuantityTotal,
-                    QuantitySold = 0,
-                    SortOrder = tt.SortOrder,
-                    PlatformFeeCents = 0, // Admin cannot set fees
-                    EventId = ev.Id
-                });
-            }
-        }
-
         await context.SaveChangesAsync();
 
         var created = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstAsync(e => e.Id == ev.Id);
 
         await adminLog.LogAsync("event.created", "Event", ev.Id, $"Event '{ev.Title}' created");
@@ -154,7 +133,7 @@ public class AdminEventsController(
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
-        var ev = await context.Events.Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
+        var ev = await context.Events.Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -170,24 +149,22 @@ public class AdminEventsController(
         if (request.EndDate.HasValue) ev.EndDate = request.EndDate.Value;
         if (request.VenueId.HasValue) ev.VenueId = request.VenueId.Value;
         if (request.IsFeatured.HasValue) ev.IsFeatured = request.IsFeatured.Value;
-        if (request.LayoutMode is not null && Enum.TryParse<Contracts.Enums.LayoutMode>(request.LayoutMode, true, out var lm))
+        if (request.LayoutMode is not null && Enum.TryParse<LayoutMode>(request.LayoutMode, true, out var lm))
         {
             if (lm != ev.LayoutMode)
             {
-                // Block layout mode change if any bookings or active seat holds exist
                 var hasBookings = await context.Bookings
                     .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
-                var hasHolds = await context.SeatHolds
-                    .AnyAsync(h => h.EventId == id && h.IsActive && h.ExpiresAt > DateTime.UtcNow);
-                if (hasBookings || hasHolds)
-                    return BadRequest(new { message = "Cannot change layout mode — active bookings or seat holds exist for this event" });
+                if (hasBookings)
+                    return BadRequest(new { message = "Cannot change layout mode — active bookings exist for this event" });
             }
             ev.LayoutMode = lm;
         }
         if (request.MaxCapacity.HasValue) ev.MaxCapacity = request.MaxCapacity.Value;
+        if (request.PricePerPersonCents.HasValue) ev.PricePerPersonCents = request.PricePerPersonCents.Value;
+        if (request.PlatformFeePercent.HasValue) ev.PlatformFeePercent = request.PlatformFeePercent.Value;
         if (request.BannerImageUrl is not null) ev.ImagePath = request.BannerImageUrl;
 
-        // Status transitions: Draft→Published, Published→Completed/Cancelled, Draft→Cancelled
         if (request.Status is not null && Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
         {
             if (!IsValidTransition(ev.Status, newStatus))
@@ -201,9 +178,6 @@ public class AdminEventsController(
         return Ok(MapToDto(ev));
     }
 
-    /// <summary>
-    /// Check if the event's layout mode is locked (has bookings or active holds).
-    /// </summary>
     [HttpGet("{id:guid}/layout-locked")]
     public async Task<IActionResult> IsLayoutModeLocked(Guid id)
     {
@@ -212,10 +186,8 @@ public class AdminEventsController(
 
         var hasBookings = await context.Bookings
             .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
-        var hasHolds = await context.SeatHolds
-            .AnyAsync(h => h.EventId == id && h.IsActive && h.ExpiresAt > DateTime.UtcNow);
 
-        return Ok(new { locked = hasBookings || hasHolds });
+        return Ok(new { locked = hasBookings });
     }
 
     [HttpPost("{id:guid}/image")]
@@ -232,14 +204,11 @@ public class AdminEventsController(
         return Ok(new { imageUrl = fileStorage.GetPublicUrl(path) });
     }
 
-    /// <summary>
-    /// Change event status with validation gates.
-    /// </summary>
     [HttpPut("{id:guid}/status")]
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeEventStatusRequest request)
     {
         var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -249,7 +218,6 @@ public class AdminEventsController(
         if (!IsValidTransition(ev.Status, newStatus))
             return BadRequest(new { message = $"Cannot transition from {ev.Status} to {newStatus}" });
 
-        // Validation gates
         if (newStatus == EventStatus.Published)
         {
             if (string.IsNullOrWhiteSpace(ev.Title))
@@ -271,9 +239,6 @@ public class AdminEventsController(
         return Ok(MapToDto(ev));
     }
 
-    /// <summary>
-    /// Soft delete — only if Draft and no bookings.
-    /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -292,16 +257,11 @@ public class AdminEventsController(
         return NoContent();
     }
 
-    /// <summary>
-    /// Duplicate an event: copies settings, layout tables, and pricing rules.
-    /// Resets status to Draft, clears bookings/holds, requires new dates.
-    /// </summary>
     [HttpPost("{id:guid}/duplicate")]
     public async Task<IActionResult> Duplicate(Guid id, [FromBody] DuplicateEventRequest request)
     {
         var original = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Include(e => e.TicketTypes)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (original is null) return NotFound(new { message = "Event not found" });
 
@@ -326,7 +286,8 @@ public class AdminEventsController(
             IsFeatured = false,
             LayoutMode = original.LayoutMode,
             MaxCapacity = original.MaxCapacity,
-            EditorMode = original.EditorMode,
+            PricePerPersonCents = original.PricePerPersonCents,
+            PlatformFeePercent = original.PlatformFeePercent,
             GridRows = original.GridRows,
             GridCols = original.GridCols,
             VenueId = original.VenueId,
@@ -341,26 +302,11 @@ public class AdminEventsController(
             context.Tables.Add(new Table
             {
                 Id = Guid.NewGuid(), Label = t.Label, Capacity = t.Capacity, Shape = t.Shape,
-                Color = t.Color, Section = t.Section, PriceType = t.PriceType, PriceCents = t.PriceCents,
-                PriceOverrideCents = t.PriceOverrideCents, IsActive = t.IsActive,
-                GridRow = t.GridRow, GridCol = t.GridCol,
+                Color = t.Color, PriceCents = t.PriceCents,
+                IsActive = t.IsActive,
+                PosX = t.PosX, PosY = t.PosY,
                 SortOrder = t.SortOrder,
                 TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
-            });
-        }
-
-        // Copy pricing rules (reset UsedCount)
-        var rules = await context.PricingRules.Where(r => r.EventId == id).ToListAsync();
-        foreach (var r in rules)
-        {
-            context.PricingRules.Add(new PricingRule
-            {
-                Id = Guid.NewGuid(), EventId = copy.Id, TableTypeId = r.TableTypeId,
-                Name = r.Name, Type = r.Type, PriceCents = r.PriceCents,
-                ValidFrom = r.ValidFrom, ValidUntil = r.ValidUntil,
-                MaxCount = r.MaxCount, UsedCount = 0, IsActive = r.IsActive,
-                SortOrder = r.SortOrder, FeePercent = null,
-                FeeFlatCents = null, Description = r.Description
             });
         }
 
@@ -370,7 +316,7 @@ public class AdminEventsController(
             $"Event '{copy.Title}' duplicated from '{original.Title}'");
 
         var created = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address).Include(e => e.TicketTypes)
+            .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstAsync(e => e.Id == copy.Id);
         return Created("", MapToDto(created));
     }
@@ -381,7 +327,8 @@ public class AdminEventsController(
         e.StartDate, e.EndDate,
         e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
         e.IsFeatured,
-        (e.LayoutMode?.ToString() ?? "None"), e.MaxCapacity, e.PlatformFeePercent, e.PublishedAt,
+        e.LayoutMode.ToString(), e.MaxCapacity, e.PricePerPersonCents, e.PlatformFeePercent,
+        e.GridRows, e.GridCols, e.PublishedAt,
         e.VenueId,
         e.Venue is not null ? new VenueDto(
             e.Venue.Id, e.Venue.Name, e.Venue.Address?.Line1 ?? "", e.Venue.Address?.City ?? "", e.Venue.Address?.State ?? "",
@@ -392,17 +339,9 @@ public class AdminEventsController(
         ) : null,
         e.OrganizerId,
         e.Organizer is not null ? $"{e.Organizer.FirstName} {e.Organizer.LastName}" : null,
-        e.TicketTypes.OrderBy(t => t.SortOrder).Select(t => new TicketTypeDto(
-            t.Id, t.Name ?? "", t.Description, t.PriceCents ?? 0,
-            t.QuantityTotal, t.QuantitySold, t.QuantityTotal - t.QuantitySold, t.SortOrder,
-            t.PlatformFeeCents ?? 0
-        )).ToList(),
         e.CreatedAt
     );
 
-    /// <summary>
-    /// Valid lifecycle transitions: Draft→Published, Draft→Cancelled, Published→Completed, Published→Cancelled.
-    /// </summary>
     private static bool IsValidTransition(EventStatus current, EventStatus target) => (current, target) switch
     {
         (EventStatus.Draft, EventStatus.Published) => true,

@@ -20,7 +20,7 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         try
         {
-            var result = await tableBookingService.LockTableAsync(userId, request.EventId, request.TableId, request.TicketTypeId);
+            var result = await tableBookingService.LockTableAsync(userId, request.EventId, request.TableId);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)

@@ -1,5 +1,4 @@
 using Api.Middleware;
-using Api.Services;
 using Contracts.DTOs.Admin;
 using Contracts.Enums;
 using Db;
@@ -56,27 +55,20 @@ public class AdminDashboardController(EventPlatformDbContext context) : Controll
         ));
     }
 
-    /// <summary>
-    /// Returns rich stats for the next upcoming event (first published event
-    /// with StartDate in the future). Powers the admin dashboard hero view.
-    /// </summary>
     [HttpGet("dashboard/next-event")]
-    public async Task<IActionResult> GetNextEvent()
+    public virtual async Task<IActionResult> GetNextEvent()
     {
         var now = DateTime.UtcNow;
         var ev = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Include(e => e.TicketTypes)
             .Where(e => e.Status == EventStatus.Published && e.StartDate > now)
             .OrderBy(e => e.StartDate)
             .FirstOrDefaultAsync();
 
         if (ev is null)
         {
-            // Fall back to any upcoming event (Draft included)
             ev = await context.Events
                 .Include(e => e.Venue).ThenInclude(v => v.Address)
-                .Include(e => e.TicketTypes)
                 .Where(e => e.StartDate > now && e.Status != EventStatus.Cancelled)
                 .OrderBy(e => e.StartDate)
                 .FirstOrDefaultAsync();
@@ -100,35 +92,23 @@ public class AdminDashboardController(EventPlatformDbContext context) : Controll
             .Where(b => b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn)
             .Sum(b => (long)b.TotalCents);
 
-        // Capacity: sum of ticket type quantities, or table-based capacity for grid layouts
-        var totalCapacity = ev.TicketTypes.Sum(tt => tt.QuantityTotal);
-        var soldCount = ev.TicketTypes.Sum(tt => tt.QuantitySold);
+        // Capacity from tables or MaxCapacity
+        var tables = await context.Tables
+            .Where(t => t.EventId == ev.Id && t.IsActive)
+            .ToListAsync();
+        var totalCapacity = ev.MaxCapacity ?? tables.Sum(t => t.Capacity);
+        var soldCount = paid + checkedInCount;
 
-        // If no ticket types but has grid tables, use table capacity
-        if (totalCapacity == 0 && ev.LayoutMode == LayoutMode.Grid)
+        // Potential revenue
+        long potentialRevenue;
+        if (ev.LayoutMode == LayoutMode.Open && ev.PricePerPersonCents.HasValue)
         {
-            var tables = await context.Tables
-                .Where(t => t.EventId == ev.Id && t.IsActive)
-                .ToListAsync();
-            totalCapacity = tables.Sum(t => t.Capacity ?? 0);
-            soldCount = paid + checkedInCount;
+            potentialRevenue = (long)ev.PricePerPersonCents.Value * totalCapacity;
         }
-
-        // Potential revenue based on ticket types
-        var potentialRevenue = ev.TicketTypes.Sum(tt => (long)(tt.PriceCents ?? 0) * tt.QuantityTotal);
-        if (potentialRevenue == 0 && ev.LayoutMode == LayoutMode.Grid)
+        else
         {
-            var tables = await context.Tables
-                .Where(t => t.EventId == ev.Id && t.IsActive)
-                .ToListAsync();
-            potentialRevenue = tables.Sum(t => (long)t.PriceCents *
-                (t.PriceType == PriceType.PerSeat ? (t.Capacity ?? 0) : 1));
+            potentialRevenue = tables.Sum(t => (long)t.PriceCents);
         }
-
-        var ticketTypes = ev.TicketTypes
-            .OrderBy(tt => tt.SortOrder)
-            .Select(tt => new TicketTypeSummaryDto(tt.Id, tt.Name ?? "", tt.PriceCents ?? 0, tt.QuantityTotal, tt.QuantitySold))
-            .ToList();
 
         var recentBookings = bookings
             .OrderByDescending(b => b.CreatedAt)
@@ -145,10 +125,10 @@ public class AdminDashboardController(EventPlatformDbContext context) : Controll
             data = new NextEventDashboardDto(
                 ev.Id, ev.Title, ev.Slug, ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
                 ev.StartDate, ev.EndDate, ev.Venue.Name, ev.Venue.Address?.Line1 ?? "", ev.Venue.Address?.City ?? "", ev.Venue.Address?.State ?? "",
-                ev.ImagePath, (ev.LayoutMode?.ToString() ?? "None"), daysUntil,
+                ev.ImagePath, ev.LayoutMode.ToString(), daysUntil,
                 bookings.Count, paid, checkedInCount, pending, cancelled, refunded,
                 revenue, potentialRevenue, totalCapacity, soldCount,
-                ticketTypes, recentBookings
+                recentBookings
             )
         });
     }

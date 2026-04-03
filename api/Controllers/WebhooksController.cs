@@ -73,7 +73,7 @@ public class WebhooksController(
         if (paymentIntent is null) return;
 
         var payment = await context.Payments
-            .Include(p => p.Booking).ThenInclude(b => b.Items).ThenInclude(i => i.TicketType)
+            .Include(p => p.Booking)
             .FirstOrDefaultAsync(p => p.PaymentIntentId == paymentIntent.Id);
 
         if (payment is null)
@@ -91,14 +91,6 @@ public class WebhooksController(
         payment.Status = PaymentStatus.Succeeded;
         payment.PaidAt = DateTime.UtcNow;
         payment.Booking.Status = BookingStatus.Paid;
-
-        foreach (var item in payment.Booking.Items)
-        {
-            await context.TicketTypes
-                .Where(t => t.Id == item.TicketTypeId)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(t => t.QuantitySold, t => t.QuantitySold + 1));
-        }
 
         await context.SaveChangesAsync();
         Log.Information("[Webhook] Payment confirmed for booking {BookingId}", payment.BookingId);

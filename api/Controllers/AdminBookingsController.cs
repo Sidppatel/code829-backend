@@ -39,7 +39,6 @@ public class AdminBookingsController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        // Try Redis cache for identical queries
         var cacheKey = $"bookings:list:{eventId}:{status}:{search}:{page}:{pageSize}";
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(cacheKey);
@@ -48,8 +47,7 @@ public class AdminBookingsController(
 
         var query = context.Bookings
             .Include(b => b.User).Include(b => b.Event)
-            .Include(b => b.Items).ThenInclude(i => i.TicketType)
-            .Include(b => b.Items).ThenInclude(i => i.Seat).ThenInclude(s => s!.Table)
+            .Include(b => b.Table)
             .Include(b => b.Payment)
             .AsQueryable();
 
@@ -58,7 +56,6 @@ public class AdminBookingsController(
         if (eventId.HasValue)
             query = query.Where(b => b.EventId == eventId.Value);
 
-        // Full-text search across booking number, user name, event title
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();
@@ -78,7 +75,7 @@ public class AdminBookingsController(
             b.Id, b.BookingNumber, b.Status.ToString(),
             b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
-            b.Items.Select(i => new BookingItemDto(i.Id, i.TicketTypeId, i.TicketType.Name ?? "", i.SeatId, i.Seat?.Label, i.PriceCents, i.QrToken, i.GuestName, i.GuestEmail, i.InvitationToken, i.IsCheckedIn, i.Seat?.Table?.Label)).ToList(),
+            b.TableId, b.Table?.Label, b.SeatsReserved,
             b.Payment is not null ? new PaymentDto(b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(), b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt) : null,
             b.CreatedAt
         )).ToList();
@@ -90,9 +87,6 @@ public class AdminBookingsController(
         return Ok(result);
     }
 
-    /// <summary>
-    /// Lightweight stats endpoint — counts only, no full booking data loaded.
-    /// </summary>
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats([FromQuery] Guid? eventId = null)
     {
@@ -112,12 +106,8 @@ public class AdminBookingsController(
         var revenue = await query
             .Where(b => b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn)
             .SumAsync(b => (long)b.TotalCents);
-        var ticketsSold = await query
-            .Where(b => b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn)
-            .SelectMany(b => b.Items)
-            .CountAsync();
 
-        var result = new { total, paid, checkedIn, revenue, ticketsSold };
+        var result = new { total, paid, checkedIn, revenue };
         var json = JsonSerializer.Serialize(result, JsonOpts);
         await db.StringSetAsync(cacheKey, json, CacheTtl);
 
@@ -127,7 +117,6 @@ public class AdminBookingsController(
     [HttpPost("{id:guid}/refund")]
     public async Task<IActionResult> Refund(Guid id)
     {
-        // Invalidate caches on mutation
         await InvalidateBookingCaches();
         try { return Ok(await bookingService.RefundAsync(id)); }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
@@ -154,19 +143,19 @@ public class AdminBookingsController(
 
         ws.Cell(1, 1).Value = "Booking #"; ws.Cell(1, 2).Value = "Status";
         ws.Cell(1, 3).Value = "User"; ws.Cell(1, 4).Value = "Event";
-        ws.Cell(1, 5).Value = "Subtotal"; ws.Cell(1, 6).Value = "Fee";
-        ws.Cell(1, 7).Value = "Total"; ws.Cell(1, 8).Value = "Items";
-        ws.Cell(1, 9).Value = "Created";
-        ws.Range(1, 1, 1, 9).Style.Font.Bold = true;
+        ws.Cell(1, 5).Value = "Table"; ws.Cell(1, 6).Value = "Seats";
+        ws.Cell(1, 7).Value = "Subtotal"; ws.Cell(1, 8).Value = "Fee";
+        ws.Cell(1, 9).Value = "Total"; ws.Cell(1, 10).Value = "Created";
+        ws.Range(1, 1, 1, 10).Style.Font.Bold = true;
 
         for (var i = 0; i < rows.Count; i++)
         {
             var r = rows[i];
             ws.Cell(i + 2, 1).Value = r.BookingNumber; ws.Cell(i + 2, 2).Value = r.Status;
             ws.Cell(i + 2, 3).Value = r.UserName; ws.Cell(i + 2, 4).Value = r.EventTitle;
-            ws.Cell(i + 2, 5).Value = r.Subtotal; ws.Cell(i + 2, 6).Value = r.Fee;
-            ws.Cell(i + 2, 7).Value = r.Total; ws.Cell(i + 2, 8).Value = r.Items;
-            ws.Cell(i + 2, 9).Value = r.Created;
+            ws.Cell(i + 2, 5).Value = r.TableLabel; ws.Cell(i + 2, 6).Value = r.SeatsReserved;
+            ws.Cell(i + 2, 7).Value = r.Subtotal; ws.Cell(i + 2, 8).Value = r.Fee;
+            ws.Cell(i + 2, 9).Value = r.Total; ws.Cell(i + 2, 10).Value = r.Created;
         }
 
         ws.Columns().AdjustToContents();
@@ -187,7 +176,7 @@ public class AdminBookingsController(
     private async Task<List<BookingExportRow>> GetExportRows(Guid? eventId)
     {
         var query = context.Bookings
-            .Include(b => b.User).Include(b => b.Event).Include(b => b.Items)
+            .Include(b => b.User).Include(b => b.Event).Include(b => b.Table)
             .AsQueryable();
 
         if (eventId.HasValue)
@@ -196,13 +185,16 @@ public class AdminBookingsController(
         return await query.OrderByDescending(b => b.CreatedAt)
             .Select(b => new BookingExportRow(
                 b.BookingNumber, b.Status.ToString(), b.User.FirstName + " " + b.User.LastName, b.Event.Title,
+                b.Table != null ? b.Table.Label : "",
+                b.SeatsReserved ?? 0,
                 $"${b.SubtotalCents / 100.0:F2}", $"${b.FeeCents / 100.0:F2}",
-                $"${b.TotalCents / 100.0:F2}", b.Items.Count,
+                $"${b.TotalCents / 100.0:F2}",
                 b.CreatedAt.ToString("yyyy-MM-dd HH:mm")
             )).ToListAsync();
     }
 
     private record BookingExportRow(
         string BookingNumber, string Status, string UserName, string EventTitle,
-        string Subtotal, string Fee, string Total, int Items, string Created);
+        string TableLabel, int SeatsReserved,
+        string Subtotal, string Fee, string Total, string Created);
 }
