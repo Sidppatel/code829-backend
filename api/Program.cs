@@ -130,14 +130,22 @@ try
     // Payment service uses real Stripe when a valid key is configured, even in dev
     if (builder.Environment.IsDevelopment())
     {
-        builder.Services.AddScoped<IEmailService, MockEmailService>();
         builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
     }
     else
     {
-        builder.Services.AddScoped<IEmailService, SmtpEmailService>();
         builder.Services.AddScoped<IFileStorageService, S3FileStorageService>();
     }
+
+    builder.Services.AddScoped<IEmailService>(sp =>
+    {
+        var settingsService = sp.GetRequiredService<ISettingsService>();
+        var key = settingsService.GetOrDefaultAsync("email_api_key").GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(key) && key != "MOCK_DEV")
+            return new SmtpEmailService(settingsService);
+        var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
+        return new MockEmailService(context);
+    });
 
     builder.Services.AddScoped<IPaymentService>(sp =>
     {

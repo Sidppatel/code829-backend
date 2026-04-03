@@ -22,9 +22,11 @@ public class SmtpEmailService(ISettingsService settings) : IEmailService
 
         var port = int.Parse(portStr ?? "587");
 
+        var username = await settings.GetOrDefaultAsync("smtp_username", fromAddress) ?? fromAddress;
+
         using var client = new SmtpClient(host, port)
         {
-            Credentials = new NetworkCredential(fromAddress, password),
+            Credentials = new NetworkCredential(username, password),
             EnableSsl = true
         };
 
