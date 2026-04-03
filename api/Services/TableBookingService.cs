@@ -25,6 +25,27 @@ public class TableBookingService(
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
+            // ── One table per user: release any existing lock first ──
+            var existingLock = await context.Tables
+                .FromSqlRaw(
+                    """
+                    SELECT * FROM tables
+                    WHERE "EventId" = {0} AND "LockedByUserId" = {1} AND "Status" = {2}
+                    FOR UPDATE
+                    """,
+                    eventId, userId, (int)TableStatus.Locked)
+                .FirstOrDefaultAsync();
+
+            if (existingLock is not null)
+            {
+                existingLock.Status = TableStatus.Available;
+                existingLock.LockedByUserId = null;
+                existingLock.LockExpiresAt = null;
+                existingLock.UpdatedAt = DateTime.UtcNow;
+                Log.Information("[TableLock] Auto-released user {UserId}'s previous lock on table {TableLabel}",
+                    userId, existingLock.Label);
+            }
+
             var table = await context.Tables
                 .FromSqlRaw(
                     """
@@ -42,11 +63,9 @@ public class TableBookingService(
                 throw new InvalidOperationException("This table is already booked");
             }
 
-            if (table.Status == TableStatus.Locked)
+            if (table.Status == TableStatus.Locked && table.LockedByUserId != userId)
             {
                 await transaction.RollbackAsync();
-                if (table.LockedByUserId == userId)
-                    throw new InvalidOperationException("You already hold this table");
                 throw new InvalidOperationException("This table is currently held by another user");
             }
 
