@@ -140,8 +140,11 @@ try
     builder.Services.AddScoped<IEmailService>(sp =>
     {
         var settingsService = sp.GetRequiredService<ISettingsService>();
-        var key = settingsService.GetOrDefaultAsync("email_api_key").GetAwaiter().GetResult();
-        if (!string.IsNullOrEmpty(key) && key != "MOCK_DEV")
+        var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")
+            return new ResendEmailService(settingsService);
+        var smtpKey = settingsService.GetOrDefaultAsync("email_api_key").GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(smtpKey) && smtpKey != "MOCK_DEV")
             return new SmtpEmailService(settingsService);
         var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
         return new MockEmailService(context);
