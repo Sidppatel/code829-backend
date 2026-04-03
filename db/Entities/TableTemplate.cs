@@ -2,7 +2,7 @@ using Contracts.Enums;
 
 namespace Db.Entities;
 
-public class TableType : BaseEntity
+public class TableTemplate : BaseEntity
 {
     public required string Name { get; set; }
     public int DefaultCapacity { get; set; }
@@ -11,5 +11,5 @@ public class TableType : BaseEntity
     public int DefaultPriceCents { get; set; }
     public bool IsActive { get; set; } = true;
 
-    public ICollection<Table> Tables { get; set; } = [];
+    public ICollection<EventTable> EventTables { get; set; } = [];
 }

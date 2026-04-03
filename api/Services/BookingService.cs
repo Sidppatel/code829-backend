@@ -41,6 +41,7 @@ public class BookingService(
             throw new InvalidOperationException("Table bookings are only available for Grid events");
 
         var table = await context.Tables
+            .Include(t => t.EventTable)
             .FirstOrDefaultAsync(t => t.Id == request.TableId!.Value && t.EventId == request.EventId)
             ?? throw new KeyNotFoundException("Table not found for this event");
 
@@ -53,7 +54,7 @@ public class BookingService(
         if (table.LockExpiresAt <= DateTime.UtcNow)
             throw new InvalidOperationException("Table lock has expired");
 
-        var subtotal = table.PriceCents;
+        var subtotal = table.EventTable.PriceCents;
         var fee = CalculateFee(subtotal, ev.PlatformFeePercent);
         var total = subtotal + fee;
 
@@ -323,6 +324,7 @@ public class BookingService(
             .Include(x => x.User)
             .Include(x => x.Event)
             .Include(x => x.Table)
+                .ThenInclude(t => t!.EventTable)
             .Include(x => x.Payment)
             .FirstOrDefaultAsync(x => x.Id == bookingId);
 

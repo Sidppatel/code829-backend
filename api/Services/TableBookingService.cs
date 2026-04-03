@@ -60,6 +60,10 @@ public class TableBookingService(
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            // Load EventTable for capacity/price info
+            var eventTable = await context.EventTables.FindAsync(table.EventTableId)
+                ?? throw new InvalidOperationException("Table's event table configuration not found");
+
             Log.Information("[TableLock] User {UserId} locked table {TableLabel} for event {EventId}, expires {ExpiresAt}",
                 userId, table.Label, eventId, expiresAt);
 
@@ -69,8 +73,8 @@ public class TableBookingService(
                 eventId,
                 userId,
                 "Locked",
-                table.Capacity,
-                table.PriceCents,
+                eventTable.Capacity,
+                eventTable.PriceCents,
                 expiresAt
             );
         }
@@ -110,6 +114,7 @@ public class TableBookingService(
     {
         var now = DateTime.UtcNow;
         return await context.Tables
+            .Include(t => t.EventTable)
             .Where(t => t.EventId == eventId
                 && t.Status == TableStatus.Locked
                 && t.LockedByUserId == userId
@@ -120,8 +125,8 @@ public class TableBookingService(
                 eventId,
                 userId,
                 "Locked",
-                t.Capacity,
-                t.PriceCents,
+                t.EventTable.Capacity,
+                t.EventTable.PriceCents,
                 t.LockExpiresAt!.Value
             ))
             .ToListAsync();

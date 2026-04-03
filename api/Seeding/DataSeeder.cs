@@ -8,7 +8,7 @@ using Serilog;
 namespace Api.Seeding;
 
 /// <summary>
-/// Seeds initial users, app settings, and table types on first run.
+/// Seeds initial users, app settings, and table templates on first run.
 /// Only seeds if the users table is empty to avoid duplicates.
 /// </summary>
 public static class DataSeeder
@@ -22,7 +22,7 @@ public static class DataSeeder
 
         await SeedUsersAsync(context, encryption);
         await SeedSettingsAsync(settingsService);
-        await SeedTableTypesAsync(context);
+        await SeedTableTemplatesAsync(context);
     }
 
     private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption)
@@ -100,21 +100,21 @@ public static class DataSeeder
         Log.Information("[Seed] App settings initialized");
     }
 
-    private static async Task SeedTableTypesAsync(EventPlatformDbContext context)
+    private static async Task SeedTableTemplatesAsync(EventPlatformDbContext context)
     {
-        if (await context.TableTypes.AnyAsync())
+        if (await context.TableTemplates.AnyAsync())
             return;
 
-        var types = new[]
+        var templates = new[]
         {
-            new TableType { Id = Guid.NewGuid(), Name = "Standard Round (4)", DefaultCapacity = 4, DefaultShape = TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 0, IsActive = true },
-            new TableType { Id = Guid.NewGuid(), Name = "VIP Rectangle (6)", DefaultCapacity = 6, DefaultShape = TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 0, IsActive = true },
-            new TableType { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 0, IsActive = true },
-            new TableType { Id = Guid.NewGuid(), Name = "Lounge Section (8)", DefaultCapacity = 8, DefaultShape = TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 0, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Standard Round (4)", DefaultCapacity = 4, DefaultShape = TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 0, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "VIP Rectangle (6)", DefaultCapacity = 6, DefaultShape = TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 0, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 0, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Lounge Section (8)", DefaultCapacity = 8, DefaultShape = TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 0, IsActive = true },
         };
 
-        context.TableTypes.AddRange(types);
+        context.TableTemplates.AddRange(templates);
         await context.SaveChangesAsync();
-        Log.Information("[Seed] Created {Count} default table types", types.Length);
+        Log.Information("[Seed] Created {Count} default table templates", templates.Length);
     }
 }

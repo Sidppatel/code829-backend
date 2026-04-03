@@ -377,9 +377,16 @@ public class EventsController(
         if (userClaim is not null && Guid.TryParse(userClaim.Value, out var uid)) userId = uid;
 
         var tables = await context.Tables
-            .Include(t => t.TableType)
+            .Include(t => t.EventTable)
             .Where(t => t.EventId == id && t.IsActive)
             .OrderBy(t => t.SortOrder)
+            .ToListAsync();
+
+        // Event table types for pricing legend
+        var eventTableTypes = await context.EventTables
+            .Where(et => et.EventId == id && et.IsActive)
+            .Select(et => new EventTableTypeInfo(
+                et.Id, et.Label, et.Capacity, et.Shape.ToString(), et.Color, et.PriceCents))
             .ToListAsync();
 
         var dtos = tables.Select(t =>
@@ -403,11 +410,12 @@ public class EventsController(
                     break;
             }
 
-            return new EventTableDto(t.Id, t.Label, t.Capacity,
-                t.Shape.ToString(), t.Color, t.PriceCents, t.PosX, t.PosY,
-                t.SortOrder, status, holdExpiresAt, isLockedByYou);
+            return new EventTableDto(t.Id, t.Label, t.EventTable.Capacity,
+                t.EventTable.Shape.ToString(), t.EventTable.Color, t.EventTable.PriceCents,
+                t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt, isLockedByYou,
+                t.EventTableId, t.EventTable.Label);
         }).ToList();
 
-        return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, dtos));
+        return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, eventTableTypes, dtos));
     }
 }

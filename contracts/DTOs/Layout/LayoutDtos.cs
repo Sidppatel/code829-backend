@@ -1,6 +1,8 @@
 namespace Contracts.DTOs.Layout;
 
-public record TableTypeResponse(
+// ─── Table Templates (global) ────────────────────────────────
+
+public record TableTemplateResponse(
     Guid Id,
     string Name,
     int DefaultCapacity,
@@ -10,13 +12,49 @@ public record TableTypeResponse(
     bool IsActive
 );
 
-public record CreateTableTypeRequest(
+public record CreateTableTemplateRequest(
     string Name,
     int DefaultCapacity,
     string DefaultShape,
     string? DefaultColor = null,
     int DefaultPriceCents = 0
 );
+
+// ─── Event Tables (per-event table types) ────────────────────
+
+public record EventTableResponse(
+    Guid Id,
+    string Label,
+    int Capacity,
+    string Shape,
+    string? Color,
+    int PriceCents,
+    bool IsActive,
+    Guid EventId,
+    Guid? TableTemplateId,
+    string? TableTemplateName,
+    int TableCount
+);
+
+public record CreateEventTableRequest(
+    Guid TableTemplateId,
+    string? Label = null,
+    int? Capacity = null,
+    string? Shape = null,
+    string? Color = null,
+    int? PriceCents = null
+);
+
+public record UpdateEventTableRequest(
+    string? Label = null,
+    int? Capacity = null,
+    string? Shape = null,
+    string? Color = null,
+    int? PriceCents = null,
+    bool? IsActive = null
+);
+
+// ─── Layout (table instances on grid) ────────────────────────
 
 public record EventLayoutResponse(
     Guid EventId,
@@ -28,16 +66,16 @@ public record EventLayoutResponse(
 public record LayoutTableResponse(
     Guid Id,
     string Label,
+    int GridRow,
+    int GridCol,
+    bool IsActive,
+    int SortOrder,
+    Guid EventTableId,
+    string EventTableLabel,
     int Capacity,
     string Shape,
     string? Color,
     int PriceCents,
-    bool IsActive,
-    double PosX,
-    double PosY,
-    int SortOrder,
-    Guid? TableTypeId,
-    string? TableTypeName,
     string Status = "Available"
 );
 
@@ -50,38 +88,27 @@ public record SaveLayoutRequest(
 public record SaveLayoutTableRequest(
     string? Id,
     string Label,
-    int Capacity,
-    string Shape,
-    string? Color,
-    int PriceCents,
+    int GridRow,
+    int GridCol,
     bool IsActive,
-    double PosX,
-    double PosY,
     int SortOrder,
-    Guid? TableTypeId
+    Guid EventTableId
 );
 
 public record AddTableRequest(
     string Label,
-    int Capacity,
-    string Shape,
-    string? Color = null,
-    int PriceCents = 0,
-    double PosX = 0,
-    double PosY = 0,
-    Guid? TableTypeId = null
+    int GridRow,
+    int GridCol,
+    Guid EventTableId
 );
 
 public record UpdateTableRequest(
     string? Label = null,
-    int? Capacity = null,
-    string? Shape = null,
-    string? Color = null,
-    int? PriceCents = null,
+    int? GridRow = null,
+    int? GridCol = null,
     bool? IsActive = null,
-    double? PosX = null,
-    double? PosY = null,
-    int? SortOrder = null
+    int? SortOrder = null,
+    Guid? EventTableId = null
 );
 
 public record LayoutStatsResponse(
@@ -91,9 +118,9 @@ public record LayoutStatsResponse(
     long TotalBookedRevenueCents
 );
 
-public record BulkInsertRequest(List<Guid> TableTypeIds);
+public record BulkInsertRequest(List<Guid> TableTemplateIds);
 
 public record BulkInsertResponse(
     int InsertedCount,
-    List<LayoutTableResponse> Tables
+    List<EventTableResponse> EventTables
 );

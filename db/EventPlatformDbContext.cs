@@ -19,10 +19,11 @@ public class EventPlatformDbContext(
 
     // Template/parent entities
     public DbSet<Venue> Venues => Set<Venue>();
-    public DbSet<TableType> TableTypes => Set<TableType>();
+    public DbSet<TableTemplate> TableTemplates => Set<TableTemplate>();
 
     // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -145,21 +146,44 @@ public class EventPlatformDbContext(
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<TableType>(entity =>
+        modelBuilder.Entity<TableTemplate>(entity =>
         {
-            entity.ToTable("table_types", t =>
+            entity.ToTable("table_templates", t =>
             {
-                t.HasCheckConstraint("CK_table_types_DefaultShape",
+                t.HasCheckConstraint("CK_table_templates_DefaultShape",
                     "\"DefaultShape\" IN ('Round','Rectangle','Square','Cocktail')");
-                t.HasCheckConstraint("CK_table_types_DefaultCapacity",
+                t.HasCheckConstraint("CK_table_templates_DefaultCapacity",
                     "\"DefaultCapacity\" > 0");
-                t.HasCheckConstraint("CK_table_types_DefaultPriceCents",
+                t.HasCheckConstraint("CK_table_templates_DefaultPriceCents",
                     "\"DefaultPriceCents\" >= 0");
             });
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.DefaultShape).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.DefaultColor).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<EventTable>(entity =>
+        {
+            entity.ToTable("event_tables", t =>
+            {
+                t.HasCheckConstraint("CK_event_tables_Shape",
+                    "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
+                t.HasCheckConstraint("CK_event_tables_Capacity",
+                    "\"Capacity\" > 0");
+                t.HasCheckConstraint("CK_event_tables_PriceCents",
+                    "\"PriceCents\" >= 0");
+            });
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EventId, e.Label });
+            entity.Property(e => e.Label).HasMaxLength(128);
+            entity.Property(e => e.Shape).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Color).HasMaxLength(20);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.TableTemplate).WithMany(tt => tt.EventTables)
+                .HasForeignKey(e => e.TableTemplateId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         // ─── Instance/child entities ─────────────────────────────
@@ -218,35 +242,31 @@ public class EventPlatformDbContext(
         {
             entity.ToTable("tables", t =>
             {
-                t.HasCheckConstraint("CK_tables_Shape",
-                    "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
-                t.HasCheckConstraint("CK_tables_PriceCents",
-                    "\"PriceCents\" >= 0");
-                t.HasCheckConstraint("CK_tables_Capacity",
-                    "\"Capacity\" > 0");
                 t.HasCheckConstraint("CK_tables_Status",
                     "\"Status\" IN ('Available','Locked','Booked')");
                 t.HasCheckConstraint("CK_tables_LockedRequiresOwner",
                     "\"Status\" <> 'Locked' OR (\"LockedByUserId\" IS NOT NULL AND \"LockExpiresAt\" IS NOT NULL)");
                 t.HasCheckConstraint("CK_tables_AvailableNoLock",
                     "\"Status\" <> 'Available' OR (\"LockedByUserId\" IS NULL AND \"LockExpiresAt\" IS NULL)");
+                t.HasCheckConstraint("CK_tables_GridRow",
+                    "\"GridRow\" >= 0");
+                t.HasCheckConstraint("CK_tables_GridCol",
+                    "\"GridCol\" >= 0");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.EventId);
             entity.HasIndex(e => new { e.EventId, e.Label }).IsUnique();
+            entity.HasIndex(e => new { e.EventId, e.GridRow, e.GridCol }).IsUnique();
             entity.HasIndex(e => new { e.EventId, e.Status })
                 .HasDatabaseName("IX_tables_EventId_Status");
             entity.Property(e => e.Label).HasMaxLength(20);
-            entity.Property(e => e.Shape).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Color).HasMaxLength(20);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20)
                 .HasDefaultValue(Contracts.Enums.TableStatus.Available);
-            entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.EventTable).WithMany(et => et.Tables)
+                .HasForeignKey(e => e.EventTableId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId)
-                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.LockedByUser).WithMany().HasForeignKey(e => e.LockedByUserId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
