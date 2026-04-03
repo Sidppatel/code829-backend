@@ -33,7 +33,7 @@ public class TableBookingService(
                     WHERE "EventId" = {0} AND "LockedByUserId" = {1} AND "Status" = {2}
                     FOR UPDATE
                     """,
-                    eventId, userId, (int)TableStatus.Locked)
+                    eventId, userId, TableStatus.Locked.ToString())
                 .FirstOrDefaultAsync();
 
             if (existingLock is not null)
@@ -108,25 +108,44 @@ public class TableBookingService(
 
     public async Task ReleaseTableLockAsync(Guid userId, Guid eventId, Guid tableId)
     {
-        var table = await context.Tables
-            .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId)
-            ?? throw new KeyNotFoundException("Table not found");
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            var table = await context.Tables
+                .FromSqlRaw(
+                    """
+                    SELECT * FROM tables
+                    WHERE "Id" = {0} AND "EventId" = {1}
+                    FOR UPDATE
+                    """,
+                    tableId, eventId)
+                .FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException("Table not found");
 
-        if (table.Status != TableStatus.Locked)
-            throw new InvalidOperationException("Table is not locked");
+            if (table.Status != TableStatus.Locked)
+                throw new InvalidOperationException("Table is not locked");
 
-        if (table.LockedByUserId != userId)
-            throw new InvalidOperationException("You do not hold this table");
+            if (table.LockedByUserId != userId)
+                throw new InvalidOperationException("You do not hold this table");
 
-        table.Status = TableStatus.Available;
-        table.LockedByUserId = null;
-        table.LockExpiresAt = null;
-        table.UpdatedAt = DateTime.UtcNow;
+            table.Status = TableStatus.Available;
+            table.LockedByUserId = null;
+            table.LockExpiresAt = null;
+            table.UpdatedAt = DateTime.UtcNow;
 
-        await context.SaveChangesAsync();
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        Log.Information("[TableLock] User {UserId} released table {TableLabel} for event {EventId}",
-            userId, table.Label, eventId);
+            Log.Information("[TableLock] User {UserId} released table {TableLabel} for event {EventId}",
+                userId, table.Label, eventId);
+        }
+        catch (InvalidOperationException) { throw; }
+        catch (KeyNotFoundException) { throw; }
+        catch (Exception)
+        {
+            try { await transaction.RollbackAsync(); } catch { }
+            throw;
+        }
     }
 
     public async Task<List<TableLockDto>> GetUserLockedTablesAsync(Guid userId, Guid eventId)
