@@ -70,16 +70,21 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
-        var bookings = await context.Bookings
-            .Where(b => b.EventId == eventId)
+        // Count tickets (seats) not bookings — SeatsReserved defaults to 1 if null
+        var stats = await context.Bookings
+            .Where(b => b.EventId == eventId && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
             .GroupBy(b => b.Status)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .Select(g => new { Status = g.Key, Tickets = g.Sum(b => b.SeatsReserved ?? 1) })
             .ToListAsync();
 
-        var checkedIn = bookings.FirstOrDefault(b => b.Status == BookingStatus.CheckedIn)?.Count ?? 0;
-        var paid = bookings.FirstOrDefault(b => b.Status == BookingStatus.Paid)?.Count ?? 0;
-        var pending = bookings.FirstOrDefault(b => b.Status == BookingStatus.Pending)?.Count ?? 0;
-        var total = bookings.Sum(b => b.Count);
+        var checkedIn = stats.FirstOrDefault(b => b.Status == BookingStatus.CheckedIn)?.Tickets ?? 0;
+        var remaining = stats.FirstOrDefault(b => b.Status == BookingStatus.Paid)?.Tickets ?? 0;
+        var totalSold = checkedIn + remaining;
+
+        // Pending bookings (not yet paid)
+        var pending = await context.Bookings
+            .Where(b => b.EventId == eventId && b.Status == BookingStatus.Pending)
+            .SumAsync(b => b.SeatsReserved ?? 1);
 
         var lastCheckIn = await context.Bookings
             .Where(b => b.EventId == eventId && b.Status == BookingStatus.CheckedIn)
@@ -87,11 +92,10 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
             .Select(b => (DateTime?)b.UpdatedAt)
             .FirstOrDefaultAsync();
 
-        var eligible = paid + checkedIn;
-        var percentage = eligible > 0 ? Math.Round(checkedIn * 100.0 / eligible, 1) : 0;
+        var percentage = totalSold > 0 ? Math.Round(checkedIn * 100.0 / totalSold, 1) : 0;
 
         return Ok(new CheckInStatsDto(
-            eventId, ev.Title, total, checkedIn, pending, paid,
+            eventId, ev.Title, totalSold, checkedIn, pending, remaining,
             percentage, lastCheckIn
         ));
     }

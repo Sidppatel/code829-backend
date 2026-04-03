@@ -3,10 +3,10 @@ namespace Contracts.DTOs.CheckIn;
 public record CheckInStatsDto(
     Guid EventId,
     string EventTitle,
-    int TotalBookings,
+    int TotalTicketsSold,
     int CheckedIn,
     int Pending,
-    int Paid,
-    double CheckInPercentage,
-    DateTime? LastCheckInAt
+    int Remaining,
+    double Percentage,
+    DateTime? LastCheckIn
 );
