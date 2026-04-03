@@ -48,6 +48,34 @@ public class BookingsController(
         catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
     }
 
+    [HttpPost("confirm-by-intent")]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> ConfirmByPaymentIntent([FromBody] ConfirmByIntentRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        try
+        {
+            var payment = await context.Payments
+                .Include(p => p.Booking)
+                .FirstOrDefaultAsync(p => p.PaymentIntentId == request.PaymentIntentId);
+
+            if (payment is null)
+                return NotFound(new { message = "Payment not found" });
+
+            if (payment.Booking.UserId != userId)
+                return Forbid("Not your booking");
+
+            if (payment.Booking.Status != BookingStatus.Pending)
+                return Ok(await bookingService.GetByIdAsync(payment.BookingId));
+
+            var booking = await bookingService.ConfirmPaymentAsync(payment.BookingId, userId);
+            return Ok(booking);
+        }
+        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+    }
+
     [HttpPost("{id:guid}/cancel")]
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> Cancel(Guid id)
