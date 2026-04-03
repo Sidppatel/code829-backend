@@ -153,20 +153,43 @@ public class DeveloperController(
     /// Get all users.
     /// </summary>
     [HttpGet("users")]
-    public async Task<IActionResult> GetUsers()
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null)
     {
-        var users = await context.Users
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        page = Math.Max(1, page);
+
+        var query = context.Users.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(u =>
+                u.Email.ToLower().Contains(term) ||
+                u.FirstName.ToLower().Contains(term) ||
+                u.LastName.ToLower().Contains(term));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var users = await query
+            .OrderByDescending(u => u.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(u => new
             {
                 u.Id,
-                Name = u.FirstName + " " + u.LastName,
+                u.FirstName,
+                u.LastName,
                 u.Email,
                 Role = u.Role.ToString(),
                 u.CreatedAt
             })
-            .OrderByDescending(u => u.CreatedAt)
             .ToListAsync();
-        return Ok(users);
+
+        return Ok(new { items = users, total = totalCount, page, pageSize });
     }
 
     /// <summary>
