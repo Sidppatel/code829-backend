@@ -491,6 +491,68 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.EventTable", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("PriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Shape")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("TableTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TableTemplateId");
+
+                    b.HasIndex("EventId", "Label");
+
+                    b.ToTable("event_tables", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_event_tables_Capacity", "\"Capacity\" > 0");
+
+                            t.HasCheckConstraint("CK_event_tables_PriceCents", "\"PriceCents\" >= 0");
+
+                            t.HasCheckConstraint("CK_event_tables_Shape", "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
+                        });
+                });
+
             modelBuilder.Entity("Db.Entities.MagicLinkToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -732,13 +794,6 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<int>("Capacity")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Color")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -746,6 +801,15 @@ namespace db.Migrations
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventTableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("GridCol")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GridRow")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -761,20 +825,6 @@ namespace db.Migrations
                     b.Property<Guid?>("LockedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<double>("PosX")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("PosY")
-                        .HasColumnType("double precision");
-
-                    b.Property<int>("PriceCents")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Shape")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -785,26 +835,18 @@ namespace db.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Available");
 
-                    b.Property<Guid?>("TableTypeId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("VenueId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("EventId");
 
+                    b.HasIndex("EventTableId");
+
                     b.HasIndex("LockedByUserId");
-
-                    b.HasIndex("TableTypeId");
-
-                    b.HasIndex("VenueId");
 
                     b.HasIndex("EventId", "Label")
                         .IsUnique();
@@ -812,23 +854,24 @@ namespace db.Migrations
                     b.HasIndex("EventId", "Status")
                         .HasDatabaseName("IX_tables_EventId_Status");
 
+                    b.HasIndex("EventId", "GridRow", "GridCol")
+                        .IsUnique();
+
                     b.ToTable("tables", null, t =>
                         {
                             t.HasCheckConstraint("CK_tables_AvailableNoLock", "\"Status\" <> 'Available' OR (\"LockedByUserId\" IS NULL AND \"LockExpiresAt\" IS NULL)");
 
-                            t.HasCheckConstraint("CK_tables_Capacity", "\"Capacity\" > 0");
+                            t.HasCheckConstraint("CK_tables_GridCol", "\"GridCol\" >= 0");
+
+                            t.HasCheckConstraint("CK_tables_GridRow", "\"GridRow\" >= 0");
 
                             t.HasCheckConstraint("CK_tables_LockedRequiresOwner", "\"Status\" <> 'Locked' OR (\"LockedByUserId\" IS NOT NULL AND \"LockExpiresAt\" IS NOT NULL)");
-
-                            t.HasCheckConstraint("CK_tables_PriceCents", "\"PriceCents\" >= 0");
-
-                            t.HasCheckConstraint("CK_tables_Shape", "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
 
                             t.HasCheckConstraint("CK_tables_Status", "\"Status\" IN ('Available','Locked','Booked')");
                         });
                 });
 
-            modelBuilder.Entity("Db.Entities.TableType", b =>
+            modelBuilder.Entity("Db.Entities.TableTemplate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -870,13 +913,13 @@ namespace db.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("table_types", null, t =>
+                    b.ToTable("table_templates", null, t =>
                         {
-                            t.HasCheckConstraint("CK_table_types_DefaultCapacity", "\"DefaultCapacity\" > 0");
+                            t.HasCheckConstraint("CK_table_templates_DefaultCapacity", "\"DefaultCapacity\" > 0");
 
-                            t.HasCheckConstraint("CK_table_types_DefaultPriceCents", "\"DefaultPriceCents\" >= 0");
+                            t.HasCheckConstraint("CK_table_templates_DefaultPriceCents", "\"DefaultPriceCents\" >= 0");
 
-                            t.HasCheckConstraint("CK_table_types_DefaultShape", "\"DefaultShape\" IN ('Round','Rectangle','Square','Cocktail')");
+                            t.HasCheckConstraint("CK_table_templates_DefaultShape", "\"DefaultShape\" IN ('Round','Rectangle','Square','Cocktail')");
                         });
                 });
 
@@ -1198,18 +1241,25 @@ namespace db.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("EventTableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventTableLabel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("GridCol")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GridRow")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<double>("PosX")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("PosY")
-                        .HasColumnType("double precision");
 
                     b.Property<int>("PriceCents")
                         .HasColumnType("integer");
@@ -1221,14 +1271,12 @@ namespace db.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("TableTypeId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("VenueId")
-                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -1282,6 +1330,24 @@ namespace db.Migrations
                     b.Navigation("Venue");
                 });
 
+            modelBuilder.Entity("Db.Entities.EventTable", b =>
+                {
+                    b.HasOne("Db.Entities.Event", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Db.Entities.TableTemplate", "TableTemplate")
+                        .WithMany("EventTables")
+                        .HasForeignKey("TableTemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Event");
+
+                    b.Navigation("TableTemplate");
+                });
+
             modelBuilder.Entity("Db.Entities.Payment", b =>
                 {
                     b.HasOne("Db.Entities.Booking", "Booking")
@@ -1312,29 +1378,22 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Db.Entities.EventTable", "EventTable")
+                        .WithMany("Tables")
+                        .HasForeignKey("EventTableId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Db.Entities.User", "LockedByUser")
                         .WithMany()
                         .HasForeignKey("LockedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Db.Entities.TableType", "TableType")
-                        .WithMany("Tables")
-                        .HasForeignKey("TableTypeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Db.Entities.Venue", "Venue")
-                        .WithMany()
-                        .HasForeignKey("VenueId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Event");
 
+                    b.Navigation("EventTable");
+
                     b.Navigation("LockedByUser");
-
-                    b.Navigation("TableType");
-
-                    b.Navigation("Venue");
                 });
 
             modelBuilder.Entity("Db.Entities.User", b =>
@@ -1362,9 +1421,14 @@ namespace db.Migrations
                     b.Navigation("Payment");
                 });
 
-            modelBuilder.Entity("Db.Entities.TableType", b =>
+            modelBuilder.Entity("Db.Entities.EventTable", b =>
                 {
                     b.Navigation("Tables");
+                });
+
+            modelBuilder.Entity("Db.Entities.TableTemplate", b =>
+                {
+                    b.Navigation("EventTables");
                 });
 
             modelBuilder.Entity("Db.Entities.Venue", b =>

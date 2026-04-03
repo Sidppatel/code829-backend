@@ -152,7 +152,7 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "table_types",
+                name: "table_templates",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
@@ -167,10 +167,10 @@ namespace db.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_table_types", x => x.Id);
-                    table.CheckConstraint("CK_table_types_DefaultCapacity", "\"DefaultCapacity\" > 0");
-                    table.CheckConstraint("CK_table_types_DefaultPriceCents", "\"DefaultPriceCents\" >= 0");
-                    table.CheckConstraint("CK_table_types_DefaultShape", "\"DefaultShape\" IN ('Round','Rectangle','Square','Cocktail')");
+                    table.PrimaryKey("PK_table_templates", x => x.Id);
+                    table.CheckConstraint("CK_table_templates_DefaultCapacity", "\"DefaultCapacity\" > 0");
+                    table.CheckConstraint("CK_table_templates_DefaultPriceCents", "\"DefaultPriceCents\" >= 0");
+                    table.CheckConstraint("CK_table_templates_DefaultShape", "\"DefaultShape\" IN ('Round','Rectangle','Square','Cocktail')");
                 });
 
             migrationBuilder.CreateTable(
@@ -313,25 +313,56 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "tables",
+                name: "event_tables",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Label = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Label = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Capacity = table.Column<int>(type: "integer", nullable: false),
                     Shape = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     Color = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     PriceCents = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TableTemplateId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_event_tables", x => x.Id);
+                    table.CheckConstraint("CK_event_tables_Capacity", "\"Capacity\" > 0");
+                    table.CheckConstraint("CK_event_tables_PriceCents", "\"PriceCents\" >= 0");
+                    table.CheckConstraint("CK_event_tables_Shape", "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
+                    table.ForeignKey(
+                        name: "FK_event_tables_events_EventId",
+                        column: x => x.EventId,
+                        principalTable: "events",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_event_tables_table_templates_TableTemplateId",
+                        column: x => x.TableTemplateId,
+                        principalTable: "table_templates",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "tables",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Label = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    GridRow = table.Column<int>(type: "integer", nullable: false),
+                    GridCol = table.Column<int>(type: "integer", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
                     Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "Available"),
                     LockedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
                     LockExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    PosX = table.Column<double>(type: "double precision", nullable: false),
-                    PosY = table.Column<double>(type: "double precision", nullable: false),
-                    SortOrder = table.Column<int>(type: "integer", nullable: false),
-                    TableTypeId = table.Column<Guid>(type: "uuid", nullable: true),
+                    EventTableId = table.Column<Guid>(type: "uuid", nullable: false),
                     EventId = table.Column<Guid>(type: "uuid", nullable: false),
-                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
@@ -339,11 +370,16 @@ namespace db.Migrations
                 {
                     table.PrimaryKey("PK_tables", x => x.Id);
                     table.CheckConstraint("CK_tables_AvailableNoLock", "\"Status\" <> 'Available' OR (\"LockedByUserId\" IS NULL AND \"LockExpiresAt\" IS NULL)");
-                    table.CheckConstraint("CK_tables_Capacity", "\"Capacity\" > 0");
+                    table.CheckConstraint("CK_tables_GridCol", "\"GridCol\" >= 0");
+                    table.CheckConstraint("CK_tables_GridRow", "\"GridRow\" >= 0");
                     table.CheckConstraint("CK_tables_LockedRequiresOwner", "\"Status\" <> 'Locked' OR (\"LockedByUserId\" IS NOT NULL AND \"LockExpiresAt\" IS NOT NULL)");
-                    table.CheckConstraint("CK_tables_PriceCents", "\"PriceCents\" >= 0");
-                    table.CheckConstraint("CK_tables_Shape", "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
                     table.CheckConstraint("CK_tables_Status", "\"Status\" IN ('Available','Locked','Booked')");
+                    table.ForeignKey(
+                        name: "FK_tables_event_tables_EventTableId",
+                        column: x => x.EventTableId,
+                        principalTable: "event_tables",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_tables_events_EventId",
                         column: x => x.EventId,
@@ -351,23 +387,11 @@ namespace db.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_tables_table_types_TableTypeId",
-                        column: x => x.TableTypeId,
-                        principalTable: "table_types",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
                         name: "FK_tables_users_LockedByUserId",
                         column: x => x.LockedByUserId,
                         principalTable: "users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_tables_venues_VenueId",
-                        column: x => x.VenueId,
-                        principalTable: "venues",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -521,6 +545,16 @@ namespace db.Migrations
                 column: "Timestamp");
 
             migrationBuilder.CreateIndex(
+                name: "IX_event_tables_EventId_Label",
+                table: "event_tables",
+                columns: new[] { "EventId", "Label" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_event_tables_TableTemplateId",
+                table: "event_tables",
+                column: "TableTemplateId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_events_Category",
                 table: "events",
                 column: "Category");
@@ -622,6 +656,12 @@ namespace db.Migrations
                 column: "EventId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_tables_EventId_GridRow_GridCol",
+                table: "tables",
+                columns: new[] { "EventId", "GridRow", "GridCol" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_tables_EventId_Label",
                 table: "tables",
                 columns: new[] { "EventId", "Label" },
@@ -633,19 +673,14 @@ namespace db.Migrations
                 columns: new[] { "EventId", "Status" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_tables_EventTableId",
+                table: "tables",
+                column: "EventTableId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_tables_LockedByUserId",
                 table: "tables",
                 column: "LockedByUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_tables_TableTypeId",
-                table: "tables",
-                column: "TableTypeId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_tables_VenueId",
-                table: "tables",
-                column: "VenueId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_users_AddressId",
@@ -674,101 +709,114 @@ namespace db.Migrations
                 table: "venues",
                 column: "Name");
 
-            // ─── Create read-only views ─────────────────────────────────
+            // ── Create Views ────────────────────────────────────────
+            migrationBuilder.Sql("""
+                CREATE OR REPLACE VIEW v_events AS
+                SELECT
+                    e."Id",
+                    e."Title",
+                    e."Slug",
+                    e."Description",
+                    e."Status"::text AS "Status",
+                    COALESCE(e."Category"::text, '') AS "Category",
+                    e."StartDate",
+                    e."EndDate",
+                    e."ImagePath",
+                    e."IsFeatured",
+                    e."LayoutMode"::text AS "LayoutMode",
+                    e."MaxCapacity",
+                    e."PricePerPersonCents",
+                    e."PlatformFeePercent",
+                    e."GridRows",
+                    e."GridCols",
+                    e."PublishedAt",
+                    e."ScheduledPublishAt",
+                    e."VenueId",
+                    e."OrganizerId",
+                    e."SearchVector",
+                    e."CreatedAt",
+                    e."UpdatedAt",
+                    v."Name" AS "VenueName",
+                    COALESCE(a."Line1", '') AS "VenueAddress",
+                    COALESCE(a."City", '') AS "VenueCity",
+                    COALESCE(a."State", '') AS "VenueState",
+                    COALESCE(a."ZipCode", '') AS "VenueZipCode",
+                    v."ImagePath" AS "VenueImagePath"
+                FROM events e
+                JOIN venues v ON e."VenueId" = v."Id"
+                LEFT JOIN addresses a ON v."AddressId" = a."Id";
+                """);
 
-            migrationBuilder.Sql(@"
-CREATE VIEW v_events AS
-SELECT
-    e.""Id"",
-    e.""Title"",
-    e.""Slug"",
-    e.""Description"",
-    e.""Status"",
-    e.""Category"",
-    e.""StartDate"",
-    e.""EndDate"",
-    e.""ImagePath"",
-    e.""IsFeatured"",
-    e.""LayoutMode"",
-    e.""MaxCapacity"",
-    e.""PricePerPersonCents"",
-    e.""PlatformFeePercent"",
-    e.""GridRows"",
-    e.""GridCols"",
-    e.""PublishedAt"",
-    e.""ScheduledPublishAt"",
-    e.""VenueId"",
-    e.""OrganizerId"",
-    e.""SearchVector"",
-    e.""CreatedAt"",
-    e.""UpdatedAt"",
-    v.""Name""       AS ""VenueName"",
-    COALESCE(a.""Line1"", '')  AS ""VenueAddress"",
-    COALESCE(a.""City"", '')   AS ""VenueCity"",
-    COALESCE(a.""State"", '')  AS ""VenueState"",
-    COALESCE(a.""ZipCode"", '') AS ""VenueZipCode"",
-    v.""ImagePath""  AS ""VenueImagePath""
-FROM events e
-JOIN venues v ON v.""Id"" = e.""VenueId""
-LEFT JOIN addresses a ON a.""Id"" = v.""AddressId"";
-");
+            migrationBuilder.Sql("""
+                CREATE OR REPLACE VIEW v_event_summary AS
+                SELECT
+                    e."Id",
+                    e."Title",
+                    e."Slug",
+                    e."Status"::text AS "Status",
+                    COALESCE(e."Category"::text, '') AS "Category",
+                    e."StartDate",
+                    e."EndDate",
+                    e."ImagePath",
+                    e."IsFeatured",
+                    e."LayoutMode"::text AS "LayoutMode",
+                    v."Name" AS "VenueName",
+                    COALESCE(a."City", '') AS "VenueCity",
+                    COALESCE(u."FirstName" || ' ' || u."LastName", '') AS "OrganizerName",
+                    CASE
+                        WHEN e."LayoutMode" = 'Open' THEN COALESCE(e."MaxCapacity", 0)
+                        ELSE COALESCE((
+                            SELECT SUM(et."Capacity" * (SELECT COUNT(*) FROM tables t2 WHERE t2."EventTableId" = et."Id" AND t2."IsActive" = true))
+                            FROM event_tables et WHERE et."EventId" = e."Id" AND et."IsActive" = true
+                        ), 0)
+                    END AS "TotalCapacity",
+                    CASE
+                        WHEN e."LayoutMode" = 'Open' THEN (
+                            SELECT COALESCE(SUM(b."SeatsReserved"), 0) FROM bookings b
+                            WHERE b."EventId" = e."Id" AND b."Status" IN ('Paid', 'CheckedIn')
+                        )
+                        ELSE (
+                            SELECT COUNT(*) FROM tables t
+                            JOIN event_tables et ON t."EventTableId" = et."Id"
+                            WHERE t."EventId" = e."Id" AND t."Status" = 'Booked'
+                        )
+                    END AS "TotalSold"
+                FROM events e
+                JOIN venues v ON e."VenueId" = v."Id"
+                LEFT JOIN addresses a ON v."AddressId" = a."Id"
+                LEFT JOIN users u ON e."OrganizerId" = u."Id";
+                """);
 
-            migrationBuilder.Sql(@"
-CREATE VIEW v_event_summary AS
-SELECT
-    e.""Id"",
-    e.""Title"",
-    e.""Slug"",
-    e.""Status"",
-    e.""Category"",
-    e.""StartDate"",
-    e.""EndDate"",
-    e.""ImagePath"",
-    e.""IsFeatured"",
-    e.""LayoutMode"",
-    v.""Name""  AS ""VenueName"",
-    COALESCE(a.""City"", '') AS ""VenueCity"",
-    CONCAT(u.""FirstName"", ' ', u.""LastName"") AS ""OrganizerName"",
-    CASE
-        WHEN e.""LayoutMode"" = 'Grid' THEN COALESCE((SELECT SUM(t.""Capacity"") FROM tables t WHERE t.""EventId"" = e.""Id"" AND t.""IsActive""), 0)
-        ELSE COALESCE(e.""MaxCapacity"", 0)
-    END AS ""TotalCapacity"",
-    COALESCE((SELECT COALESCE(SUM(b.""SeatsReserved""), 0) + COUNT(CASE WHEN b.""TableId"" IS NOT NULL AND b.""SeatsReserved"" IS NULL THEN 1 END)
-              FROM bookings b WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid', 'CheckedIn')), 0) AS ""TotalSold""
-FROM events e
-JOIN venues v ON v.""Id"" = e.""VenueId""
-LEFT JOIN addresses a ON a.""Id"" = v.""AddressId""
-JOIN users u ON u.""Id"" = e.""OrganizerId"";
-");
-
-            migrationBuilder.Sql(@"
-CREATE VIEW v_tables AS
-SELECT
-    t.""Id"",
-    t.""EventId"",
-    t.""VenueId"",
-    t.""TableTypeId"",
-    t.""Label"",
-    t.""Capacity"",
-    t.""Shape"",
-    t.""Color"",
-    t.""PriceCents"",
-    t.""IsActive"",
-    t.""PosX"",
-    t.""PosY"",
-    t.""SortOrder"",
-    t.""CreatedAt"",
-    t.""UpdatedAt""
-FROM tables t;
-");
+            migrationBuilder.Sql("""
+                CREATE OR REPLACE VIEW v_tables AS
+                SELECT
+                    t."Id",
+                    t."EventId",
+                    t."EventTableId",
+                    t."Label",
+                    t."GridRow",
+                    t."GridCol",
+                    t."IsActive",
+                    t."SortOrder",
+                    t."Status"::text AS "Status",
+                    t."CreatedAt",
+                    t."UpdatedAt",
+                    et."Capacity",
+                    et."Shape"::text AS "Shape",
+                    et."Color",
+                    et."PriceCents",
+                    et."Label" AS "EventTableLabel"
+                FROM tables t
+                JOIN event_tables et ON t."EventTableId" = et."Id";
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events CASCADE;");
-            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary CASCADE;");
             migrationBuilder.Sql("DROP VIEW IF EXISTS v_tables CASCADE;");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary CASCADE;");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events CASCADE;");
 
             migrationBuilder.DropTable(
                 name: "admin_logs");
@@ -801,10 +849,13 @@ FROM tables t;
                 name: "tables");
 
             migrationBuilder.DropTable(
+                name: "event_tables");
+
+            migrationBuilder.DropTable(
                 name: "events");
 
             migrationBuilder.DropTable(
-                name: "table_types");
+                name: "table_templates");
 
             migrationBuilder.DropTable(
                 name: "users");
