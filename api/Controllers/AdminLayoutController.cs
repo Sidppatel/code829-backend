@@ -203,16 +203,16 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .OrderBy(t => t.SortOrder)
             .ToListAsync();
 
+        var lockedIds = await GetLockedTableIdsAsync(eventId);
+
         return Ok(new EventLayoutResponse(
             eventId, ev.GridRows, ev.GridCols,
-            tables.Select(MapTable).ToList()));
+            tables.Select(t => MapTableWithStatus(t, lockedIds)).ToList()));
     }
 
     [HttpPost("admin/events/{eventId:guid}/layout")]
     public async Task<IActionResult> SaveLayout(Guid eventId, [FromBody] SaveLayoutRequest request)
     {
-        if (await IsLayoutLockedAsync(eventId))
-            return Conflict(new { message = "Layout is locked — tables have active bookings" });
 
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
@@ -279,15 +279,22 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         ev.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
-        return Ok(await GetLayoutInternal(eventId));
+        // Re-fetch with status
+        var ev2 = await context.Events.FindAsync(eventId);
+        var updatedTables = await context.Tables
+            .Include(t => t.TableType)
+            .Where(t => t.EventId == eventId)
+            .OrderBy(t => t.SortOrder)
+            .ToListAsync();
+        var updatedLocked = await GetLockedTableIdsAsync(eventId);
+        return Ok(new EventLayoutResponse(
+            eventId, ev2?.GridRows, ev2?.GridCols,
+            updatedTables.Select(t => MapTableWithStatus(t, updatedLocked)).ToList()));
     }
 
     [HttpPost("admin/events/{eventId:guid}/layout/table")]
     public async Task<IActionResult> AddTable(Guid eventId, [FromBody] AddTableRequest request)
     {
-        if (await IsLayoutLockedAsync(eventId))
-            return Conflict(new { message = "Layout is locked — tables have active bookings" });
-
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -309,9 +316,6 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPut("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
     public async Task<IActionResult> UpdateTable(Guid eventId, Guid tableId, [FromBody] Contracts.DTOs.Layout.UpdateTableRequest request)
     {
-        if (await IsLayoutLockedAsync(eventId))
-            return Conflict(new { message = "Layout is locked — tables have active bookings" });
-
         var table = await context.Tables.FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
 
@@ -337,9 +341,6 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpDelete("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
     public async Task<IActionResult> DeleteTable(Guid eventId, Guid tableId)
     {
-        if (await IsLayoutLockedAsync(eventId))
-            return Conflict(new { message = "Layout is locked — tables have active bookings" });
-
         var table = await context.Tables
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
@@ -552,4 +553,20 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         t.PriceCents, t.IsActive,
         t.PosX, t.PosY,
         t.SortOrder, t.TableTypeId, t.TableType?.Name);
+
+    private static LayoutTableResponse MapTableWithStatus(Table t, HashSet<Guid> lockedIds)
+    {
+        var status = lockedIds.Contains(t.Id)
+            ? (t.Status == TableStatus.Booked ? "Booked"
+                : t.Status == TableStatus.Locked ? "Locked"
+                : "Booked") // If in lockedIds (has active booking) but status not set, treat as Booked
+            : "Available";
+
+        return new LayoutTableResponse(
+            t.Id, t.Label, t.Capacity, t.Shape.ToString(), t.Color,
+            t.PriceCents, t.IsActive,
+            t.PosX, t.PosY,
+            t.SortOrder, t.TableTypeId, t.TableType?.Name,
+            status);
+    }
 }

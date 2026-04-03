@@ -37,7 +37,8 @@ public record LayoutTableResponse(
     double PosY,
     int SortOrder,
     Guid? TableTypeId,
-    string? TableTypeName
+    string? TableTypeName,
+    string Status = "Available"
 );
 
 public record SaveLayoutRequest(
