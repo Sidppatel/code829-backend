@@ -143,9 +143,6 @@ try
         var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
         if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")
             return new ResendEmailService(settingsService);
-        var smtpKey = settingsService.GetOrDefaultAsync("email_api_key").GetAwaiter().GetResult();
-        if (!string.IsNullOrEmpty(smtpKey) && smtpKey != "MOCK_DEV")
-            return new SmtpEmailService(settingsService);
         var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
         return new MockEmailService(context);
     });
