@@ -7,19 +7,10 @@ public record CreateEventRequest(
     DateTime StartDate,
     DateTime EndDate,
     Guid VenueId,
+    string LayoutMode,
     bool IsFeatured = false,
-    string? LayoutMode = null,
     int? MaxCapacity = null,
+    int? PricePerPersonCents = null,
     int? PlatformFeePercent = null,
-    string? BannerImageUrl = null,
-    List<CreateTicketTypeRequest>? TicketTypes = null
-);
-
-public record CreateTicketTypeRequest(
-    string Name,
-    string? Description,
-    int PriceCents,
-    int QuantityTotal,
-    int SortOrder = 0,
-    int PlatformFeeCents = 0
+    string? BannerImageUrl = null
 );

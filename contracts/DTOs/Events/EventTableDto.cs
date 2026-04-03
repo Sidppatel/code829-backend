@@ -6,12 +6,9 @@ public record EventTableDto(
     int Capacity,
     string Shape,
     string? Color,
-    string? Section,
-    string PriceType,
     int PriceCents,
-    int PlatformFeeCents,
-    int? GridRow,
-    int? GridCol,
+    double PosX,
+    double PosY,
     int SortOrder,
     string Status,
     DateTime? HoldExpiresAt,
@@ -20,7 +17,7 @@ public record EventTableDto(
 
 public record EventTablesResponse(
     Guid EventId,
-    int GridRows,
-    int GridCols,
+    int? GridRows,
+    int? GridCols,
     List<EventTableDto> Tables
 );

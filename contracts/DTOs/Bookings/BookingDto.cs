@@ -12,24 +12,11 @@ public record BookingDto(
     int FeeCents,
     int TotalCents,
     string? QrToken,
-    List<BookingItemDto> Items,
+    Guid? TableId,
+    string? TableLabel,
+    int? SeatsReserved,
     PaymentDto? Payment,
     DateTime CreatedAt
-);
-
-public record BookingItemDto(
-    Guid Id,
-    Guid TicketTypeId,
-    string TicketTypeName,
-    Guid? SeatId,
-    string? SeatLabel,
-    int PriceCents,
-    string? QrToken = null,
-    string? GuestName = null,
-    string? GuestEmail = null,
-    string? InvitationToken = null,
-    bool IsCheckedIn = false,
-    string? TableLabel = null
 );
 
 public record PaymentDto(

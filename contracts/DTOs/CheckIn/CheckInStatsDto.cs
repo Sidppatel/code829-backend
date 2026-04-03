@@ -8,6 +8,5 @@ public record CheckInStatsDto(
     int Pending,
     int Paid,
     double CheckInPercentage,
-    int TotalTicketsSold,
     DateTime? LastCheckInAt
 );

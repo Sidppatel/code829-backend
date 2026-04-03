@@ -2,8 +2,7 @@ namespace Contracts.DTOs.Tables;
 
 public record LockTableRequest(
     Guid EventId,
-    Guid TableId,
-    Guid TicketTypeId
+    Guid TableId
 );
 
 public record ReleaseTableRequest(
@@ -18,8 +17,6 @@ public record TableLockDto(
     Guid UserId,
     string Status,
     int Capacity,
-    string PriceType,
     int PriceCents,
-    int PlatformFeeCents,
     DateTime ExpiresAt
 );

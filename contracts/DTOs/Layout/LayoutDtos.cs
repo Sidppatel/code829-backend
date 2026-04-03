@@ -7,7 +7,6 @@ public record TableTypeResponse(
     string DefaultShape,
     string? DefaultColor,
     int DefaultPriceCents,
-    int PlatformFeeCents,
     bool IsActive
 );
 
@@ -21,7 +20,6 @@ public record CreateTableTypeRequest(
 
 public record EventLayoutResponse(
     Guid EventId,
-    string? EditorMode,
     int? GridRows,
     int? GridCols,
     List<LayoutTableResponse> Tables
@@ -33,21 +31,16 @@ public record LayoutTableResponse(
     int Capacity,
     string Shape,
     string? Color,
-    string? Section,
-    string PriceType,
     int PriceCents,
-    int? PriceOverrideCents,
-    int PlatformFeeCents,
     bool IsActive,
-    int? GridRow,
-    int? GridCol,
+    double PosX,
+    double PosY,
     int SortOrder,
     Guid? TableTypeId,
     string? TableTypeName
 );
 
 public record SaveLayoutRequest(
-    string? EditorMode,
     int? GridRows,
     int? GridCols,
     List<SaveLayoutTableRequest> Tables
@@ -59,13 +52,10 @@ public record SaveLayoutTableRequest(
     int Capacity,
     string Shape,
     string? Color,
-    string? Section,
-    string PriceType,
     int PriceCents,
-    int? PriceOverrideCents,
     bool IsActive,
-    int? GridRow,
-    int? GridCol,
+    double PosX,
+    double PosY,
     int SortOrder,
     Guid? TableTypeId
 );
@@ -75,11 +65,9 @@ public record AddTableRequest(
     int Capacity,
     string Shape,
     string? Color = null,
-    string? Section = null,
-    string PriceType = "PerSeat",
     int PriceCents = 0,
-    int? GridRow = null,
-    int? GridCol = null,
+    double PosX = 0,
+    double PosY = 0,
     Guid? TableTypeId = null
 );
 
@@ -88,13 +76,10 @@ public record UpdateTableRequest(
     int? Capacity = null,
     string? Shape = null,
     string? Color = null,
-    string? Section = null,
-    string? PriceType = null,
     int? PriceCents = null,
-    int? PriceOverrideCents = null,
     bool? IsActive = null,
-    int? GridRow = null,
-    int? GridCol = null,
+    double? PosX = null,
+    double? PosY = null,
     int? SortOrder = null
 );
 

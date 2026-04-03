@@ -7,6 +7,5 @@ public record ScanResponse(
     string? UserName,
     string? EventTitle,
     string? Status,
-    int? ItemCount,
     DateTime? ScannedAt
 );

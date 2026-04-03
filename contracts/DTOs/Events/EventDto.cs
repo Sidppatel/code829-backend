@@ -15,12 +15,14 @@ public record EventDto(
     bool IsFeatured,
     string LayoutMode,
     int? MaxCapacity,
+    int? PricePerPersonCents,
     int? PlatformFeePercent,
+    int? GridRows,
+    int? GridCols,
     DateTime? PublishedAt,
     Guid VenueId,
     VenueDto? Venue,
     Guid OrganizerId,
     string? OrganizerName,
-    List<TicketTypeDto> TicketTypes,
     DateTime CreatedAt
 );

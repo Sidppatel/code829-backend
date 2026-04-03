@@ -11,6 +11,7 @@ public record UpdateEventRequest(
     string? Status = null,
     string? LayoutMode = null,
     int? MaxCapacity = null,
+    int? PricePerPersonCents = null,
     int? PlatformFeePercent = null,
     string? BannerImageUrl = null
 );

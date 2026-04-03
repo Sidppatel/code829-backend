@@ -1,8 +1,5 @@
 namespace Contracts.DTOs.Events;
 
-/// <summary>
-/// Lightweight event DTO for listing pages — omits full description and nested venue details.
-/// </summary>
 public record EventSummaryDto(
     Guid Id,
     string Title,
@@ -13,11 +10,11 @@ public record EventSummaryDto(
     DateTime EndDate,
     string? ImageUrl,
     bool IsFeatured,
+    string LayoutMode,
     string VenueName,
     string VenueCity,
     string VenueState,
-    int? MinPriceCents,
-    int? MaxPriceCents,
+    int? PricePerPersonCents,
     int TotalCapacity,
     int TotalSold
 );

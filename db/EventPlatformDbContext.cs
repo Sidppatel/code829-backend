@@ -20,22 +20,12 @@ public class EventPlatformDbContext(
     // Template/parent entities
     public DbSet<Venue> Venues => Set<Venue>();
     public DbSet<TableType> TableTypes => Set<TableType>();
-    public DbSet<TicketTypeTemplate> TicketTypeTemplates => Set<TicketTypeTemplate>();
-    public DbSet<VenueLayout> VenueLayouts => Set<VenueLayout>();
-    public DbSet<VenueLayoutTable> VenueLayoutTables => Set<VenueLayoutTable>();
-    public DbSet<PricingRuleTemplate> PricingRuleTemplates => Set<PricingRuleTemplate>();
-    public DbSet<EventTemplate> EventTemplates => Set<EventTemplate>();
 
     // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
-    public DbSet<TicketType> TicketTypes => Set<TicketType>();
     public DbSet<Table> Tables => Set<Table>();
-    public DbSet<Seat> Seats => Set<Seat>();
-    public DbSet<SeatHold> SeatHolds => Set<SeatHold>();
     public DbSet<Booking> Bookings => Set<Booking>();
-    public DbSet<BookingItem> BookingItems => Set<BookingItem>();
     public DbSet<Payment> Payments => Set<Payment>();
-    public DbSet<PricingRule> PricingRules => Set<PricingRule>();
 
     // Logging
     public DbSet<DeveloperLog> DeveloperLogs => Set<DeveloperLog>();
@@ -46,9 +36,7 @@ public class EventPlatformDbContext(
     // Read-only views
     public DbSet<EventView> EventViews => Set<EventView>();
     public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
-    public DbSet<TicketTypeView> TicketTypeViews => Set<TicketTypeView>();
     public DbSet<TableView> TableViews => Set<TableView>();
-    public DbSet<PricingRuleView> PricingRuleViews => Set<PricingRuleView>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -167,106 +155,11 @@ public class EventPlatformDbContext(
                     "\"DefaultCapacity\" > 0");
                 t.HasCheckConstraint("CK_table_types_DefaultPriceCents",
                     "\"DefaultPriceCents\" >= 0");
-                t.HasCheckConstraint("CK_table_types_PlatformFeeCents",
-                    "\"PlatformFeeCents\" >= 0");
             });
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.DefaultShape).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.DefaultColor).HasMaxLength(20);
-            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<TicketTypeTemplate>(entity =>
-        {
-            entity.ToTable("ticket_type_templates", t =>
-            {
-                t.HasCheckConstraint("CK_ticket_type_templates_DefaultPriceCents",
-                    "\"DefaultPriceCents\" >= 0");
-                t.HasCheckConstraint("CK_ticket_type_templates_DefaultPlatformFeeCents",
-                    "\"DefaultPlatformFeeCents\" >= 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.Description).HasMaxLength(512);
-        });
-
-        modelBuilder.Entity<VenueLayout>(entity =>
-        {
-            entity.ToTable("venue_layouts", t =>
-            {
-                t.HasCheckConstraint("CK_venue_layouts_LayoutMode",
-                    "\"LayoutMode\" IN ('None','Grid','CapacityOnly')");
-                t.HasCheckConstraint("CK_venue_layouts_EditorMode",
-                    "\"EditorMode\" IS NULL OR \"EditorMode\" IN ('Grid')");
-                t.HasCheckConstraint("CK_venue_layouts_GridDimensions",
-                    "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
-            });
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.VenueId, e.Name }).IsUnique();
-            entity.HasIndex(e => e.VenueId).IsUnique()
-                .HasFilter("\"IsDefault\" = true")
-                .HasDatabaseName("IX_venue_layouts_OneDefaultPerVenue");
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.EditorMode).HasConversion<string>().HasMaxLength(20);
-            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<VenueLayoutTable>(entity =>
-        {
-            entity.ToTable("venue_layout_tables", t =>
-            {
-                t.HasCheckConstraint("CK_venue_layout_tables_PriceType",
-                    "\"PriceType\" IN ('PerTable','PerSeat')");
-                t.HasCheckConstraint("CK_venue_layout_tables_PriceCents",
-                    "\"PriceCents\" >= 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.VenueLayoutId, e.Label }).IsUnique();
-            entity.Property(e => e.Label).HasMaxLength(20);
-            entity.Property(e => e.Section).HasMaxLength(64);
-            entity.Property(e => e.PriceType).HasConversion<string>().HasMaxLength(20);
-            entity.HasOne(e => e.VenueLayout).WithMany(vl => vl.Tables).HasForeignKey(e => e.VenueLayoutId);
-            entity.HasOne(e => e.TableType).WithMany().HasForeignKey(e => e.TableTypeId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<PricingRuleTemplate>(entity =>
-        {
-            entity.ToTable("pricing_rule_templates", t =>
-            {
-                t.HasCheckConstraint("CK_pricing_rule_templates_Type",
-                    "\"Type\" IN ('Standard','EarlyBird','FirstN')");
-                t.HasCheckConstraint("CK_pricing_rule_templates_DefaultPriceCents",
-                    "\"DefaultPriceCents\" >= 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Description).HasMaxLength(512);
-        });
-
-        modelBuilder.Entity<EventTemplate>(entity =>
-        {
-            entity.ToTable("event_templates", t =>
-            {
-                t.HasCheckConstraint("CK_event_templates_Category",
-                    "\"Category\" IS NULL OR \"Category\" IN ('Music','Business','Social','Dining','Tech','Arts','Family','Sports')");
-                t.HasCheckConstraint("CK_event_templates_LayoutMode",
-                    "\"LayoutMode\" IS NULL OR \"LayoutMode\" IN ('None','Grid','CapacityOnly')");
-                t.HasCheckConstraint("CK_event_templates_DefaultMaxCapacity",
-                    "\"DefaultMaxCapacity\" IS NULL OR \"DefaultMaxCapacity\" > 0");
-                t.HasCheckConstraint("CK_event_templates_DefaultPlatformFeePercent",
-                    "\"DefaultPlatformFeePercent\" IS NULL OR (\"DefaultPlatformFeePercent\" >= 0 AND \"DefaultPlatformFeePercent\" <= 100)");
-            });
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.Description).HasMaxLength(512);
-            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
         });
 
         // ─── Instance/child entities ─────────────────────────────
@@ -280,13 +173,13 @@ public class EventPlatformDbContext(
                 t.HasCheckConstraint("CK_events_Category",
                     "\"Category\" IS NULL OR \"Category\" IN ('Music','Business','Social','Dining','Tech','Arts','Family','Sports')");
                 t.HasCheckConstraint("CK_events_LayoutMode",
-                    "\"LayoutMode\" IS NULL OR \"LayoutMode\" IN ('None','Grid','CapacityOnly')");
-                t.HasCheckConstraint("CK_events_EditorMode",
-                    "\"EditorMode\" IS NULL OR \"EditorMode\" IN ('Grid')");
+                    "\"LayoutMode\" IN ('Grid','Open')");
                 t.HasCheckConstraint("CK_events_DateRange",
                     "\"EndDate\" > \"StartDate\"");
                 t.HasCheckConstraint("CK_events_MaxCapacity",
                     "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
+                t.HasCheckConstraint("CK_events_PricePerPersonCents",
+                    "\"PricePerPersonCents\" IS NULL OR \"PricePerPersonCents\" >= 0");
                 t.HasCheckConstraint("CK_events_PlatformFeePercent",
                     "\"PlatformFeePercent\" IS NULL OR (\"PlatformFeePercent\" >= 0 AND \"PlatformFeePercent\" <= 100)");
                 t.HasCheckConstraint("CK_events_GridDimensions",
@@ -311,38 +204,14 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.ImagePath).HasMaxLength(512);
             entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.EditorMode).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.EventTemplate).WithMany(et => et.Events).HasForeignKey(e => e.EventTemplateId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(e => e.VenueLayout).WithMany(vl => vl.Events).HasForeignKey(e => e.VenueLayoutId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
 #pragma warning disable CS8603
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, Description = e.Description! })
                   .HasIndex(e => e.SearchVector).HasMethod("GIN");
 #pragma warning restore CS8603
-        });
-
-        modelBuilder.Entity<TicketType>(entity =>
-        {
-            entity.ToTable("ticket_types", t =>
-            {
-                t.HasCheckConstraint("CK_ticket_types_PriceCents",
-                    "\"PriceCents\" IS NULL OR \"PriceCents\" >= 0");
-                t.HasCheckConstraint("CK_ticket_types_QuantityTotal",
-                    "\"QuantityTotal\" >= 0");
-                t.HasCheckConstraint("CK_ticket_types_QuantitySold",
-                    "\"QuantitySold\" >= 0 AND \"QuantitySold\" <= \"QuantityTotal\"");
-            });
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.Description).HasMaxLength(512);
-            entity.HasOne(e => e.Event).WithMany(ev => ev.TicketTypes).HasForeignKey(e => e.EventId);
-            entity.HasOne(e => e.Template).WithMany(t => t.TicketTypes).HasForeignKey(e => e.TemplateId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Table>(entity =>
@@ -350,15 +219,11 @@ public class EventPlatformDbContext(
             entity.ToTable("tables", t =>
             {
                 t.HasCheckConstraint("CK_tables_Shape",
-                    "\"Shape\" IS NULL OR \"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
-                t.HasCheckConstraint("CK_tables_PriceType",
-                    "\"PriceType\" IN ('PerTable','PerSeat')");
+                    "\"Shape\" IN ('Round','Rectangle','Square','Cocktail')");
                 t.HasCheckConstraint("CK_tables_PriceCents",
                     "\"PriceCents\" >= 0");
-                t.HasCheckConstraint("CK_tables_PriceOverrideCents",
-                    "\"PriceOverrideCents\" IS NULL OR \"PriceOverrideCents\" >= 0");
                 t.HasCheckConstraint("CK_tables_Capacity",
-                    "\"Capacity\" IS NULL OR \"Capacity\" > 0");
+                    "\"Capacity\" > 0");
                 t.HasCheckConstraint("CK_tables_Status",
                     "\"Status\" IN ('Available','Locked','Booked')");
                 t.HasCheckConstraint("CK_tables_LockedRequiresOwner",
@@ -368,62 +233,22 @@ public class EventPlatformDbContext(
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.EventId);
-            entity.HasIndex(e => new { e.EventId, e.Label }).IsUnique()
-                .HasFilter("\"EventId\" IS NOT NULL");
+            entity.HasIndex(e => new { e.EventId, e.Label }).IsUnique();
             entity.HasIndex(e => new { e.EventId, e.Status })
                 .HasDatabaseName("IX_tables_EventId_Status");
             entity.Property(e => e.Label).HasMaxLength(20);
             entity.Property(e => e.Shape).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.Color).HasMaxLength(20);
-            entity.Property(e => e.Section).HasMaxLength(64);
-            entity.Property(e => e.PriceType).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20)
                 .HasDefaultValue(Contracts.Enums.TableStatus.Available);
             entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.VenueLayoutTable).WithMany(vlt => vlt.Tables).HasForeignKey(e => e.VenueLayoutTableId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.LockedByUser).WithMany().HasForeignKey(e => e.LockedByUserId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<Seat>(entity =>
-        {
-            entity.ToTable("seats", t =>
-            {
-                t.HasCheckConstraint("CK_seats_SeatNumber",
-                    "\"SeatNumber\" > 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.TableId, e.SeatNumber }).IsUnique();
-            entity.Property(e => e.Label).HasMaxLength(20);
-            entity.HasOne(e => e.Table).WithMany(t => t.Seats).HasForeignKey(e => e.TableId);
-        });
-
-        modelBuilder.Entity<SeatHold>(entity =>
-        {
-            entity.ToTable("seat_holds", t =>
-            {
-                t.HasCheckConstraint("CK_seat_holds_ExpiresAfterCreate",
-                    "\"ExpiresAt\" > \"CreatedAt\"");
-            });
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.SeatId, e.EventId })
-                .IsUnique().HasFilter("\"IsActive\" = true");
-            entity.HasIndex(e => e.ExpiresAt);
-            entity.HasIndex(e => e.UserId);
-            entity.HasIndex(e => new { e.IsActive, e.ExpiresAt })
-                .HasFilter("\"IsActive\" = true");
-            entity.HasOne(e => e.Seat).WithMany(s => s.Holds).HasForeignKey(e => e.SeatId);
-            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
-            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.TicketType).WithMany().HasForeignKey(e => e.TicketTypeId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Booking>(entity =>
@@ -453,33 +278,11 @@ public class EventPlatformDbContext(
             entity.Property(e => e.BookingNumber).HasMaxLength(20);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.QrToken).HasMaxLength(128);
-            entity.Property(e => e.Notes).HasMaxLength(1024);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Table).WithMany().HasForeignKey(e => e.TableId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<BookingItem>(entity =>
-        {
-            entity.ToTable("booking_items", t =>
-            {
-                t.HasCheckConstraint("CK_booking_items_PriceCents",
-                    "\"PriceCents\" >= 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.QrToken).IsUnique().HasFilter("\"QrToken\" IS NOT NULL");
-            entity.HasIndex(e => e.InvitationToken).IsUnique().HasFilter("\"InvitationToken\" IS NOT NULL");
-            entity.Property(e => e.QrToken).HasMaxLength(128);
-            entity.Property(e => e.GuestName).HasMaxLength(256);
-            entity.Property(e => e.GuestEmail).HasMaxLength(256);
-            entity.Property(e => e.InvitationToken).HasMaxLength(128);
-            entity.HasOne(e => e.Booking).WithMany(b => b.Items).HasForeignKey(e => e.BookingId);
-            entity.HasOne(e => e.TicketType).WithMany().HasForeignKey(e => e.TicketTypeId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.Seat).WithMany().HasForeignKey(e => e.SeatId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -511,37 +314,6 @@ public class EventPlatformDbContext(
             entity.Property(e => e.RefundId).HasMaxLength(128);
             entity.HasOne(e => e.Booking).WithOne(b => b.Payment).HasForeignKey<Payment>(e => e.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<PricingRule>(entity =>
-        {
-            entity.ToTable("pricing_rules", t =>
-            {
-                t.HasCheckConstraint("CK_pricing_rules_Type",
-                    "\"Type\" IS NULL OR \"Type\" IN ('Standard','EarlyBird','FirstN')");
-                t.HasCheckConstraint("CK_pricing_rules_PriceCents",
-                    "\"PriceCents\" IS NULL OR \"PriceCents\" >= 0");
-                t.HasCheckConstraint("CK_pricing_rules_DateRange",
-                    "\"ValidFrom\" IS NULL OR \"ValidUntil\" IS NULL OR \"ValidUntil\" > \"ValidFrom\"");
-                t.HasCheckConstraint("CK_pricing_rules_MaxCount",
-                    "\"MaxCount\" IS NULL OR \"MaxCount\" > 0");
-                t.HasCheckConstraint("CK_pricing_rules_UsedCount",
-                    "\"UsedCount\" >= 0");
-                t.HasCheckConstraint("CK_pricing_rules_FeePercent",
-                    "\"FeePercent\" IS NULL OR (\"FeePercent\" >= 0 AND \"FeePercent\" <= 100)");
-                t.HasCheckConstraint("CK_pricing_rules_FeeFlatCents",
-                    "\"FeeFlatCents\" IS NULL OR \"FeeFlatCents\" >= 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.EventId);
-            entity.Property(e => e.Name).HasMaxLength(128);
-            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Description).HasMaxLength(512);
-            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId);
-            entity.HasOne(e => e.TableType).WithMany().HasForeignKey(e => e.TableTypeId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(e => e.Template).WithMany(t => t.PricingRules).HasForeignKey(e => e.TemplateId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         // ─── Logging ─────────────────────────────────────────────
@@ -630,21 +402,9 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.Id);
         });
 
-        modelBuilder.Entity<TicketTypeView>(entity =>
-        {
-            entity.ToView("v_ticket_types");
-            entity.HasKey(e => e.Id);
-        });
-
         modelBuilder.Entity<TableView>(entity =>
         {
             entity.ToView("v_tables");
-            entity.HasKey(e => e.Id);
-        });
-
-        modelBuilder.Entity<PricingRuleView>(entity =>
-        {
-            entity.ToView("v_pricing_rules");
             entity.HasKey(e => e.Id);
         });
     }

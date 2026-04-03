@@ -1,7 +1,6 @@
 using Contracts.DTOs.Tables;
 using Contracts.Enums;
 using Db;
-using Db.Entities;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -12,7 +11,7 @@ public class TableBookingService(
     ISettingsService settings
 ) : ITableBookingService
 {
-    public async Task<TableLockDto> LockTableAsync(Guid userId, Guid eventId, Guid tableId, Guid ticketTypeId)
+    public async Task<TableLockDto> LockTableAsync(Guid userId, Guid eventId, Guid tableId)
     {
         var holdMinutes = int.Parse(
             await settings.GetOrDefaultAsync("hold_expiry_minutes", "10") ?? "10");
@@ -23,16 +22,9 @@ public class TableBookingService(
         if (ev.Status != EventStatus.Published)
             throw new InvalidOperationException("Event is not available for booking");
 
-        var ticketType = await context.TicketTypes.FindAsync(ticketTypeId)
-            ?? throw new KeyNotFoundException("Ticket type not found");
-
-        if (ticketType.EventId != eventId)
-            throw new InvalidOperationException("Ticket type does not belong to this event");
-
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
-            // Row-level lock on the table to prevent concurrent lock attempts
             var table = await context.Tables
                 .FromSqlRaw(
                     """
@@ -41,7 +33,6 @@ public class TableBookingService(
                     FOR UPDATE
                     """,
                     tableId, eventId)
-                .Include(t => t.TableType)
                 .FirstOrDefaultAsync()
                 ?? throw new KeyNotFoundException("Table not found for this event");
 
@@ -61,31 +52,10 @@ public class TableBookingService(
 
             var expiresAt = DateTime.UtcNow.AddMinutes(holdMinutes);
 
-            // Update table status
             table.Status = TableStatus.Locked;
             table.LockedByUserId = userId;
             table.LockExpiresAt = expiresAt;
             table.UpdatedAt = DateTime.UtcNow;
-
-            // Also create SeatHolds for backward compatibility
-            var seats = await context.Seats
-                .Where(s => s.TableId == tableId)
-                .OrderBy(s => s.SeatNumber)
-                .ToListAsync();
-
-            foreach (var seat in seats)
-            {
-                context.SeatHolds.Add(new SeatHold
-                {
-                    Id = Guid.NewGuid(),
-                    SeatId = seat.Id,
-                    EventId = eventId,
-                    UserId = userId,
-                    TicketTypeId = ticketTypeId,
-                    ExpiresAt = expiresAt,
-                    IsActive = true
-                });
-            }
 
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -99,10 +69,8 @@ public class TableBookingService(
                 eventId,
                 userId,
                 "Locked",
-                table.Capacity ?? 0,
-                table.PriceType.ToString(),
-                table.PriceOverrideCents ?? table.PriceCents,
-                table.TableType?.PlatformFeeCents ?? 0,
+                table.Capacity,
+                table.PriceCents,
                 expiresAt
             );
         }
@@ -132,18 +100,6 @@ public class TableBookingService(
         table.LockExpiresAt = null;
         table.UpdatedAt = DateTime.UtcNow;
 
-        // Release corresponding SeatHolds
-        var seatIds = await context.Seats
-            .Where(s => s.TableId == tableId)
-            .Select(s => s.Id)
-            .ToListAsync();
-
-        await context.SeatHolds
-            .Where(h => seatIds.Contains(h.SeatId) && h.EventId == eventId && h.UserId == userId && h.IsActive)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(h => h.IsActive, false)
-                .SetProperty(h => h.UpdatedAt, DateTime.UtcNow));
-
         await context.SaveChangesAsync();
 
         Log.Information("[TableLock] User {UserId} released table {TableLabel} for event {EventId}",
@@ -154,7 +110,6 @@ public class TableBookingService(
     {
         var now = DateTime.UtcNow;
         return await context.Tables
-            .Include(t => t.TableType)
             .Where(t => t.EventId == eventId
                 && t.Status == TableStatus.Locked
                 && t.LockedByUserId == userId
@@ -165,10 +120,8 @@ public class TableBookingService(
                 eventId,
                 userId,
                 "Locked",
-                t.Capacity ?? 0,
-                t.PriceType.ToString(),
-                t.PriceOverrideCents ?? t.PriceCents,
-                t.TableType != null ? t.TableType.PlatformFeeCents : 0,
+                t.Capacity,
+                t.PriceCents,
                 t.LockExpiresAt!.Value
             ))
             .ToListAsync();
@@ -178,7 +131,6 @@ public class TableBookingService(
     {
         var now = DateTime.UtcNow;
 
-        // Release expired table locks
         var expiredTables = await context.Tables
             .Where(t => t.Status == TableStatus.Locked && t.LockExpiresAt <= now)
             .ToListAsync();
@@ -194,7 +146,6 @@ public class TableBookingService(
         if (expiredTables.Count > 0)
             await context.SaveChangesAsync();
 
-        // Expire pending bookings linked to tables that are no longer locked
         var expiredBookings = await context.Bookings
             .Where(b => b.Status == BookingStatus.Pending
                 && b.TableId != null
@@ -228,21 +179,6 @@ public class TableBookingService(
         table.LockedByUserId = null;
         table.LockExpiresAt = null;
         table.UpdatedAt = DateTime.UtcNow;
-
-        // Deactivate SeatHolds since the table is now permanently booked
-        var seatIds = await context.Seats
-            .Where(s => s.TableId == tableId)
-            .Select(s => s.Id)
-            .ToListAsync();
-
-        if (seatIds.Count > 0)
-        {
-            await context.SeatHolds
-                .Where(h => seatIds.Contains(h.SeatId) && h.IsActive)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(h => h.IsActive, false)
-                    .SetProperty(h => h.UpdatedAt, DateTime.UtcNow));
-        }
 
         await context.SaveChangesAsync();
 

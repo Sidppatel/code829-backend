@@ -21,9 +21,6 @@ public record EventRevenueDto(
     long RevenueCents
 );
 
-/// <summary>
-/// Rich stats for the next upcoming event — powers the admin dashboard hero.
-/// </summary>
 public record NextEventDashboardDto(
     Guid EventId,
     string Title,
@@ -39,31 +36,17 @@ public record NextEventDashboardDto(
     string? ImagePath,
     string LayoutMode,
     int DaysUntil,
-    // Booking breakdown
     int TotalBookings,
     int PaidBookings,
     int CheckedInBookings,
     int PendingBookings,
     int CancelledBookings,
     int RefundedBookings,
-    // Revenue
     long RevenueCents,
     long PotentialRevenueCents,
-    // Capacity
     int TotalCapacity,
     int SoldCount,
-    // Ticket types breakdown
-    List<TicketTypeSummaryDto> TicketTypes,
-    // Recent bookings
     List<RecentBookingDto> RecentBookings
-);
-
-public record TicketTypeSummaryDto(
-    Guid Id,
-    string Name,
-    int PriceCents,
-    int QuantityTotal,
-    int QuantitySold
 );
 
 public record RecentBookingDto(
