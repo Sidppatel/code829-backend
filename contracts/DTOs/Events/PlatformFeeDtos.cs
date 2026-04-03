@@ -4,6 +4,8 @@ public record EventFeeResponse(
     Guid EventId,
     string Title,
     string LayoutMode,
+    int? PricePerPersonCents,
+    int? MaxCapacity,
     int? PlatformFeeCents,
     int DefaultFeeCents,
     List<TableTypeFee> TableTypes

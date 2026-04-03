@@ -40,6 +40,7 @@ public class DeveloperEventsController(
 
         return Ok(new EventFeeResponse(
             ev.Id, ev.Title, ev.LayoutMode.ToString(),
+            ev.PricePerPersonCents, ev.MaxCapacity,
             ev.PlatformFeeCents, defaultFee, tableTypes
         ));
     }
