@@ -55,7 +55,8 @@ public class BookingService(
             throw new InvalidOperationException("Table lock has expired");
 
         var subtotal = table.EventTable.PriceCents;
-        var fee = CalculateFee(subtotal, ev.PlatformFeePercent);
+        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
+        var fee = table.EventTable.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
         var total = subtotal + fee;
 
         var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);
@@ -135,7 +136,8 @@ public class BookingService(
 
             var pricePerPerson = ev.PricePerPersonCents.Value;
             var subtotal = pricePerPerson * seatsRequested;
-            var fee = CalculateFee(subtotal, ev.PlatformFeePercent);
+            var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
+            var fee = ev.PlatformFeeCents ?? defaultFeeCents;
             var total = subtotal + fee;
 
             var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);

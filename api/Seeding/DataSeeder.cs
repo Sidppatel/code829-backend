@@ -71,6 +71,7 @@ public static class DataSeeder
             ["email_from_address"] = ("noreply@code829.local", "Sender email address"),
             ["platform_fee_percent"] = ("8", "Platform fee percentage on ticket price"),
             ["platform_fee_flat_cents"] = ("0", "Flat fee per booking in cents"),
+            ["default_platform_fee_cents"] = ("1500", "Default flat platform fee per booking in cents ($15.00)"),
             ["frontend_url"] = ("http://localhost:5173", "Frontend URL for magic link emails"),
             ["cors_origins"] = ("http://localhost:5173", "Comma-separated allowed CORS origins"),
             ["brand_name"] = ("Code829", "White-label brand name"),

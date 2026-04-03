@@ -17,6 +17,7 @@ public record EventDto(
     int? MaxCapacity,
     int? PricePerPersonCents,
     int? PlatformFeePercent,
+    int? PlatformFeeCents,
     int? GridRows,
     int? GridCols,
     DateTime? PublishedAt,

@@ -267,7 +267,7 @@ public class EventsController(
             ev.StartDate, ev.EndDate,
             ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
             ev.IsFeatured,
-            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent,
+            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
             ev.GridRows, ev.GridCols, ev.PublishedAt,
             ev.VenueId,
             new VenueDto(
@@ -301,7 +301,7 @@ public class EventsController(
             ev.StartDate, ev.EndDate,
             ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
             ev.IsFeatured,
-            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent,
+            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
             ev.GridRows, ev.GridCols, ev.PublishedAt,
             ev.VenueId,
             new VenueDto(
@@ -396,7 +396,7 @@ public class EventsController(
         var eventTableTypes = await context.EventTables
             .Where(et => et.EventId == id && et.IsActive)
             .Select(et => new EventTableTypeInfo(
-                et.Id, et.Label, et.Capacity, et.Shape.ToString(), et.Color, et.PriceCents))
+                et.Id, et.Label, et.Capacity, et.Shape.ToString(), et.Color, et.PriceCents, et.PlatformFeeCents))
             .ToListAsync();
 
         var dtos = tables.Select(t =>

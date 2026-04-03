@@ -9,6 +9,7 @@ public class EventTable : BaseEntity
     public TableShape Shape { get; set; } = TableShape.Round;
     public string? Color { get; set; }
     public int PriceCents { get; set; }
+    public int? PlatformFeeCents { get; set; }
     public bool IsActive { get; set; } = true;
 
     public Guid EventId { get; set; }

@@ -349,7 +349,7 @@ public class AdminEventsController(
         e.StartDate, e.EndDate,
         e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
         e.IsFeatured,
-        e.LayoutMode.ToString(), e.MaxCapacity, e.PricePerPersonCents, e.PlatformFeePercent,
+        e.LayoutMode.ToString(), e.MaxCapacity, e.PricePerPersonCents, e.PlatformFeePercent, e.PlatformFeeCents,
         e.GridRows, e.GridCols, e.PublishedAt,
         e.VenueId,
         e.Venue is not null ? new VenueDto(

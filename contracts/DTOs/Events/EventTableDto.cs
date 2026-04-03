@@ -23,7 +23,8 @@ public record EventTableTypeInfo(
     int Capacity,
     string Shape,
     string? Color,
-    int PriceCents
+    int PriceCents,
+    int? PlatformFeeCents = null
 );
 
 public record EventTablesResponse(

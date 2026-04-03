@@ -18,6 +18,7 @@ public class Event : BaseEntity
     public int? MaxCapacity { get; set; }
     public int? PricePerPersonCents { get; set; }
     public int? PlatformFeePercent { get; set; }
+    public int? PlatformFeeCents { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DateTime? ScheduledPublishAt { get; set; }
     public int? GridRows { get; set; }
