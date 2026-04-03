@@ -92,7 +92,10 @@ public class BookingsController(
 
     [HttpGet("mine")]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> GetMyBookings([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetMyBookings(
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         if (page < 1) page = 1;
@@ -104,6 +107,15 @@ public class BookingsController(
             .Include(b => b.Payment)
             .Include(b => b.User)
             .Where(b => b.UserId == userId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(b =>
+                b.Event.Title.ToLower().Contains(term) ||
+                b.BookingNumber.ToLower().Contains(term) ||
+                b.Status.ToString().ToLower().Contains(term));
+        }
 
         var total = await query.CountAsync();
         var items = await query
