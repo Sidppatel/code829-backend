@@ -19,4 +19,10 @@ public class User : BaseEntity
     public string? Phone { get; set; }
     public bool OptInLocationEmail { get; set; }
     public bool HasCompletedOnboarding { get; set; }
+
+    /// <summary>
+    /// Stripe Connect account ID for organizers (e.g., "acct_xxx").
+    /// Required for organizers to receive payouts via destination charges.
+    /// </summary>
+    public string? StripeConnectedAccountId { get; set; }
 }

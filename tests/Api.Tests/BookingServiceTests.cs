@@ -110,7 +110,7 @@ public class BookingServiceTests : IDisposable
         _redisDb.Setup(d => d.ScriptEvaluateAsync(It.IsAny<string>(),
             It.IsAny<RedisKey[]>(), It.IsAny<RedisValue[]>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(RedisResult.Create((RedisValue)1));
-        _paymentService.Setup(p => p.CreatePaymentIntentAsync(It.IsAny<int>(), It.IsAny<string>()))
+        _paymentService.Setup(p => p.CreatePaymentIntentAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string>()))
             .ReturnsAsync(("pi_test_123", "pi_test_123_secret", "requires_confirmation"));
 
         var request = new CreateBookingRequest(_eventId, SeatsReserved: 2);
@@ -132,7 +132,7 @@ public class BookingServiceTests : IDisposable
         _redisDb.Setup(d => d.ScriptEvaluateAsync(It.IsAny<string>(),
             It.IsAny<RedisKey[]>(), It.IsAny<RedisValue[]>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(RedisResult.Create((RedisValue)1));
-        _paymentService.Setup(p => p.CreatePaymentIntentAsync(It.IsAny<int>(), It.IsAny<string>()))
+        _paymentService.Setup(p => p.CreatePaymentIntentAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string>()))
             .ReturnsAsync(("pi_test_123", "pi_test_123_secret", "requires_confirmation"));
 
         var request = new CreateBookingRequest(_eventId, SeatsReserved: 1);
@@ -153,7 +153,7 @@ public class BookingServiceTests : IDisposable
         _redisDb.Setup(d => d.ScriptEvaluateAsync(It.IsAny<string>(),
             It.IsAny<RedisKey[]>(), It.IsAny<RedisValue[]>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(RedisResult.Create((RedisValue)1));
-        _paymentService.Setup(p => p.CreatePaymentIntentAsync(It.IsAny<int>(), It.IsAny<string>()))
+        _paymentService.Setup(p => p.CreatePaymentIntentAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string>()))
             .ReturnsAsync(("pi_test_123", "pi_test_123_secret", "requires_confirmation"));
 
         var request = new CreateBookingRequest(_eventId, SeatsReserved: 1);

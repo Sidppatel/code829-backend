@@ -15,7 +15,8 @@ namespace Api.Controllers;
 [Route("bookings")]
 public class BookingsController(
     IBookingService bookingService,
-    EventPlatformDbContext context
+    EventPlatformDbContext context,
+    ISettingsService settingsService
 ) : ControllerBase
 {
     [HttpPost]
@@ -137,6 +138,14 @@ public class BookingsController(
         )).ToList();
 
         return Ok(new PagedResponse<BookingDto>(dtos, total, page, pageSize));
+    }
+
+    [HttpGet("stripe-config")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetStripeConfig()
+    {
+        var publishableKey = await settingsService.GetOrDefaultAsync("stripe_publishable_key", "");
+        return Ok(new { publishableKey });
     }
 
     [HttpGet("{id:guid}/qr")]

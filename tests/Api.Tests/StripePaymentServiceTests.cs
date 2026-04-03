@@ -20,7 +20,7 @@ public class StripePaymentServiceTests
     {
         _settingsService.Setup(s => s.GetAsync("stripe_secret_key")).ReturnsAsync("MOCK_DEV");
 
-        var act = () => _service.CreatePaymentIntentAsync(5000);
+        var act = () => _service.CreatePaymentIntentAsync(5000, 1500, null);
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not configured*");
     }

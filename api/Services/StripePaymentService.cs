@@ -4,12 +4,17 @@ using Stripe;
 namespace Api.Services;
 
 /// <summary>
-/// Production Stripe payment service using the Stripe.net SDK.
-/// Reads stripe_secret_key from DB settings.
+/// Production Stripe payment service using destination charges (Stripe Connect).
+/// The total amount is charged to the customer. The organizer receives (total - applicationFee)
+/// via transfer_data. The platform keeps the applicationFee minus Stripe processing costs.
 /// </summary>
 public class StripePaymentService(ISettingsService settings) : IPaymentService
 {
-    public async Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(int amountCents, string currency = "usd")
+    public async Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
+        int amountCents,
+        int applicationFeeCents,
+        string? connectedAccountId,
+        string currency = "usd")
     {
         var client = await GetClientAsync();
 
@@ -20,12 +25,22 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
             AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true }
         };
 
+        if (!string.IsNullOrEmpty(connectedAccountId))
+        {
+            options.ApplicationFeeAmount = applicationFeeCents;
+            options.TransferData = new PaymentIntentTransferDataOptions
+            {
+                Destination = connectedAccountId
+            };
+        }
+
         try
         {
             var service = new PaymentIntentService(client);
             var intent = await service.CreateAsync(options);
-            Log.Information("[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}",
-                intent.Id, amountCents, currency);
+            Log.Information(
+                "[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}, fee={Fee}, dest={Dest}",
+                intent.Id, amountCents, currency, applicationFeeCents, connectedAccountId ?? "none");
             return (intent.Id, intent.ClientSecret, intent.Status);
         }
         catch (StripeException ex)
@@ -63,7 +78,9 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
             var service = new RefundService(client);
             var refund = await service.CreateAsync(new RefundCreateOptions
             {
-                PaymentIntent = paymentIntentId
+                PaymentIntent = paymentIntentId,
+                RefundApplicationFee = true,
+                ReverseTransfer = true
             });
             Log.Information("[Stripe] Refund {RefundId} created for PaymentIntent {IntentId}",
                 refund.Id, paymentIntentId);

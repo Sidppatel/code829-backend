@@ -59,7 +59,9 @@ public class BookingService(
         var fee = table.EventTable.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
         var total = subtotal + fee;
 
-        var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);
+        var organizer = await context.Users.FindAsync(ev.OrganizerId);
+        var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
+            total, fee, organizer?.StripeConnectedAccountId);
 
         var booking = new Booking
         {
@@ -98,7 +100,8 @@ public class BookingService(
         Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}",
             booking.BookingNumber, table.Label, request.EventId, total / 100.0);
 
-        return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+        var dto = await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+        return dto with { ClientSecret = clientSecret };
     }
 
     private async Task<BookingDto> CreateCapacityBookingAsync(Guid userId, CreateBookingRequest request, Event ev)
@@ -140,7 +143,9 @@ public class BookingService(
             var fee = ev.PlatformFeeCents ?? defaultFeeCents;
             var total = subtotal + fee;
 
-            var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);
+            var organizer = await context.Users.FindAsync(ev.OrganizerId);
+            var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
+                total, fee, organizer?.StripeConnectedAccountId);
 
             var booking = new Booking
             {
@@ -179,7 +184,8 @@ public class BookingService(
             Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}",
                 booking.BookingNumber, seatsRequested, request.EventId, total / 100.0);
 
-            return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+            var dto = await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+            return dto with { ClientSecret = clientSecret };
         }
         finally
         {

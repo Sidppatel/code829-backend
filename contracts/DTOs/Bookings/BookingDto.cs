@@ -16,7 +16,8 @@ public record BookingDto(
     string? TableLabel,
     int? SeatsReserved,
     PaymentDto? Payment,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string? ClientSecret = null
 );
 
 public record PaymentDto(
