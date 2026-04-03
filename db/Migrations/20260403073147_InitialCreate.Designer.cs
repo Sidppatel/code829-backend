@@ -13,8 +13,8 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260403072407_SimplifyToGridOpenSystem")]
-    partial class SimplifyToGridOpenSystem
+    [Migration("20260403073147_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

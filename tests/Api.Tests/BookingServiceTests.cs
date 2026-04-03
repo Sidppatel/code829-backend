@@ -105,7 +105,7 @@ public class BookingServiceTests : IDisposable
     public async Task CreateAsync_OpenEvent_ValidRequest_CreatesBookingWithCorrectTotals()
     {
         _redisDb.Setup(d => d.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(),
-            It.IsAny<TimeSpan?>(), It.IsAny<bool>(), It.IsAny<When>(), It.IsAny<CommandFlags>()))
+            It.IsAny<TimeSpan?>(), It.IsAny<When>()))
             .ReturnsAsync(true);
         _redisDb.Setup(d => d.ScriptEvaluateAsync(It.IsAny<string>(),
             It.IsAny<RedisKey[]>(), It.IsAny<RedisValue[]>(), It.IsAny<CommandFlags>()))
@@ -127,7 +127,7 @@ public class BookingServiceTests : IDisposable
     public async Task ConfirmPaymentAsync_WhenNotOwner_ThrowsUnauthorizedAccessException()
     {
         _redisDb.Setup(d => d.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(),
-            It.IsAny<TimeSpan?>(), It.IsAny<bool>(), It.IsAny<When>(), It.IsAny<CommandFlags>()))
+            It.IsAny<TimeSpan?>(), It.IsAny<When>()))
             .ReturnsAsync(true);
         _redisDb.Setup(d => d.ScriptEvaluateAsync(It.IsAny<string>(),
             It.IsAny<RedisKey[]>(), It.IsAny<RedisValue[]>(), It.IsAny<CommandFlags>()))
@@ -148,7 +148,7 @@ public class BookingServiceTests : IDisposable
     public async Task RefundAsync_WhenNotPaid_ThrowsInvalidOperationException()
     {
         _redisDb.Setup(d => d.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(),
-            It.IsAny<TimeSpan?>(), It.IsAny<bool>(), It.IsAny<When>(), It.IsAny<CommandFlags>()))
+            It.IsAny<TimeSpan?>(), It.IsAny<When>()))
             .ReturnsAsync(true);
         _redisDb.Setup(d => d.ScriptEvaluateAsync(It.IsAny<string>(),
             It.IsAny<RedisKey[]>(), It.IsAny<RedisValue[]>(), It.IsAny<CommandFlags>()))
