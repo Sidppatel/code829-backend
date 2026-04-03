@@ -127,18 +127,26 @@ try
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
 
     // Conditional service registration: mock in dev, real in prod
+    // Payment service uses real Stripe when a valid key is configured, even in dev
     if (builder.Environment.IsDevelopment())
     {
         builder.Services.AddScoped<IEmailService, MockEmailService>();
-        builder.Services.AddScoped<IPaymentService, MockPaymentService>();
         builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
     }
     else
     {
         builder.Services.AddScoped<IEmailService, SmtpEmailService>();
-        builder.Services.AddScoped<IPaymentService, StripePaymentService>();
         builder.Services.AddScoped<IFileStorageService, S3FileStorageService>();
     }
+
+    builder.Services.AddScoped<IPaymentService>(sp =>
+    {
+        var settingsService = sp.GetRequiredService<ISettingsService>();
+        var key = settingsService.GetOrDefaultAsync("stripe_secret_key").GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(key) && key != "MOCK_DEV")
+            return new StripePaymentService(settingsService);
+        return new MockPaymentService();
+    });
 
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
