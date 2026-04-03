@@ -660,14 +660,21 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
     protected async Task<HashSet<Guid>> GetLockedTableIdsAsync(Guid eventId)
     {
-        var lockedTableIds = await context.Bookings
+        var bookingLockedIds = await context.Bookings
             .Where(b => b.EventId == eventId && b.TableId.HasValue
                 && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn || b.Status == BookingStatus.Pending))
             .Select(b => b.TableId!.Value)
             .Distinct()
             .ToListAsync();
 
-        return lockedTableIds.ToHashSet();
+        var holdLockedIds = await context.Tables
+            .Where(t => t.EventId == eventId
+                && t.Status == TableStatus.Locked
+                && t.LockExpiresAt > DateTime.UtcNow)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        return bookingLockedIds.Union(holdLockedIds).ToHashSet();
     }
 
     private static LayoutTableResponse MapTable(Table t) => new(

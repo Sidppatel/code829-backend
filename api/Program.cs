@@ -2,7 +2,11 @@ using System.Text;
 using Api.Middleware;
 using Api.Seeding;
 using Api.Services;
+using Api.Validators;
 using Api.Workers;
+using Contracts.DTOs.Auth;
+using Contracts.DTOs.Bookings;
+using Contracts.DTOs.Events;
 using Db;
 using Db.Interceptors;
 using Db.Repositories;
@@ -168,7 +172,9 @@ try
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
     builder.Services.AddFluentValidationAutoValidation();
-    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+    builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
+    builder.Services.AddScoped<IValidator<CreateBookingRequest>, CreateBookingRequestValidator>();
+    builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();

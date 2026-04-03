@@ -56,7 +56,7 @@ public class EventsController(
         {
             var trimmedSearch = search.Trim();
 
-            if (trimmedSearch.Length < 2)
+            if (trimmedSearch.Length < 3)
             {
                 query = query.Where(e =>
                     EF.Functions.ILike(e.Title, $"%{trimmedSearch}%") ||
@@ -76,7 +76,17 @@ public class EventsController(
                     .ToListAsync();
 
                 var matchIds = ftsIds.Union(trigramIds).Distinct().ToList();
-                query = query.Where(e => matchIds.Contains(e.Id));
+
+                if (matchIds.Count == 0)
+                {
+                    query = query.Where(e =>
+                        EF.Functions.ILike(e.Title, $"%{trimmedSearch}%") ||
+                        EF.Functions.ILike(e.Venue.Name, $"%{trimmedSearch}%"));
+                }
+                else
+                {
+                    query = query.Where(e => matchIds.Contains(e.Id));
+                }
             }
         }
 
