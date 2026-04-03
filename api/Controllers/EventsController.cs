@@ -415,14 +415,13 @@ public class EventsController(
         var ev = await context.Events.FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
-        var now = DateTime.UtcNow;
         Guid? userId = null;
         var userClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userClaim is not null && Guid.TryParse(userClaim.Value, out var uid)) userId = uid;
 
         var tables = await context.Tables
             .Include(t => t.TableType)
-            .Include(t => t.Seats).ThenInclude(s => s.Holds)
+            .Include(t => t.Seats)
             .Where(t => t.EventId == id && t.IsActive)
             .OrderBy(t => t.SortOrder)
             .ToListAsync();
@@ -445,46 +444,31 @@ public class EventsController(
         }
         if (needsSync) await context.SaveChangesAsync();
 
-        // Get booked seat IDs (Paid or CheckedIn bookings)
-        var bookedSeatIds = await context.BookingItems
-            .Where(bi => bi.SeatId.HasValue
-                && bi.Booking.EventId == id
-                && (bi.Booking.Status == BookingStatus.Paid || bi.Booking.Status == BookingStatus.CheckedIn))
-            .Select(bi => bi.SeatId!.Value)
-            .ToHashSetAsync();
-
         var dtos = tables.Select(t =>
         {
-            var seatIds = t.Seats.Select(s => s.Id).ToList();
-            var isBooked = seatIds.Any(sid => bookedSeatIds.Contains(sid));
+            string status;
+            DateTime? holdExpiresAt = null;
+            var isLockedByYou = false;
 
-            if (isBooked)
+            switch (t.Status)
             {
-                return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
-                    (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
-                    t.PriceType.ToString(), t.PriceCents, t.TableType?.PlatformFeeCents ?? 0, t.GridRow, t.GridCol,
-                    t.SortOrder, "Booked", null);
-            }
-
-            var activeHolds = t.Seats
-                .SelectMany(s => s.Holds)
-                .Where(h => h.IsActive && h.ExpiresAt > now)
-                .ToList();
-
-            if (activeHolds.Count > 0)
-            {
-                var heldByMe = userId.HasValue && activeHolds.Any(h => h.UserId == userId.Value);
-                var expiresAt = heldByMe && userId.HasValue ? activeHolds.Where(h => h.UserId == userId.Value).Min(h => h.ExpiresAt) : (DateTime?)null;
-                return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
-                    (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
-                    t.PriceType.ToString(), t.PriceCents, t.TableType?.PlatformFeeCents ?? 0, t.GridRow, t.GridCol,
-                    t.SortOrder, heldByMe ? "HeldByYou" : "Held", expiresAt);
+                case TableStatus.Booked:
+                    status = "Booked";
+                    break;
+                case TableStatus.Locked:
+                    isLockedByYou = userId.HasValue && t.LockedByUserId == userId.Value;
+                    status = isLockedByYou ? "HeldByYou" : "Held";
+                    holdExpiresAt = isLockedByYou ? t.LockExpiresAt : null;
+                    break;
+                default:
+                    status = "Available";
+                    break;
             }
 
             return new EventTableDto(t.Id, t.Label, t.Capacity ?? 0,
                 (t.Shape ?? TableShape.Round).ToString(), t.Color, t.Section,
                 t.PriceType.ToString(), t.PriceCents, t.TableType?.PlatformFeeCents ?? 0, t.GridRow, t.GridCol,
-                t.SortOrder, "Available", null);
+                t.SortOrder, status, holdExpiresAt, isLockedByYou);
         }).ToList();
 
         return Ok(new EventTablesResponse(id, ev.GridRows ?? 0, ev.GridCols ?? 0, dtos));

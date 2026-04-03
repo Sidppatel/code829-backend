@@ -27,6 +27,236 @@ public class BookingService(
         if (ev.Status != EventStatus.Published)
             throw new InvalidOperationException("Event is not available for booking");
 
+        // Route to the appropriate booking flow
+        if (request.TableId.HasValue)
+            return await CreateTableBookingAsync(userId, request, ev);
+
+        if (request.SeatsReserved.HasValue)
+            return await CreateCapacityBookingAsync(userId, request, ev);
+
+        return await CreateSeatBookingAsync(userId, request, ev);
+    }
+
+    private async Task<BookingDto> CreateTableBookingAsync(Guid userId, CreateBookingRequest request, Event ev)
+    {
+        var table = await context.Tables
+            .Include(t => t.Seats)
+            .Include(t => t.TableType)
+            .FirstOrDefaultAsync(t => t.Id == request.TableId!.Value && t.EventId == request.EventId)
+            ?? throw new KeyNotFoundException("Table not found for this event");
+
+        if (table.Status != TableStatus.Locked)
+            throw new InvalidOperationException("Table must be locked before booking");
+
+        if (table.LockedByUserId != userId)
+            throw new InvalidOperationException("You do not hold this table");
+
+        if (table.LockExpiresAt <= DateTime.UtcNow)
+            throw new InvalidOperationException("Table lock has expired");
+
+        var ticketTypeId = request.TicketTypeId
+            ?? throw new InvalidOperationException("TicketTypeId is required for table bookings");
+
+        var tt = await context.TicketTypes.FindAsync(ticketTypeId)
+            ?? throw new KeyNotFoundException("Ticket type not found");
+
+        if (tt.EventId != request.EventId)
+            throw new InvalidOperationException("Ticket type does not belong to this event");
+
+        // Calculate price based on table pricing
+        var tablePrice = table.PriceOverrideCents ?? table.PriceCents;
+        var feePerItem = table.TableType?.PlatformFeeCents ?? tt.PlatformFeeCents ?? 0;
+
+        int subtotal, fee;
+        var bookingItems = new List<BookingItem>();
+
+        if (table.PriceType == PriceType.PerTable)
+        {
+            subtotal = tablePrice;
+            fee = feePerItem;
+            // One booking item for the whole table, linked to the first seat
+            var firstSeat = table.Seats.OrderBy(s => s.SeatNumber).FirstOrDefault();
+            bookingItems.Add(new BookingItem
+            {
+                Id = Guid.NewGuid(),
+                TicketTypeId = ticketTypeId,
+                SeatId = firstSeat?.Id,
+                PriceCents = tablePrice
+            });
+        }
+        else
+        {
+            // PerSeat: one booking item per seat
+            var seatCount = table.Seats.Count;
+            subtotal = tablePrice * seatCount;
+            fee = feePerItem * seatCount;
+            foreach (var seat in table.Seats.OrderBy(s => s.SeatNumber))
+            {
+                bookingItems.Add(new BookingItem
+                {
+                    Id = Guid.NewGuid(),
+                    TicketTypeId = ticketTypeId,
+                    SeatId = seat.Id,
+                    PriceCents = tablePrice
+                });
+            }
+        }
+
+        var total = subtotal + fee;
+        var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);
+
+        var booking = new Booking
+        {
+            Id = Guid.NewGuid(),
+            BookingNumber = await GenerateBookingNumberAsync(),
+            Status = BookingStatus.Pending,
+            UserId = userId,
+            EventId = request.EventId,
+            TableId = table.Id,
+            SubtotalCents = subtotal,
+            FeeCents = fee,
+            TotalCents = total
+        };
+
+        foreach (var bi in bookingItems)
+            bi.BookingId = booking.Id;
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            context.Bookings.Add(booking);
+            context.BookingItems.AddRange(bookingItems);
+            context.Payments.Add(new Payment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                PaymentIntentId = intentId,
+                Status = PaymentStatus.RequiresConfirmation,
+                AmountCents = total
+            });
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
+        Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}",
+            booking.BookingNumber, table.Label, request.EventId, total / 100.0);
+
+        return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+    }
+
+    private async Task<BookingDto> CreateCapacityBookingAsync(Guid userId, CreateBookingRequest request, Event ev)
+    {
+        if (ev.LayoutMode != LayoutMode.CapacityOnly)
+            throw new InvalidOperationException("Capacity reservations are only available for open-layout events");
+
+        if (!ev.MaxCapacity.HasValue || ev.MaxCapacity <= 0)
+            throw new InvalidOperationException("Event has no capacity configured");
+
+        var seatsRequested = request.SeatsReserved!.Value;
+        var ticketTypeId = request.TicketTypeId
+            ?? throw new InvalidOperationException("TicketTypeId is required for capacity bookings");
+
+        var tt = await context.TicketTypes.FindAsync(ticketTypeId)
+            ?? throw new KeyNotFoundException("Ticket type not found");
+
+        if (tt.EventId != request.EventId)
+            throw new InvalidOperationException("Ticket type does not belong to this event");
+
+        // Use Redis lock to serialize capacity checks
+        var redisDb = redis.GetDatabase();
+        var lockKey = $"capacity:{request.EventId}";
+        var lockToken = Guid.NewGuid().ToString();
+        var acquired = await redisDb.StringSetAsync(lockKey, lockToken, TimeSpan.FromSeconds(10), When.NotExists);
+        if (!acquired)
+            throw new InvalidOperationException("Another reservation is in progress. Please try again.");
+
+        try
+        {
+            var activeStatuses = new[] { BookingStatus.Pending, BookingStatus.Paid, BookingStatus.CheckedIn };
+            var totalReserved = await context.Bookings
+                .Where(b => b.EventId == request.EventId
+                    && activeStatuses.Contains(b.Status)
+                    && b.SeatsReserved.HasValue)
+                .SumAsync(b => b.SeatsReserved!.Value);
+
+            if (totalReserved + seatsRequested > ev.MaxCapacity.Value)
+                throw new InvalidOperationException(
+                    $"Not enough capacity. Available: {ev.MaxCapacity.Value - totalReserved}, requested: {seatsRequested}");
+
+            var price = tt.PriceCents ?? 0;
+            var feePerSeat = tt.PlatformFeeCents ?? 0;
+            var subtotal = price * seatsRequested;
+            var fee = feePerSeat * seatsRequested;
+            var total = subtotal + fee;
+
+            var (intentId, _, _) = await paymentService.CreatePaymentIntentAsync(total);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                BookingNumber = await GenerateBookingNumberAsync(),
+                Status = BookingStatus.Pending,
+                UserId = userId,
+                EventId = request.EventId,
+                SeatsReserved = seatsRequested,
+                SubtotalCents = subtotal,
+                FeeCents = fee,
+                TotalCents = total
+            };
+
+            var bookingItems = new List<BookingItem>();
+            for (var i = 0; i < seatsRequested; i++)
+            {
+                bookingItems.Add(new BookingItem
+                {
+                    Id = Guid.NewGuid(),
+                    BookingId = booking.Id,
+                    TicketTypeId = ticketTypeId,
+                    PriceCents = price
+                });
+            }
+
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            try
+            {
+                context.Bookings.Add(booking);
+                context.BookingItems.AddRange(bookingItems);
+                context.Payments.Add(new Payment
+                {
+                    Id = Guid.NewGuid(),
+                    BookingId = booking.Id,
+                    PaymentIntentId = intentId,
+                    Status = PaymentStatus.RequiresConfirmation,
+                    AmountCents = total
+                });
+                await context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
+            Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}",
+                booking.BookingNumber, seatsRequested, request.EventId, total / 100.0);
+
+            return await GetByIdAsync(booking.Id) ?? throw new InvalidOperationException("Booking creation failed");
+        }
+        finally
+        {
+            var script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+            await redisDb.ScriptEvaluateAsync(script, [(RedisKey)lockKey], [(RedisValue)lockToken]);
+        }
+    }
+
+    private async Task<BookingDto> CreateSeatBookingAsync(Guid userId, CreateBookingRequest request, Event ev)
+    {
         var maxTickets = int.Parse(
             await settings.GetOrDefaultAsync("max_tickets_per_booking", "10") ?? "10");
         if (request.Items.Count > maxTickets)
@@ -169,6 +399,14 @@ public class BookingService(
         if (booking.Status != BookingStatus.Pending)
             throw new InvalidOperationException($"Cannot confirm booking in {booking.Status} status");
 
+        // For table bookings, verify the table lock is still valid
+        if (booking.TableId.HasValue)
+        {
+            var table = await context.Tables.FindAsync(booking.TableId.Value);
+            if (table is null || table.Status != TableStatus.Locked || table.LockedByUserId != userId)
+                throw new InvalidOperationException("Table lock has expired. Please select a new table.");
+        }
+
         // Use explicit transaction for atomicity
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
@@ -195,6 +433,19 @@ public class BookingService(
                     .Where(t => t.Id == item.TicketTypeId)
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(t => t.QuantitySold, t => t.QuantitySold + 1));
+            }
+
+            // Mark table as permanently booked if this is a table booking
+            if (booking.TableId.HasValue)
+            {
+                var tableToBook = await context.Tables.FindAsync(booking.TableId.Value);
+                if (tableToBook is not null)
+                {
+                    tableToBook.Status = TableStatus.Booked;
+                    tableToBook.LockedByUserId = null;
+                    tableToBook.LockExpiresAt = null;
+                    tableToBook.UpdatedAt = DateTime.UtcNow;
+                }
             }
 
             // Release any seat holds for this user+event
@@ -247,6 +498,19 @@ public class BookingService(
 
         if (booking.Status is not (BookingStatus.Pending or BookingStatus.Paid))
             throw new InvalidOperationException($"Cannot cancel booking in {booking.Status} status");
+
+        // Release table lock if this is a pending table booking
+        if (booking.TableId.HasValue && booking.Status == BookingStatus.Pending)
+        {
+            var table = await context.Tables.FindAsync(booking.TableId.Value);
+            if (table is not null && table.Status == TableStatus.Locked && table.LockedByUserId == booking.UserId)
+            {
+                table.Status = TableStatus.Available;
+                table.LockedByUserId = null;
+                table.LockExpiresAt = null;
+                table.UpdatedAt = DateTime.UtcNow;
+            }
+        }
 
         booking.Status = BookingStatus.Cancelled;
         booking.UpdatedAt = DateTime.UtcNow;

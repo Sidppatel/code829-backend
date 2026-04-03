@@ -25,6 +25,11 @@ public class Booking : BaseEntity
 
     public string? Notes { get; set; }
 
+    public Guid? TableId { get; set; }
+    public Table? Table { get; set; }
+
+    public int? SeatsReserved { get; set; }
+
     public ICollection<BookingItem> Items { get; set; } = [];
     public Payment? Payment { get; set; }
 }

@@ -17,11 +17,15 @@ public class HoldCleanupWorker(IServiceScopeFactory scopeFactory) : BackgroundSe
             {
                 using var scope = scopeFactory.CreateScope();
                 var seatService = scope.ServiceProvider.GetRequiredService<ISeatService>();
-                var cleaned = await seatService.CleanupExpiredHoldsAsync();
-                if (cleaned > 0)
-                {
-                    Log.Information("[HoldCleanup] Expired {Count} seat holds", cleaned);
-                }
+                var tableBookingService = scope.ServiceProvider.GetRequiredService<ITableBookingService>();
+
+                var seatsCleaned = await seatService.CleanupExpiredHoldsAsync();
+                if (seatsCleaned > 0)
+                    Log.Information("[HoldCleanup] Expired {Count} seat holds", seatsCleaned);
+
+                var tablesCleaned = await tableBookingService.CleanupExpiredLocksAsync();
+                if (tablesCleaned > 0)
+                    Log.Information("[HoldCleanup] Cleaned {Count} expired table locks/bookings", tablesCleaned);
             }
             catch (Exception ex)
             {

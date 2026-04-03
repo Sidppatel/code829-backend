@@ -359,16 +359,26 @@ public class EventPlatformDbContext(
                     "\"PriceOverrideCents\" IS NULL OR \"PriceOverrideCents\" >= 0");
                 t.HasCheckConstraint("CK_tables_Capacity",
                     "\"Capacity\" IS NULL OR \"Capacity\" > 0");
+                t.HasCheckConstraint("CK_tables_Status",
+                    "\"Status\" IN ('Available','Locked','Booked')");
+                t.HasCheckConstraint("CK_tables_LockedRequiresOwner",
+                    "\"Status\" <> 'Locked' OR (\"LockedByUserId\" IS NOT NULL AND \"LockExpiresAt\" IS NOT NULL)");
+                t.HasCheckConstraint("CK_tables_AvailableNoLock",
+                    "\"Status\" <> 'Available' OR (\"LockedByUserId\" IS NULL AND \"LockExpiresAt\" IS NULL)");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.EventId);
             entity.HasIndex(e => new { e.EventId, e.Label }).IsUnique()
                 .HasFilter("\"EventId\" IS NOT NULL");
+            entity.HasIndex(e => new { e.EventId, e.Status })
+                .HasDatabaseName("IX_tables_EventId_Status");
             entity.Property(e => e.Label).HasMaxLength(20);
             entity.Property(e => e.Shape).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.Color).HasMaxLength(20);
             entity.Property(e => e.Section).HasMaxLength(64);
             entity.Property(e => e.PriceType).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20)
+                .HasDefaultValue(Contracts.Enums.TableStatus.Available);
             entity.HasOne(e => e.TableType).WithMany(tt => tt.Tables).HasForeignKey(e => e.TableTypeId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
@@ -376,6 +386,8 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.VenueLayoutTable).WithMany(vlt => vlt.Tables).HasForeignKey(e => e.VenueLayoutTableId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.LockedByUser).WithMany().HasForeignKey(e => e.LockedByUserId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -419,7 +431,7 @@ public class EventPlatformDbContext(
             entity.ToTable("bookings", t =>
             {
                 t.HasCheckConstraint("CK_bookings_Status",
-                    "\"Status\" IN ('Pending','Paid','CheckedIn','Cancelled','Refunded')");
+                    "\"Status\" IN ('Pending','Paid','CheckedIn','Cancelled','Refunded','Expired')");
                 t.HasCheckConstraint("CK_bookings_SubtotalCents",
                     "\"SubtotalCents\" >= 0");
                 t.HasCheckConstraint("CK_bookings_FeeCents",
@@ -428,6 +440,8 @@ public class EventPlatformDbContext(
                     "\"TotalCents\" >= 0");
                 t.HasCheckConstraint("CK_bookings_TotalFormula",
                     "\"TotalCents\" = \"SubtotalCents\" + \"FeeCents\"");
+                t.HasCheckConstraint("CK_bookings_SeatsReserved",
+                    "\"SeatsReserved\" IS NULL OR \"SeatsReserved\" > 0");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.BookingNumber).IsUnique();
@@ -444,6 +458,8 @@ public class EventPlatformDbContext(
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Table).WithMany().HasForeignKey(e => e.TableId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<BookingItem>(entity =>

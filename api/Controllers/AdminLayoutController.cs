@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Api.Middleware;
+using Api.Services;
 using Contracts.DTOs.Layout;
 using Contracts.Enums;
 using Db;
@@ -103,6 +104,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout/draft")]
     public async Task<IActionResult> SaveDraft(Guid eventId, [FromBody] SaveLayoutRequest request)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var db = redis.GetDatabase();
         var json = JsonSerializer.Serialize(request, JsonOpts);
         await db.StringSetAsync(DraftKey(eventId), json, DraftTtl);
@@ -133,6 +137,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout/flush")]
     public async Task<IActionResult> FlushDraft(Guid eventId)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(DraftKey(eventId));
         if (!cached.HasValue)
@@ -208,13 +215,14 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     }
 
     /// <summary>
-    /// Returns table IDs that have active holds or bookings — these cannot be modified/deleted.
+    /// Returns whether the entire layout is locked (any table non-Available) plus per-table lock IDs.
     /// </summary>
     [HttpGet("admin/events/{eventId:guid}/layout/locked")]
     public async Task<IActionResult> GetLockedTables(Guid eventId)
     {
         var locked = await GetLockedTableIdsAsync(eventId);
-        return Ok(new { lockedTableIds = locked });
+        var layoutLocked = await IsLayoutLockedAsync(eventId);
+        return Ok(new { layoutLocked, lockedTableIds = locked });
     }
 
     [HttpGet("admin/events/{eventId:guid}/layout")]
@@ -237,6 +245,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout")]
     public async Task<IActionResult> SaveLayout(Guid eventId, [FromBody] SaveLayoutRequest request)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -339,6 +350,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout/table")]
     public async Task<IActionResult> AddTable(Guid eventId, [FromBody] AddTableRequest request)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -365,6 +379,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPut("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
     public async Task<IActionResult> UpdateTable(Guid eventId, Guid tableId, [FromBody] Contracts.DTOs.Layout.UpdateTableRequest request)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var table = await context.Tables.FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new { message = "Table not found" });
 
@@ -391,6 +408,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpDelete("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
     public async Task<IActionResult> DeleteTable(Guid eventId, Guid tableId)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var table = await context.Tables
             .Include(t => t.Seats)
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
@@ -527,6 +547,9 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout/bulk-insert")]
     public async Task<IActionResult> BulkInsertTables(Guid eventId, [FromBody] BulkInsertRequest request)
     {
+        if (await IsLayoutLockedAsync(eventId))
+            return Conflict(new { message = "Layout is locked — tables have active bookings or holds" });
+
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
@@ -638,6 +661,16 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         return new EventLayoutResponse(
             eventId, ev?.EditorMode?.ToString(), ev?.GridRows, ev?.GridCols,
             tables.Select(MapTable).ToList());
+    }
+
+    /// <summary>
+    /// Returns true if the layout is immutable — any table is Locked or Booked.
+    /// When true, no layout modifications (add/update/delete/save/flush/bulk-insert) are allowed.
+    /// </summary>
+    private async Task<bool> IsLayoutLockedAsync(Guid eventId)
+    {
+        return await context.Tables.AnyAsync(t =>
+            t.EventId == eventId && t.Status != TableStatus.Available);
     }
 
     /// <summary>

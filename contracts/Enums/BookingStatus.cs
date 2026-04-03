@@ -6,5 +6,6 @@ public enum BookingStatus
     Paid = 1,
     CheckedIn = 2,
     Cancelled = 3,
-    Refunded = 4
+    Refunded = 4,
+    Expired = 5
 }

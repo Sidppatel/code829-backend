@@ -19,6 +19,12 @@ public class Table : BaseEntity
     public int? PriceOverrideCents { get; set; }
     public bool IsActive { get; set; } = true;
 
+    // Table booking state
+    public TableStatus Status { get; set; } = TableStatus.Available;
+    public Guid? LockedByUserId { get; set; }
+    public User? LockedByUser { get; set; }
+    public DateTime? LockExpiresAt { get; set; }
+
     // Grid mode positioning
     public int? GridRow { get; set; }
     public int? GridCol { get; set; }

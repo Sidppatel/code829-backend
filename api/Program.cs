@@ -108,6 +108,7 @@ try
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ISeatService, SeatService>();
+    builder.Services.AddScoped<ITableBookingService, TableBookingService>();
     builder.Services.AddScoped<IPricingEngine, PricingEngine>();
     builder.Services.AddScoped<IBookingService, BookingService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();

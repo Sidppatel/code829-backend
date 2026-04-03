@@ -14,7 +14,8 @@ public record EventTableDto(
     int? GridCol,
     int SortOrder,
     string Status,
-    DateTime? HoldExpiresAt
+    DateTime? HoldExpiresAt,
+    bool IsLockedByYou = false
 );
 
 public record EventTablesResponse(
