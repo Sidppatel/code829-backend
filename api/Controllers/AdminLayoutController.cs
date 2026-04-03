@@ -116,27 +116,39 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new { message = "Event not found" });
 
-        var template = await context.TableTemplates.FindAsync(request.TableTemplateId);
-        if (template is null) return NotFound(new { message = "Table template not found" });
+        TableTemplate? template = null;
+        if (request.TableTemplateId.HasValue)
+        {
+            template = await context.TableTemplates.FindAsync(request.TableTemplateId.Value);
+            if (template is null) return NotFound(new { message = "Table template not found" });
+        }
 
-        if (request.Shape is not null && !Enum.TryParse<TableShape>(request.Shape, true, out _))
+        // When no template, Label/Capacity/Shape are required
+        if (template is null)
+        {
+            if (string.IsNullOrWhiteSpace(request.Label))
+                return BadRequest(new { message = "Label is required when no template is selected" });
+            if (request.Capacity is null || request.Capacity <= 0)
+                return BadRequest(new { message = "Capacity is required when no template is selected" });
+            if (string.IsNullOrWhiteSpace(request.Shape))
+                return BadRequest(new { message = "Shape is required when no template is selected" });
+        }
+
+        var shapeStr = request.Shape ?? template?.DefaultShape.ToString() ?? "Square";
+        if (!Enum.TryParse<TableShape>(shapeStr, true, out var shape))
             return BadRequest(new { message = "Invalid shape" });
-
-        var shape = request.Shape is not null && Enum.TryParse<TableShape>(request.Shape, true, out var s)
-            ? s
-            : template.DefaultShape;
 
         var et = new EventTable
         {
             Id = Guid.NewGuid(),
-            Label = request.Label ?? template.Name,
-            Capacity = request.Capacity ?? template.DefaultCapacity,
+            Label = request.Label ?? template?.Name ?? "Custom Table",
+            Capacity = request.Capacity ?? template?.DefaultCapacity ?? 4,
             Shape = shape,
-            Color = request.Color ?? template.DefaultColor,
-            PriceCents = request.PriceCents ?? template.DefaultPriceCents,
+            Color = request.Color ?? template?.DefaultColor,
+            PriceCents = request.PriceCents ?? template?.DefaultPriceCents ?? 0,
             IsActive = true,
             EventId = eventId,
-            TableTemplateId = template.Id
+            TableTemplateId = template?.Id
         };
         context.EventTables.Add(et);
         await context.SaveChangesAsync();
@@ -311,9 +323,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout/draft")]
     public async Task<IActionResult> SaveDraft(Guid eventId, [FromBody] SaveLayoutRequest request)
     {
-        if (await IsLayoutLockedAsync(eventId))
-            return Conflict(new { message = "Layout is locked — tables have active bookings" });
-
+        // Drafts are ephemeral Redis data — allow saving even when some tables are locked.
+        // Actual constraint enforcement happens in SaveLayout.
         var db = redis.GetDatabase();
         var json = JsonSerializer.Serialize(request, JsonOpts);
         await db.StringSetAsync(DraftKey(eventId), json, DraftTtl);

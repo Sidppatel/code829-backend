@@ -37,7 +37,7 @@ public record EventTableResponse(
 );
 
 public record CreateEventTableRequest(
-    Guid TableTemplateId,
+    Guid? TableTemplateId = null,
     string? Label = null,
     int? Capacity = null,
     string? Shape = null,
