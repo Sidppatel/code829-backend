@@ -8,9 +8,10 @@ using Serilog;
 namespace Api.Seeding;
 
 /// <summary>
-/// Seeds bookings across events and users. Grid events get table-based bookings
-/// (one BookingItem per seat with SeatId). Non-Grid events get standard ticket bookings.
-/// Distribution: 60% Paid, 15% Pending, 15% CheckedIn, 5% Cancelled, 5% Refunded.
+/// Seeds bookings across events and users.
+/// Grid events: table bookings (TableId set, table marked as Booked).
+/// Open events: capacity bookings (SeatsReserved set).
+/// Distribution: ~60% Paid, ~15% Pending, ~15% CheckedIn, ~5% Cancelled, ~5% Refunded.
 /// </summary>
 public static class BookingSeeder
 {
@@ -27,15 +28,14 @@ public static class BookingSeeder
             .ToListAsync();
 
         var events = await context.Events
-            .Include(e => e.TicketTypes)
-            .Where(e => e.Status == EventStatus.Published || e.Status == EventStatus.Completed)
+            .Where(e => e.Status == EventStatus.Published)
             .ToListAsync();
 
         if (users.Count == 0 || events.Count == 0)
             return;
 
         var gridEvents = events.Where(e => e.LayoutMode == LayoutMode.Grid).ToList();
-        var nonGridEvents = events.Where(e => e.LayoutMode != LayoutMode.Grid).ToList();
+        var openEvents = events.Where(e => e.LayoutMode == LayoutMode.Open).ToList();
 
         var rng = new Random(42);
         var bookingNumber = 1;
@@ -44,14 +44,12 @@ public static class BookingSeeder
         foreach (var ev in gridEvents)
         {
             var tables = await context.Tables
-                .Include(t => t.Seats)
                 .Where(t => t.EventId == ev.Id && t.IsActive)
                 .OrderBy(t => t.SortOrder)
                 .ToListAsync();
 
-            if (tables.Count == 0 || ev.TicketTypes.Count == 0) continue;
+            if (tables.Count == 0) continue;
 
-            var ticketType = ev.TicketTypes.First();
             // Book 30-60% of tables
             var tablesToBook = tables.OrderBy(_ => rng.Next())
                 .Take(Math.Max(1, (int)(tables.Count * (0.3 + rng.NextDouble() * 0.3))))
@@ -59,8 +57,6 @@ public static class BookingSeeder
 
             foreach (var table in tablesToBook)
             {
-                if (table.Seats.Count == 0) continue;
-
                 var user = users[rng.Next(users.Count)];
                 var status = PickStatus(rng);
                 var createdAt = DateTime.UtcNow.AddDays(-rng.Next(1, 20)).AddHours(-rng.Next(0, 24));
@@ -78,6 +74,7 @@ public static class BookingSeeder
                     Status = status,
                     UserId = user.Id,
                     EventId = ev.Id,
+                    TableId = table.Id,
                     SubtotalCents = tablePrice,
                     FeeCents = fee,
                     TotalCents = tablePrice + fee,
@@ -87,90 +84,64 @@ public static class BookingSeeder
                 };
                 context.Bookings.Add(booking);
 
-                // One BookingItem per seat at the table
-                foreach (var seat in table.Seats.OrderBy(s => s.SeatNumber))
-                {
-                    var itemQr = (status is BookingStatus.Paid or BookingStatus.CheckedIn) ? GenerateQrToken() : null;
-                    var invToken = (status is BookingStatus.Paid or BookingStatus.CheckedIn) ? GenerateInvitationToken() : null;
-
-                    context.BookingItems.Add(new BookingItem
-                    {
-                        Id = Guid.NewGuid(),
-                        BookingId = booking.Id,
-                        TicketTypeId = ticketType.Id,
-                        SeatId = seat.Id,
-                        PriceCents = 0, // price is on the table, not per-seat
-                        QrToken = itemQr,
-                        InvitationToken = invToken,
-                        CreatedAt = createdAt,
-                        UpdatedAt = createdAt
-                    });
-                }
-
+                // Mark the table as booked for confirmed bookings
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
-                    ticketType.QuantitySold += table.Seats.Count;
+                {
+                    table.Status = TableStatus.Booked;
+                }
 
                 AddPayment(context, booking, status, createdAt);
             }
         }
 
-        // ── Non-Grid event bookings (ticket-based) ───────────────────
-        var nonGridBookingTarget = 45;
-        for (var i = 0; i < nonGridBookingTarget; i++)
+        // ── Open event bookings (capacity-based) ─────────────────────
+        foreach (var ev in openEvents)
         {
-            var ev = nonGridEvents[rng.Next(nonGridEvents.Count)];
-            if (ev.TicketTypes.Count == 0) continue;
+            var pricePerPerson = ev.PricePerPersonCents ?? 0;
+            var maxCap = ev.MaxCapacity ?? 200;
+            var totalSeatsBooked = 0;
 
-            var user = users[rng.Next(users.Count)];
-            var status = PickStatus(rng);
-            var createdAt = DateTime.UtcNow.AddDays(-rng.Next(1, 30)).AddHours(-rng.Next(0, 24));
-
-            var itemCount = rng.Next(1, Math.Min(4, ev.TicketTypes.Count + 1));
-            var selectedTickets = ev.TicketTypes.OrderBy(_ => rng.Next()).Take(itemCount).ToList();
-
-            var subtotal = selectedTickets.Sum(tt => tt.PriceCents ?? 0);
-            var fee = (int)Math.Ceiling(subtotal * 0.08);
-
-            string? qrToken = null;
-            if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
-                qrToken = GenerateQrToken();
-
-            var booking = new Booking
+            // Create 5-12 bookings per open event
+            var bookingCount = rng.Next(5, 13);
+            for (var i = 0; i < bookingCount; i++)
             {
-                Id = Guid.NewGuid(),
-                BookingNumber = $"BK-SEED-{bookingNumber++:D4}",
-                Status = status,
-                UserId = user.Id,
-                EventId = ev.Id,
-                SubtotalCents = subtotal,
-                FeeCents = fee,
-                TotalCents = subtotal + fee,
-                QrToken = qrToken,
-                CreatedAt = createdAt,
-                UpdatedAt = createdAt
-            };
-            context.Bookings.Add(booking);
+                var seatsReserved = rng.Next(1, 7); // 1-6 seats per booking
+                if (totalSeatsBooked + seatsReserved > maxCap * 0.6)
+                    break;
 
-            foreach (var tt in selectedTickets)
-            {
-                var itemQr = (status is BookingStatus.Paid or BookingStatus.CheckedIn) ? GenerateQrToken() : null;
+                var user = users[rng.Next(users.Count)];
+                var status = PickStatus(rng);
+                var createdAt = DateTime.UtcNow.AddDays(-rng.Next(1, 30)).AddHours(-rng.Next(0, 24));
 
-                context.BookingItems.Add(new BookingItem
+                var subtotal = pricePerPerson * seatsReserved;
+                var fee = (int)Math.Ceiling(subtotal * 0.08);
+
+                string? qrToken = null;
+                if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
+                    qrToken = GenerateQrToken();
+
+                var booking = new Booking
                 {
                     Id = Guid.NewGuid(),
-                    BookingId = booking.Id,
-                    TicketTypeId = tt.Id,
-                    PriceCents = tt.PriceCents ?? 0,
-                    QrToken = itemQr,
+                    BookingNumber = $"BK-SEED-{bookingNumber++:D4}",
+                    Status = status,
+                    UserId = user.Id,
+                    EventId = ev.Id,
+                    SeatsReserved = seatsReserved,
+                    SubtotalCents = subtotal,
+                    FeeCents = fee,
+                    TotalCents = subtotal + fee,
+                    QrToken = qrToken,
                     CreatedAt = createdAt,
                     UpdatedAt = createdAt
-                });
+                };
+                context.Bookings.Add(booking);
 
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
-                    tt.QuantitySold++;
-            }
+                    totalSeatsBooked += seatsReserved;
 
-            AddPayment(context, booking, status, createdAt);
+                AddPayment(context, booking, status, createdAt);
+            }
         }
 
         await context.SaveChangesAsync();
@@ -225,11 +196,5 @@ public static class BookingSeeder
     {
         var bytes = RandomNumberGenerator.GetBytes(24);
         return $"QR-{Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')}";
-    }
-
-    private static string GenerateInvitationToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(32);
-        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
     }
 }

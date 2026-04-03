@@ -107,9 +107,7 @@ try
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
-    builder.Services.AddScoped<ISeatService, SeatService>();
     builder.Services.AddScoped<ITableBookingService, TableBookingService>();
-    builder.Services.AddScoped<IPricingEngine, PricingEngine>();
     builder.Services.AddScoped<IBookingService, BookingService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
 
@@ -180,7 +178,7 @@ try
         ChangeTrackingInterceptor.IsSuspended = true;
         await DataSeeder.SeedAsync(app.Services);
         await VenueEventSeeder.SeedAsync(app.Services);
-        await LayoutPricingSeeder.SeedAsync(app.Services);
+        await LayoutSeeder.SeedAsync(app.Services);
         await BookingSeeder.SeedAsync(app.Services);
         ChangeTrackingInterceptor.IsSuspended = false;
     }
