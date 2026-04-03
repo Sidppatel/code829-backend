@@ -212,18 +212,27 @@ public class BookingServiceTests : IDisposable
         };
         _context.Events.Add(gridEvent);
 
-        var table = new Table
+        var eventTable = new EventTable
         {
             Id = Guid.NewGuid(),
-            Label = "T1",
+            Label = "Standard Table",
             Capacity = 4,
             Shape = TableShape.Round,
             PriceCents = 10000,
             IsActive = true,
+            EventId = gridEvent.Id
+        };
+        _context.EventTables.Add(eventTable);
+
+        var table = new Table
+        {
+            Id = Guid.NewGuid(),
+            Label = "T1",
+            IsActive = true,
             Status = TableStatus.Available,
             SortOrder = 1,
             EventId = gridEvent.Id,
-            VenueId = _venueId
+            EventTableId = eventTable.Id
         };
         _context.Tables.Add(table);
         await _context.SaveChangesAsync();

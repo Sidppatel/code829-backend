@@ -92,11 +92,12 @@ public class AdminDashboardController(EventPlatformDbContext context) : Controll
             .Where(b => b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn)
             .Sum(b => (long)b.TotalCents);
 
-        // Capacity from tables or MaxCapacity
+        // Capacity from event tables or MaxCapacity
         var tables = await context.Tables
+            .Include(t => t.EventTable)
             .Where(t => t.EventId == ev.Id && t.IsActive)
             .ToListAsync();
-        var totalCapacity = ev.MaxCapacity ?? tables.Sum(t => t.Capacity);
+        var totalCapacity = ev.MaxCapacity ?? tables.Sum(t => t.EventTable.Capacity);
         var soldCount = paid + checkedInCount;
 
         // Potential revenue
@@ -107,7 +108,7 @@ public class AdminDashboardController(EventPlatformDbContext context) : Controll
         }
         else
         {
-            potentialRevenue = tables.Sum(t => (long)t.PriceCents);
+            potentialRevenue = tables.Sum(t => (long)t.EventTable.PriceCents);
         }
 
         var recentBookings = bookings

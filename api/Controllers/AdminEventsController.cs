@@ -295,19 +295,41 @@ public class AdminEventsController(
         };
         context.Events.Add(copy);
 
-        // Copy layout tables
-        var tables = await context.Tables.Where(t => t.EventId == id).ToListAsync();
-        foreach (var t in tables)
+        // Copy event tables and their table instances
+        var eventTables = await context.EventTables
+            .Include(et => et.Tables)
+            .Where(et => et.EventId == id)
+            .ToListAsync();
+        foreach (var et in eventTables)
         {
-            context.Tables.Add(new Table
+            var newEventTable = new EventTable
             {
-                Id = Guid.NewGuid(), Label = t.Label, Capacity = t.Capacity, Shape = t.Shape,
-                Color = t.Color, PriceCents = t.PriceCents,
-                IsActive = t.IsActive,
-                PosX = t.PosX, PosY = t.PosY,
-                SortOrder = t.SortOrder,
-                TableTypeId = t.TableTypeId, EventId = copy.Id, VenueId = copy.VenueId
-            });
+                Id = Guid.NewGuid(),
+                Label = et.Label,
+                Capacity = et.Capacity,
+                Shape = et.Shape,
+                Color = et.Color,
+                PriceCents = et.PriceCents,
+                IsActive = et.IsActive,
+                EventId = copy.Id,
+                TableTemplateId = et.TableTemplateId
+            };
+            context.EventTables.Add(newEventTable);
+
+            foreach (var t in et.Tables)
+            {
+                context.Tables.Add(new Table
+                {
+                    Id = Guid.NewGuid(),
+                    Label = t.Label,
+                    GridRow = t.GridRow,
+                    GridCol = t.GridCol,
+                    IsActive = t.IsActive,
+                    SortOrder = t.SortOrder,
+                    EventTableId = newEventTable.Id,
+                    EventId = copy.Id
+                });
+            }
         }
 
         await context.SaveChangesAsync();

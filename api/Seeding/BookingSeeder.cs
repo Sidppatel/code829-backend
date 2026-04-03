@@ -44,6 +44,7 @@ public static class BookingSeeder
         foreach (var ev in gridEvents)
         {
             var tables = await context.Tables
+                .Include(t => t.EventTable)
                 .Where(t => t.EventId == ev.Id && t.IsActive)
                 .OrderBy(t => t.SortOrder)
                 .ToListAsync();
@@ -60,7 +61,7 @@ public static class BookingSeeder
                 var user = users[rng.Next(users.Count)];
                 var status = PickStatus(rng);
                 var createdAt = DateTime.UtcNow.AddDays(-rng.Next(1, 20)).AddHours(-rng.Next(0, 24));
-                var tablePrice = table.PriceCents;
+                var tablePrice = table.EventTable.PriceCents;
                 var fee = (int)Math.Ceiling(tablePrice * 0.08);
 
                 string? qrToken = null;
