@@ -26,14 +26,12 @@ public class WebhooksController(
             var webhookSecret = await settings.GetOrDefaultAsync("stripe_webhook_secret", "");
             if (string.IsNullOrEmpty(webhookSecret))
             {
-                Log.Warning("[Webhook] stripe_webhook_secret not configured, skipping signature validation");
-                stripeEvent = EventUtility.ParseEvent(json);
+                Log.Error("[Webhook] stripe_webhook_secret not configured — rejecting request");
+                return StatusCode(500, "Webhook secret not configured");
             }
-            else
-            {
-                var signature = Request.Headers["Stripe-Signature"].ToString();
-                stripeEvent = EventUtility.ConstructEvent(json, signature, webhookSecret);
-            }
+
+            var signature = Request.Headers["Stripe-Signature"].ToString();
+            stripeEvent = EventUtility.ConstructEvent(json, signature, webhookSecret);
         }
         catch (StripeException ex)
         {

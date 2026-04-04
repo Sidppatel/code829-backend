@@ -5,6 +5,7 @@ using Contracts.DTOs.Tables;
 using Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace Api.Controllers;
 
@@ -61,13 +62,12 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
     [HttpPost("release-beacon")]
     [AllowAnonymous]
     public async Task<IActionResult> ReleaseTableBeacon(
-        [FromQuery] string token,
-        [FromBody] ReleaseTableRequest request)
+        [FromBody] ReleaseBeaconRequest request)
     {
         try
         {
             var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(token);
+            var jwt = handler.ReadJwtToken(request.Token);
             var userIdClaim = jwt.Claims.FirstOrDefault(c =>
                 c.Type == ClaimTypes.NameIdentifier ||
                 c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
@@ -77,9 +77,10 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
             await tableBookingService.ReleaseTableLockAsync(userId, request.EventId, request.TableId);
             return Ok();
         }
-        catch
+        catch (Exception ex)
         {
-            return Ok(); // Always return 200 for beacon — fire and forget
+            Log.Warning(ex, "[TableBooking] Beacon release failed for table {TableId}", request.EventTableId);
+            return Ok(); // Still return 200 for beacon (fire-and-forget) but LOG the error
         }
     }
 

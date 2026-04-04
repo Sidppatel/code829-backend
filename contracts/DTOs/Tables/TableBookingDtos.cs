@@ -10,6 +10,15 @@ public record ReleaseTableRequest(
     Guid TableId
 );
 
+public record ReleaseBeaconRequest(
+    Guid EventId,
+    Guid TableId,
+    string Token
+)
+{
+    public Guid EventTableId => TableId;
+};
+
 public record TableLockDto(
     Guid TableId,
     string TableLabel,
