@@ -121,6 +121,30 @@ public static class DataSeeder
                 await settings.SetAsync("cors_origins", "https://code829.pages.dev", "Comma-separated allowed CORS origins");
                 Log.Information("[Seed] Updated cors_origins to production URL");
             }
+
+            // Override SMTP/email settings from environment variables (set in Render dashboard)
+            var smtpOverrides = new (string EnvVar, string SettingKey, string Description)[]
+            {
+                ("SMTP_HOST", "smtp_host", "SMTP server hostname"),
+                ("SMTP_PORT", "smtp_port", "SMTP port"),
+                ("SMTP_USERNAME", "smtp_username", "SMTP username"),
+                ("SMTP_PASSWORD", "smtp_password", "SMTP password or app password"),
+                ("EMAIL_FROM_ADDRESS", "email_from_address", "Sender email address"),
+            };
+
+            foreach (var (envVar, settingKey, description) in smtpOverrides)
+            {
+                var envValue = Environment.GetEnvironmentVariable(envVar);
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    var current = await settings.GetOrDefaultAsync(settingKey);
+                    if (current != envValue)
+                    {
+                        await settings.SetAsync(settingKey, envValue, description);
+                        Log.Information("[Seed] Updated {SettingKey} from environment", settingKey);
+                    }
+                }
+            }
         }
 
         Log.Information("[Seed] App settings initialized");
