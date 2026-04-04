@@ -8,11 +8,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
-EXPOSE 8000
+# Render provides PORT at runtime (typically 10000); fallback to 8000 for local Docker
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV PORT=8000
-
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health/live || exit 1
+ENV PORT=10000
+EXPOSE 10000
 
 ENTRYPOINT ["dotnet", "api.dll"]
