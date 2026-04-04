@@ -142,15 +142,16 @@ public class DeveloperController(
     /// <summary>
     /// Update a setting value.
     /// </summary>
-    private static readonly HashSet<string> ImmutableSettings = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> MutableSettings = new(StringComparer.OrdinalIgnoreCase)
     {
-        "jwt_secret", "stripe_secret_key", "stripe_webhook_secret", "smtp_password"
+        "brand_name", "brand_tagline", "brand_primary_color", "brand_accent_color",
+        "default_platform_fee_cents", "platform_fee_percent", "platform_fee_flat_cents"
     };
 
     [HttpPut("settings")]
     public async Task<IActionResult> UpdateSetting([FromBody] UpdateSettingRequest request)
     {
-        if (ImmutableSettings.Contains(request.Key))
+        if (!MutableSettings.Contains(request.Key))
             return BadRequest(new ApiError(400, $"Setting '{request.Key}' cannot be modified via the API", HttpContext.TraceIdentifier));
 
         await settingsService.SetAsync(request.Key, request.Value);
