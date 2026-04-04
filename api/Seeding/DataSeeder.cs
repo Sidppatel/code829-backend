@@ -109,14 +109,14 @@ public static class DataSeeder
         if (env == "Production")
         {
             var frontendUrl = await settings.GetOrDefaultAsync("frontend_url");
-            if (frontendUrl is null || frontendUrl.Contains("localhost"))
+            if (frontendUrl is null || frontendUrl != "https://code829.com")
             {
                 await settings.SetAsync("frontend_url", "https://code829.com", "Frontend URL for magic link emails");
                 Log.Information("[Seed] Updated frontend_url to production URL");
             }
 
             var corsOrigins = await settings.GetOrDefaultAsync("cors_origins");
-            if (corsOrigins is null || corsOrigins.Contains("localhost"))
+            if (corsOrigins is null || corsOrigins != "https://code829.com")
             {
                 await settings.SetAsync("cors_origins", "https://code829.com", "Comma-separated allowed CORS origins");
                 Log.Information("[Seed] Updated cors_origins to production URL");
