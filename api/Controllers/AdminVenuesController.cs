@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("admin/venues")]
 [Authorize]
 [RequireRole(UserRole.Admin)]

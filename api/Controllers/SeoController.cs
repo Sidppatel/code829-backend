@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("")]
 public class SeoController(
     EventPlatformDbContext context,

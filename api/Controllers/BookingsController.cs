@@ -13,6 +13,7 @@ using Serilog;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("bookings")]
 public class BookingsController(
     IBookingService bookingService,

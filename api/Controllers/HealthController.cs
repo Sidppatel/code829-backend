@@ -6,6 +6,7 @@ using StackExchange.Redis;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("")]
 public class HealthController(
     EventPlatformDbContext dbContext,

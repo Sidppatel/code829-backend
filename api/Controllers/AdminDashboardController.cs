@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("admin")]
 [Authorize]
 [RequireRole(UserRole.Admin)]

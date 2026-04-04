@@ -12,6 +12,7 @@ using Serilog;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("auth")]
 public class AuthController(
     IAuthService authService,
@@ -23,7 +24,6 @@ public class AuthController(
     /// Request a magic link email for passwordless login.
     /// </summary>
     [HttpPost("magic-link")]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> RequestMagicLink([FromBody] MagicLinkRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Email))
@@ -37,7 +37,6 @@ public class AuthController(
     /// Verify a magic link token and return a JWT.
     /// </summary>
     [HttpPost("magic-link/verify")]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> VerifyMagicLink([FromBody] MagicLinkVerifyRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
@@ -59,7 +58,6 @@ public class AuthController(
     /// Development-only instant login. Returns 404 in production.
     /// </summary>
     [HttpPost("dev-login")]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> DevLogin([FromBody] DevLoginRequest request)
     {
         if (!environment.IsDevelopment())

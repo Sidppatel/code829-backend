@@ -11,6 +11,7 @@ using Serilog;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("tables")]
 public class TableBookingController(ITableBookingService tableBookingService) : ControllerBase
 {
@@ -62,7 +63,6 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
     /// </summary>
     [HttpPost("release-beacon")]
     [AllowAnonymous]
-    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> ReleaseTableBeacon(
         [FromBody] ReleaseBeaconRequest request)
     {

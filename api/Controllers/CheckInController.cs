@@ -11,6 +11,7 @@ using Serilog;
 namespace Api.Controllers;
 
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("checkin")]
 [Authorize]
 [RequireRole(UserRole.Staff)]
