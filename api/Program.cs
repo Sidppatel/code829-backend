@@ -229,20 +229,16 @@ try
         }
     }
 
-    // Seed data (development only) — suspend change tracking to avoid exponential slowdown
+    // Seed data — suspend change tracking to avoid exponential slowdown
+    ChangeTrackingInterceptor.IsSuspended = true;
+    await DataSeeder.SeedAsync(app.Services);
+    await VenueEventSeeder.SeedAsync(app.Services);
+    await LayoutSeeder.SeedAsync(app.Services);
     if (app.Environment.IsDevelopment())
     {
-        ChangeTrackingInterceptor.IsSuspended = true;
-        await DataSeeder.SeedAsync(app.Services);
-        await VenueEventSeeder.SeedAsync(app.Services);
-        await LayoutSeeder.SeedAsync(app.Services);
         await BookingSeeder.SeedAsync(app.Services);
-        ChangeTrackingInterceptor.IsSuspended = false;
     }
-    else
-    {
-        await DataSeeder.SeedAsync(app.Services);
-    }
+    ChangeTrackingInterceptor.IsSuspended = false;
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);
