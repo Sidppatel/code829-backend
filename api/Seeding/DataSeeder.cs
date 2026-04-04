@@ -104,6 +104,25 @@ public static class DataSeeder
             }
         }
 
+        // In production, ensure frontend_url and cors_origins point to the real deployment
+        var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        if (env == "Production")
+        {
+            var frontendUrl = await settings.GetOrDefaultAsync("frontend_url");
+            if (frontendUrl is null || frontendUrl.Contains("localhost"))
+            {
+                await settings.SetAsync("frontend_url", "https://code829.pages.dev", "Frontend URL for magic link emails");
+                Log.Information("[Seed] Updated frontend_url to production URL");
+            }
+
+            var corsOrigins = await settings.GetOrDefaultAsync("cors_origins");
+            if (corsOrigins is null || corsOrigins.Contains("localhost"))
+            {
+                await settings.SetAsync("cors_origins", "https://code829.pages.dev", "Comma-separated allowed CORS origins");
+                Log.Information("[Seed] Updated cors_origins to production URL");
+            }
+        }
+
         Log.Information("[Seed] App settings initialized");
     }
 
