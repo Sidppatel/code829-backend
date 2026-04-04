@@ -140,6 +140,9 @@ public static class DataSeeder
             {
                 ("RESEND_API_KEY", "resend_api_key", "Resend API key for sending emails"),
                 ("EMAIL_FROM_ADDRESS", "email_from_address", "Sender email address"),
+                ("STRIPE_SECRET_KEY", "stripe_secret_key", "Stripe secret key"),
+                ("STRIPE_PUBLISHABLE_KEY", "stripe_publishable_key", "Stripe publishable key"),
+                ("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret", "Stripe webhook signing secret"),
             };
 
             foreach (var (envVar, settingKey, description) in envOverrides)
