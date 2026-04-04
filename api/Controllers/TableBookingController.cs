@@ -54,6 +54,35 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
         }
     }
 
+    /// <summary>
+    /// Fire-and-forget table release via navigator.sendBeacon (no auth header possible).
+    /// JWT is passed as a query parameter instead.
+    /// </summary>
+    [HttpPost("release-beacon")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ReleaseTableBeacon(
+        [FromQuery] string token,
+        [FromBody] ReleaseTableRequest request)
+    {
+        try
+        {
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwt = handler.ReadJwtToken(token);
+            var userIdClaim = jwt.Claims.FirstOrDefault(c =>
+                c.Type == ClaimTypes.NameIdentifier ||
+                c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
+            if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized();
+
+            await tableBookingService.ReleaseTableLockAsync(userId, request.EventId, request.TableId);
+            return Ok();
+        }
+        catch
+        {
+            return Ok(); // Always return 200 for beacon — fire and forget
+        }
+    }
+
     [HttpGet("my-locks/{eventId:guid}")]
     [Authorize]
     [RequireRole(UserRole.User)]
