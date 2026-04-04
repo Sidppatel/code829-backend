@@ -18,13 +18,10 @@ public class ResendEmailService(ISettingsService settings) : IEmailService
         var apiKey = await settings.GetAsync("resend_api_key");
         var fromAddress = await settings.GetOrDefaultAsync("email_from_address", "noreply@code829.com") ?? "noreply@code829.com";
 
-        var payload = JsonSerializer.Serialize(new
-        {
-            from = fromAddress,
-            to = new[] { recipient },
-            subject,
-            text = body
-        });
+        var isHtml = body.TrimStart().StartsWith('<');
+        var payload = isHtml
+            ? JsonSerializer.Serialize(new { from = fromAddress, to = new[] { recipient }, subject, html = body })
+            : JsonSerializer.Serialize(new { from = fromAddress, to = new[] { recipient }, subject, text = body });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);

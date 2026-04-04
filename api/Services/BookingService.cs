@@ -277,12 +277,9 @@ public class BookingService(
         await emailService.SendAsync(
             booking.User.Email,
             $"Booking Confirmed — {booking.Event.Title} | {brandName}",
-            $"Hi {booking.User.FirstName},\n\n" +
-            $"Your booking {booking.BookingNumber} for {booking.Event.Title} is confirmed!\n" +
-            $"Total: ${booking.TotalCents / 100.0:F2}\n\n" +
-            $"View your check-in QR code: {checkinLink}\n\n" +
-            $"Show your QR code at the venue for check-in.\n\n" +
-            $"— {brandName}"
+            EmailTemplates.BookingConfirmed(
+                brandName!, booking.User.FirstName, booking.BookingNumber,
+                booking.Event.Title, $"${booking.TotalCents / 100.0:F2}", checkinLink)
         );
 
         Log.Information("[Booking] Confirmed {BookingNumber}, QR: {QrToken}", booking.BookingNumber, booking.QrToken);

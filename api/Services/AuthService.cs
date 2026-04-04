@@ -53,7 +53,7 @@ public class AuthService(
         await emailService.SendAsync(
             normalizedEmail,
             $"Your {brandName} login link",
-            $"Click here to log in: {verifyUrl}\n\nThis link expires in {expiryMinutes} minutes."
+            EmailTemplates.MagicLink(brandName!, verifyUrl, expiryMinutes)
         );
 
         Log.Information("[Auth] Magic link sent to {Email}", normalizedEmail);

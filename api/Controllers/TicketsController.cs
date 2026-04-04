@@ -143,13 +143,9 @@ public class TicketsController(
         await emailService.SendAsync(
             request.Email,
             $"You're invited! {eventTitle} | {brandName}",
-            $"Hi{(string.IsNullOrEmpty(request.GuestName) ? "" : $" {request.GuestName}")},\n\n" +
-            $"{inviterName} has invited you to {eventTitle}!\n" +
-            $"Date: {eventDate}\n" +
-            $"Seat #{ticket.SeatNumber}\n\n" +
-            $"Claim your ticket: {claimUrl}\n\n" +
-            $"This link expires in 7 days.\n\n" +
-            $"— {brandName}"
+            EmailTemplates.TicketInvite(
+                brandName!, request.GuestName ?? "", inviterName,
+                eventTitle, eventDate, ticket.SeatNumber, claimUrl)
         );
 
         Log.Information("[Tickets] Invite sent for {TicketCode} to {Email}", ticket.TicketCode, request.Email);
