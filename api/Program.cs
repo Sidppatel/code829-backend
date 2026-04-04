@@ -148,11 +148,11 @@ try
 
         // Priority 2: Resend HTTP API
         var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
+        var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
         if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")
-            return new ResendEmailService(settingsService);
+            return new ResendEmailService(settingsService, context);
 
         // Fallback: Mock (logs to console + DB, no real emails)
-        var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
         return new MockEmailService(context);
     });
 
