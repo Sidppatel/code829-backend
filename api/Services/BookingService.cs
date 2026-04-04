@@ -219,7 +219,9 @@ public class BookingService(
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
-            await paymentService.ConfirmPaymentAsync(booking.Payment!.PaymentIntentId);
+            var paymentStatus = await paymentService.ConfirmPaymentAsync(booking.Payment!.PaymentIntentId);
+            if (paymentStatus != "succeeded")
+                throw new InvalidOperationException($"Payment has not succeeded (status: {paymentStatus}). Please complete payment before confirming.");
             booking.Payment.Status = PaymentStatus.Succeeded;
             booking.Payment.PaidAt = DateTime.UtcNow;
 

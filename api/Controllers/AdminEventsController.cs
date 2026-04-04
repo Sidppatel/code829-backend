@@ -130,12 +130,19 @@ public class AdminEventsController(
         return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created));
     }
 
+    private Guid GetCurrentUserId() =>
+        Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    private bool IsOwnerOrDeveloper(Guid organizerId) =>
+        organizerId == GetCurrentUserId() || User.IsInRole(UserRole.Developer.ToString());
+
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
         var ev = await context.Events.Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         if (request.Title is not null)
         {
@@ -195,6 +202,7 @@ public class AdminEventsController(
     {
         var ev = await context.Events.FindAsync(id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "events", file.FileName);
         ev.ImagePath = path;
@@ -211,6 +219,7 @@ public class AdminEventsController(
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         if (!Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
             return BadRequest(new ApiError(400, "Invalid status", HttpContext.TraceIdentifier));
@@ -244,6 +253,7 @@ public class AdminEventsController(
     {
         var ev = await context.Events.FindAsync(id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         if (ev.Status != EventStatus.Draft)
             return BadRequest(new ApiError(400, "Only draft events can be deleted", HttpContext.TraceIdentifier));
@@ -264,6 +274,7 @@ public class AdminEventsController(
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (original is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(original.OrganizerId)) return Forbid();
 
         var organizerId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var slug = GenerateSlug(original.Title + " copy");

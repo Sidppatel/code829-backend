@@ -68,10 +68,11 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
         try
         {
             var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(request.Token);
-            var userIdClaim = jwt.Claims.FirstOrDefault(c =>
-                c.Type == ClaimTypes.NameIdentifier ||
-                c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
+            var jwtOptions = HttpContext.RequestServices
+                .GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>()
+                .Get(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
+            var principal = handler.ValidateToken(request.Token, jwtOptions.TokenValidationParameters, out _);
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
 
