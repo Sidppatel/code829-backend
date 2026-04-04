@@ -122,6 +122,19 @@ public static class DataSeeder
                 Log.Information("[Seed] Updated cors_origins to production URL");
             }
 
+            // Reset SMTP settings to MOCK_DEV so Resend (HTTP API) takes priority
+            // Render free tier blocks outbound SMTP ports (587/465)
+            var smtpKeys = new[] { "smtp_host", "smtp_username", "smtp_password" };
+            foreach (var key in smtpKeys)
+            {
+                var current = await settings.GetOrDefaultAsync(key);
+                if (current != null && current != "MOCK_DEV")
+                {
+                    await settings.SetAsync(key, "MOCK_DEV");
+                    Log.Information("[Seed] Reset {SettingKey} to MOCK_DEV (SMTP blocked on Render)", key);
+                }
+            }
+
             // Override email/Resend settings from environment variables (set in Render dashboard)
             var envOverrides = new (string EnvVar, string SettingKey, string Description)[]
             {
