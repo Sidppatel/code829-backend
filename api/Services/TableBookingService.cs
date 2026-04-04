@@ -86,6 +86,9 @@ public class TableBookingService(
             Log.Information("[TableLock] User {UserId} locked table {TableLabel} for event {EventId}, expires {ExpiresAt}",
                 userId, table.Label, eventId, expiresAt);
 
+            var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
+            var feeCents = eventTable.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
+
             return new TableLockDto(
                 table.Id,
                 table.Label,
@@ -94,6 +97,7 @@ public class TableBookingService(
                 "Locked",
                 eventTable.Capacity,
                 eventTable.PriceCents,
+                feeCents,
                 expiresAt
             );
         }
@@ -151,23 +155,29 @@ public class TableBookingService(
     public async Task<List<TableLockDto>> GetUserLockedTablesAsync(Guid userId, Guid eventId)
     {
         var now = DateTime.UtcNow;
-        return await context.Tables
+        var ev = await context.Events.FindAsync(eventId);
+        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
+        var eventFeeFallback = ev?.PlatformFeeCents ?? defaultFeeCents;
+
+        var tables = await context.Tables
             .Include(t => t.EventTable)
             .Where(t => t.EventId == eventId
                 && t.Status == TableStatus.Locked
                 && t.LockedByUserId == userId
                 && t.LockExpiresAt > now)
-            .Select(t => new TableLockDto(
-                t.Id,
-                t.Label,
-                eventId,
-                userId,
-                "Locked",
-                t.EventTable.Capacity,
-                t.EventTable.PriceCents,
-                t.LockExpiresAt!.Value
-            ))
             .ToListAsync();
+
+        return tables.Select(t => new TableLockDto(
+            t.Id,
+            t.Label,
+            eventId,
+            userId,
+            "Locked",
+            t.EventTable.Capacity,
+            t.EventTable.PriceCents,
+            t.EventTable.PlatformFeeCents ?? eventFeeFallback,
+            t.LockExpiresAt!.Value
+        )).ToList();
     }
 
     public async Task<int> CleanupExpiredLocksAsync()

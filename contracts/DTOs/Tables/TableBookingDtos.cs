@@ -18,5 +18,6 @@ public record TableLockDto(
     string Status,
     int Capacity,
     int PriceCents,
+    int PlatformFeeCents,
     DateTime ExpiresAt
 );
