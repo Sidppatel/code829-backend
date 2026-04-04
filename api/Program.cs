@@ -375,6 +375,9 @@ static string ConvertRedisUrl(string url)
         if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
             config += $",password={parts[1]}";
     }
+    // Enable TLS for non-localhost connections (e.g., Upstash)
+    if (!uri.Host.Contains("localhost") && !uri.Host.Contains("127.0.0.1"))
+        config += ",ssl=true,abortConnect=false";
     return config;
 }
 
