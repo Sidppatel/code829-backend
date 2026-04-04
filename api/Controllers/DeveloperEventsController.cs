@@ -15,7 +15,6 @@ namespace Api.Controllers;
 /// plus dedicated fee management endpoints.
 /// </summary>
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("developer/events")]
 [Authorize]
 [RequireRole(UserRole.Developer)]

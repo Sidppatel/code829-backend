@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("brand")]
 public class BrandController(ISettingsService settings) : ControllerBase
 {

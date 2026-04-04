@@ -13,7 +13,6 @@ using StackExchange.Redis;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("events")]
 public class EventsController(
     EventPlatformDbContext context,

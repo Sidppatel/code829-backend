@@ -15,7 +15,6 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("admin/events")]
 [Authorize]
 [RequireRole(UserRole.Admin)]

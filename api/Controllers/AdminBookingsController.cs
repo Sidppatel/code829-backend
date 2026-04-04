@@ -17,7 +17,6 @@ using StackExchange.Redis;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("admin/bookings")]
 [Authorize]
 [RequireRole(UserRole.Admin)]

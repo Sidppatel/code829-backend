@@ -12,7 +12,6 @@ using Serilog;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("auth")]
 public class AuthController(
     IAuthService authService,

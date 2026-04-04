@@ -13,7 +13,6 @@ namespace Api.Controllers;
 /// Developers access bookings via role hierarchy (Developer > Admin).
 /// </summary>
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("developer/bookings")]
 [Authorize]
 [RequireRole(UserRole.Developer)]

@@ -9,7 +9,6 @@ using Stripe;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("webhooks")]
 public class WebhooksController(
     EventPlatformDbContext context,

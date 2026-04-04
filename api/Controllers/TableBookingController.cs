@@ -11,7 +11,6 @@ using Serilog;
 namespace Api.Controllers;
 
 [ApiController]
-[IgnoreAntiforgeryToken]
 [Route("tables")]
 public class TableBookingController(ITableBookingService tableBookingService) : ControllerBase
 {

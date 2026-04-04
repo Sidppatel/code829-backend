@@ -14,7 +14,6 @@ namespace Api.Controllers;
 
 [ApiController]
 [Authorize]
-[IgnoreAntiforgeryToken]
 [RequireRole(UserRole.Admin)]
 [Route("")]
 public class AdminLayoutController(EventPlatformDbContext context, IConnectionMultiplexer redis) : ControllerBase

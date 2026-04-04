@@ -185,20 +185,9 @@ try
     builder.Services.AddAuthorization();
 
     // Controllers + OpenAPI + Validation
-    builder.Services.AddControllersWithViews(options =>
-    {
-        options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
-    });
-    builder.Services.AddAntiforgery(options =>
-    {
-        options.HeaderName = "X-XSRF-TOKEN";
-        options.Cookie.Name = "XSRF-TOKEN";
-        options.Cookie.HttpOnly = false; // Frontend needs to read it
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-            ? CookieSecurePolicy.SameAsRequest
-            : CookieSecurePolicy.Always;
-    });
+    // CSRF note: Antiforgery tokens are designed for server-rendered forms, not SPA + JWT APIs.
+    // This API is protected by JWT auth + SameSite cookies + CORS origin checks instead.
+    builder.Services.AddControllers();
     builder.Services.AddOpenApi();
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
@@ -294,7 +283,6 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
-    app.UseAntiforgery();
     app.UseMiddleware<RoleAuthorizationMiddleware>();
 
     app.MapControllers();
