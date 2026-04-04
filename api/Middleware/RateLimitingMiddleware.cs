@@ -8,9 +8,9 @@ namespace Api.Middleware;
 /// Default: 30 requests per 15 minutes for general endpoints.
 /// Stricter limits for auth (5/min) and seat hold (20/min) endpoints.
 /// </summary>
-public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
+public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env)
 {
-    private const int DefaultLimit = 30;
+    private const int DefaultLimit = 60;
     private static readonly TimeSpan DefaultWindow = TimeSpan.FromMinutes(15);
 
     private const int AuthLimit = 5;
@@ -24,9 +24,16 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // No loopback bypass — in production the reverse proxy forwards real client IPs,
-        // and in dev the rate limit is generous enough for normal testing.
+        // Skip rate limiting for loopback in development — React StrictMode double-invokes
+        // effects, and Vite HMR triggers rapid reloads that exhaust limits quickly.
+        // In production, the reverse proxy forwards real client IPs so loopback won't match.
         var remoteIp = context.Connection.RemoteIpAddress;
+        if (env.IsDevelopment() && remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp))
+        {
+            await next(context);
+            return;
+        }
+
         var ip = remoteIp?.ToString() ?? "unknown";
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "/";
 

@@ -1,7 +1,9 @@
 using System.Net;
 using Api.Middleware;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using StackExchange.Redis;
 
@@ -11,12 +13,15 @@ public class RateLimitingMiddlewareTests
 {
     private readonly Mock<IConnectionMultiplexer> _redis;
     private readonly Mock<IDatabase> _redisDb;
+    private readonly Mock<IWebHostEnvironment> _env;
 
     public RateLimitingMiddlewareTests()
     {
         _redis = new Mock<IConnectionMultiplexer>();
         _redisDb = new Mock<IDatabase>();
         _redis.Setup(r => r.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(_redisDb.Object);
+        _env = new Mock<IWebHostEnvironment>();
+        _env.Setup(e => e.EnvironmentName).Returns(Environments.Production);
     }
 
     [Fact]
@@ -34,7 +39,7 @@ public class RateLimitingMiddlewareTests
             return Task.CompletedTask;
         };
 
-        var middleware = new RateLimitingMiddleware(next, _redis.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
         var context = CreateHttpContext("192.168.1.1", "/events");
 
         await middleware.InvokeAsync(context);
@@ -58,7 +63,7 @@ public class RateLimitingMiddlewareTests
             return Task.CompletedTask;
         };
 
-        var middleware = new RateLimitingMiddleware(next, _redis.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
         var context = CreateHttpContext("192.168.1.1", "/events");
 
         await middleware.InvokeAsync(context);
@@ -82,7 +87,7 @@ public class RateLimitingMiddlewareTests
             .ReturnsAsync(true);
 
         RequestDelegate next = _ => Task.CompletedTask;
-        var middleware = new RateLimitingMiddleware(next, _redis.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
 
         // Two different IPs
         await middleware.InvokeAsync(CreateHttpContext("10.0.0.1", "/events"));
