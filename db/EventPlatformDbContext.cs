@@ -29,6 +29,9 @@ public class EventPlatformDbContext(
     public DbSet<BookingTicket> BookingTickets => Set<BookingTicket>();
     public DbSet<Payment> Payments => Set<Payment>();
 
+    // User-facing
+    public DbSet<Feedback> Feedbacks => Set<Feedback>();
+
     // Logging
     public DbSet<DeveloperLog> DeveloperLogs => Set<DeveloperLog>();
     public DbSet<AdminLog> AdminLogs => Set<AdminLog>();
@@ -436,6 +439,20 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Recipient).HasMaxLength(256);
             entity.Property(e => e.Subject).HasMaxLength(512);
             entity.Property(e => e.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<Feedback>(entity =>
+        {
+            entity.ToTable("feedbacks");
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.Type).HasMaxLength(20);
+            entity.Property(e => e.Message).HasMaxLength(2000);
+            entity.Property(e => e.UserAgent).HasMaxLength(512);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.Type);
         });
 
         // ─── Read-only views ─────────────────────────────────────

@@ -1,0 +1,111 @@
+using System.Security.Claims;
+using Contracts.DTOs;
+using Db;
+using Db.Entities;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Api.Middleware;
+using Contracts.Enums;
+
+namespace Api.Controllers;
+
+[ApiController]
+[Route("feedback")]
+public class FeedbackController(EventPlatformDbContext context) : ControllerBase
+{
+    private static readonly string[] ValidTypes = ["General", "Bug", "Suggestion", "Compliment", "Complaint"];
+
+    /// <summary>
+    /// Submit feedback — no auth required.
+    /// </summary>
+    [HttpPost]
+    [AllowAnonymous]
+    public async Task<IActionResult> Submit([FromBody] SubmitFeedbackRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest(new ApiError(400, "Name is required", HttpContext.TraceIdentifier));
+        if (string.IsNullOrWhiteSpace(request.Message) || request.Message.Trim().Length < 10)
+            return BadRequest(new ApiError(400, "Message must be at least 10 characters", HttpContext.TraceIdentifier));
+        if (!ValidTypes.Contains(request.Type))
+            return BadRequest(new ApiError(400, $"Type must be one of: {string.Join(", ", ValidTypes)}", HttpContext.TraceIdentifier));
+        if (request.Rating < 0 || request.Rating > 5)
+            return BadRequest(new ApiError(400, "Rating must be between 0 and 5", HttpContext.TraceIdentifier));
+
+        Guid? userId = null;
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (claim is not null && Guid.TryParse(claim.Value, out var uid))
+            userId = uid;
+
+        var feedback = new Feedback
+        {
+            Name = request.Name.Trim(),
+            Email = request.Email?.Trim(),
+            Type = request.Type,
+            Message = request.Message.Trim(),
+            Rating = request.Rating,
+            UserId = userId,
+            UserAgent = Request.Headers.UserAgent.ToString(),
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+        };
+
+        context.Feedbacks.Add(feedback);
+        await context.SaveChangesAsync();
+
+        Log.Information("[Feedback] New {Type} feedback from {Name} (rating={Rating})", feedback.Type, feedback.Name, feedback.Rating);
+
+        return Ok(new { message = "Thank you for your feedback!" });
+    }
+
+    /// <summary>
+    /// Admin: list all feedback with pagination.
+    /// </summary>
+    [HttpGet]
+    [Authorize]
+    [RequireRole(UserRole.Admin)]
+    public async Task<IActionResult> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? type = null)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+        var query = context.Feedbacks
+            .Include(f => f.User)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(type))
+            query = query.Where(f => f.Type == type);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(f => f.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(f => new FeedbackDto(
+                f.Id, f.Name, f.Email, f.Type, f.Message, f.Rating,
+                f.UserId, f.User != null ? f.User.FirstName + " " + f.User.LastName : null,
+                f.CreatedAt
+            ))
+            .ToListAsync();
+
+        return Ok(new PagedResponse<FeedbackDto>(items, total, page, pageSize));
+    }
+
+    /// <summary>
+    /// Admin: delete feedback.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize]
+    [RequireRole(UserRole.Admin)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var feedback = await context.Feedbacks.FindAsync(id);
+        if (feedback is null) return NotFound();
+        context.Feedbacks.Remove(feedback);
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
+}
