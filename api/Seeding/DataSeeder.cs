@@ -122,17 +122,14 @@ public static class DataSeeder
                 Log.Information("[Seed] Updated cors_origins to production URL");
             }
 
-            // Override SMTP/email settings from environment variables (set in Render dashboard)
-            var smtpOverrides = new (string EnvVar, string SettingKey, string Description)[]
+            // Override email/Resend settings from environment variables (set in Render dashboard)
+            var envOverrides = new (string EnvVar, string SettingKey, string Description)[]
             {
-                ("SMTP_HOST", "smtp_host", "SMTP server hostname"),
-                ("SMTP_PORT", "smtp_port", "SMTP port"),
-                ("SMTP_USERNAME", "smtp_username", "SMTP username"),
-                ("SMTP_PASSWORD", "smtp_password", "SMTP password or app password"),
+                ("RESEND_API_KEY", "resend_api_key", "Resend API key for sending emails"),
                 ("EMAIL_FROM_ADDRESS", "email_from_address", "Sender email address"),
             };
 
-            foreach (var (envVar, settingKey, description) in smtpOverrides)
+            foreach (var (envVar, settingKey, description) in envOverrides)
             {
                 var envValue = Environment.GetEnvironmentVariable(envVar);
                 if (!string.IsNullOrEmpty(envValue))
