@@ -195,7 +195,9 @@ try
         options.Cookie.Name = "XSRF-TOKEN";
         options.Cookie.HttpOnly = false; // Frontend needs to read it
         options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
     });
     builder.Services.AddOpenApi();
     builder.Services.AddFluentValidationAutoValidation();
