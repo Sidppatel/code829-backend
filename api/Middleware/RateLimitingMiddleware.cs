@@ -5,12 +5,12 @@ namespace Api.Middleware;
 
 /// <summary>
 /// Redis-based rate limiting middleware for distributed deployments.
-/// Default: 100 requests per 15 minutes for general endpoints.
+/// Default: 30 requests per 15 minutes for general endpoints.
 /// Stricter limits for auth (5/min) and seat hold (20/min) endpoints.
 /// </summary>
 public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
 {
-    private const int DefaultLimit = 100;
+    private const int DefaultLimit = 30;
     private static readonly TimeSpan DefaultWindow = TimeSpan.FromMinutes(15);
 
     private const int AuthLimit = 5;
@@ -24,14 +24,9 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Skip rate limiting for loopback — React StrictMode double-invokes effects in dev
+        // No loopback bypass — in production the reverse proxy forwards real client IPs,
+        // and in dev the rate limit is generous enough for normal testing.
         var remoteIp = context.Connection.RemoteIpAddress;
-        if (remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp))
-        {
-            await next(context);
-            return;
-        }
-
         var ip = remoteIp?.ToString() ?? "unknown";
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "/";
 

@@ -9,10 +9,30 @@ namespace Api.Services;
 public class LocalFileStorageService : IFileStorageService
 {
     private const string UploadsDir = "uploads";
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private static readonly HashSet<string> AllowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+    private static readonly Dictionary<string, string[]> ExtensionToContentTypes = new()
+    {
+        [".jpg"] = ["image/jpeg"],
+        [".jpeg"] = ["image/jpeg"],
+        [".png"] = ["image/png"],
+        [".gif"] = ["image/gif"],
+        [".webp"] = ["image/webp"],
+    };
 
     public async Task<string> SaveAsync(Stream fileStream, string entityType, string fileName)
     {
-        var ext = Path.GetExtension(fileName);
+        // Sanitize filename — strip path traversal characters
+        fileName = Path.GetFileName(fileName);
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
+        if (!AllowedExtensions.Contains(ext))
+            throw new InvalidOperationException($"File extension '{ext}' is not allowed. Allowed: {string.Join(", ", AllowedExtensions)}");
+
+        if (fileStream.CanSeek && fileStream.Length > MaxFileSizeBytes)
+            throw new InvalidOperationException($"File exceeds maximum allowed size of {MaxFileSizeBytes / (1024 * 1024)} MB");
+
         var storedName = $"{Guid.NewGuid():N}{ext}";
         var relativePath = Path.Combine(entityType, storedName);
         var fullPath = Path.Combine(UploadsDir, relativePath);
