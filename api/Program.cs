@@ -185,7 +185,18 @@ try
     builder.Services.AddAuthorization();
 
     // Controllers + OpenAPI + Validation
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
+    });
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-XSRF-TOKEN";
+        options.Cookie.Name = "XSRF-TOKEN";
+        options.Cookie.HttpOnly = false; // Frontend needs to read it
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
     builder.Services.AddOpenApi();
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
@@ -280,6 +291,7 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseAntiforgery();
     app.UseMiddleware<RoleAuthorizationMiddleware>();
 
     app.MapControllers();

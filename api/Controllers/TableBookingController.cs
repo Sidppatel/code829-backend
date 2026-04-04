@@ -61,6 +61,7 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
     /// </summary>
     [HttpPost("release-beacon")]
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> ReleaseTableBeacon(
         [FromBody] ReleaseBeaconRequest request)
     {

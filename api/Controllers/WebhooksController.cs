@@ -16,6 +16,7 @@ public class WebhooksController(
 ) : ControllerBase
 {
     [HttpPost("stripe")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> HandleStripeWebhook()
     {
         var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
