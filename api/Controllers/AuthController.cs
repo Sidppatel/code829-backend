@@ -6,6 +6,7 @@ using Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace Api.Controllers;
 
@@ -48,6 +49,7 @@ public class AuthController(
         }
         catch (UnauthorizedAccessException ex)
         {
+            Log.Warning(ex, "[Auth] VerifyMagicLink failed: {Message}", ex.Message);
             return Unauthorized(new { message = ex.Message });
         }
     }
@@ -72,6 +74,7 @@ public class AuthController(
         }
         catch (KeyNotFoundException ex)
         {
+            Log.Warning(ex, "[Auth] DevLogin failed: {Message}", ex.Message);
             return NotFound(new { message = ex.Message });
         }
     }
@@ -92,6 +95,7 @@ public class AuthController(
         }
         catch (UnauthorizedAccessException ex)
         {
+            Log.Warning(ex, "[Auth] RefreshToken failed: {Message}", ex.Message);
             return Unauthorized(new { message = ex.Message });
         }
     }

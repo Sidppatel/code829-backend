@@ -8,6 +8,7 @@ using Db;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace Api.Controllers;
 
@@ -29,8 +30,8 @@ public class BookingsController(
             var booking = await bookingService.CreateAsync(userId, request);
             return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
         }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/confirm")]
@@ -43,9 +44,9 @@ public class BookingsController(
             var booking = await bookingService.ConfirmPaymentAsync(id, userId);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
     }
 
     [HttpPost("confirm-by-intent")]
@@ -71,9 +72,9 @@ public class BookingsController(
             var booking = await bookingService.ConfirmPaymentAsync(payment.BookingId, userId);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
     }
 
     [HttpPost("{id:guid}/cancel")]
@@ -86,9 +87,9 @@ public class BookingsController(
             var booking = await bookingService.CancelAsync(id, userId);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] Cancel forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
     }
 
     [HttpPost("{id:guid}/refund")]
@@ -100,8 +101,8 @@ public class BookingsController(
             var booking = await bookingService.RefundAsync(id);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
     }
 
     [HttpGet("{id:guid}")]
@@ -186,8 +187,8 @@ public class BookingsController(
             var png = await bookingService.GetQrImageAsync(id, userId);
             return File(png, "image/png");
         }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] GetQrCode failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] GetQrCode failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] GetQrCode forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
     }
 }

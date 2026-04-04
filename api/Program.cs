@@ -271,6 +271,7 @@ try
               .AllowCredentials();
     });
 
+    app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<RateLimitingMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();
 

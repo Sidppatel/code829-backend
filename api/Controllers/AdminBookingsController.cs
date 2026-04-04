@@ -11,6 +11,7 @@ using Db;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using StackExchange.Redis;
 
 namespace Api.Controllers;
@@ -119,8 +120,8 @@ public class AdminBookingsController(
     {
         await InvalidateBookingCaches();
         try { return Ok(await bookingService.RefundAsync(id)); }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
     }
 
     [HttpGet("export/csv")]

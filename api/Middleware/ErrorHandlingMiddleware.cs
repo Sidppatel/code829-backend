@@ -25,9 +25,6 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
             var correlationId = context.TraceIdentifier;
 
             Log.Error(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
-            Console.Error.WriteLine($"[ERROR] {context.Request.Method} {context.Request.Path}: {ex.GetType().Name}: {ex.Message}");
-            if (ex.InnerException is not null)
-                Console.Error.WriteLine($"[ERROR] Inner: {ex.InnerException.Message}");
 
             try
             {
