@@ -19,14 +19,34 @@ public class AuthController(
     Db.EventPlatformDbContext context
 ) : ControllerBase
 {
+    private const int MagicLinkLimit = 2;
+    private static readonly TimeSpan MagicLinkWindow = TimeSpan.FromMinutes(2);
+
     /// <summary>
     /// Request a magic link email for passwordless login.
+    /// Rate limited to 2 requests per email per 2 minutes.
     /// </summary>
     [HttpPost("magic-link")]
-    public async Task<IActionResult> RequestMagicLink([FromBody] MagicLinkRequest request)
+    public async Task<IActionResult> RequestMagicLink(
+        [FromBody] MagicLinkRequest request,
+        [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
     {
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
+
+        // Per-email rate limit
+        var emailKey = $"ratelimit:magic-link:{request.Email.Trim().ToLowerInvariant()}";
+        var db = redis.GetDatabase();
+        var count = await db.StringIncrementAsync(emailKey);
+        if (count == 1)
+            await db.KeyExpireAsync(emailKey, MagicLinkWindow);
+
+        if (count > MagicLinkLimit)
+        {
+            var ttl = await db.KeyTimeToLiveAsync(emailKey);
+            var retryAfter = (int)Math.Ceiling((ttl ?? MagicLinkWindow).TotalSeconds);
+            return StatusCode(429, new { statusCode = 429, message = "Too many requests. Please try again shortly.", retryAfterSeconds = retryAfter });
+        }
 
         var response = await authService.SendMagicLinkAsync(request.Email);
         return Ok(response);

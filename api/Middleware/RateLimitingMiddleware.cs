@@ -19,7 +19,8 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
     private const int SeatHoldLimit = 20;
     private static readonly TimeSpan SeatHoldWindow = TimeSpan.FromMinutes(1);
 
-    private static readonly string[] AuthPaths = ["/auth/magic-link", "/auth/dev-login"];
+    // magic-link has its own per-email rate limit in AuthController
+    private static readonly string[] AuthPaths = ["/auth/dev-login"];
     private static readonly string[] SeatHoldPaths = ["/seats/hold", "/seats/hold-table"];
 
     public async Task InvokeAsync(HttpContext context)
