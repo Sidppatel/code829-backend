@@ -126,15 +126,15 @@ public class DeveloperController(
     public async Task<IActionResult> GetSettings()
     {
         var all = await settingsRepo.GetAllAsync();
-        var dtos = all.Select(s =>
+        var dtos = new List<SettingDto>();
+        foreach (var s in all)
         {
-            // Mask all but last 4 chars for sensitive values
-            var decrypted = settingsService.GetOrDefaultAsync(s.Key).Result ?? "";
+            var decrypted = await settingsService.GetOrDefaultAsync(s.Key) ?? "";
             var masked = decrypted.Length > 4
                 ? new string('*', decrypted.Length - 4) + decrypted[^4..]
                 : "****";
-            return new SettingDto(s.Key, masked, s.Description, s.UpdatedAt);
-        }).ToList();
+            dtos.Add(new SettingDto(s.Key, masked, s.Description, s.UpdatedAt));
+        }
 
         return Ok(dtos);
     }

@@ -297,16 +297,11 @@ try
 
     app.MapControllers();
 
-    // OpenAPI + Scalar: always available but auth-protected in production
-    app.MapOpenApi();
+    // OpenAPI + Scalar: only available in development
     if (app.Environment.IsDevelopment())
     {
+        app.MapOpenApi();
         app.MapScalarApiReference();
-    }
-    else
-    {
-        // In production, Scalar requires authentication
-        app.MapScalarApiReference().RequireAuthorization();
     }
 
     Log.Information("Event Platform API starting on port {Port}", port);

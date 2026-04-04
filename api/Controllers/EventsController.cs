@@ -123,22 +123,30 @@ public class EventsController(
 
         var totalCount = await query.CountAsync();
 
-        var items = await query
+        var pagedEvents = await query
             .OrderBy(e => e.StartDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(e => new EventSummaryDto(
-                e.Id, e.Title, e.Slug, e.Status.ToString(), e.Category.HasValue ? e.Category.Value.ToString() : "",
-                e.StartDate, e.EndDate,
-                e.ImagePath != null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
-                e.IsFeatured,
-                e.LayoutMode.ToString(),
-                e.Venue.Name, e.Venue.Address!.City, e.Venue.Address!.State,
-                e.PricePerPersonCents,
-                e.MaxCapacity ?? 0,
-                context.Bookings.Count(b => b.EventId == e.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
-            ))
             .ToListAsync();
+
+        var pagedEventIds = pagedEvents.Select(e => e.Id).ToList();
+        var bookingCounts = await context.Bookings
+            .Where(b => pagedEventIds.Contains(b.EventId) && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
+            .GroupBy(b => b.EventId)
+            .Select(g => new { EventId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EventId, x => x.Count);
+
+        var items = pagedEvents.Select(e => new EventSummaryDto(
+            e.Id, e.Title, e.Slug, e.Status.ToString(), e.Category.HasValue ? e.Category.Value.ToString() : "",
+            e.StartDate, e.EndDate,
+            e.ImagePath != null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
+            e.IsFeatured,
+            e.LayoutMode.ToString(),
+            e.Venue.Name, e.Venue.Address!.City, e.Venue.Address!.State,
+            e.PricePerPersonCents,
+            e.MaxCapacity ?? 0,
+            bookingCounts.GetValueOrDefault(e.Id, 0)
+        )).ToList();
 
         var result = new PagedResponse<EventSummaryDto>(items, totalCount, page, pageSize);
         var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
