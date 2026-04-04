@@ -30,6 +30,9 @@ jobs:
           --health-retries 5
 
     steps:
+      - name: Prefer IPv4 for outbound connections
+        run: sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4

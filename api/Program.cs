@@ -329,7 +329,8 @@ static string ConvertPostgresUrl(string url)
     var userInfo = uri.UserInfo.Split(':');
     var sslMode = Environment.GetEnvironmentVariable("DATABASE_SSL_MODE")
         ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ? "Disable" : "VerifyFull");
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60;IP Type=IPv4";
+
+    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
 }
 
 /// <summary>
