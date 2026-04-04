@@ -368,12 +368,6 @@ public class BookingService(
         return qrCode.GetGraphic(10);
     }
 
-    private static int CalculateFee(int subtotalCents, int? platformFeePercent)
-    {
-        if (!platformFeePercent.HasValue || platformFeePercent.Value <= 0)
-            return 0;
-        return (int)Math.Ceiling(subtotalCents * platformFeePercent.Value / 100.0);
-    }
 
     private async Task<string> GenerateBookingNumberAsync()
     {
