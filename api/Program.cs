@@ -185,7 +185,7 @@ try
     builder.Services.AddAuthorization();
 
     // Controllers + OpenAPI + Validation
-    builder.Services.AddControllers(options =>
+    builder.Services.AddControllersWithViews(options =>
     {
         options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
     });
