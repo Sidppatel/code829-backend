@@ -1,3 +1,4 @@
+using Contracts.DTOs;
 using System.Text.Json;
 using Api.Middleware;
 using Contracts.DTOs.Layout;
@@ -37,7 +38,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> CreateTableTemplate([FromBody] CreateTableTemplateRequest request)
     {
         if (!Enum.TryParse<TableShape>(request.DefaultShape, true, out var shape))
-            return BadRequest(new { message = "Invalid shape" });
+            return BadRequest(new ApiError(400, "Invalid shape", HttpContext.TraceIdentifier));
 
         var tt = new TableTemplate
         {
@@ -60,10 +61,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> UpdateTableTemplate(Guid id, [FromBody] CreateTableTemplateRequest request)
     {
         var tt = await context.TableTemplates.FindAsync(id);
-        if (tt is null) return NotFound(new { message = "Table template not found" });
+        if (tt is null) return NotFound(new ApiError(404, "Table template not found", HttpContext.TraceIdentifier));
 
         if (!Enum.TryParse<TableShape>(request.DefaultShape, true, out var shape))
-            return BadRequest(new { message = "Invalid shape" });
+            return BadRequest(new ApiError(400, "Invalid shape", HttpContext.TraceIdentifier));
 
         tt.Name = request.Name;
         tt.DefaultCapacity = request.DefaultCapacity;
@@ -82,7 +83,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> DeleteTableTemplate(Guid id)
     {
         var tt = await context.TableTemplates.FindAsync(id);
-        if (tt is null) return NotFound(new { message = "Table template not found" });
+        if (tt is null) return NotFound(new ApiError(404, "Table template not found", HttpContext.TraceIdentifier));
 
         tt.IsActive = false;
         tt.UpdatedAt = DateTime.UtcNow;
@@ -98,7 +99,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> GetEventTables(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var eventTables = await context.EventTables
             .Include(et => et.TableTemplate)
@@ -114,29 +115,29 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> CreateEventTable(Guid eventId, [FromBody] CreateEventTableRequest request)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         TableTemplate? template = null;
         if (request.TableTemplateId.HasValue)
         {
             template = await context.TableTemplates.FindAsync(request.TableTemplateId.Value);
-            if (template is null) return NotFound(new { message = "Table template not found" });
+            if (template is null) return NotFound(new ApiError(404, "Table template not found", HttpContext.TraceIdentifier));
         }
 
         // When no template, Label/Capacity/Shape are required
         if (template is null)
         {
             if (string.IsNullOrWhiteSpace(request.Label))
-                return BadRequest(new { message = "Label is required when no template is selected" });
+                return BadRequest(new ApiError(400, "Label is required when no template is selected", HttpContext.TraceIdentifier));
             if (request.Capacity is null || request.Capacity <= 0)
-                return BadRequest(new { message = "Capacity is required when no template is selected" });
+                return BadRequest(new ApiError(400, "Capacity is required when no template is selected", HttpContext.TraceIdentifier));
             if (string.IsNullOrWhiteSpace(request.Shape))
-                return BadRequest(new { message = "Shape is required when no template is selected" });
+                return BadRequest(new ApiError(400, "Shape is required when no template is selected", HttpContext.TraceIdentifier));
         }
 
         var shapeStr = request.Shape ?? template?.DefaultShape.ToString() ?? "Square";
         if (!Enum.TryParse<TableShape>(shapeStr, true, out var shape))
-            return BadRequest(new { message = "Invalid shape" });
+            return BadRequest(new ApiError(400, "Invalid shape", HttpContext.TraceIdentifier));
 
         var et = new EventTable
         {
@@ -169,7 +170,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .Include(x => x.TableTemplate)
             .Include(x => x.Tables)
             .FirstOrDefaultAsync(x => x.Id == id && x.EventId == eventId);
-        if (et is null) return NotFound(new { message = "Event table not found" });
+        if (et is null) return NotFound(new ApiError(404, "Event table not found", HttpContext.TraceIdentifier));
 
         // Block if any tables have active bookings
         var tableIds = et.Tables.Select(t => t.Id).ToList();
@@ -177,10 +178,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             b.EventId == eventId && b.TableId.HasValue && tableIds.Contains(b.TableId.Value)
             && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn || b.Status == BookingStatus.Pending));
         if (hasActiveBookings)
-            return BadRequest(new { message = "Cannot modify — tables have active bookings" });
+            return BadRequest(new ApiError(400, "Cannot modify — tables have active bookings", HttpContext.TraceIdentifier));
 
         if (request.Shape is not null && !Enum.TryParse<TableShape>(request.Shape, true, out _))
-            return BadRequest(new { message = "Invalid shape" });
+            return BadRequest(new ApiError(400, "Invalid shape", HttpContext.TraceIdentifier));
 
         if (request.Label is not null) et.Label = request.Label;
         if (request.Capacity.HasValue) et.Capacity = request.Capacity.Value;
@@ -200,14 +201,14 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var et = await context.EventTables
             .Include(x => x.Tables)
             .FirstOrDefaultAsync(x => x.Id == id && x.EventId == eventId);
-        if (et is null) return NotFound(new { message = "Event table not found" });
+        if (et is null) return NotFound(new ApiError(404, "Event table not found", HttpContext.TraceIdentifier));
 
         var tableIds = et.Tables.Select(t => t.Id).ToList();
         var hasActiveBookings = await context.Bookings.AnyAsync(b =>
             b.EventId == eventId && b.TableId.HasValue && tableIds.Contains(b.TableId.Value)
             && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn || b.Status == BookingStatus.Pending));
         if (hasActiveBookings)
-            return BadRequest(new { message = "Cannot delete — tables have active bookings" });
+            return BadRequest(new ApiError(400, "Cannot delete — tables have active bookings", HttpContext.TraceIdentifier));
 
         // Cascade delete table instances
         context.Tables.RemoveRange(et.Tables);
@@ -224,7 +225,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> GetLayout(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var tables = await context.Tables
             .Include(t => t.EventTable)
@@ -243,7 +244,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> SaveLayout(Guid eventId, [FromBody] SaveLayoutRequest request)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var locked = await GetLockedTableIdsAsync(eventId);
 
@@ -261,7 +262,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         foreach (var rt in request.Tables)
         {
             if (!cells.Add((rt.GridRow, rt.GridCol)))
-                return BadRequest(new { message = $"Duplicate grid cell ({rt.GridRow}, {rt.GridCol})" });
+                return BadRequest(new ApiError(400, $"Duplicate grid cell ({rt.GridRow}, {rt.GridCol})", HttpContext.TraceIdentifier));
         }
 
         // Remove tables not in request (skip locked)
@@ -348,7 +349,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> FlushDraft(Guid eventId)
     {
         if (await IsLayoutLockedAsync(eventId))
-            return Conflict(new { message = "Layout is locked — tables have active bookings" });
+            return Conflict(new ApiError(409, "Layout is locked — tables have active bookings", HttpContext.TraceIdentifier));
 
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(DraftKey(eventId));
@@ -360,7 +361,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             return Ok(new { message = "Invalid draft" });
 
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var locked = await GetLockedTableIdsAsync(eventId);
 
@@ -420,11 +421,11 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> AddTable(Guid eventId, [FromBody] AddTableRequest request)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var eventTable = await context.EventTables.FindAsync(request.EventTableId);
         if (eventTable is null || eventTable.EventId != eventId)
-            return BadRequest(new { message = "Event table not found for this event" });
+            return BadRequest(new ApiError(400, "Event table not found for this event", HttpContext.TraceIdentifier));
 
         var table = new Table
         {
@@ -452,11 +453,11 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var table = await context.Tables
             .Include(t => t.EventTable)
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
-        if (table is null) return NotFound(new { message = "Table not found" });
+        if (table is null) return NotFound(new ApiError(404, "Table not found", HttpContext.TraceIdentifier));
 
         var locked = await GetLockedTableIdsAsync(eventId);
         if (locked.Contains(tableId))
-            return BadRequest(new { message = "This table has active bookings and cannot be modified" });
+            return BadRequest(new ApiError(400, "This table has active bookings and cannot be modified", HttpContext.TraceIdentifier));
 
         if (request.Label is not null) table.Label = request.Label;
         if (request.GridRow.HasValue) table.GridRow = request.GridRow.Value;
@@ -467,7 +468,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         {
             var et = await context.EventTables.FindAsync(request.EventTableId.Value);
             if (et is null || et.EventId != eventId)
-                return BadRequest(new { message = "Event table not found for this event" });
+                return BadRequest(new ApiError(400, "Event table not found for this event", HttpContext.TraceIdentifier));
             table.EventTableId = request.EventTableId.Value;
         }
 
@@ -484,11 +485,11 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var table = await context.Tables
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
-        if (table is null) return NotFound(new { message = "Table not found" });
+        if (table is null) return NotFound(new ApiError(404, "Table not found", HttpContext.TraceIdentifier));
 
         var locked = await GetLockedTableIdsAsync(eventId);
         if (locked.Contains(tableId))
-            return BadRequest(new { message = "This table has active bookings and cannot be deleted" });
+            return BadRequest(new ApiError(400, "This table has active bookings and cannot be deleted", HttpContext.TraceIdentifier));
 
         context.Tables.Remove(table);
         await context.SaveChangesAsync();
@@ -501,7 +502,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> GetLayoutWithStatus(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var tables = await context.Tables
             .Include(t => t.EventTable)
@@ -562,7 +563,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> GetLayoutStats(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var stats = await context.Tables
             .Include(t => t.EventTable)
@@ -597,7 +598,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     public async Task<IActionResult> BulkInsertEventTables(Guid eventId, [FromBody] BulkInsertRequest request)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         // Find which templates already have an EventTable for this event
         var existingTemplateIds = await context.EventTables

@@ -73,7 +73,7 @@ public class AdminEventsController(
             .Include(e => e.Organizer)
             .FirstOrDefaultAsync(e => e.Id == id);
 
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         return Ok(MapToDto(ev));
     }
 
@@ -81,13 +81,13 @@ public class AdminEventsController(
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
         var venue = await context.Venues.FindAsync(request.VenueId);
-        if (venue is null) return BadRequest(new { message = "Venue not found" });
+        if (venue is null) return BadRequest(new ApiError(400, "Venue not found", HttpContext.TraceIdentifier));
 
         if (!Enum.TryParse<EventCategory>(request.Category, true, out var category))
-            return BadRequest(new { message = "Invalid category" });
+            return BadRequest(new ApiError(400, "Invalid category", HttpContext.TraceIdentifier));
 
         if (!Enum.TryParse<LayoutMode>(request.LayoutMode, true, out var layoutMode))
-            return BadRequest(new { message = "Invalid layout mode" });
+            return BadRequest(new ApiError(400, "Invalid layout mode", HttpContext.TraceIdentifier));
 
         var organizerId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var slug = GenerateSlug(request.Title);
@@ -135,7 +135,7 @@ public class AdminEventsController(
     {
         var ev = await context.Events.Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         if (request.Title is not null)
         {
@@ -156,7 +156,7 @@ public class AdminEventsController(
                 var hasBookings = await context.Bookings
                     .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
                 if (hasBookings)
-                    return BadRequest(new { message = "Cannot change layout mode — active bookings exist for this event" });
+                    return BadRequest(new ApiError(400, "Cannot change layout mode — active bookings exist for this event", HttpContext.TraceIdentifier));
             }
             ev.LayoutMode = lm;
         }
@@ -168,7 +168,7 @@ public class AdminEventsController(
         if (request.Status is not null && Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
         {
             if (!IsValidTransition(ev.Status, newStatus))
-                return BadRequest(new { message = $"Cannot transition from {ev.Status} to {newStatus}" });
+                return BadRequest(new ApiError(400, $"Cannot transition from {ev.Status} to {newStatus}", HttpContext.TraceIdentifier));
             ev.Status = newStatus;
             if (newStatus == EventStatus.Published) ev.PublishedAt = DateTime.UtcNow;
         }
@@ -182,7 +182,7 @@ public class AdminEventsController(
     public async Task<IActionResult> IsLayoutModeLocked(Guid id)
     {
         var ev = await context.Events.FindAsync(id);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var hasBookings = await context.Bookings
             .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
@@ -194,7 +194,7 @@ public class AdminEventsController(
     public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
     {
         var ev = await context.Events.FindAsync(id);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "events", file.FileName);
         ev.ImagePath = path;
@@ -210,24 +210,24 @@ public class AdminEventsController(
         var ev = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         if (!Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
-            return BadRequest(new { message = "Invalid status" });
+            return BadRequest(new ApiError(400, "Invalid status", HttpContext.TraceIdentifier));
 
         if (!IsValidTransition(ev.Status, newStatus))
-            return BadRequest(new { message = $"Cannot transition from {ev.Status} to {newStatus}" });
+            return BadRequest(new ApiError(400, $"Cannot transition from {ev.Status} to {newStatus}", HttpContext.TraceIdentifier));
 
         if (newStatus == EventStatus.Published)
         {
             if (string.IsNullOrWhiteSpace(ev.Title))
-                return BadRequest(new { message = "Title is required to publish" });
+                return BadRequest(new ApiError(400, "Title is required to publish", HttpContext.TraceIdentifier));
             if (ev.StartDate == default || ev.EndDate == default)
-                return BadRequest(new { message = "Dates are required to publish" });
+                return BadRequest(new ApiError(400, "Dates are required to publish", HttpContext.TraceIdentifier));
         }
 
         if (newStatus == EventStatus.Completed && ev.EndDate > DateTime.UtcNow)
-            return BadRequest(new { message = "Cannot complete an event before its end date" });
+            return BadRequest(new ApiError(400, "Cannot complete an event before its end date", HttpContext.TraceIdentifier));
 
         ev.Status = newStatus;
         if (newStatus == EventStatus.Published) ev.PublishedAt = DateTime.UtcNow;
@@ -243,14 +243,14 @@ public class AdminEventsController(
     public async Task<IActionResult> Delete(Guid id)
     {
         var ev = await context.Events.FindAsync(id);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         if (ev.Status != EventStatus.Draft)
-            return BadRequest(new { message = "Only draft events can be deleted" });
+            return BadRequest(new ApiError(400, "Only draft events can be deleted", HttpContext.TraceIdentifier));
 
         var hasBookings = await context.Bookings.AnyAsync(b => b.EventId == id);
         if (hasBookings)
-            return BadRequest(new { message = "Cannot delete an event with bookings" });
+            return BadRequest(new ApiError(400, "Cannot delete an event with bookings", HttpContext.TraceIdentifier));
 
         context.Events.Remove(ev);
         await context.SaveChangesAsync();
@@ -263,7 +263,7 @@ public class AdminEventsController(
         var original = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstOrDefaultAsync(e => e.Id == id);
-        if (original is null) return NotFound(new { message = "Event not found" });
+        if (original is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var organizerId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var slug = GenerateSlug(original.Title + " copy");

@@ -120,8 +120,8 @@ public class AdminBookingsController(
     {
         await InvalidateBookingCaches();
         try { return Ok(await bookingService.RefundAsync(id)); }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpGet("export/csv")]

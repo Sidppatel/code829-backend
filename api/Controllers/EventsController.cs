@@ -267,7 +267,7 @@ public class EventsController(
             .Include(e => e.Organizer)
             .FirstOrDefaultAsync(e => e.Id == id);
 
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var dto = new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
@@ -301,7 +301,7 @@ public class EventsController(
             .Include(e => e.Organizer)
             .FirstOrDefaultAsync(e => e.Slug == slug);
 
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         return Ok(new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
@@ -388,7 +388,7 @@ public class EventsController(
     public async Task<IActionResult> GetTables(Guid id)
     {
         var ev = await context.Events.FirstOrDefaultAsync(e => e.Id == id);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         Guid? userId = null;
         var userClaim = User.FindFirst(ClaimTypes.NameIdentifier);

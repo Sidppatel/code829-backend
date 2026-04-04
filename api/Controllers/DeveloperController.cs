@@ -199,15 +199,15 @@ public class DeveloperController(
     public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
     {
         if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
-            return BadRequest(new { message = "Invalid role" });
+            return BadRequest(new ApiError(400, "Invalid role", HttpContext.TraceIdentifier));
 
         var user = await context.Users.FindAsync(id);
-        if (user is null) return NotFound(new { message = "User not found" });
+        if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
         // Ensure developers cannot demote or duplicate the master developer via this endpoint
         // (Assuming developer is highest role, but let's just make sure they don't break themselves)
         if (user.Role == UserRole.Developer && role != UserRole.Developer)
-            return BadRequest(new { message = "Cannot demote a Developer" });
+            return BadRequest(new ApiError(400, "Cannot demote a Developer", HttpContext.TraceIdentifier));
 
         user.Role = role;
         user.UpdatedAt = DateTime.UtcNow;

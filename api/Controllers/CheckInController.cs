@@ -1,3 +1,4 @@
+using Contracts.DTOs;
 using Api.Middleware;
 using Contracts.DTOs.CheckIn;
 using Contracts.Enums;
@@ -68,7 +69,7 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
     public async Task<IActionResult> GetStats(Guid eventId)
     {
         var ev = await context.Events.FindAsync(eventId);
-        if (ev is null) return NotFound(new { message = "Event not found" });
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         // Count tickets (seats) not bookings — SeatsReserved defaults to 1 if null
         var stats = await context.Bookings

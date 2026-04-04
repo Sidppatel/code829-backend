@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Contracts.DTOs;
 using Contracts.Enums;
 
 namespace Api.Middleware;
@@ -25,7 +26,7 @@ public class RoleAuthorizationMiddleware(RequestDelegate next)
             if (!context.User.Identity?.IsAuthenticated ?? true)
             {
                 context.Response.StatusCode = 401;
-                await context.Response.WriteAsJsonAsync(new { message = "Authentication required" });
+                await context.Response.WriteAsJsonAsync(new ApiError(401, "Authentication required", CorrelationId: context.TraceIdentifier));
                 return;
             }
 
@@ -33,7 +34,7 @@ public class RoleAuthorizationMiddleware(RequestDelegate next)
             if (roleClaim is null || !Enum.TryParse<UserRole>(roleClaim, out var userRole) || userRole < roleAttr.MinimumRole)
             {
                 context.Response.StatusCode = 403;
-                await context.Response.WriteAsJsonAsync(new { message = "Insufficient permissions" });
+                await context.Response.WriteAsJsonAsync(new ApiError(403, "Insufficient permissions", CorrelationId: context.TraceIdentifier));
                 return;
             }
         }

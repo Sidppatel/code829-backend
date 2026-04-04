@@ -1,3 +1,4 @@
+using Contracts.DTOs;
 using System.Security.Claims;
 using Api.Middleware;
 using Api.Services;
@@ -26,7 +27,7 @@ public class AuthController(
     public async Task<IActionResult> RequestMagicLink([FromBody] MagicLinkRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Email))
-            return BadRequest(new { message = "Email is required" });
+            return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
 
         var response = await authService.SendMagicLinkAsync(request.Email);
         return Ok(response);
@@ -40,7 +41,7 @@ public class AuthController(
     public async Task<IActionResult> VerifyMagicLink([FromBody] MagicLinkVerifyRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Token))
-            return BadRequest(new { message = "Token is required" });
+            return BadRequest(new ApiError(400, "Token is required", HttpContext.TraceIdentifier));
 
         try
         {
@@ -50,7 +51,7 @@ public class AuthController(
         catch (UnauthorizedAccessException ex)
         {
             Log.Warning(ex, "[Auth] VerifyMagicLink failed: {Message}", ex.Message);
-            return Unauthorized(new { message = ex.Message });
+            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
         }
     }
 
@@ -65,7 +66,7 @@ public class AuthController(
             return NotFound();
 
         if (string.IsNullOrWhiteSpace(request.Email))
-            return BadRequest(new { message = "Email is required" });
+            return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
 
         try
         {
@@ -75,7 +76,7 @@ public class AuthController(
         catch (KeyNotFoundException ex)
         {
             Log.Warning(ex, "[Auth] DevLogin failed: {Message}", ex.Message);
-            return NotFound(new { message = ex.Message });
+            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
         }
     }
 
@@ -86,7 +87,7 @@ public class AuthController(
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
-            return BadRequest(new { message = "Refresh token is required" });
+            return BadRequest(new ApiError(400, "Refresh token is required", HttpContext.TraceIdentifier));
 
         try
         {
@@ -96,7 +97,7 @@ public class AuthController(
         catch (UnauthorizedAccessException ex)
         {
             Log.Warning(ex, "[Auth] RefreshToken failed: {Message}", ex.Message);
-            return Unauthorized(new { message = ex.Message });
+            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
         }
     }
 
@@ -110,11 +111,11 @@ public class AuthController(
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new { message = "Invalid token" });
+            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
         var user = await authService.GetCurrentUserAsync(userId);
         if (user is null)
-            return NotFound(new { message = "User not found" });
+            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
         return Ok(user);
     }
@@ -126,12 +127,12 @@ public class AuthController(
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new { message = "Invalid token" });
+            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
         var user = await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user is null)
-            return NotFound(new { message = "User not found" });
+            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
         if (!string.IsNullOrWhiteSpace(request.FirstName))
             user.FirstName = request.FirstName;

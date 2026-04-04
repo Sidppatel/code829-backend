@@ -1,3 +1,4 @@
+using Contracts.DTOs;
 using System.Security.Claims;
 using Api.Middleware;
 using Api.Services;
@@ -26,11 +27,11 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new { message = ex.Message });
+            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { message = ex.Message });
+            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
         }
     }
 
@@ -47,11 +48,11 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new { message = ex.Message });
+            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier));
         }
     }
 

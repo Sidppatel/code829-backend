@@ -43,7 +43,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var venue = await context.Venues.Include(v => v.Address).FirstOrDefaultAsync(v => v.Id == id);
-        if (venue is null) return NotFound(new { message = "Venue not found" });
+        if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
         return Ok(MapToDto(venue, fileStorage));
     }
 
@@ -81,7 +81,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVenueRequest request)
     {
         var venue = await context.Venues.Include(v => v.Address).FirstOrDefaultAsync(v => v.Id == id);
-        if (venue is null) return NotFound(new { message = "Venue not found" });
+        if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         if (request.Name is not null) venue.Name = request.Name;
         if (request.Description is not null) venue.Description = request.Description;
@@ -125,7 +125,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
     {
         var venue = await context.Venues.FindAsync(id);
-        if (venue is null) return NotFound(new { message = "Venue not found" });
+        if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "venues", file.FileName);
         venue.ImagePath = path;
@@ -139,7 +139,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> Delete(Guid id)
     {
         var venue = await context.Venues.FindAsync(id);
-        if (venue is null) return NotFound(new { message = "Venue not found" });
+        if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         venue.IsActive = false;
         venue.UpdatedAt = DateTime.UtcNow;

@@ -53,8 +53,9 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
 
             var response = JsonSerializer.Serialize(new
             {
-                error = "Too many requests. Please try again later.",
-                retryAfterSeconds
+                statusCode = 429,
+                message = "Too many requests. Please try again later.",
+                correlationId = context.TraceIdentifier
             });
 
             await context.Response.WriteAsync(response);

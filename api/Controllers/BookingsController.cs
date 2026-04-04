@@ -30,8 +30,8 @@ public class BookingsController(
             var booking = await bookingService.CreateAsync(userId, request);
             return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/confirm")]
@@ -44,9 +44,9 @@ public class BookingsController(
             var booking = await bookingService.ConfirmPaymentAsync(id, userId);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] ConfirmPayment forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("confirm-by-intent")]
@@ -61,10 +61,10 @@ public class BookingsController(
                 .FirstOrDefaultAsync(p => p.PaymentIntentId == request.PaymentIntentId);
 
             if (payment is null)
-                return NotFound(new { message = "Payment not found" });
+                return NotFound(new ApiError(404, "Payment not found", HttpContext.TraceIdentifier));
 
             if (payment.Booking.UserId != userId)
-                return Forbid("Not your booking");
+                return StatusCode(403, new ApiError(403, "Not your booking", HttpContext.TraceIdentifier));
 
             if (payment.Booking.Status != BookingStatus.Pending)
                 return Ok(await bookingService.GetByIdAsync(payment.BookingId));
@@ -72,9 +72,9 @@ public class BookingsController(
             var booking = await bookingService.ConfirmPaymentAsync(payment.BookingId, userId);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/cancel")]
@@ -87,9 +87,9 @@ public class BookingsController(
             var booking = await bookingService.CancelAsync(id, userId);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] Cancel forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] Cancel forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/refund")]
@@ -101,8 +101,8 @@ public class BookingsController(
             var booking = await bookingService.RefundAsync(id);
             return Ok(booking);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpGet("{id:guid}")]
@@ -112,10 +112,10 @@ public class BookingsController(
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var userRole = Enum.Parse<UserRole>(User.FindFirst(ClaimTypes.Role)!.Value);
         var booking = await bookingService.GetByIdAsync(id);
-        if (booking is null) return NotFound(new { message = "Booking not found" });
+        if (booking is null) return NotFound(new ApiError(404, "Booking not found", HttpContext.TraceIdentifier));
 
         if (userRole < UserRole.Staff && booking.UserId != userId)
-            return Forbid("Not your booking");
+            return StatusCode(403, new ApiError(403, "Not your booking", HttpContext.TraceIdentifier));
 
         return Ok(booking);
     }
@@ -187,8 +187,8 @@ public class BookingsController(
             var png = await bookingService.GetQrImageAsync(id, userId);
             return File(png, "image/png");
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] GetQrCode failed: {Message}", ex.Message); return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] GetQrCode failed: {Message}", ex.Message); return BadRequest(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] GetQrCode forbidden: {Message}", ex.Message); return Forbid(ex.Message); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] GetQrCode failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] GetQrCode failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] GetQrCode forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
     }
 }

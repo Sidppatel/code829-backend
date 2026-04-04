@@ -1,3 +1,4 @@
+using Contracts.DTOs;
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs.Events;
