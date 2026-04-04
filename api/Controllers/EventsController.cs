@@ -265,7 +265,7 @@ public class EventsController(
         var ev = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.Organizer)
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.Id == id && e.Status == EventStatus.Published);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
@@ -299,7 +299,7 @@ public class EventsController(
         var ev = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .Include(e => e.Organizer)
-            .FirstOrDefaultAsync(e => e.Slug == slug);
+            .FirstOrDefaultAsync(e => e.Slug == slug && e.Status == EventStatus.Published);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 

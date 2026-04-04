@@ -263,9 +263,13 @@ public class TicketsController(
         if (ticket.GuestUserId == userId)
             return Ok(new { message = "You've already claimed this ticket", ticketId = ticket.Id });
 
+        if (ticket.Status == TicketStatus.Claimed)
+            return BadRequest(new ApiError(400, "This ticket has already been claimed", HttpContext.TraceIdentifier));
+
         ticket.GuestUserId = userId;
         ticket.Status = TicketStatus.Claimed;
         ticket.ClaimedAt = DateTime.UtcNow;
+        ticket.InviteTokenHash = null;
         ticket.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
