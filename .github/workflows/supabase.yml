@@ -52,6 +52,7 @@ jobs:
         run: dotnet ef database update --project db/db.csproj --startup-project api/api.csproj --no-build --configuration Release
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_SSL_MODE: Require
           REDIS_URL: redis://localhost:6379
           SETTINGS_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
           ASPNETCORE_ENVIRONMENT: Production
