@@ -140,9 +140,18 @@ try
     builder.Services.AddScoped<IEmailService>(sp =>
     {
         var settingsService = sp.GetRequiredService<ISettingsService>();
+
+        // Priority 1: SMTP (Gmail, Outlook, etc.) — check if smtp_host is configured
+        var smtpHost = settingsService.GetOrDefaultAsync("smtp_host").GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(smtpHost) && smtpHost != "MOCK_DEV")
+            return new SmtpEmailService(settingsService);
+
+        // Priority 2: Resend HTTP API
         var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
         if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")
             return new ResendEmailService(settingsService);
+
+        // Fallback: Mock (logs to console + DB, no real emails)
         var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
         return new MockEmailService(context);
     });
