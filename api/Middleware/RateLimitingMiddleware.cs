@@ -10,7 +10,7 @@ namespace Api.Middleware;
 /// </summary>
 public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env)
 {
-    private const int DefaultLimit = 60;
+    private const int DefaultLimit = 200;
     private static readonly TimeSpan DefaultWindow = TimeSpan.FromMinutes(15);
 
     private const int AuthLimit = 5;
