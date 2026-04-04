@@ -25,4 +25,6 @@ public class Booking : BaseEntity
     public int? SeatsReserved { get; set; }
 
     public Payment? Payment { get; set; }
+
+    public ICollection<BookingTicket> Tickets { get; set; } = [];
 }

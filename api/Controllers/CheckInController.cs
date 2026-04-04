@@ -22,6 +22,64 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         if (string.IsNullOrWhiteSpace(request.QrToken))
             return BadRequest(new ScanResponse(false, "QR token is required", null, null, null, null, null));
 
+        // First try per-seat ticket QR tokens
+        var ticket = await context.BookingTickets
+            .Include(t => t.Booking).ThenInclude(b => b.User)
+            .Include(t => t.Booking).ThenInclude(b => b.Event)
+            .Include(t => t.GuestUser)
+            .FirstOrDefaultAsync(t => t.QrToken == request.QrToken);
+
+        if (ticket is not null)
+        {
+            var guestName = ticket.GuestUser is not null
+                ? $"{ticket.GuestUser.FirstName} {ticket.GuestUser.LastName}"
+                : $"{ticket.Booking.User.FirstName} {ticket.Booking.User.LastName}";
+
+            if (ticket.Status == Contracts.Enums.TicketStatus.CheckedIn)
+            {
+                Log.Warning("[CheckIn] Double scan for ticket {TicketCode}", ticket.TicketCode);
+                return Conflict(new ScanResponse(
+                    false, $"Ticket already checked in (Seat #{ticket.SeatNumber})",
+                    ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                    "CheckedIn", ticket.UpdatedAt
+                ));
+            }
+
+            if (ticket.Booking.Status != BookingStatus.Paid && ticket.Booking.Status != BookingStatus.CheckedIn)
+            {
+                return BadRequest(new ScanResponse(
+                    false, $"Booking is {ticket.Booking.Status} — cannot check in",
+                    ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                    ticket.Booking.Status.ToString(), null
+                ));
+            }
+
+            ticket.Status = Contracts.Enums.TicketStatus.CheckedIn;
+            ticket.UpdatedAt = DateTime.UtcNow;
+
+            // Mark parent booking as CheckedIn if all tickets are checked in
+            var allTickets = await context.BookingTickets
+                .Where(t => t.BookingId == ticket.BookingId)
+                .ToListAsync();
+            if (allTickets.All(t => t.Status == Contracts.Enums.TicketStatus.CheckedIn))
+            {
+                ticket.Booking.Status = BookingStatus.CheckedIn;
+                ticket.Booking.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await context.SaveChangesAsync();
+
+            Log.Information("[CheckIn] Ticket {TicketCode} (Seat #{Seat}) checked in for {Event}",
+                ticket.TicketCode, ticket.SeatNumber, ticket.Booking.Event.Title);
+
+            return Ok(new ScanResponse(
+                true, $"Check-in successful — Seat #{ticket.SeatNumber}",
+                ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                "CheckedIn", DateTime.UtcNow
+            ));
+        }
+
+        // Fallback: legacy booking-level QR token
         var booking = await context.Bookings
             .Include(b => b.User)
             .Include(b => b.Event)

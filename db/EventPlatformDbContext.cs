@@ -26,6 +26,7 @@ public class EventPlatformDbContext(
     public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingTicket> BookingTickets => Set<BookingTicket>();
     public DbSet<Payment> Payments => Set<Payment>();
 
     // Logging
@@ -306,6 +307,33 @@ public class EventPlatformDbContext(
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Table).WithMany().HasForeignKey(e => e.TableId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<BookingTicket>(entity =>
+        {
+            entity.ToTable("booking_tickets", t =>
+            {
+                t.HasCheckConstraint("CK_booking_tickets_Status",
+                    "\"Status\" IN ('Unassigned','Invited','Claimed','CheckedIn')");
+                t.HasCheckConstraint("CK_booking_tickets_SeatNumber",
+                    "\"SeatNumber\" > 0");
+            });
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.QrToken).IsUnique();
+            entity.HasIndex(e => e.InviteTokenHash).IsUnique()
+                .HasFilter("\"InviteTokenHash\" IS NOT NULL");
+            entity.HasIndex(e => new { e.BookingId, e.SeatNumber }).IsUnique();
+            entity.HasIndex(e => e.GuestUserId);
+            entity.Property(e => e.TicketCode).HasMaxLength(20);
+            entity.Property(e => e.QrToken).HasMaxLength(128);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.InviteTokenHash).HasMaxLength(128);
+            entity.Property(e => e.InvitedEmail).HasMaxLength(256);
+            entity.HasOne(e => e.Booking).WithMany(b => b.Tickets)
+                .HasForeignKey(e => e.BookingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.GuestUser).WithMany()
+                .HasForeignKey(e => e.GuestUserId).IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Payment>(entity =>

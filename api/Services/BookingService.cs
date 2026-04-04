@@ -226,16 +226,38 @@ public class BookingService(
             booking.Status = BookingStatus.Paid;
             booking.QrToken = GenerateQrToken();
 
+            // Determine seat count and generate per-seat tickets
+            var seatCount = booking.SeatsReserved ?? 1;
             if (booking.TableId.HasValue)
             {
-                var tableToBook = await context.Tables.FindAsync(booking.TableId.Value);
+                var tableToBook = await context.Tables
+                    .Include(t => t.EventTable)
+                    .FirstOrDefaultAsync(t => t.Id == booking.TableId.Value);
                 if (tableToBook is not null)
                 {
+                    seatCount = tableToBook.EventTable.Capacity;
                     tableToBook.Status = TableStatus.Booked;
                     tableToBook.LockedByUserId = null;
                     tableToBook.LockExpiresAt = null;
                     tableToBook.UpdatedAt = DateTime.UtcNow;
                 }
+            }
+
+            var timestamp = DateTime.UtcNow.ToString("yyMMdd");
+            for (var seat = 1; seat <= seatCount; seat++)
+            {
+                var ticket = new BookingTicket
+                {
+                    Id = Guid.NewGuid(),
+                    TicketCode = $"TK-{timestamp}-{RandomNumberGenerator.GetInt32(100000, 999999)}",
+                    QrToken = GenerateQrToken(),
+                    SeatNumber = seat,
+                    BookingId = booking.Id,
+                    Status = seat == 1 ? TicketStatus.Claimed : TicketStatus.Unassigned,
+                    GuestUserId = seat == 1 ? booking.UserId : null,
+                    ClaimedAt = seat == 1 ? DateTime.UtcNow : null,
+                };
+                context.BookingTickets.Add(ticket);
             }
 
             await context.SaveChangesAsync();
