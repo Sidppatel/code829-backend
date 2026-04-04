@@ -342,7 +342,24 @@ static string ConvertPostgresUrl(string url)
     // Otherwise parse as a postgres:// URI
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
-    return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+    var host = ResolveToIPv4(uri.Host);
+    return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+}
+
+/// <summary>
+/// Resolves a hostname to an IPv4 address to avoid IPv6 connectivity issues in CI.
+/// Falls back to the original hostname if resolution fails.
+/// </summary>
+static string ResolveToIPv4(string host)
+{
+    try
+    {
+        var addresses = System.Net.Dns.GetHostAddresses(host);
+        var ipv4 = addresses.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+        if (ipv4 is not null) return ipv4.ToString();
+    }
+    catch { /* Fall back to hostname */ }
+    return host;
 }
 
 /// <summary>

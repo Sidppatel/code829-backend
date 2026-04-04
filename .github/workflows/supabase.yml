@@ -30,8 +30,14 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Prefer IPv4 for outbound connections
-        run: sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+      - name: Disable IPv6 to force IPv4 DNS resolution
+        run: |
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+          echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4
+          # Verify: DNS should only return A records now
+          getent ahostsv4 db.liumjvxetqcvdmiakmpw.supabase.co || true
 
       - uses: actions/checkout@v4
 
