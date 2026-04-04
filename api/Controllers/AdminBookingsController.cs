@@ -75,8 +75,10 @@ public class AdminBookingsController(
         var dtos = items.Select(b => new BookingDto(
             b.Id, b.BookingNumber, b.Status.ToString(),
             b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
+            b.Event.StartDate, b.Event.EndDate, b.Event.Category.ToString(), b.Event.ImagePath,
+            null, null,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
-            b.TableId, b.Table?.Label, b.SeatsReserved,
+            b.TableId, b.Table?.Label, b.SeatsReserved, 0,
             b.Payment is not null ? new PaymentDto(b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(), b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt) : null,
             b.CreatedAt
         )).ToList();

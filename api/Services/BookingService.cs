@@ -352,19 +352,29 @@ public class BookingService(
     {
         var b = await context.Bookings
             .Include(x => x.User)
-            .Include(x => x.Event)
+            .Include(x => x.Event).ThenInclude(e => e.Venue).ThenInclude(v => v!.Address)
             .Include(x => x.Table)
                 .ThenInclude(t => t!.EventTable)
             .Include(x => x.Payment)
+            .Include(x => x.Tickets)
             .FirstOrDefaultAsync(x => x.Id == bookingId);
 
         if (b is null) return null;
 
+        var venue = b.Event.Venue;
+        var addr = venue?.Address;
+        var venueAddress = addr is not null
+            ? $"{addr.Line1}, {addr.City}, {addr.State} {addr.ZipCode}"
+            : null;
+
         return new BookingDto(
             b.Id, b.BookingNumber, b.Status.ToString(),
             b.UserId, $"{b.User.FirstName} {b.User.LastName}", b.EventId, b.Event.Title,
+            b.Event.StartDate, b.Event.EndDate, b.Event.Category.ToString(), b.Event.ImagePath,
+            venue?.Name, venueAddress,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.TableId, b.Table?.Label, b.SeatsReserved,
+            b.Tickets.Count,
             b.Payment is not null ? new PaymentDto(
                 b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(),
                 b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt
