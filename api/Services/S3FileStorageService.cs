@@ -35,12 +35,19 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
         var client = await GetClientAsync();
         var bucket = await settings.GetAsync("s3_bucket");
 
+        // Buffer into MemoryStream so the SDK knows Content-Length upfront.
+        // R2 rejects chunked/streaming uploads (STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER).
+        var ms = new MemoryStream();
+        await fileStream.CopyToAsync(ms);
+        ms.Position = 0;
+
         var request = new PutObjectRequest
         {
             BucketName = bucket,
             Key = key,
-            InputStream = fileStream,
-            ContentType = contentType
+            InputStream = ms,
+            ContentType = contentType,
+            DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
         };
 
         await client.PutObjectAsync(request);
@@ -53,12 +60,18 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
         var client = await GetClientAsync();
         var bucket = await settings.GetAsync("s3_bucket");
 
+        // Buffer into MemoryStream so the SDK knows Content-Length upfront.
+        var ms = new MemoryStream();
+        await fileStream.CopyToAsync(ms);
+        ms.Position = 0;
+
         var request = new PutObjectRequest
         {
             BucketName = bucket,
             Key = key,
-            InputStream = fileStream,
+            InputStream = ms,
             ContentType = contentType,
+            DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
             Headers = { CacheControl = "public, max-age=31536000, immutable" }
         };
 
@@ -107,7 +120,7 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
 
         var config = new AmazonS3Config
         {
-            RegionEndpoint = RegionEndpoint.GetBySystemName(region)
+            RegionEndpoint = RegionEndpoint.GetBySystemName(region),
         };
 
         if (!string.IsNullOrEmpty(endpointUrl))
