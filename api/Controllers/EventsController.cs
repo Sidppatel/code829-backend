@@ -136,10 +136,17 @@ public class EventsController(
             .Select(g => new { EventId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.EventId, x => x.Count);
 
+        // Pull primary images from the images table for this page of events
+        var primaryImages = await context.Images
+            .Where(img => img.EntityType == "event" && pagedEventIds.Contains(img.EntityId) && img.IsPrimary)
+            .ToDictionaryAsync(img => img.EntityId, img => img.StorageKey);
+
         var items = pagedEvents.Select(e => new EventSummaryDto(
             e.Id, e.Title, e.Slug, e.Status.ToString(), e.Category.HasValue ? e.Category.Value.ToString() : "",
             e.StartDate, e.EndDate,
-            e.ImagePath != null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
+            e.ImagePath != null
+                ? fileStorage.GetPublicUrl(e.ImagePath)
+                : primaryImages.TryGetValue(e.Id, out var key) ? fileStorage.GetPublicUrl($"{key}_card.webp") : null,
             e.IsFeatured,
             e.LayoutMode.ToString(),
             e.Venue.Name, e.Venue.Address!.City, e.Venue.Address!.State,
@@ -269,11 +276,12 @@ public class EventsController(
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
+        var imageUrl = await ResolveEventImageUrlAsync(ev.Id, ev.ImagePath);
         var dto = new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
             ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
             ev.StartDate, ev.EndDate,
-            ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
+            imageUrl,
             ev.IsFeatured,
             ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
             ev.GridRows, ev.GridCols, ev.PublishedAt,
@@ -303,11 +311,12 @@ public class EventsController(
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
+        var slugImageUrl = await ResolveEventImageUrlAsync(ev.Id, ev.ImagePath);
         return Ok(new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
             ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
             ev.StartDate, ev.EndDate,
-            ev.ImagePath is not null ? fileStorage.GetPublicUrl(ev.ImagePath) : null,
+            slugImageUrl,
             ev.IsFeatured,
             ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
             ev.GridRows, ev.GridCols, ev.PublishedAt,
@@ -435,5 +444,26 @@ public class EventsController(
         }).ToList();
 
         return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, eventTableTypes, dtos));
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the best available image URL for an event:
+    /// 1. ImagePath on the event row (legacy direct upload)
+    /// 2. Primary image from the images table (new upload pipeline)
+    /// 3. null (show placeholder)
+    /// </summary>
+    private async Task<string?> ResolveEventImageUrlAsync(Guid eventId, string? imagePath)
+    {
+        if (imagePath is not null)
+            return fileStorage.GetPublicUrl(imagePath);
+
+        var primary = await context.Images
+            .Where(img => img.EntityType == "event" && img.EntityId == eventId && img.IsPrimary)
+            .Select(img => img.StorageKey)
+            .FirstOrDefaultAsync();
+
+        return primary is not null ? fileStorage.GetPublicUrl($"{primary}_card.webp") : null;
     }
 }
