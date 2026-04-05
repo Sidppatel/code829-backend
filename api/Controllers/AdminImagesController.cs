@@ -100,7 +100,7 @@ public class AdminImagesController(
     {
         var user = await context.Users.FindAsync(userId);
         if (user is null) return false;
-        if (user.Role == UserRole.Developer) return true;
+        if (user.Role == UserRole.Developer || user.Role == UserRole.Admin) return true;
 
         return entityType switch
         {

@@ -134,7 +134,9 @@ public class AdminEventsController(
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
     private bool IsOwnerOrDeveloper(Guid organizerId) =>
-        organizerId == GetCurrentUserId() || User.IsInRole(UserRole.Developer.ToString());
+        organizerId == GetCurrentUserId()
+        || User.IsInRole(UserRole.Developer.ToString())
+        || User.IsInRole(UserRole.Admin.ToString());
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
