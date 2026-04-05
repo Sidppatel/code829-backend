@@ -43,8 +43,9 @@ public class AuthServiceTests : IDisposable
         _encryptionService.Setup(e => e.HashEmail(It.IsAny<string>()))
             .Returns((string email) => email.GetHashCode().ToString());
 
+        var fileStorage = new Mock<IFileStorageService>();
         _service = new AuthService(_context, _userRepository, _settingsService.Object,
-            _emailService.Object, _encryptionService.Object, _environment.Object);
+            _emailService.Object, _encryptionService.Object, _environment.Object, fileStorage.Object);
     }
 
     [Fact]

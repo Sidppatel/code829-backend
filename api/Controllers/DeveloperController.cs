@@ -19,7 +19,8 @@ namespace Api.Controllers;
 public class DeveloperController(
     EventPlatformDbContext context,
     ISettingsService settingsService,
-    IAppSettingRepository settingsRepo
+    IAppSettingRepository settingsRepo,
+    IImageService imageService
 ) : ControllerBase
 {
     /// <summary>
@@ -228,5 +229,39 @@ public class DeveloperController(
         await context.SaveChangesAsync();
 
         return Ok(new { message = $"User updated to {role}" });
+    }
+
+    /// <summary>
+    /// Upload or replace the company/platform logo. Developer only.
+    /// </summary>
+    [HttpPost("logo")]
+    public async Task<IActionResult> UploadLogo(IFormFile file)
+    {
+        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+
+        // Use a fixed entity ID for the platform logo so there's only ever one
+        var platformEntityId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+        // Delete old logo if any
+        var existing = await imageService.GetByEntityAsync("platform", platformEntityId);
+        foreach (var old in existing)
+            await imageService.DeleteAsync(old.Id);
+
+        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "platform", platformEntityId, userId);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get the current company/platform logo.
+    /// </summary>
+    [HttpGet("logo")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetLogo()
+    {
+        var platformEntityId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var images = await imageService.GetByEntityAsync("platform", platformEntityId);
+        var logo = images.FirstOrDefault();
+        if (logo is null) return NotFound(new ApiError(404, "No logo uploaded", HttpContext.TraceIdentifier));
+        return Ok(logo);
     }
 }

@@ -19,7 +19,8 @@ public class AuthService(
     ISettingsService settingsService,
     IEmailService emailService,
     IEncryptionService encryptionService,
-    IWebHostEnvironment environment
+    IWebHostEnvironment environment,
+    IFileStorageService fileStorage
 ) : IAuthService
 {
     public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null)
@@ -139,7 +140,8 @@ public class AuthService(
             ZipCode: user.Address?.ZipCode,
             Phone: user.Phone,
             OptInLocationEmail: user.OptInLocationEmail,
-            HasCompletedOnboarding: user.HasCompletedOnboarding
+            HasCompletedOnboarding: user.HasCompletedOnboarding,
+            AvatarUrl: user.AvatarPath is not null ? fileStorage.GetPublicUrl(user.AvatarPath) : null
         );
     }
 
@@ -219,7 +221,8 @@ public class AuthService(
             ZipCode: user.Address?.ZipCode,
             Phone: user.Phone,
             OptInLocationEmail: user.OptInLocationEmail,
-            HasCompletedOnboarding: user.HasCompletedOnboarding
+            HasCompletedOnboarding: user.HasCompletedOnboarding,
+            AvatarUrl: user.AvatarPath is not null ? fileStorage.GetPublicUrl(user.AvatarPath) : null
         );
 
         return new AuthResponse(

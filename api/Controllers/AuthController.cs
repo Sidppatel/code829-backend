@@ -16,7 +16,8 @@ namespace Api.Controllers;
 public class AuthController(
     IAuthService authService,
     IWebHostEnvironment environment,
-    Db.EventPlatformDbContext context
+    Db.EventPlatformDbContext context,
+    IImageService imageService
 ) : ControllerBase
 {
     private const int MagicLinkLimit = 2;
@@ -193,6 +194,63 @@ public class AuthController(
         await context.SaveChangesAsync();
 
         return Ok(new { message = "Profile updated successfully" });
+    }
+
+    /// <summary>
+    /// Upload or replace the current user's avatar.
+    /// </summary>
+    [HttpPost("me/avatar")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> UploadAvatar(IFormFile file)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+
+        var user = await context.Users.FindAsync(userId);
+        if (user is null)
+            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+
+        // Delete old avatar images if any
+        var oldImages = await imageService.GetByEntityAsync("user", userId);
+        foreach (var old in oldImages)
+            await imageService.DeleteAsync(old.Id);
+
+        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId, userId);
+
+        user.AvatarPath = result.Url;
+        user.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Delete the current user's avatar.
+    /// </summary>
+    [HttpDelete("me/avatar")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> DeleteAvatar()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+
+        var user = await context.Users.FindAsync(userId);
+        if (user is null)
+            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+
+        var images = await imageService.GetByEntityAsync("user", userId);
+        foreach (var img in images)
+            await imageService.DeleteAsync(img.Id);
+
+        user.AvatarPath = null;
+        user.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return NoContent();
     }
 }
 

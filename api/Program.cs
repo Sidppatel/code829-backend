@@ -125,6 +125,9 @@ try
     builder.Services.AddScoped<ITableBookingService, TableBookingService>();
     builder.Services.AddScoped<IBookingService, BookingService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
+    builder.Services.AddScoped<IImageRepository, ImageRepository>();
+    builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
+    builder.Services.AddScoped<IImageService, ImageService>();
 
     // Conditional service registration: mock in dev, real in prod
     // Payment service uses real Stripe when a valid key is configured, even in dev

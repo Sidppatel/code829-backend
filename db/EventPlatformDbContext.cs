@@ -29,6 +29,9 @@ public class EventPlatformDbContext(
     public DbSet<BookingTicket> BookingTickets => Set<BookingTicket>();
     public DbSet<Payment> Payments => Set<Payment>();
 
+    // Images
+    public DbSet<Image> Images => Set<Image>();
+
     // User-facing
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
@@ -96,6 +99,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.FirstName).HasMaxLength(128);
             entity.Property(e => e.LastName).HasMaxLength(128);
             entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.AvatarPath).HasMaxLength(512);
             entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
@@ -367,6 +371,20 @@ public class EventPlatformDbContext(
             entity.Property(e => e.RefundId).HasMaxLength(128);
             entity.HasOne(e => e.Booking).WithOne(b => b.Payment).HasForeignKey<Payment>(e => e.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ─── Images ──────────────────────────────────────────────
+
+        modelBuilder.Entity<Image>(entity =>
+        {
+            entity.ToTable("images");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EntityType, e.EntityId });
+            entity.Property(e => e.EntityType).HasMaxLength(20);
+            entity.Property(e => e.StorageKey).HasMaxLength(500);
+            entity.Property(e => e.OriginalName).HasMaxLength(255);
+            entity.HasOne(e => e.UploadedBy).WithMany().HasForeignKey(e => e.UploadedById)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         // ─── Logging ─────────────────────────────────────────────

@@ -13,5 +13,6 @@ public record UserDto(
     string? ZipCode,
     string? Phone,
     bool OptInLocationEmail,
-    bool HasCompletedOnboarding
+    bool HasCompletedOnboarding,
+    string? AvatarUrl
 );

@@ -48,6 +48,24 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
         return key;
     }
 
+    public async Task SaveWithKeyAsync(Stream fileStream, string key, string contentType)
+    {
+        var client = await GetClientAsync();
+        var bucket = await settings.GetAsync("s3_bucket");
+
+        var request = new PutObjectRequest
+        {
+            BucketName = bucket,
+            Key = key,
+            InputStream = fileStream,
+            ContentType = contentType,
+            Headers = { CacheControl = "public, max-age=31536000, immutable" }
+        };
+
+        await client.PutObjectAsync(request);
+        Log.Information("[S3] Uploaded {Key} to {Bucket}", key, bucket);
+    }
+
     public async Task<bool> DeleteAsync(string path)
     {
         var client = await GetClientAsync();

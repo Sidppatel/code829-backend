@@ -46,6 +46,17 @@ public class LocalFileStorageService : IFileStorageService
         return relativePath;
     }
 
+    public async Task SaveWithKeyAsync(Stream fileStream, string key, string contentType)
+    {
+        var fullPath = Path.Combine(UploadsDir, key);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+        await using var fs = File.Create(fullPath);
+        await fileStream.CopyToAsync(fs);
+
+        Log.Information("[LocalStorage] Saved {Key}", key);
+    }
+
     public Task<bool> DeleteAsync(string path)
     {
         var fullPath = Path.Combine(UploadsDir, path);

@@ -25,4 +25,6 @@ public class User : BaseEntity
     /// Required for organizers to receive payouts via destination charges.
     /// </summary>
     public string? StripeConnectedAccountId { get; set; }
+
+    public string? AvatarPath { get; set; }
 }
