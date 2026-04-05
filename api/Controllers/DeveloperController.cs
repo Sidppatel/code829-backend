@@ -144,10 +144,8 @@ public class DeveloperController(
     /// </summary>
     private static readonly HashSet<string> MutableSettings = new(StringComparer.OrdinalIgnoreCase)
     {
-        "brand_name", "brand_tagline", "brand_primary_color", "brand_accent_color",
-        "default_platform_fee_cents", "platform_fee_percent", "platform_fee_flat_cents",
-        // SMTP / Email
-        "smtp_host", "smtp_port", "smtp_username", "smtp_password",
+        "app_name", "default_platform_fee_cents",
+        // Email
         "resend_api_key", "email_from_address",
         // Stripe
         "stripe_secret_key", "stripe_publishable_key", "stripe_webhook_secret",

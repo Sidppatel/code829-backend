@@ -47,13 +47,13 @@ public class AuthService(
         await context.SaveChangesAsync();
 
         var frontendUrl = await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
-        var brandName = await settingsService.GetOrDefaultAsync("brand_name", "Code829");
+        var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var verifyUrl = $"{frontendUrl}/auth/verify?token={Uri.EscapeDataString(rawToken)}";
 
         await emailService.SendAsync(
             normalizedEmail,
-            $"Your {brandName} login link",
-            EmailTemplates.MagicLink(brandName!, verifyUrl, expiryMinutes)
+            $"Your {appName} login link",
+            EmailTemplates.MagicLink(appName, verifyUrl, expiryMinutes)
         );
 
         Log.Information("[Auth] Magic link sent to {Email}", normalizedEmail);

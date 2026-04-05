@@ -141,12 +141,7 @@ try
     {
         var settingsService = sp.GetRequiredService<ISettingsService>();
 
-        // Priority 1: SMTP (Gmail, Outlook, etc.) — check if smtp_host is configured
-        var smtpHost = settingsService.GetOrDefaultAsync("smtp_host").GetAwaiter().GetResult();
-        if (!string.IsNullOrEmpty(smtpHost) && smtpHost != "MOCK_DEV")
-            return new SmtpEmailService(settingsService);
-
-        // Priority 2: Resend HTTP API
+        // Resend HTTP API
         var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
         var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
         if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")

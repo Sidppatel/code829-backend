@@ -36,7 +36,7 @@ public class AuthServiceTests : IDisposable
             .ReturnsAsync("15");
         _settingsService.Setup(s => s.GetOrDefaultAsync("frontend_url", "http://localhost:5173"))
             .ReturnsAsync("http://localhost:5173");
-        _settingsService.Setup(s => s.GetOrDefaultAsync("brand_name", "Code829"))
+        _settingsService.Setup(s => s.GetOrDefaultAsync("app_name", "Code829"))
             .ReturnsAsync("Code829");
         _settingsService.Setup(s => s.GetAsync("jwt_secret"))
             .ReturnsAsync("a-very-long-jwt-secret-key-that-is-at-least-32-bytes-long-for-hmac256");

@@ -134,7 +134,7 @@ public class TicketsController(
 
         // Send invite email
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
-        var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
+        var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var inviterName = $"{ticket.Booking.User.FirstName} {ticket.Booking.User.LastName}";
         var eventTitle = ticket.Booking.Event.Title;
         var eventDate = ticket.Booking.Event.StartDate.ToString("dddd, MMMM d, yyyy 'at' h:mm tt");
@@ -142,9 +142,9 @@ public class TicketsController(
 
         await emailService.SendAsync(
             request.Email,
-            $"You're invited! {eventTitle} | {brandName}",
+            $"You're invited! {eventTitle} | {appName}",
             EmailTemplates.TicketInvite(
-                brandName!, request.GuestName ?? "", inviterName,
+                appName, request.GuestName ?? "", inviterName,
                 eventTitle, eventDate, ticket.SeatNumber, claimUrl)
         );
 

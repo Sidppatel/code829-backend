@@ -232,14 +232,14 @@ public class EventsController(
         if (ev is null) return NotFound();
 
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
-        var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
+        var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var dateStr = ev.StartDate.ToString("MMM d, yyyy");
         var description = ev.Description?.Length > 160 ? ev.Description[..157] + "..." : ev.Description ?? "";
         var canonicalUrl = $"{frontendUrl}/events/{ev.Slug}";
 
         return Ok(new
         {
-            title = $"{ev.Title} — {dateStr} — {ev.Venue.Address?.City ?? ""} | {brandName}",
+            title = $"{ev.Title} — {dateStr} — {ev.Venue.Address?.City ?? ""} | Code829",
             description,
             canonicalUrl,
             og = new
@@ -248,7 +248,7 @@ public class EventsController(
                 title = ev.Title,
                 description,
                 url = canonicalUrl,
-                site_name = brandName
+                site_name = appName
             },
             twitter = new
             {
@@ -335,7 +335,7 @@ public class EventsController(
         if (ev is null) return NotFound();
 
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
-        var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
+        var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
 
         var priceCents = ev.PricePerPersonCents ?? 0;
 
@@ -367,7 +367,7 @@ public class EventsController(
             ["organizer"] = new Dictionary<string, object?>
             {
                 ["@type"] = "Organization",
-                ["name"] = brandName
+                ["name"] = appName
             },
             ["offers"] = new List<Dictionary<string, object?>>
             {

@@ -69,27 +69,13 @@ public static class DataSeeder
             ["stripe_secret_key"] = ("MOCK_DEV", "Stripe secret key (sk_test_... or sk_live_...)"),
             ["stripe_publishable_key"] = ("MOCK_DEV", "Stripe publishable key (pk_test_... or pk_live_...)"),
             ["stripe_webhook_secret"] = ("MOCK_DEV", "Stripe webhook signing secret (whsec_...)"),
-            ["smtp_host"] = ("MOCK_DEV", "SMTP server hostname (e.g. smtp.gmail.com)"),
-            ["smtp_port"] = ("587", "SMTP port: 587 for TLS/STARTTLS, 465 for SSL"),
-            ["smtp_username"] = ("MOCK_DEV", "SMTP username (e.g. yourname@gmail.com)"),
-            ["smtp_password"] = ("MOCK_DEV", "SMTP password or app password (16-char for Gmail)"),
             ["resend_api_key"] = ("MOCK_DEV", "Resend API key for sending emails (re_...)"),
-            ["email_from_address"] = ("noreply@code829.local", "Sender email address (defaults to smtp_username if empty)"),
-            ["platform_fee_percent"] = ("8", "Platform fee percentage on ticket price"),
-            ["platform_fee_flat_cents"] = ("0", "Flat fee per booking in cents"),
+            ["email_from_address"] = ("noreply@code829.local", "Sender email address"),
+            ["app_name"] = ("Code829", "Application name used in emails and SEO"),
             ["default_platform_fee_cents"] = ("1500", "Default flat platform fee per booking in cents ($15.00)"),
             ["frontend_url"] = ("http://localhost:5173", "Frontend URL for magic link emails"),
             ["cors_origins"] = ("http://localhost:5173", "Comma-separated allowed CORS origins"),
-            ["brand_name"] = ("Code829", "White-label brand name"),
-            ["brand_tagline"] = ("Where Great Events Come to Life", "Brand tagline"),
-            ["brand_primary_color"] = ("#4f46e5", "Primary brand color"),
-            ["brand_accent_color"] = ("#f97316", "CTA/accent color"),
-            ["default_theme"] = ("system", "Default theme: light, dark, or system"),
-            ["default_city"] = ("Mobile", "Default event city"),
-            ["default_state"] = ("AL", "Default state"),
-            ["default_timezone"] = ("America/Chicago", "Default timezone"),
             ["search_results_per_page"] = ("20", "Search pagination page size"),
-            ["max_tickets_per_booking"] = ("10", "Maximum tickets per booking"),
             ["dev_log_retention_days"] = ("90", "Developer log retention in days"),
             ["admin_log_retention_days"] = ("365", "Admin log retention in days"),
             ["system_log_retention_days"] = ("30", "System log retention in days"),
@@ -122,20 +108,7 @@ public static class DataSeeder
                 Log.Information("[Seed] Updated cors_origins to production URL");
             }
 
-            // Reset SMTP settings to MOCK_DEV so Resend (HTTP API) takes priority
-            // Render free tier blocks outbound SMTP ports (587/465)
-            var smtpKeys = new[] { "smtp_host", "smtp_username", "smtp_password" };
-            foreach (var key in smtpKeys)
-            {
-                var current = await settings.GetOrDefaultAsync(key);
-                if (current != null && current != "MOCK_DEV")
-                {
-                    await settings.SetAsync(key, "MOCK_DEV");
-                    Log.Information("[Seed] Reset {SettingKey} to MOCK_DEV (SMTP blocked on Render)", key);
-                }
-            }
-
-            // Override email/Resend settings from environment variables (set in Render dashboard)
+            // Override settings from environment variables (set in Render dashboard)
             var envOverrides = new (string EnvVar, string SettingKey, string Description)[]
             {
                 ("RESEND_API_KEY", "resend_api_key", "Resend API key for sending emails"),

@@ -271,14 +271,14 @@ public class BookingService(
             throw;
         }
 
-        var brandName = await settings.GetOrDefaultAsync("brand_name", "Code829");
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var checkinLink = $"{frontendUrl}/booking/{booking.Id}/checkin";
         await emailService.SendAsync(
             booking.User.Email,
-            $"Booking Confirmed — {booking.Event.Title} | {brandName}",
+            $"Booking Confirmed — {booking.Event.Title} | {appName}",
             EmailTemplates.BookingConfirmed(
-                brandName!, booking.User.FirstName, booking.BookingNumber,
+                appName, booking.User.FirstName, booking.BookingNumber,
                 booking.Event.Title, $"${booking.TotalCents / 100.0:F2}", checkinLink)
         );
 
