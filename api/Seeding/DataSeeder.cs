@@ -79,6 +79,12 @@ public static class DataSeeder
             ["dev_log_retention_days"] = ("90", "Developer log retention in days"),
             ["admin_log_retention_days"] = ("365", "Admin log retention in days"),
             ["system_log_retention_days"] = ("30", "System log retention in days"),
+            ["s3_bucket"] = ("MOCK_DEV", "Cloudflare R2 bucket name"),
+            ["s3_access_key"] = ("MOCK_DEV", "Cloudflare R2 access key ID"),
+            ["s3_secret_key"] = ("MOCK_DEV", "Cloudflare R2 secret access key"),
+            ["s3_region"] = ("auto", "Cloudflare R2 region (always 'auto')"),
+            ["s3_endpoint_url"] = ("MOCK_DEV", "Cloudflare R2 endpoint (https://<account-id>.r2.cloudflarestorage.com)"),
+            ["cdn_base_url"] = ("MOCK_DEV", "Public CDN URL for serving uploaded images"),
         };
 
         foreach (var (key, (value, description)) in defaults)
@@ -118,6 +124,11 @@ public static class DataSeeder
                 ("STRIPE_SECRET_KEY", "stripe_secret_key", "Stripe secret key"),
                 ("STRIPE_PUBLISHABLE_KEY", "stripe_publishable_key", "Stripe publishable key"),
                 ("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret", "Stripe webhook signing secret"),
+                ("S3_BUCKET", "s3_bucket", "Cloudflare R2 bucket name"),
+                ("S3_ACCESS_KEY", "s3_access_key", "Cloudflare R2 access key ID"),
+                ("S3_SECRET_KEY", "s3_secret_key", "Cloudflare R2 secret access key"),
+                ("S3_ENDPOINT_URL", "s3_endpoint_url", "Cloudflare R2 endpoint URL"),
+                ("CDN_BASE_URL", "cdn_base_url", "Public CDN URL for serving images"),
             };
 
             foreach (var (envVar, settingKey, description) in envOverrides)
