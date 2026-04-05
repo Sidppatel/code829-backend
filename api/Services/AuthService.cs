@@ -22,7 +22,7 @@ public class AuthService(
     IWebHostEnvironment environment
 ) : IAuthService
 {
-    public async Task<MagicLinkResponse> SendMagicLinkAsync(string email)
+    public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
@@ -49,6 +49,8 @@ public class AuthService(
         var frontendUrl = await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var verifyUrl = $"{frontendUrl}/auth/verify?token={Uri.EscapeDataString(rawToken)}";
+        if (!string.IsNullOrWhiteSpace(returnUrl))
+            verifyUrl += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
 
         await emailService.SendAsync(
             normalizedEmail,
