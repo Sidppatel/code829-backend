@@ -17,7 +17,8 @@ public record CreateTableTemplateRequest(
     int DefaultCapacity,
     string DefaultShape,
     string? DefaultColor = null,
-    int DefaultPriceCents = 0
+    int DefaultPriceCents = 0,
+    bool? IsActive = null
 );
 
 // ─── Event Tables (per-event table types) ────────────────────

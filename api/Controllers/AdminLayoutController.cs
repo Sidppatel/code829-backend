@@ -71,6 +71,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         tt.DefaultShape = shape;
         tt.DefaultColor = request.DefaultColor;
         tt.DefaultPriceCents = request.DefaultPriceCents;
+        if (request.IsActive.HasValue) tt.IsActive = request.IsActive.Value;
         tt.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();
