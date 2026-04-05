@@ -86,6 +86,8 @@ public static class DataSeeder
             var existing = await settings.GetOrDefaultAsync(key);
             if (existing is null)
             {
+                // Use SetAsync (upsert) to avoid duplicate key errors if the key
+                // was already created by a migration or previous partial run
                 await settings.SetAsync(key, value, description);
             }
         }

@@ -20,8 +20,9 @@ namespace db.Migrations
                 );
                 """);
 
-            // Rename brand_name → app_name
+            // Rename brand_name → app_name (delete app_name first if it exists from a partial run)
             migrationBuilder.Sql("""
+                DELETE FROM app_settings WHERE "Key" = 'app_name';
                 UPDATE app_settings
                 SET "Key" = 'app_name',
                     "Description" = 'Application name used in emails and SEO'
