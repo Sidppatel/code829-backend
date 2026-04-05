@@ -219,7 +219,7 @@ public class AuthController(
 
         var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId, userId);
 
-        user.AvatarPath = result.Url;
+        user.AvatarPath = result.StorageKey;
         user.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 

@@ -18,6 +18,7 @@ public record ImageDto(
 
 public record ImageUploadResponse(
     Guid Id,
+    string StorageKey,
     string Url,
     string ThumbnailUrl,
     string CardUrl,

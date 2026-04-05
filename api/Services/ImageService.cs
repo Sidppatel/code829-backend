@@ -52,9 +52,11 @@ public class ImageService(
         // Dispose variant streams
         foreach (var v in variants) v.Stream.Dispose();
 
+        var storageKey = $"{baseKey}.webp";
         return new ImageUploadResponse(
             image.Id,
-            fileStorage.GetPublicUrl($"{baseKey}.webp"),
+            storageKey,
+            fileStorage.GetPublicUrl(storageKey),
             fileStorage.GetPublicUrl($"{baseKey}_thumb.webp"),
             fileStorage.GetPublicUrl($"{baseKey}_card.webp"),
             isPrimary
