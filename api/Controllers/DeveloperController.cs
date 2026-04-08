@@ -204,7 +204,7 @@ public class DeveloperController(
             })
             .ToListAsync();
 
-        return Ok(new { items = users, total = totalCount, page, pageSize });
+        return Ok(new { items = users, totalCount = totalCount, page, pageSize });
     }
 
     /// <summary>
