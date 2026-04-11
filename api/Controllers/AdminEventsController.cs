@@ -61,7 +61,25 @@ public class AdminEventsController(
             .Take(pageSize)
             .ToListAsync();
 
-        var dtos = items.Select(e => MapToDto(e)).ToList();
+        var pagedEventIds = items.Select(e => e.Id).ToList();
+        var bookingCounts = await context.Bookings
+            .Where(b => pagedEventIds.Contains(b.EventId) && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
+            .GroupBy(b => b.EventId)
+            .Select(g => new { EventId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EventId, x => x.Count);
+
+        var availableTableCounts = await context.Tables
+            .Where(t => pagedEventIds.Contains(t.EventId) && t.IsActive && t.Status == TableStatus.Available)
+            .GroupBy(t => t.EventId)
+            .Select(g => new { EventId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EventId, x => x.Count);
+
+        var dtos = items.Select(e => MapToDto(
+            e,
+            e.MaxCapacity ?? 0,
+            bookingCounts.GetValueOrDefault(e.Id, 0),
+            availableTableCounts.GetValueOrDefault(e.Id, 0)
+        )).ToList();
         return Ok(new PagedResponse<EventDto>(dtos, totalCount, page, pageSize));
     }
 
@@ -74,7 +92,14 @@ public class AdminEventsController(
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        return Ok(MapToDto(ev));
+
+        var totalSold = await context.Bookings
+            .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
+
+        var noOfAvailableTables = await context.Tables
+            .CountAsync(t => t.EventId == id && t.IsActive && t.Status == TableStatus.Available);
+
+        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, noOfAvailableTables));
     }
 
     [HttpPost]
@@ -127,7 +152,7 @@ public class AdminEventsController(
             .FirstAsync(e => e.Id == ev.Id);
 
         await adminLog.LogAsync("event.created", "Event", ev.Id, $"Event '{ev.Title}' created");
-        return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created));
+        return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created, ev.MaxCapacity ?? 0, 0, 0));
     }
 
     private Guid GetCurrentUserId() =>
@@ -184,7 +209,14 @@ public class AdminEventsController(
 
         ev.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
-        return Ok(MapToDto(ev));
+
+        var totalSold = await context.Bookings
+            .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
+
+        var noOfAvailableTables = await context.Tables
+            .CountAsync(t => t.EventId == id && t.IsActive && t.Status == TableStatus.Available);
+
+        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, noOfAvailableTables));
     }
 
     [HttpGet("{id:guid}/layout-locked")]
@@ -247,7 +279,14 @@ public class AdminEventsController(
 
         await adminLog.LogAsync($"event.{newStatus.ToString().ToLower()}", "Event", ev.Id,
             $"Event '{ev.Title}' status changed to {newStatus}");
-        return Ok(MapToDto(ev));
+
+        var totalSold = await context.Bookings
+            .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
+
+        var noOfAvailableTables = await context.Tables
+            .CountAsync(t => t.EventId == id && t.IsActive && t.Status == TableStatus.Available);
+
+        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, noOfAvailableTables));
     }
 
     [HttpDelete("{id:guid}")]
@@ -353,10 +392,11 @@ public class AdminEventsController(
         var created = await context.Events
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstAsync(e => e.Id == copy.Id);
-        return Created("", MapToDto(created));
+
+        return Created("", MapToDto(created, copy.MaxCapacity ?? 0, 0, 0));
     }
 
-    private EventDto MapToDto(Event e) => new(
+    private EventDto MapToDto(Event e, int totalCapacity, int totalSold, int noOfAvailableTables) => new(
         e.Id, e.Title, e.Slug, e.Description,
         e.Status.ToString(), (e.Category?.ToString() ?? ""),
         e.StartDate, e.EndDate,
@@ -374,7 +414,10 @@ public class AdminEventsController(
         ) : null,
         e.OrganizerId,
         e.Organizer is not null ? $"{e.Organizer.FirstName} {e.Organizer.LastName}" : null,
-        e.CreatedAt
+        e.CreatedAt,
+        totalCapacity,
+        totalSold,
+        noOfAvailableTables
     );
 
     private static bool IsValidTransition(EventStatus current, EventStatus target) => (current, target) switch

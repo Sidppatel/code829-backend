@@ -287,6 +287,13 @@ public class EventsController(
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var imageUrl = await ResolveEventImageUrlAsync(ev.Id, ev.ImagePath);
+
+        var totalSold = await context.Bookings
+            .CountAsync(b => b.EventId == ev.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
+
+        var noOfAvailableTables = await context.Tables
+            .CountAsync(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available);
+
         var dto = new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
             ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
@@ -305,7 +312,10 @@ public class EventsController(
             ),
             ev.OrganizerId,
             ev.Organizer is not null ? $"{ev.Organizer.FirstName} {ev.Organizer.LastName}" : null,
-            ev.CreatedAt
+            ev.CreatedAt,
+            ev.MaxCapacity ?? 0,
+            totalSold,
+            noOfAvailableTables
         );
 
         return Ok(dto);
@@ -322,6 +332,13 @@ public class EventsController(
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var slugImageUrl = await ResolveEventImageUrlAsync(ev.Id, ev.ImagePath);
+
+        var totalSold = await context.Bookings
+            .CountAsync(b => b.EventId == ev.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
+
+        var noOfAvailableTables = await context.Tables
+            .CountAsync(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available);
+
         return Ok(new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
             ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
@@ -340,7 +357,10 @@ public class EventsController(
             ),
             ev.OrganizerId,
             ev.Organizer is not null ? $"{ev.Organizer.FirstName} {ev.Organizer.LastName}" : null,
-            ev.CreatedAt
+            ev.CreatedAt,
+            ev.MaxCapacity ?? 0,
+            totalSold,
+            noOfAvailableTables
         ));
     }
 

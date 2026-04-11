@@ -25,5 +25,8 @@ public record EventDto(
     VenueDto? Venue,
     Guid OrganizerId,
     string? OrganizerName,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    int TotalCapacity,
+    int TotalSold,
+    int NoOfAvailableTables
 );
