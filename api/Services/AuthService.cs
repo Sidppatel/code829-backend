@@ -23,7 +23,7 @@ public class AuthService(
     IFileStorageService fileStorage
 ) : IAuthService
 {
-    public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null)
+    public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? frontendOrigin = null)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
@@ -47,7 +47,7 @@ public class AuthService(
         context.MagicLinkTokens.Add(magicLink);
         await context.SaveChangesAsync();
 
-        var frontendUrl = await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var verifyUrl = $"{frontendUrl}/auth/verify?token={Uri.EscapeDataString(rawToken)}";
         if (!string.IsNullOrWhiteSpace(returnUrl))

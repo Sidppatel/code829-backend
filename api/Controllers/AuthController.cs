@@ -49,7 +49,7 @@ public class AuthController(
             return StatusCode(429, new { statusCode = 429, message = "Too many requests. Please try again shortly.", retryAfterSeconds = retryAfter });
         }
 
-        var response = await authService.SendMagicLinkAsync(request.Email, request.ReturnUrl);
+        var response = await authService.SendMagicLinkAsync(request.Email, request.ReturnUrl, request.FrontendOrigin);
         return Ok(response);
     }
 
