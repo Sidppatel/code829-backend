@@ -136,6 +136,15 @@ public class EventsController(
             .Select(g => new { EventId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.EventId, x => x.Count);
 
+        // NEW: available tables per event (IsActive + Status == Available)
+        var availableTableCounts = await context.Tables
+            .Where(t => pagedEventIds.Contains(t.EventId)
+                        && t.IsActive
+                        && t.Status == TableStatus.Available)
+            .GroupBy(t => t.EventId)
+            .Select(g => new { EventId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EventId, x => x.Count);
+
         // Pull primary images from the images table for this page of events
         var primaryImages = await context.Images
             .Where(img => img.EntityType == "event" && pagedEventIds.Contains(img.EntityId) && img.IsPrimary)
@@ -152,7 +161,8 @@ public class EventsController(
             e.Venue.Name, e.Venue.Address!.City, e.Venue.Address!.State,
             e.PricePerPersonCents,
             e.MaxCapacity ?? 0,
-            bookingCounts.GetValueOrDefault(e.Id, 0)
+            bookingCounts.GetValueOrDefault(e.Id, 0),
+            availableTableCounts.GetValueOrDefault(e.Id, 0)
         )).ToList();
 
         var result = new PagedResponse<EventSummaryDto>(items, totalCount, page, pageSize);

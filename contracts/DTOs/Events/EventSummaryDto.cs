@@ -16,5 +16,6 @@ public record EventSummaryDto(
     string VenueState,
     int? PricePerPersonCents,
     int TotalCapacity,
-    int TotalSold
+    int TotalSold,
+    int NoOfAvailableTables
 );
