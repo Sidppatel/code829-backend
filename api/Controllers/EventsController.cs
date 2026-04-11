@@ -137,13 +137,17 @@ public class EventsController(
             .ToDictionaryAsync(x => x.EventId, x => x.Count);
 
         // NEW: available tables per event (IsActive + Status == Available)
-        var availableTableCounts = await context.Tables
+        var tableStats = await context.Tables
             .Where(t => pagedEventIds.Contains(t.EventId)
                         && t.IsActive
                         && t.Status == TableStatus.Available)
             .GroupBy(t => t.EventId)
-            .Select(g => new { EventId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.EventId, x => x.Count);
+            .Select(g => new { 
+                EventId = g.Key, 
+                Count = g.Count(),
+                MinPrice = (int?)g.Min(t => t.EventTable.PriceCents)
+            })
+            .ToDictionaryAsync(x => x.EventId, x => x);
 
         // Pull primary images from the images table for this page of events
         var primaryImages = await context.Images
@@ -162,7 +166,8 @@ public class EventsController(
             e.PricePerPersonCents,
             e.MaxCapacity ?? 0,
             bookingCounts.GetValueOrDefault(e.Id, 0),
-            availableTableCounts.GetValueOrDefault(e.Id, 0)
+            tableStats.TryGetValue(e.Id, out var stats) ? stats.Count : 0,
+            tableStats.TryGetValue(e.Id, out var s) ? s.MinPrice : null
         )).ToList();
 
         var result = new PagedResponse<EventSummaryDto>(items, totalCount, page, pageSize);
@@ -291,8 +296,13 @@ public class EventsController(
         var totalSold = await context.Bookings
             .CountAsync(b => b.EventId == ev.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
 
-        var noOfAvailableTables = await context.Tables
-            .CountAsync(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available);
+        var tableStats = await context.Tables
+            .Where(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available)
+            .Select(t => (int?)t.EventTable.PriceCents)
+            .ToListAsync();
+
+        var noOfAvailableTables = tableStats.Count;
+        var minPricePerTableCents = tableStats.Any() ? tableStats.Min() : null;
 
         var dto = new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
@@ -315,7 +325,8 @@ public class EventsController(
             ev.CreatedAt,
             ev.MaxCapacity ?? 0,
             totalSold,
-            noOfAvailableTables
+            noOfAvailableTables,
+            minPricePerTableCents
         );
 
         return Ok(dto);
@@ -336,8 +347,13 @@ public class EventsController(
         var totalSold = await context.Bookings
             .CountAsync(b => b.EventId == ev.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
 
-        var noOfAvailableTables = await context.Tables
-            .CountAsync(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available);
+        var tableStats = await context.Tables
+            .Where(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available)
+            .Select(t => (int?)t.EventTable.PriceCents)
+            .ToListAsync();
+
+        var noOfAvailableTables = tableStats.Count;
+        var minPricePerTableCents = tableStats.Any() ? tableStats.Min() : null;
 
         return Ok(new EventDto(
             ev.Id, ev.Title, ev.Slug, ev.Description,
@@ -360,7 +376,8 @@ public class EventsController(
             ev.CreatedAt,
             ev.MaxCapacity ?? 0,
             totalSold,
-            noOfAvailableTables
+            noOfAvailableTables,
+            minPricePerTableCents
         ));
     }
 

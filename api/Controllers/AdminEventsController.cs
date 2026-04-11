@@ -68,17 +68,22 @@ public class AdminEventsController(
             .Select(g => new { EventId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.EventId, x => x.Count);
 
-        var availableTableCounts = await context.Tables
+        var tableStats = await context.Tables
             .Where(t => pagedEventIds.Contains(t.EventId) && t.IsActive && t.Status == TableStatus.Available)
             .GroupBy(t => t.EventId)
-            .Select(g => new { EventId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.EventId, x => x.Count);
+            .Select(g => new { 
+                EventId = g.Key, 
+                Count = g.Count(),
+                MinPrice = (int?)g.Min(t => t.EventTable.PriceCents)
+            })
+            .ToDictionaryAsync(x => x.EventId, x => x);
 
         var dtos = items.Select(e => MapToDto(
             e,
             e.MaxCapacity ?? 0,
             bookingCounts.GetValueOrDefault(e.Id, 0),
-            availableTableCounts.GetValueOrDefault(e.Id, 0)
+            tableStats.TryGetValue(e.Id, out var stats) ? stats.Count : 0,
+            tableStats.TryGetValue(e.Id, out var s) ? s.MinPrice : null
         )).ToList();
         return Ok(new PagedResponse<EventDto>(dtos, totalCount, page, pageSize));
     }
@@ -95,11 +100,8 @@ public class AdminEventsController(
 
         var totalSold = await context.Bookings
             .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-
-        var noOfAvailableTables = await context.Tables
-            .CountAsync(t => t.EventId == id && t.IsActive && t.Status == TableStatus.Available);
-
-        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, noOfAvailableTables));
+        var (availableCount, minPrice) = await GetTableStatsAsync(id);
+        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, availableCount, minPrice));
     }
 
     [HttpPost]
@@ -152,7 +154,7 @@ public class AdminEventsController(
             .FirstAsync(e => e.Id == ev.Id);
 
         await adminLog.LogAsync("event.created", "Event", ev.Id, $"Event '{ev.Title}' created");
-        return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created, ev.MaxCapacity ?? 0, 0, 0));
+        return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created, ev.MaxCapacity ?? 0, 0, 0, null));
     }
 
     private Guid GetCurrentUserId() =>
@@ -212,11 +214,8 @@ public class AdminEventsController(
 
         var totalSold = await context.Bookings
             .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-
-        var noOfAvailableTables = await context.Tables
-            .CountAsync(t => t.EventId == id && t.IsActive && t.Status == TableStatus.Available);
-
-        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, noOfAvailableTables));
+        var (availableCount, minPrice) = await GetTableStatsAsync(id);
+        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, availableCount, minPrice));
     }
 
     [HttpGet("{id:guid}/layout-locked")]
@@ -282,11 +281,8 @@ public class AdminEventsController(
 
         var totalSold = await context.Bookings
             .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-
-        var noOfAvailableTables = await context.Tables
-            .CountAsync(t => t.EventId == id && t.IsActive && t.Status == TableStatus.Available);
-
-        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, noOfAvailableTables));
+        var (availableCount, minPrice) = await GetTableStatsAsync(id);
+        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, availableCount, minPrice));
     }
 
     [HttpDelete("{id:guid}")]
@@ -393,10 +389,11 @@ public class AdminEventsController(
             .Include(e => e.Venue).ThenInclude(v => v.Address)
             .FirstAsync(e => e.Id == copy.Id);
 
-        return Created("", MapToDto(created, copy.MaxCapacity ?? 0, 0, 0));
+        var (availableCount, minPrice) = await GetTableStatsAsync(copy.Id);
+        return Created("", MapToDto(created, copy.MaxCapacity ?? 0, 0, availableCount, minPrice));
     }
 
-    private EventDto MapToDto(Event e, int totalCapacity, int totalSold, int noOfAvailableTables) => new(
+    private EventDto MapToDto(Event e, int totalCapacity, int totalSold, int noOfAvailableTables, int? minPricePerTableCents) => new(
         e.Id, e.Title, e.Slug, e.Description,
         e.Status.ToString(), (e.Category?.ToString() ?? ""),
         e.StartDate, e.EndDate,
@@ -417,8 +414,19 @@ public class AdminEventsController(
         e.CreatedAt,
         totalCapacity,
         totalSold,
-        noOfAvailableTables
+        noOfAvailableTables,
+        minPricePerTableCents
     );
+
+    private async Task<(int count, int? minPrice)> GetTableStatsAsync(Guid eventId)
+    {
+        var stats = await context.Tables
+            .Where(t => t.EventId == eventId && t.IsActive && t.Status == TableStatus.Available)
+            .Select(t => (int?)t.EventTable.PriceCents)
+            .ToListAsync();
+
+        return (stats.Count, stats.Any() ? stats.Min() : null);
+    }
 
     private static bool IsValidTransition(EventStatus current, EventStatus target) => (current, target) switch
     {

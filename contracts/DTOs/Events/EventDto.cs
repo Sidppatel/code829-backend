@@ -28,5 +28,6 @@ public record EventDto(
     DateTime CreatedAt,
     int TotalCapacity,
     int TotalSold,
-    int NoOfAvailableTables
+    int NoOfAvailableTables,
+    int? MinPricePerTableCents
 );
