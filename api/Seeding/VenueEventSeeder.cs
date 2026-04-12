@@ -1,6 +1,6 @@
 using Contracts.Enums;
 using Db;
-using Db.Entities;
+using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -8,8 +8,7 @@ namespace Api.Seeding;
 
 /// <summary>
 /// Seeds 10 real Mobile/Gulf Coast AL venues and ~10 events using Grid or Open layout modes.
-/// Grid events: price per table (tables created by LayoutSeeder).
-/// Open events: price per person with MaxCapacity.
+/// Uses stored procedures for all writes to validate SPs on every dev startup.
 /// </summary>
 public static class VenueEventSeeder
 {
@@ -17,6 +16,8 @@ public static class VenueEventSeeder
     {
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        var venueProc = scope.ServiceProvider.GetRequiredService<IVenueProcedures>();
+        var eventProc = scope.ServiceProvider.GetRequiredService<IEventProcedures>();
 
         if (await context.Venues.AnyAsync())
             return;
@@ -24,18 +25,15 @@ public static class VenueEventSeeder
         var organizer = await context.Users.FirstAsync(u => u.Email == "organizer@code829.local");
         var admin = await context.Users.FirstAsync(u => u.Email == "admin@code829.local");
 
-        var venues = SeedVenues(context);
-        await context.SaveChangesAsync();
-        Log.Information("[Seed] Created {Count} venues", venues.Count);
+        var venueIds = await SeedVenuesAsync(venueProc);
+        Log.Information("[Seed] Created {Count} venues via SP", venueIds.Count);
 
-        SeedEvents(context, venues, organizer.Id, admin.Id);
-        await context.SaveChangesAsync();
-
+        await SeedEventsAsync(eventProc, venueIds, organizer.Id, admin.Id);
         var eventCount = await context.Events.CountAsync();
-        Log.Information("[Seed] Created {Count} events", eventCount);
+        Log.Information("[Seed] Created {Count} events via SP", eventCount);
     }
 
-    private static List<Venue> SeedVenues(EventPlatformDbContext context)
+    private static async Task<List<Guid>> SeedVenuesAsync(IVenueProcedures venueProc)
     {
         var venueData = new (string Name, string Line1, string City, string State, string Zip, string? Phone, string? Email, string? Website, string Desc)[]
         {
@@ -61,44 +59,21 @@ public static class VenueEventSeeder
                 "Charming civic center in the arts community of Fairhope, hosting lectures, dances, and cultural events on Mobile Bay."),
         };
 
-        var venues = new List<Venue>();
+        var venueIds = new List<Guid>();
         foreach (var (name, line1, city, state, zip, phone, email, website, desc) in venueData)
         {
-            var address = new Address
-            {
-                Id = Guid.NewGuid(),
-                Line1 = line1,
-                City = city,
-                State = state,
-                ZipCode = zip
-            };
-            context.Addresses.Add(address);
-
-            var venue = new Venue
-            {
-                Id = Guid.NewGuid(),
-                Name = name,
-                AddressId = address.Id,
-                Address = address,
-                Description = desc,
-                Phone = phone,
-                Email = email,
-                Website = website,
-            };
-            venues.Add(venue);
+            var id = await venueProc.CreateVenueAsync(name, desc, null, phone, email, website, line1, null, city, state, zip);
+            venueIds.Add(id);
         }
 
-        context.Venues.AddRange(venues);
-        return venues;
+        return venueIds;
     }
 
-    private static void SeedEvents(EventPlatformDbContext context, List<Venue> venues, Guid organizerId, Guid adminId)
+    private static async Task SeedEventsAsync(IEventProcedures eventProc, List<Guid> venueIds, Guid organizerId, Guid adminId)
     {
         var now = DateTime.UtcNow;
 
-        // ──────────────────────────────────────────────────────────────
         // Grid events — price per table, tables created by LayoutSeeder
-        // ──────────────────────────────────────────────────────────────
         var gridEvents = new (string Title, string Desc, EventCategory Cat, EventStatus Status, int VenueIdx, Guid OrgId, int WeeksOut, bool Featured, int Rows, int Cols)[]
         {
             ("Bellingrath Gardens Spring Gala", "Elegant evening fundraiser among the azaleas. Live orchestra, gourmet dinner, and silent auction.",
@@ -116,31 +91,15 @@ public static class VenueEventSeeder
         foreach (var (title, desc, cat, status, venueIdx, orgId, weeksOut, featured, rows, cols) in gridEvents)
         {
             var startDate = now.AddDays(weeksOut * 7).Date.AddHours(18);
-            var ev = new Event
-            {
-                Id = Guid.NewGuid(),
-                Title = title,
-                Slug = GenerateSlug(title),
-                Description = desc,
-                Status = status,
-                Category = cat,
-                StartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
-                EndDate = DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
-                IsFeatured = featured,
-                LayoutMode = LayoutMode.Grid,
-                GridRows = rows,
-                GridCols = cols,
-                PublishedAt = status == EventStatus.Published
-                    ? DateTime.UtcNow.AddDays(-7) : null,
-                VenueId = venues[venueIdx].Id,
-                OrganizerId = orgId
-            };
-            context.Events.Add(ev);
+            await eventProc.CreateEventAsync(
+                title, GenerateSlug(title), desc, status.ToString(), cat.ToString(),
+                DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
+                DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
+                null, featured, LayoutMode.Grid.ToString(), null, null, null, null,
+                rows, cols, venueIds[venueIdx], orgId, null);
         }
 
-        // ──────────────────────────────────────────────────────────────
         // Open events — price per person with MaxCapacity
-        // ──────────────────────────────────────────────────────────────
         var openEvents = new (string Title, string Desc, EventCategory Cat, EventStatus Status, int VenueIdx, Guid OrgId, int WeeksOut, bool Featured, int PricePerPersonCents, int MaxCapacity)[]
         {
             ("Gulf Coast Jazz Night", "An evening of smooth jazz featuring Gulf Coast musicians. Enjoy craft cocktails and Southern appetizers under the stars.",
@@ -158,66 +117,32 @@ public static class VenueEventSeeder
         foreach (var (title, desc, cat, status, venueIdx, orgId, weeksOut, featured, pricePerPerson, maxCap) in openEvents)
         {
             var startDate = now.AddDays(weeksOut * 7).Date.AddHours(18);
-            var ev = new Event
-            {
-                Id = Guid.NewGuid(),
-                Title = title,
-                Slug = GenerateSlug(title),
-                Description = desc,
-                Status = status,
-                Category = cat,
-                StartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
-                EndDate = DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
-                IsFeatured = featured,
-                LayoutMode = LayoutMode.Open,
-                PricePerPersonCents = pricePerPerson,
-                MaxCapacity = maxCap,
-                PublishedAt = status == EventStatus.Published
-                    ? DateTime.UtcNow.AddDays(-7) : null,
-                VenueId = venues[venueIdx].Id,
-                OrganizerId = orgId
-            };
-            context.Events.Add(ev);
+            await eventProc.CreateEventAsync(
+                title, GenerateSlug(title), desc, status.ToString(), cat.ToString(),
+                DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
+                DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
+                null, featured, LayoutMode.Open.ToString(), maxCap, pricePerPerson, null, null,
+                null, null, venueIds[venueIdx], orgId, null);
         }
 
-        // ──────────────────────────────────────────────────────────────
         // Draft events (1 Grid, 1 Open)
-        // ──────────────────────────────────────────────────────────────
-        var draftGrid = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = "Mobile Mardi Gras Preview Ball",
-            Slug = GenerateSlug("Mobile Mardi Gras Preview Ball"),
-            Description = "Exclusive preview of the upcoming Mardi Gras season with floats, royalty, and brass bands.",
-            Status = EventStatus.Draft,
-            Category = EventCategory.Social,
-            StartDate = DateTime.SpecifyKind(now.AddDays(49).Date.AddHours(19), DateTimeKind.Utc),
-            EndDate = DateTime.SpecifyKind(now.AddDays(49).Date.AddHours(23), DateTimeKind.Utc),
-            LayoutMode = LayoutMode.Grid,
-            GridRows = 6,
-            GridCols = 8,
-            VenueId = venues[1].Id,
-            OrganizerId = adminId
-        };
-        context.Events.Add(draftGrid);
+        var draftGridStart = DateTime.SpecifyKind(now.AddDays(49).Date.AddHours(19), DateTimeKind.Utc);
+        await eventProc.CreateEventAsync(
+            "Mobile Mardi Gras Preview Ball", GenerateSlug("Mobile Mardi Gras Preview Ball"),
+            "Exclusive preview of the upcoming Mardi Gras season with floats, royalty, and brass bands.",
+            EventStatus.Draft.ToString(), EventCategory.Social.ToString(),
+            draftGridStart, draftGridStart.AddHours(4),
+            null, false, LayoutMode.Grid.ToString(), null, null, null, null,
+            6, 8, venueIds[1], adminId, null);
 
-        var draftOpen = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = "Summer Coding Bootcamp for Kids",
-            Slug = GenerateSlug("Summer Coding Bootcamp for Kids"),
-            Description = "Two-week intensive coding program for ages 10-16. Learn Python, web development, and game design.",
-            Status = EventStatus.Draft,
-            Category = EventCategory.Tech,
-            StartDate = DateTime.SpecifyKind(now.AddDays(56).Date.AddHours(9), DateTimeKind.Utc),
-            EndDate = DateTime.SpecifyKind(now.AddDays(56).Date.AddHours(16), DateTimeKind.Utc),
-            LayoutMode = LayoutMode.Open,
-            PricePerPersonCents = 29900,
-            MaxCapacity = 30,
-            VenueId = venues[9].Id,
-            OrganizerId = organizerId
-        };
-        context.Events.Add(draftOpen);
+        var draftOpenStart = DateTime.SpecifyKind(now.AddDays(56).Date.AddHours(9), DateTimeKind.Utc);
+        await eventProc.CreateEventAsync(
+            "Summer Coding Bootcamp for Kids", GenerateSlug("Summer Coding Bootcamp for Kids"),
+            "Two-week intensive coding program for ages 10-16. Learn Python, web development, and game design.",
+            EventStatus.Draft.ToString(), EventCategory.Tech.ToString(),
+            draftOpenStart, draftOpenStart.AddHours(7),
+            null, false, LayoutMode.Open.ToString(), 30, 29900, null, null,
+            null, null, venueIds[9], organizerId, null);
     }
 
     private static string GenerateSlug(string title)

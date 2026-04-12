@@ -2,6 +2,7 @@ using Api.Services;
 using Contracts.Enums;
 using Db;
 using Db.Entities;
+using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -19,13 +20,14 @@ public static class DataSeeder
         var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
         var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
         var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+        var authProc = scope.ServiceProvider.GetRequiredService<IAuthProcedures>();
 
-        await SeedUsersAsync(context, encryption);
+        await SeedUsersAsync(context, encryption, authProc);
         await SeedSettingsAsync(settingsService);
         await SeedTableTemplatesAsync(context);
     }
 
-    private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption)
+    private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IAuthProcedures authProc)
     {
         if (await context.Users.AnyAsync())
             return;
@@ -43,20 +45,10 @@ public static class DataSeeder
 
         foreach (var (email, firstName, lastName, role) in users)
         {
-            context.Users.Add(new User
-            {
-                Id = Guid.NewGuid(),
-                Email = email,
-                EmailHash = encryption.HashEmail(email),
-                FirstName = firstName,
-                LastName = lastName,
-                Role = role,
-                IsActive = true
-            });
+            await authProc.UpsertUserAsync(email, encryption.HashEmail(email), firstName, lastName, role.ToString());
         }
 
-        await context.SaveChangesAsync();
-        Log.Information("[Seed] Created {Count} users", users.Length);
+        Log.Information("[Seed] Created {Count} users via SP", users.Length);
     }
 
     private static async Task SeedSettingsAsync(ISettingsService settings)
@@ -92,13 +84,10 @@ public static class DataSeeder
             var existing = await settings.GetOrDefaultAsync(key);
             if (existing is null)
             {
-                // Use SetAsync (upsert) to avoid duplicate key errors if the key
-                // was already created by a migration or previous partial run
                 await settings.SetAsync(key, value, description);
             }
         }
 
-        // In production, ensure frontend_url and cors_origins point to the real deployment
         var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
         if (env == "Production")
         {
@@ -116,7 +105,6 @@ public static class DataSeeder
                 Log.Information("[Seed] Updated cors_origins to production URL");
             }
 
-            // Override settings from environment variables (set in Render dashboard)
             var envOverrides = new (string EnvVar, string SettingKey, string Description)[]
             {
                 ("RESEND_API_KEY", "resend_api_key", "Resend API key for sending emails"),

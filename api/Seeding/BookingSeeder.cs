@@ -1,14 +1,14 @@
 using System.Security.Cryptography;
 using Contracts.Enums;
 using Db;
-using Db.Entities;
+using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 namespace Api.Seeding;
 
 /// <summary>
-/// Seeds bookings across events and users.
+/// Seeds bookings across events and users via stored procedures.
 /// Grid events: table bookings (TableId set, table marked as Booked).
 /// Open events: capacity bookings (SeatsReserved set).
 /// Distribution: ~60% Paid, ~15% Pending, ~15% CheckedIn, ~5% Cancelled, ~5% Refunded.
@@ -19,6 +19,9 @@ public static class BookingSeeder
     {
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        var bookingProc = scope.ServiceProvider.GetRequiredService<IBookingProcedures>();
+        var paymentProc = scope.ServiceProvider.GetRequiredService<IPaymentProcedures>();
+        var tableProc = scope.ServiceProvider.GetRequiredService<ITableProcedures>();
 
         if (await context.Bookings.AnyAsync())
             return;
@@ -40,7 +43,7 @@ public static class BookingSeeder
         var rng = new Random(42);
         var bookingNumber = 1;
 
-        // ── Grid event bookings (table-based) ────────────────────────
+        // Grid event bookings (table-based)
         foreach (var ev in gridEvents)
         {
             var tables = await context.Tables
@@ -51,7 +54,6 @@ public static class BookingSeeder
 
             if (tables.Count == 0) continue;
 
-            // Book 30-60% of tables
             var tablesToBook = tables.OrderBy(_ => rng.Next())
                 .Take(Math.Max(1, (int)(tables.Count * (0.3 + rng.NextDouble() * 0.3))))
                 .ToList();
@@ -60,99 +62,55 @@ public static class BookingSeeder
             {
                 var user = users[rng.Next(users.Count)];
                 var status = PickStatus(rng);
-                var createdAt = DateTime.UtcNow.AddDays(-rng.Next(1, 20)).AddHours(-rng.Next(0, 24));
                 var tablePrice = table.EventTable.PriceCents;
                 var fee = (int)Math.Ceiling(tablePrice * 0.08);
+                var bn = $"BK-SEED-{bookingNumber++:D4}";
 
-                string? qrToken = null;
+                var bookingId = await bookingProc.CreateBookingAsync(
+                    user.Id, ev.Id, table.Id, null,
+                    tablePrice, fee, tablePrice + fee, bn, status.ToString());
+
+                // Mark table as booked for confirmed bookings
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
-                    qrToken = GenerateQrToken();
+                    await tableProc.MarkTableBookedAsync(table.Id);
 
-                var booking = new Booking
-                {
-                    Id = Guid.NewGuid(),
-                    BookingNumber = $"BK-SEED-{bookingNumber++:D4}",
-                    Status = status,
-                    UserId = user.Id,
-                    EventId = ev.Id,
-                    TableId = table.Id,
-                    SubtotalCents = tablePrice,
-                    FeeCents = fee,
-                    TotalCents = tablePrice + fee,
-                    QrToken = qrToken,
-                    CreatedAt = createdAt,
-                    UpdatedAt = createdAt
-                };
-                context.Bookings.Add(booking);
-
-                // Mark the table as booked for confirmed bookings
-                if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
-                {
-                    table.Status = TableStatus.Booked;
-                }
-
-                AddPayment(context, booking, status, createdAt);
+                await AddPaymentAsync(paymentProc, bookingId, status);
             }
         }
 
-        // ── Open event bookings (capacity-based) ─────────────────────
+        // Open event bookings (capacity-based)
         foreach (var ev in openEvents)
         {
             var pricePerPerson = ev.PricePerPersonCents ?? 0;
             var maxCap = ev.MaxCapacity ?? 200;
             var totalSeatsBooked = 0;
 
-            // Create 5-12 bookings per open event
             var bookingCount = rng.Next(5, 13);
             for (var i = 0; i < bookingCount; i++)
             {
-                var seatsReserved = rng.Next(1, 7); // 1-6 seats per booking
+                var seatsReserved = rng.Next(1, 7);
                 if (totalSeatsBooked + seatsReserved > maxCap * 0.6)
                     break;
 
                 var user = users[rng.Next(users.Count)];
                 var status = PickStatus(rng);
-                var createdAt = DateTime.UtcNow.AddDays(-rng.Next(1, 30)).AddHours(-rng.Next(0, 24));
-
                 var subtotal = pricePerPerson * seatsReserved;
                 var fee = (int)Math.Ceiling(subtotal * 0.08);
+                var bn = $"BK-SEED-{bookingNumber++:D4}";
 
-                string? qrToken = null;
-                if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
-                    qrToken = GenerateQrToken();
-
-                var booking = new Booking
-                {
-                    Id = Guid.NewGuid(),
-                    BookingNumber = $"BK-SEED-{bookingNumber++:D4}",
-                    Status = status,
-                    UserId = user.Id,
-                    EventId = ev.Id,
-                    SeatsReserved = seatsReserved,
-                    SubtotalCents = subtotal,
-                    FeeCents = fee,
-                    TotalCents = subtotal + fee,
-                    QrToken = qrToken,
-                    CreatedAt = createdAt,
-                    UpdatedAt = createdAt
-                };
-                context.Bookings.Add(booking);
+                var bookingId = await bookingProc.CreateBookingAsync(
+                    user.Id, ev.Id, null, seatsReserved,
+                    subtotal, fee, subtotal + fee, bn, status.ToString());
 
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
                     totalSeatsBooked += seatsReserved;
 
-                AddPayment(context, booking, status, createdAt);
+                await AddPaymentAsync(paymentProc, bookingId, status);
             }
         }
 
-        await context.SaveChangesAsync();
-
         var total = await context.Bookings.CountAsync();
-        var counts = await context.Bookings.GroupBy(b => b.Status)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
-            .ToListAsync();
-        var summary = string.Join(", ", counts.Select(c => $"{c.Status}: {c.Count}"));
-        Log.Information("[Seed] Created {Total} bookings ({Summary})", total, summary);
+        Log.Information("[Seed] Created {Total} bookings via SP", total);
     }
 
     private static BookingStatus PickStatus(Random rng)
@@ -168,34 +126,20 @@ public static class BookingSeeder
         };
     }
 
-    private static void AddPayment(EventPlatformDbContext context, Booking booking, BookingStatus status, DateTime createdAt)
+    private static async Task AddPaymentAsync(IPaymentProcedures paymentProc, Guid bookingId, BookingStatus status)
     {
         var paymentStatus = status switch
         {
-            BookingStatus.Paid or BookingStatus.CheckedIn => PaymentStatus.Succeeded,
-            BookingStatus.Refunded => PaymentStatus.Refunded,
-            BookingStatus.Cancelled => PaymentStatus.Failed,
-            _ => PaymentStatus.RequiresConfirmation
+            BookingStatus.Paid or BookingStatus.CheckedIn => "Succeeded",
+            BookingStatus.Refunded => "Refunded",
+            BookingStatus.Cancelled => "Failed",
+            _ => "RequiresConfirmation"
         };
 
-        context.Payments.Add(new Payment
-        {
-            Id = Guid.NewGuid(),
-            BookingId = booking.Id,
-            PaymentIntentId = $"pi_seed_{Guid.NewGuid():N}",
-            Status = paymentStatus,
-            AmountCents = booking.TotalCents,
-            PaidAt = paymentStatus is PaymentStatus.Succeeded or PaymentStatus.Refunded
-                ? createdAt.AddMinutes(1) : null,
-            RefundedAt = paymentStatus == PaymentStatus.Refunded ? createdAt.AddDays(1) : null,
-            CreatedAt = createdAt,
-            UpdatedAt = createdAt
-        });
-    }
+        var intentId = $"pi_seed_{Guid.NewGuid():N}";
+        await paymentProc.CreatePaymentAsync(bookingId, intentId, 0);
 
-    private static string GenerateQrToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(24);
-        return $"QR-{Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')}";
+        if (paymentStatus != "RequiresConfirmation")
+            await paymentProc.UpdatePaymentStatusAsync(intentId, paymentStatus);
     }
 }
