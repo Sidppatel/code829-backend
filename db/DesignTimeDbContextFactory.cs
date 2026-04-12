@@ -1,4 +1,3 @@
-using Db.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -22,6 +21,6 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<EventPlatf
         var optionsBuilder = new DbContextOptionsBuilder<EventPlatformDbContext>();
         optionsBuilder.UseNpgsql(connStr);
 
-        return new EventPlatformDbContext(optionsBuilder.Options, new ChangeTrackingInterceptor());
+        return new EventPlatformDbContext(optionsBuilder.Options);
     }
 }

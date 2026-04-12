@@ -1,13 +1,11 @@
 using Db.Entities;
 using Db.Entities.Views;
-using Db.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Db;
 
 public class EventPlatformDbContext(
-    DbContextOptions<EventPlatformDbContext> options,
-    ChangeTrackingInterceptor changeTrackingInterceptor
+    DbContextOptions<EventPlatformDbContext> options
 ) : DbContext(options)
 {
     // Core entities
@@ -50,11 +48,6 @@ public class EventPlatformDbContext(
     public DbSet<VenueView> VenueViews => Set<VenueView>();
     public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.AddInterceptors(changeTrackingInterceptor);
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

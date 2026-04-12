@@ -7,9 +7,10 @@ using Api.Workers;
 using Contracts.DTOs.Auth;
 using Contracts.DTOs.Bookings;
 using Contracts.DTOs.Events;
+using System.IO.Compression;
 using Db;
-using Db.Interceptors;
 using Db.Repositories;
+using Microsoft.AspNetCore.ResponseCompression;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -100,7 +101,6 @@ try
         ?? throw new InvalidOperationException("DATABASE_URL is required");
     var connStr = ConvertPostgresUrl(dbUrl);
 
-    builder.Services.AddSingleton<ChangeTrackingInterceptor>();
     builder.Services.AddDbContext<EventPlatformDbContext>((sp, options) =>
     {
         options.UseNpgsql(connStr);
@@ -219,6 +219,16 @@ try
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();
 
+    // Response compression (Brotli + gzip)
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.EnableForHttps = true;
+        options.Providers.Add<BrotliCompressionProvider>();
+        options.Providers.Add<GzipCompressionProvider>();
+    });
+    builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+    builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+
     var app = builder.Build();
 
     // Apply pending migrations on every startup — with retry for slow DB startup
@@ -242,13 +252,11 @@ try
         }
     }
 
-    // Seed data — suspend change tracking to avoid exponential slowdown
-    ChangeTrackingInterceptor.IsSuspended = true;
+    // Seed data
     await DataSeeder.SeedAsync(app.Services);
     await VenueEventSeeder.SeedAsync(app.Services);
     await LayoutSeeder.SeedAsync(app.Services);
     await BookingSeeder.SeedAsync(app.Services);
-    ChangeTrackingInterceptor.IsSuspended = false;
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);
@@ -266,6 +274,7 @@ try
     }
 
     // Middleware pipeline
+    app.UseResponseCompression();
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
     // CORS must run before rate limiting so that 429 responses still include CORS headers
@@ -342,7 +351,7 @@ static string ConvertPostgresUrl(string url)
         if (!url.Contains("SslMode=", StringComparison.OrdinalIgnoreCase))
             url += $";SslMode={sslMode}";
         if (!url.Contains("Minimum Pool Size=", StringComparison.OrdinalIgnoreCase))
-            url += ";Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+            url += ";Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=300;Command Timeout=30;Timeout=15";
         return url;
     }
 
@@ -350,7 +359,7 @@ static string ConvertPostgresUrl(string url)
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
     var host = ResolveToIPv4(uri.Host);
-    return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=5;Maximum Pool Size=50;Connection Idle Lifetime=60";
+    return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=300;Command Timeout=30;Timeout=15";
 }
 
 /// <summary>

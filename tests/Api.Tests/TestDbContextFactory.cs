@@ -1,5 +1,4 @@
 using Db;
-using Db.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Tests;
@@ -11,16 +10,13 @@ public static class TestDbContextFactory
 {
     public static EventPlatformDbContext Create()
     {
-        ChangeTrackingInterceptor.IsSuspended = true;
-
         var options = new DbContextOptionsBuilder<EventPlatformDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .ConfigureWarnings(w => w.Ignore(
                 Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
-        var interceptor = new ChangeTrackingInterceptor();
-        return new TestDbContext(options, interceptor);
+        return new TestDbContext(options);
     }
 }
 
@@ -29,8 +25,8 @@ public static class TestDbContextFactory
 /// </summary>
 public class TestDbContext : EventPlatformDbContext
 {
-    public TestDbContext(DbContextOptions<EventPlatformDbContext> options, ChangeTrackingInterceptor interceptor)
-        : base(options, interceptor) { }
+    public TestDbContext(DbContextOptions<EventPlatformDbContext> options)
+        : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,7 +37,5 @@ public class TestDbContext : EventPlatformDbContext
         {
             entity.Ignore(e => e.SearchVector);
         });
-
-        // EventView no longer has SearchVector — nothing to ignore
     }
 }
