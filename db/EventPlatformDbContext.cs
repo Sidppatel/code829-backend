@@ -15,7 +15,7 @@ public class EventPlatformDbContext(
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
-    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
 
     // Template/parent entities
     public DbSet<Venue> Venues => Set<Venue>();
@@ -45,6 +45,11 @@ public class EventPlatformDbContext(
     public DbSet<EventView> EventViews => Set<EventView>();
     public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
     public DbSet<TableView> TableViews => Set<TableView>();
+    public DbSet<BookingView> BookingViews => Set<BookingView>();
+    public DbSet<BookingTicketView> BookingTicketViews => Set<BookingTicketView>();
+    public DbSet<VenueView> VenueViews => Set<VenueView>();
+    public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
+    public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -129,13 +134,19 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Email).HasMaxLength(256);
         });
 
-        modelBuilder.Entity<RefreshToken>(entity =>
+        modelBuilder.Entity<DeviceSession>(entity =>
         {
-            entity.ToTable("refresh_tokens");
+            entity.ToTable("device_sessions");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.SessionHash).IsUnique();
             entity.HasIndex(e => e.UserId);
-            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.HasIndex(e => new { e.ExpiresAt, e.RevokedAt })
+                .HasFilter("\"RevokedAt\" IS NULL")
+                .HasDatabaseName("IX_device_sessions_Active");
+            entity.Property(e => e.SessionHash).HasMaxLength(128);
+            entity.Property(e => e.DeviceFingerprint).HasMaxLength(256);
+            entity.Property(e => e.DeviceName).HasMaxLength(256);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -490,6 +501,36 @@ public class EventPlatformDbContext(
         modelBuilder.Entity<TableView>(entity =>
         {
             entity.ToView("v_tables");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<BookingView>(entity =>
+        {
+            entity.ToView("v_bookings");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<BookingTicketView>(entity =>
+        {
+            entity.ToView("v_booking_tickets");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<VenueView>(entity =>
+        {
+            entity.ToView("v_venues");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<UserProfileView>(entity =>
+        {
+            entity.ToView("v_user_profile");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<EventTablesSummaryView>(entity =>
+        {
+            entity.ToView("v_event_tables_summary");
             entity.HasKey(e => e.Id);
         });
     }

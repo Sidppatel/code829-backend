@@ -1,5 +1,3 @@
-using NpgsqlTypes;
-
 namespace Db.Entities.Views;
 
 public class EventView
@@ -18,20 +16,36 @@ public class EventView
     public int? MaxCapacity { get; set; }
     public int? PricePerPersonCents { get; set; }
     public int? PlatformFeePercent { get; set; }
+    public int? PlatformFeeCents { get; set; }
     public int? GridRows { get; set; }
     public int? GridCols { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DateTime? ScheduledPublishAt { get; set; }
     public Guid VenueId { get; set; }
     public Guid OrganizerId { get; set; }
-    public NpgsqlTsVector? SearchVector { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    // Venue
     public string VenueName { get; set; } = null!;
     public string VenueAddress { get; set; } = null!;
     public string VenueCity { get; set; } = null!;
     public string VenueState { get; set; } = null!;
     public string VenueZipCode { get; set; } = null!;
+    public string? VenueDescription { get; set; }
     public string? VenueImagePath { get; set; }
+    public string? VenuePhone { get; set; }
+    public string? VenueEmail { get; set; }
+    public string? VenueWebsite { get; set; }
+    public bool VenueIsActive { get; set; }
+    public DateTime VenueCreatedAt { get; set; }
+
+    // Organizer
+    public string OrganizerFirstName { get; set; } = null!;
+    public string OrganizerLastName { get; set; } = null!;
+
+    // Aggregates
+    public int TotalSold { get; set; }
+    public int AvailableTables { get; set; }
+    public int? MinTablePriceCents { get; set; }
 }

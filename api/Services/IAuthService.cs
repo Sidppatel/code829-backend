@@ -8,5 +8,4 @@ public interface IAuthService
     Task<AuthResponse> VerifyMagicLinkAsync(string token);
     Task<AuthResponse> DevLoginAsync(string email);
     Task<UserDto?> GetCurrentUserAsync(Guid userId);
-    Task<AuthResponse> RefreshTokenAsync(string refreshToken);
 }

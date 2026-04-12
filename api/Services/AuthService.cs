@@ -147,29 +147,6 @@ public class AuthService(
         );
     }
 
-    public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
-    {
-        var tokenHash = HashToken(refreshToken);
-
-        var storedToken = await context.RefreshTokens
-            .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow);
-
-        if (storedToken is null)
-            throw new UnauthorizedAccessException("Invalid or expired refresh token");
-
-        // Mark old token as used (rotation)
-        storedToken.IsUsed = true;
-
-        var user = storedToken.User;
-        if (!user.IsActive)
-            throw new UnauthorizedAccessException("User account is disabled");
-
-        await context.SaveChangesAsync();
-
-        return await GenerateAuthResponseAsync(user);
-    }
-
     private async Task<AuthResponse> GenerateAuthResponseAsync(User user)
     {
         var jwtSecret = await settingsService.GetAsync("jwt_secret");
@@ -195,21 +172,6 @@ public class AuthService(
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        // Generate refresh token (64 bytes = 512 bits)
-        var refreshBytes = RandomNumberGenerator.GetBytes(64);
-        var rawRefreshToken = Convert.ToBase64String(refreshBytes);
-        var refreshTokenHash = HashToken(rawRefreshToken);
-
-        context.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = refreshTokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(30),
-            IsUsed = false
-        });
-        await context.SaveChangesAsync();
-
         var userDto = new UserDto(
             Id: user.Id,
             Email: user.Email,
@@ -232,8 +194,7 @@ public class AuthService(
         return new AuthResponse(
             Token: tokenString,
             User: userDto,
-            ExpiresAt: expiresAt,
-            RefreshToken: rawRefreshToken
+            ExpiresAt: expiresAt
         );
     }
 

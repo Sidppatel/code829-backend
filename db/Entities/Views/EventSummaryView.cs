@@ -10,11 +10,20 @@ public class EventSummaryView
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public string? ImagePath { get; set; }
+    public string? PrimaryImageKey { get; set; }
     public bool IsFeatured { get; set; }
     public string LayoutMode { get; set; } = null!;
+    public int? PricePerPersonCents { get; set; }
+    public int? MaxCapacity { get; set; }
+    public Guid VenueId { get; set; }
     public string VenueName { get; set; } = null!;
     public string VenueCity { get; set; } = null!;
+    public string VenueState { get; set; } = null!;
+    public Guid OrganizerId { get; set; }
     public string OrganizerName { get; set; } = null!;
-    public long TotalCapacity { get; set; }
-    public long TotalSold { get; set; }
+    public int TotalCapacity { get; set; }
+    public int TotalSold { get; set; }
+    public int AvailableTables { get; set; }
+    public int? MinTablePriceCents { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

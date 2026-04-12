@@ -11,6 +11,8 @@ public class TableView
     public bool IsActive { get; set; }
     public int SortOrder { get; set; }
     public string Status { get; set; } = null!;
+    public Guid? LockedByUserId { get; set; }
+    public DateTime? LockExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -19,5 +21,6 @@ public class TableView
     public string Shape { get; set; } = null!;
     public string? Color { get; set; }
     public int PriceCents { get; set; }
+    public int? PlatformFeeCents { get; set; }
     public string EventTableLabel { get; set; } = null!;
 }

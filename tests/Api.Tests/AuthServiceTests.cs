@@ -129,7 +129,6 @@ public class AuthServiceTests : IDisposable
 
         result.Should().NotBeNull();
         result.User.Email.Should().Be("newuser@example.com");
-        result.RefreshToken.Should().NotBeNullOrEmpty();
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == "newuser@example.com");
         user.Should().NotBeNull();
@@ -143,50 +142,6 @@ public class AuthServiceTests : IDisposable
         var act = () => _service.DevLoginAsync("test@example.com");
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not available*");
-    }
-
-    [Fact]
-    public async Task RefreshToken_WithValidToken_ReturnsNewTokens()
-    {
-        // Create a user and a valid refresh token
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = "refresh@example.com",
-            EmailHash = "refreshhash",
-            FirstName = "Refresh",
-            LastName = "User",
-            Role = UserRole.User,
-            IsActive = true
-        };
-        _context.Users.Add(user);
-
-        var rawRefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-        var hash = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(rawRefreshToken));
-        var tokenHash = Convert.ToHexStringLower(hash);
-
-        _context.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = tokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(30),
-            IsUsed = false
-        });
-        await _context.SaveChangesAsync();
-
-        var result = await _service.RefreshTokenAsync(rawRefreshToken);
-
-        result.Should().NotBeNull();
-        result.User.Email.Should().Be("refresh@example.com");
-        result.Token.Should().NotBeNullOrEmpty();
-        result.RefreshToken.Should().NotBeNullOrEmpty();
-        result.RefreshToken.Should().NotBe(rawRefreshToken); // rotated
-
-        // Old token should be marked as used
-        var oldToken = await _context.RefreshTokens.FirstAsync(t => t.TokenHash == tokenHash);
-        oldToken.IsUsed.Should().BeTrue();
     }
 
     public void Dispose()

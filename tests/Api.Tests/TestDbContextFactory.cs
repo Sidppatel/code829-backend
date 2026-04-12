@@ -42,9 +42,6 @@ public class TestDbContext : EventPlatformDbContext
             entity.Ignore(e => e.SearchVector);
         });
 
-        modelBuilder.Entity<Db.Entities.Views.EventView>(entity =>
-        {
-            entity.Ignore(e => e.SearchVector);
-        });
+        // EventView no longer has SearchVector — nothing to ignore
     }
 }
