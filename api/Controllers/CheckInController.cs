@@ -3,6 +3,7 @@ using Api.Middleware;
 using Contracts.DTOs.CheckIn;
 using Contracts.Enums;
 using Db;
+using Db.Entities.Views;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -126,25 +127,21 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
     [HttpGet("events/{eventId:guid}/stats")]
     public async Task<IActionResult> GetStats(Guid eventId)
     {
-        var ev = await context.Events.FindAsync(eventId);
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        // Count tickets (seats) not bookings — SeatsReserved defaults to 1 if null
-        var stats = await context.Bookings
-            .Where(b => b.EventId == eventId && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
-            .GroupBy(b => b.Status)
-            .Select(g => new { Status = g.Key, Tickets = g.Sum(b => b.SeatsReserved ?? 1) })
+        var bookings = await context.BookingViews.AsNoTracking()
+            .Where(b => b.EventId == eventId)
             .ToListAsync();
 
-        var checkedIn = stats.FirstOrDefault(b => b.Status == BookingStatus.CheckedIn)?.Tickets ?? 0;
-        var remaining = stats.FirstOrDefault(b => b.Status == BookingStatus.Paid)?.Tickets ?? 0;
+        var paidOrCheckedIn = bookings.Where(b => b.Status is "Paid" or "CheckedIn").ToList();
+        var checkedIn = paidOrCheckedIn.Where(b => b.Status == "CheckedIn").Sum(b => b.SeatsReserved ?? 1);
+        var remaining = paidOrCheckedIn.Where(b => b.Status == "Paid").Sum(b => b.SeatsReserved ?? 1);
         var totalSold = checkedIn + remaining;
+        var pending = bookings.Where(b => b.Status == "Pending").Sum(b => b.SeatsReserved ?? 1);
 
-        // Pending bookings (not yet paid)
-        var pending = await context.Bookings
-            .Where(b => b.EventId == eventId && b.Status == BookingStatus.Pending)
-            .SumAsync(b => b.SeatsReserved ?? 1);
-
+        // LastCheckIn not available from view — use entity for this specific field
         var lastCheckIn = await context.Bookings
             .Where(b => b.EventId == eventId && b.Status == BookingStatus.CheckedIn)
             .OrderByDescending(b => b.UpdatedAt)

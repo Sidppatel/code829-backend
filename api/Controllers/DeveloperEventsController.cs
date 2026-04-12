@@ -1,46 +1,45 @@
-using Contracts.DTOs;
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs.Events;
 using Contracts.Enums;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
-/// <summary>
-/// Developer event routes inherit all admin event actions via the /developer/events prefix,
-/// plus dedicated fee management endpoints.
-/// </summary>
 [ApiController]
 [Route("developer/events")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
 public class DeveloperEventsController(
     EventPlatformDbContext context,
+    IEventProcedures eventProc,
+    ITableProcedures tableProc,
     IFileStorageService fileStorage,
     IAdminLogService adminLog,
     ISettingsService settings
-) : AdminEventsController(context, fileStorage, adminLog)
+) : AdminEventsController(context, eventProc, tableProc, fileStorage, adminLog)
 {
     [HttpGet("{id:guid}/fees")]
     public async Task<IActionResult> GetEventFees(Guid id)
     {
-        var ev = await context.Events.FindAsync(id);
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound();
 
         var defaultFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
 
-        var tableTypes = await context.EventTables
+        var tableTypes = await context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id && et.IsActive)
             .OrderBy(et => et.Label)
             .Select(et => new TableTypeFee(et.Id, et.Label, et.PriceCents, et.PlatformFeeCents))
             .ToListAsync();
 
         return Ok(new EventFeeResponse(
-            ev.Id, ev.Title, ev.LayoutMode.ToString(),
+            ev.Id, ev.Title, ev.LayoutMode,
             ev.PricePerPersonCents, ev.MaxCapacity,
             ev.PlatformFeeCents, defaultFee, tableTypes
         ));

@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Contracts.DTOs;
 using Db;
-using Db.Entities;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +13,10 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("feedback")]
-public class FeedbackController(EventPlatformDbContext context) : ControllerBase
+public class FeedbackController(
+    EventPlatformDbContext context,
+    IFeedbackProcedures feedbackProc
+) : ControllerBase
 {
     private static readonly string[] ValidTypes = ["General", "Bug", "Suggestion", "Compliment", "Complaint"];
 
@@ -38,22 +41,13 @@ public class FeedbackController(EventPlatformDbContext context) : ControllerBase
         if (claim is not null && Guid.TryParse(claim.Value, out var uid))
             userId = uid;
 
-        var feedback = new Feedback
-        {
-            Name = request.Name.Trim(),
-            Email = request.Email?.Trim(),
-            Type = request.Type,
-            Message = request.Message.Trim(),
-            Rating = request.Rating,
-            UserId = userId,
-            UserAgent = Request.Headers.UserAgent.ToString(),
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-        };
+        await feedbackProc.CreateFeedbackAsync(
+            request.Name.Trim(), request.Email?.Trim() ?? "", request.Type,
+            request.Message.Trim(), request.Rating, userId,
+            Request.Headers.UserAgent.ToString(),
+            HttpContext.Connection.RemoteIpAddress?.ToString());
 
-        context.Feedbacks.Add(feedback);
-        await context.SaveChangesAsync();
-
-        Log.Information("[Feedback] New {Type} feedback from {Name} (rating={Rating})", feedback.Type, feedback.Name, feedback.Rating);
+        Log.Information("[Feedback] New {Type} feedback from {Name} (rating={Rating})", request.Type, request.Name, request.Rating);
 
         return Ok(new { message = "Thank you for your feedback!" });
     }

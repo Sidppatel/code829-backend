@@ -161,12 +161,12 @@ try
 
         // Resend HTTP API
         var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
-        var context = sp.GetRequiredService<Db.EventPlatformDbContext>();
+        var logProc = sp.GetRequiredService<Db.Repositories.StoredProcedures.ILogProcedures>();
         if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")
-            return new ResendEmailService(settingsService, context);
+            return new ResendEmailService(settingsService, logProc);
 
         // Fallback: Mock (logs to console + DB, no real emails)
-        return new MockEmailService(context);
+        return new MockEmailService(logProc);
     });
 
     builder.Services.AddScoped<IPaymentService>(sp =>

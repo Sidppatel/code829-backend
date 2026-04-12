@@ -1,6 +1,5 @@
 using System.Text;
 using Api.Services;
-using Contracts.Enums;
 using Db;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -23,8 +22,8 @@ public class SeoController(
     {
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
 
-        var events = await context.Events
-            .Where(e => e.Status == EventStatus.Published)
+        var events = await context.EventViews.AsNoTracking()
+            .Where(e => e.Status == "Published")
             .Select(e => new { e.Slug, e.UpdatedAt })
             .ToListAsync();
 

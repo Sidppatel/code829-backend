@@ -4,12 +4,14 @@ namespace Db.Repositories.StoredProcedures;
 
 public class LogProcedures(EventPlatformDbContext context) : ILogProcedures
 {
-    public async Task<Guid> CreateAdminLogAsync(string action, Guid actorId, string actorEmail, string actorRole, string? entityType, Guid? entityId, string? description, string? metadataJson, string? ip, CancellationToken ct = default)
+    public async Task<Guid> CreateAdminLogAsync(string action, Guid? actorId, string? actorEmail, string? actorRole, string? entityType, Guid? entityId, string? description, string? metadataJson, string? ip, CancellationToken ct = default)
     {
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_admin_log(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8) AS \"Value\"",
-                action, actorId, actorEmail, actorRole,
+                action,
+                (object?)actorId ?? DBNull.Value, (object?)actorEmail ?? DBNull.Value,
+                (object?)actorRole ?? DBNull.Value,
                 (object?)entityType ?? DBNull.Value, (object?)entityId ?? DBNull.Value,
                 (object?)description ?? DBNull.Value, (object?)metadataJson ?? DBNull.Value,
                 (object?)ip ?? DBNull.Value)

@@ -43,13 +43,11 @@ public class EventsController(
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(cacheKey);
         if (cached.HasValue)
-        {
             return Content(cached.ToString(), "application/json");
-        }
 
-        var query = context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Where(e => e.Status == EventStatus.Published)
+        var query = context.EventSummaryViews
+            .AsNoTracking()
+            .Where(e => e.Status == "Published")
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -60,7 +58,7 @@ public class EventsController(
             {
                 query = query.Where(e =>
                     EF.Functions.ILike(e.Title, $"%{trimmedSearch}%") ||
-                    EF.Functions.ILike(e.Venue.Name, $"%{trimmedSearch}%"));
+                    EF.Functions.ILike(e.VenueName, $"%{trimmedSearch}%"));
             }
             else
             {
@@ -81,7 +79,7 @@ public class EventsController(
                 {
                     query = query.Where(e =>
                         EF.Functions.ILike(e.Title, $"%{trimmedSearch}%") ||
-                        EF.Functions.ILike(e.Venue.Name, $"%{trimmedSearch}%"));
+                        EF.Functions.ILike(e.VenueName, $"%{trimmedSearch}%"));
                 }
                 else
                 {
@@ -90,16 +88,15 @@ public class EventsController(
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(category) && Enum.TryParse<EventCategory>(category, true, out var cat))
-            query = query.Where(e => e.Category == cat);
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(e => e.Category == category);
 
         if (!string.IsNullOrWhiteSpace(city))
-            query = query.Where(e => e.Venue.Address!.City.ToLower() == city.ToLower());
+            query = query.Where(e => EF.Functions.ILike(e.VenueCity, city));
 
         if (venueId.HasValue)
             query = query.Where(e => e.VenueId == venueId.Value);
 
-        // Price range filter (based on PricePerPersonCents for Open events)
         if (minPrice.HasValue)
             query = query.Where(e => e.PricePerPersonCents >= minPrice.Value);
         if (maxPrice.HasValue)
@@ -123,54 +120,29 @@ public class EventsController(
 
         var totalCount = await query.CountAsync();
 
-        var pagedEvents = await query
+        var items = await query
             .OrderBy(e => e.StartDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        var pagedEventIds = pagedEvents.Select(e => e.Id).ToList();
-        var bookingCounts = await context.Bookings
-            .Where(b => pagedEventIds.Contains(b.EventId) && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
-            .GroupBy(b => b.EventId)
-            .Select(g => new { EventId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.EventId, x => x.Count);
-
-        // NEW: available tables per event (IsActive + Status == Available)
-        var tableStats = await context.Tables
-            .Where(t => pagedEventIds.Contains(t.EventId)
-                        && t.IsActive
-                        && t.Status == TableStatus.Available)
-            .GroupBy(t => t.EventId)
-            .Select(g => new { 
-                EventId = g.Key, 
-                Count = g.Count(),
-                MinPrice = (int?)g.Min(t => t.EventTable.PriceCents)
-            })
-            .ToDictionaryAsync(x => x.EventId, x => x);
-
-        // Pull primary images from the images table for this page of events
-        var primaryImages = await context.Images
-            .Where(img => img.EntityType == "event" && pagedEventIds.Contains(img.EntityId) && img.IsPrimary)
-            .ToDictionaryAsync(img => img.EntityId, img => img.StorageKey);
-
-        var items = pagedEvents.Select(e => new EventSummaryDto(
-            e.Id, e.Title, e.Slug, e.Status.ToString(), e.Category.HasValue ? e.Category.Value.ToString() : "",
+        var dtos = items.Select(e => new EventSummaryDto(
+            e.Id, e.Title, e.Slug, e.Status, e.Category,
             e.StartDate, e.EndDate,
             e.ImagePath != null
                 ? fileStorage.GetPublicUrl(e.ImagePath)
-                : primaryImages.TryGetValue(e.Id, out var key) ? fileStorage.GetPublicUrl($"{key}_card.webp") : null,
+                : e.PrimaryImageKey != null ? fileStorage.GetPublicUrl($"{e.PrimaryImageKey}_card.webp") : null,
             e.IsFeatured,
-            e.LayoutMode.ToString(),
-            e.Venue.Name, e.Venue.Address!.City, e.Venue.Address!.State,
+            e.LayoutMode,
+            e.VenueName, e.VenueCity, e.VenueState,
             e.PricePerPersonCents,
             e.MaxCapacity ?? 0,
-            bookingCounts.GetValueOrDefault(e.Id, 0),
-            tableStats.TryGetValue(e.Id, out var stats) ? stats.Count : 0,
-            tableStats.TryGetValue(e.Id, out var s) ? s.MinPrice : null
+            e.TotalSold,
+            e.AvailableTables,
+            e.MinTablePriceCents
         )).ToList();
 
-        var result = new PagedResponse<EventSummaryDto>(items, totalCount, page, pageSize);
+        var result = new PagedResponse<EventSummaryDto>(dtos, totalCount, page, pageSize);
         var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         await db.StringSetAsync(cacheKey, json, ListCacheTtl);
 
@@ -181,20 +153,20 @@ public class EventsController(
     public async Task<IActionResult> GetFacets()
     {
         var now = DateTime.UtcNow;
-        var published = context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Where(e => e.Status == EventStatus.Published && e.EndDate >= now);
+        var published = context.EventSummaryViews
+            .AsNoTracking()
+            .Where(e => e.Status == "Published" && e.EndDate >= now);
 
         var categories = await published
-            .Select(e => e.Category.ToString())
+            .Select(e => e.Category)
             .Distinct().ToListAsync();
 
         var cities = await published
-            .Select(e => e.Venue.Address!.City)
+            .Select(e => e.VenueCity)
             .Distinct().OrderBy(c => c).ToListAsync();
 
         var venues = await published
-            .Select(e => new { e.VenueId, e.Venue.Name })
+            .Select(e => new { e.VenueId, Name = e.VenueName })
             .Distinct().ToListAsync();
 
         var priceRange = await published
@@ -218,8 +190,9 @@ public class EventsController(
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var now = DateTime.UtcNow;
 
-        var events = await context.Events
-            .Where(e => e.Status == EventStatus.Published && e.EndDate >= now)
+        var events = await context.EventSummaryViews
+            .AsNoTracking()
+            .Where(e => e.Status == "Published" && e.EndDate >= now)
             .OrderBy(e => e.StartDate)
             .Take(50)
             .Select(e => new { e.Title, e.Slug })
@@ -247,8 +220,7 @@ public class EventsController(
     [HttpGet("{id:guid}/seo")]
     public async Task<IActionResult> GetSeoMeta(Guid id)
     {
-        var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
+        var ev = await context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (ev is null) return NotFound();
@@ -261,7 +233,7 @@ public class EventsController(
 
         return Ok(new
         {
-            title = $"{ev.Title} — {dateStr} — {ev.Venue.Address?.City ?? ""} | Code829",
+            title = $"{ev.Title} — {dateStr} — {ev.VenueCity} | Code829",
             description,
             canonicalUrl,
             og = new
@@ -284,109 +256,38 @@ public class EventsController(
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Include(e => e.Organizer)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Status == EventStatus.Published);
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id && e.Status == "Published");
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var imageUrl = await ResolveEventImageUrlAsync(ev.Id, ev.ImagePath);
+        var imageUrl = ev.ImagePath is not null
+            ? fileStorage.GetPublicUrl(ev.ImagePath)
+            : await ResolveEventImageUrlAsync(ev.Id);
 
-        var totalSold = await context.Bookings
-            .CountAsync(b => b.EventId == ev.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-
-        var tableStats = await context.Tables
-            .Where(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available)
-            .Select(t => (int?)t.EventTable.PriceCents)
-            .ToListAsync();
-
-        var noOfAvailableTables = tableStats.Count;
-        var minPricePerTableCents = tableStats.Any() ? tableStats.Min() : null;
-
-        var dto = new EventDto(
-            ev.Id, ev.Title, ev.Slug, ev.Description,
-            ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
-            ev.StartDate, ev.EndDate,
-            imageUrl,
-            ev.IsFeatured,
-            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
-            ev.GridRows, ev.GridCols, ev.PublishedAt,
-            ev.VenueId,
-            new VenueDto(
-                ev.Venue.Id, ev.Venue.Name, ev.Venue.Address?.Line1 ?? "", ev.Venue.Address?.City ?? "", ev.Venue.Address?.State ?? "",
-                ev.Venue.Address?.ZipCode ?? "", ev.Venue.Description,
-                ev.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(ev.Venue.ImagePath) : null,
-                ev.Venue.Phone, ev.Venue.Email, ev.Venue.Website,
-                ev.Venue.IsActive, ev.Venue.CreatedAt
-            ),
-            ev.OrganizerId,
-            ev.Organizer is not null ? $"{ev.Organizer.FirstName} {ev.Organizer.LastName}" : null,
-            ev.CreatedAt,
-            ev.MaxCapacity ?? 0,
-            totalSold,
-            noOfAvailableTables,
-            minPricePerTableCents
-        );
-
-        return Ok(dto);
+        return Ok(MapEventDto(ev, imageUrl));
     }
 
     [HttpGet("by-slug/{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
     {
-        var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Include(e => e.Organizer)
-            .FirstOrDefaultAsync(e => e.Slug == slug && e.Status == EventStatus.Published);
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Slug == slug && e.Status == "Published");
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var slugImageUrl = await ResolveEventImageUrlAsync(ev.Id, ev.ImagePath);
+        var imageUrl = ev.ImagePath is not null
+            ? fileStorage.GetPublicUrl(ev.ImagePath)
+            : await ResolveEventImageUrlAsync(ev.Id);
 
-        var totalSold = await context.Bookings
-            .CountAsync(b => b.EventId == ev.Id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-
-        var tableStats = await context.Tables
-            .Where(t => t.EventId == ev.Id && t.IsActive && t.Status == TableStatus.Available)
-            .Select(t => (int?)t.EventTable.PriceCents)
-            .ToListAsync();
-
-        var noOfAvailableTables = tableStats.Count;
-        var minPricePerTableCents = tableStats.Any() ? tableStats.Min() : null;
-
-        return Ok(new EventDto(
-            ev.Id, ev.Title, ev.Slug, ev.Description,
-            ev.Status.ToString(), (ev.Category?.ToString() ?? ""),
-            ev.StartDate, ev.EndDate,
-            slugImageUrl,
-            ev.IsFeatured,
-            ev.LayoutMode.ToString(), ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
-            ev.GridRows, ev.GridCols, ev.PublishedAt,
-            ev.VenueId,
-            new VenueDto(
-                ev.Venue.Id, ev.Venue.Name, ev.Venue.Address?.Line1 ?? "", ev.Venue.Address?.City ?? "", ev.Venue.Address?.State ?? "",
-                ev.Venue.Address?.ZipCode ?? "", ev.Venue.Description,
-                ev.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(ev.Venue.ImagePath) : null,
-                ev.Venue.Phone, ev.Venue.Email, ev.Venue.Website,
-                ev.Venue.IsActive, ev.Venue.CreatedAt
-            ),
-            ev.OrganizerId,
-            ev.Organizer is not null ? $"{ev.Organizer.FirstName} {ev.Organizer.LastName}" : null,
-            ev.CreatedAt,
-            ev.MaxCapacity ?? 0,
-            totalSold,
-            noOfAvailableTables,
-            minPricePerTableCents
-        ));
+        return Ok(MapEventDto(ev, imageUrl));
     }
 
     [HttpGet("{id:guid}/schema")]
     public async Task<IActionResult> GetSchemaOrg(Guid id)
     {
-        var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Status == EventStatus.Published);
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id && e.Status == "Published");
 
         if (ev is null) return NotFound();
 
@@ -409,14 +310,14 @@ public class EventsController(
             ["location"] = new Dictionary<string, object?>
             {
                 ["@type"] = "Place",
-                ["name"] = ev.Venue.Name,
+                ["name"] = ev.VenueName,
                 ["address"] = new Dictionary<string, object?>
                 {
                     ["@type"] = "PostalAddress",
-                    ["streetAddress"] = ev.Venue.Address?.Line1 ?? "",
-                    ["addressLocality"] = ev.Venue.Address?.City ?? "",
-                    ["addressRegion"] = ev.Venue.Address?.State ?? "",
-                    ["postalCode"] = ev.Venue.Address?.ZipCode ?? "",
+                    ["streetAddress"] = ev.VenueAddress,
+                    ["addressLocality"] = ev.VenueCity,
+                    ["addressRegion"] = ev.VenueState,
+                    ["postalCode"] = ev.VenueZipCode,
                     ["addressCountry"] = "US"
                 }
             },
@@ -443,24 +344,23 @@ public class EventsController(
     [HttpGet("{id:guid}/tables")]
     public async Task<IActionResult> GetTables(Guid id)
     {
-        var ev = await context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         Guid? userId = null;
         var userClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userClaim is not null && Guid.TryParse(userClaim.Value, out var uid)) userId = uid;
 
-        var tables = await context.Tables
-            .Include(t => t.EventTable)
+        var tables = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == id && t.IsActive)
             .OrderBy(t => t.SortOrder)
             .ToListAsync();
 
-        // Event table types for pricing legend
-        var eventTableTypes = await context.EventTables
-            .Where(et => et.EventId == id && et.IsActive)
+        var eventTableTypes = await context.EventTablesSummaryViews.AsNoTracking()
+            .Where(et => et.EventId == id)
             .Select(et => new EventTableTypeInfo(
-                et.Id, et.Label, et.Capacity, et.Shape.ToString(), et.Color, et.PriceCents, et.PlatformFeeCents))
+                et.Id, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents, et.PlatformFeeCents))
             .ToListAsync();
 
         var dtos = tables.Select(t =>
@@ -471,10 +371,10 @@ public class EventsController(
 
             switch (t.Status)
             {
-                case TableStatus.Booked:
+                case "Booked":
                     status = "Booked";
                     break;
-                case TableStatus.Locked:
+                case "Locked":
                     isLockedByYou = userId.HasValue && t.LockedByUserId == userId.Value;
                     status = isLockedByYou ? "HeldByYou" : "Held";
                     holdExpiresAt = isLockedByYou ? t.LockExpiresAt : null;
@@ -484,28 +384,42 @@ public class EventsController(
                     break;
             }
 
-            return new EventTableDto(t.Id, t.Label, t.EventTable.Capacity,
-                t.EventTable.Shape.ToString(), t.EventTable.Color, t.EventTable.PriceCents,
+            return new EventTableDto(t.Id, t.Label, t.Capacity,
+                t.Shape, t.Color, t.PriceCents,
                 t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt, isLockedByYou,
-                t.EventTableId, t.EventTable.Label);
+                t.EventTableId, t.EventTableLabel);
         }).ToList();
 
         return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, eventTableTypes, dtos));
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
+    private EventDto MapEventDto(Db.Entities.Views.EventView ev, string? imageUrl) => new(
+        ev.Id, ev.Title, ev.Slug, ev.Description,
+        ev.Status, ev.Category,
+        ev.StartDate, ev.EndDate,
+        imageUrl,
+        ev.IsFeatured,
+        ev.LayoutMode, ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
+        ev.GridRows, ev.GridCols, ev.PublishedAt,
+        ev.VenueId,
+        new VenueDto(
+            ev.VenueId, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
+            ev.VenueZipCode, ev.VenueDescription,
+            ev.VenueImagePath is not null ? fileStorage.GetPublicUrl(ev.VenueImagePath) : null,
+            ev.VenuePhone, ev.VenueEmail, ev.VenueWebsite,
+            ev.VenueIsActive, ev.VenueCreatedAt
+        ),
+        ev.OrganizerId,
+        $"{ev.OrganizerFirstName} {ev.OrganizerLastName}",
+        ev.CreatedAt,
+        ev.MaxCapacity ?? 0,
+        ev.TotalSold,
+        ev.AvailableTables,
+        ev.MinTablePriceCents
+    );
 
-    /// <summary>
-    /// Returns the best available image URL for an event:
-    /// 1. ImagePath on the event row (legacy direct upload)
-    /// 2. Primary image from the images table (new upload pipeline)
-    /// 3. null (show placeholder)
-    /// </summary>
-    private async Task<string?> ResolveEventImageUrlAsync(Guid eventId, string? imagePath)
+    private async Task<string?> ResolveEventImageUrlAsync(Guid eventId)
     {
-        if (imagePath is not null)
-            return fileStorage.GetPublicUrl(imagePath);
-
         var primary = await context.Images
             .Where(img => img.EntityType == "event" && img.EntityId == eventId && img.IsPrimary)
             .Select(img => img.StorageKey)

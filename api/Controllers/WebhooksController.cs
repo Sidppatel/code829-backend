@@ -1,6 +1,7 @@
 using Api.Services;
 using Contracts.Enums;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -12,7 +13,9 @@ namespace Api.Controllers;
 [Route("webhooks")]
 public class WebhooksController(
     EventPlatformDbContext context,
-    ISettingsService settings
+    ISettingsService settings,
+    IPaymentProcedures paymentProc,
+    IBookingProcedures bookingProc
 ) : ControllerBase
 {
     [HttpPost("stripe")]
@@ -71,7 +74,6 @@ public class WebhooksController(
         if (paymentIntent is null) return;
 
         var payment = await context.Payments
-            .Include(p => p.Booking)
             .FirstOrDefaultAsync(p => p.PaymentIntentId == paymentIntent.Id);
 
         if (payment is null)
@@ -86,11 +88,8 @@ public class WebhooksController(
             return;
         }
 
-        payment.Status = PaymentStatus.Succeeded;
-        payment.PaidAt = DateTime.UtcNow;
-        payment.Booking.Status = BookingStatus.Paid;
-
-        await context.SaveChangesAsync();
+        await paymentProc.UpdatePaymentStatusAsync(paymentIntent.Id, "Succeeded");
+        await bookingProc.ConfirmBookingAsync(payment.BookingId, "");
         Log.Information("[Webhook] Payment confirmed for booking {BookingId}", payment.BookingId);
     }
 
@@ -100,7 +99,6 @@ public class WebhooksController(
         if (paymentIntent is null) return;
 
         var payment = await context.Payments
-            .Include(p => p.Booking)
             .FirstOrDefaultAsync(p => p.PaymentIntentId == paymentIntent.Id);
 
         if (payment is null) return;
@@ -108,9 +106,8 @@ public class WebhooksController(
         if (payment.Status == PaymentStatus.Failed)
             return;
 
-        payment.Status = PaymentStatus.Failed;
-        payment.Booking.Status = BookingStatus.Cancelled;
-        await context.SaveChangesAsync();
+        await paymentProc.UpdatePaymentStatusAsync(paymentIntent.Id, "Failed");
+        await bookingProc.CancelBookingAsync(payment.BookingId);
 
         Log.Warning("[Webhook] Payment failed for booking {BookingId}: {Reason}",
             payment.BookingId, paymentIntent.LastPaymentError?.Message ?? "unknown");
@@ -122,18 +119,14 @@ public class WebhooksController(
         if (refund?.PaymentIntentId is null) return;
 
         var payment = await context.Payments
-            .Include(p => p.Booking)
             .FirstOrDefaultAsync(p => p.PaymentIntentId == refund.PaymentIntentId);
 
         if (payment is null) return;
 
         if (refund.Status == "succeeded" && payment.Status != PaymentStatus.Refunded)
         {
-            payment.Status = PaymentStatus.Refunded;
-            payment.RefundedAt = DateTime.UtcNow;
-            payment.RefundId = refund.Id;
-            payment.Booking.Status = BookingStatus.Refunded;
-            await context.SaveChangesAsync();
+            await paymentProc.UpdatePaymentStatusAsync(refund.PaymentIntentId, "Refunded");
+            await bookingProc.RefundBookingAsync(payment.BookingId);
             Log.Information("[Webhook] Refund synced for booking {BookingId}", payment.BookingId);
         }
     }

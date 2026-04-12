@@ -8,6 +8,7 @@ using Contracts.DTOs.Bookings;
 using Contracts.Enums;
 using Db;
 using Db.Entities;
+using Db.Entities.Views;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -34,33 +35,28 @@ public class TicketsController(
     public async Task<IActionResult> GetTicketsForBooking(Guid bookingId)
     {
         var userId = GetUserId();
-        var booking = await context.Bookings
-            .Include(b => b.Event).ThenInclude(e => e.Venue)
-            .FirstOrDefaultAsync(b => b.Id == bookingId);
 
+        // Verify booking ownership via view
+        var booking = await context.BookingViews.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == bookingId);
         if (booking is null)
             return NotFound(new ApiError(404, "Booking not found", HttpContext.TraceIdentifier));
         if (booking.UserId != userId)
             return StatusCode(403, new ApiError(403, "Not your booking", HttpContext.TraceIdentifier));
 
-        var tickets = await context.BookingTickets
-            .Include(t => t.GuestUser)
+        var tickets = await context.BookingTicketViews.AsNoTracking()
             .Where(t => t.BookingId == bookingId)
             .OrderBy(t => t.SeatNumber)
             .ToListAsync();
 
-        var tableLabel = booking.TableId.HasValue
-            ? await context.Tables.Where(t => t.Id == booking.TableId).Select(t => t.Label).FirstOrDefaultAsync()
-            : null;
-
         var dtos = tickets.Select(t => new BookingTicketDto(
-            t.Id, t.TicketCode, t.SeatNumber, t.Status.ToString(),
+            t.Id, t.TicketCode, t.SeatNumber, t.Status,
             booking.Id, booking.BookingNumber,
-            booking.EventId, booking.Event.Title, booking.Event.StartDate,
-            booking.Event.Venue?.Name ?? "",
-            tableLabel,
-            t.GuestUser is not null ? $"{t.GuestUser.FirstName} {t.GuestUser.LastName}" : null,
-            t.GuestUser?.Email,
+            booking.EventId, booking.EventTitle, booking.EventStartDate,
+            booking.VenueName,
+            booking.TableLabel,
+            t.GuestFirstName is not null ? $"{t.GuestFirstName} {t.GuestLastName}" : null,
+            t.GuestEmail,
             t.InvitedEmail, t.InviteSentAt, t.ClaimedAt
         ));
 
@@ -285,33 +281,27 @@ public class TicketsController(
     {
         var userId = GetUserId();
 
-        var tickets = await context.BookingTickets
-            .Include(t => t.Booking).ThenInclude(b => b.Event).ThenInclude(e => e.Venue)
+        var tickets = await context.BookingTicketViews.AsNoTracking()
             .Where(t => t.GuestUserId == userId)
-            .OrderByDescending(t => t.Booking.Event.StartDate)
+            .OrderByDescending(t => t.EventStartDate)
             .ToListAsync();
 
-        // Get table labels for table bookings
-        var tableIds = tickets
-            .Where(t => t.Booking.TableId.HasValue)
-            .Select(t => t.Booking.TableId!.Value)
-            .Distinct()
-            .ToList();
-        var tableLabels = tableIds.Count > 0
-            ? await context.Tables.Where(t => tableIds.Contains(t.Id))
-                .ToDictionaryAsync(t => t.Id, t => t.Label)
-            : new Dictionary<Guid, string>();
+        // Get table labels from booking views for table bookings
+        var bookingIds = tickets.Select(t => t.BookingId).Distinct().ToList();
+        var bookingTableLabels = await context.BookingViews.AsNoTracking()
+            .Where(b => bookingIds.Contains(b.Id) && b.TableId.HasValue)
+            .ToDictionaryAsync(b => b.Id, b => b.TableLabel);
 
         var dtos = tickets.Select(t => new GuestTicketDto(
             t.Id,
             t.TicketCode,
             t.SeatNumber,
-            t.Status.ToString(),
-            t.Booking.Event.Title,
-            t.Booking.Event.StartDate,
-            t.Booking.Event.Venue?.Name ?? "",
-            t.Booking.TableId.HasValue && tableLabels.TryGetValue(t.Booking.TableId.Value, out var label) ? label : null,
-            t.Booking.BookingNumber,
+            t.Status,
+            t.EventTitle,
+            t.EventStartDate,
+            t.VenueName,
+            bookingTableLabels.TryGetValue(t.BookingId, out var label) ? label : null,
+            t.BookingNumber,
             t.ClaimedAt
         ));
 

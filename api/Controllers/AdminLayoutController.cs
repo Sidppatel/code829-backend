@@ -102,6 +102,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
+        // Use summary view for read, but fall back to entity for full data including template name
         var eventTables = await context.EventTables
             .Include(et => et.TableTemplate)
             .Include(et => et.Tables)
@@ -228,17 +229,14 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var tables = await context.Tables
-            .Include(t => t.EventTable)
+        var tables = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId)
             .OrderBy(t => t.SortOrder)
             .ToListAsync();
 
-        var lockedIds = await GetLockedTableIdsAsync(eventId);
-
         return Ok(new EventLayoutResponse(
             eventId, ev.GridRows, ev.GridCols,
-            tables.Select(t => MapTableWithStatus(t, lockedIds)).ToList()));
+            tables.Select(MapTableViewToResponse).ToList()));
     }
 
     [HttpPost("admin/events/{eventId:guid}/layout")]
@@ -505,15 +503,14 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var tables = await context.Tables
-            .Include(t => t.EventTable)
+        var tables = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId && t.IsActive)
             .OrderBy(t => t.SortOrder)
             .ToListAsync();
 
-        var bookingInfo = await context.Bookings
+        var bookingInfo = await context.BookingViews.AsNoTracking()
             .Where(b => b.EventId == eventId && b.TableId.HasValue
-                && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
+                && (b.Status == "Paid" || b.Status == "CheckedIn"))
             .GroupBy(b => b.TableId!.Value)
             .Select(g => new
             {
@@ -525,8 +522,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
         var result = tables.Select(t =>
         {
-            var status = t.Status == TableStatus.Booked ? "Booked"
-                : t.Status == TableStatus.Locked ? "Held"
+            var status = t.Status == "Booked" ? "Booked"
+                : t.Status == "Locked" ? "Held"
                 : "Available";
 
             bookingInfo.TryGetValue(t.Id, out var info);
@@ -540,11 +537,11 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
                 t.IsActive,
                 t.SortOrder,
                 t.EventTableId,
-                EventTableLabel = t.EventTable.Label,
-                t.EventTable.Capacity,
-                Shape = t.EventTable.Shape.ToString(),
-                t.EventTable.Color,
-                t.EventTable.PriceCents,
+                EventTableLabel = t.EventTableLabel,
+                t.Capacity,
+                t.Shape,
+                t.Color,
+                t.PriceCents,
                 Status = status,
                 SeatsBooked = info?.SeatsBooked ?? 0,
                 BookingCount = info?.BookingCount ?? 0
@@ -566,19 +563,18 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var stats = await context.Tables
-            .Include(t => t.EventTable)
+        var stats = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId && t.IsActive)
-            .Select(t => new { t.EventTable.Capacity, t.EventTable.PriceCents })
+            .Select(t => new { t.Capacity, t.PriceCents })
             .ToListAsync();
 
         var totalTables = stats.Count;
         var totalCapacity = stats.Sum(s => s.Capacity);
         var totalPotentialRevenueCents = stats.Sum(s => (long)s.PriceCents);
 
-        var totalBookedRevenueCents = await context.Bookings
+        var totalBookedRevenueCents = await context.BookingViews.AsNoTracking()
             .Where(b => b.EventId == eventId && b.TableId.HasValue
-                && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
+                && (b.Status == "Paid" || b.Status == "CheckedIn"))
             .SumAsync(b => (long)b.SubtotalCents);
 
         return Ok(new LayoutStatsResponse(
@@ -684,6 +680,12 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         t.SortOrder, t.EventTableId, t.EventTable.Label,
         t.EventTable.Capacity, t.EventTable.Shape.ToString(),
         t.EventTable.Color, t.EventTable.PriceCents);
+
+    private static LayoutTableResponse MapTableViewToResponse(Db.Entities.Views.TableView t) => new(
+        t.Id, t.Label, t.GridRow, t.GridCol, t.IsActive,
+        t.SortOrder, t.EventTableId, t.EventTableLabel,
+        t.Capacity, t.Shape, t.Color, t.PriceCents,
+        t.Status);
 
     private static LayoutTableResponse MapTableWithStatus(Table t, HashSet<Guid> lockedIds)
     {

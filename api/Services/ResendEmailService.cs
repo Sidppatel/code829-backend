@@ -1,17 +1,12 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using Db;
-using Db.Entities;
+using Db.Repositories.StoredProcedures;
 using Serilog;
 
 namespace Api.Services;
 
-/// <summary>
-/// Email service using Resend HTTP API.
-/// Required settings: resend_api_key, email_from_address.
-/// </summary>
-public class ResendEmailService(ISettingsService settings, EventPlatformDbContext context) : IEmailService
+public class ResendEmailService(ISettingsService settings, ILogProcedures logProc) : IEmailService
 {
     private static readonly HttpClient Http = new();
 
@@ -34,16 +29,7 @@ public class ResendEmailService(ISettingsService settings, EventPlatformDbContex
 
         var status = response.IsSuccessStatusCode ? "sent" : "failed";
 
-        // Log to database
-        context.EmailLogs.Add(new EmailLog
-        {
-            Id = Guid.NewGuid(),
-            Recipient = recipient,
-            Subject = subject,
-            Body = body,
-            Status = status
-        });
-        await context.SaveChangesAsync();
+        await logProc.CreateEmailLogAsync(recipient, subject, body, status);
 
         if (!response.IsSuccessStatusCode)
         {

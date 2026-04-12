@@ -6,6 +6,7 @@ using Contracts.DTOs.Logs;
 using Contracts.Enums;
 using Db;
 using Db.Repositories;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,8 @@ public class DeveloperController(
     EventPlatformDbContext context,
     ISettingsService settingsService,
     IAppSettingRepository settingsRepo,
-    IImageService imageService
+    IImageService imageService,
+    IUserProcedures userProc
 ) : ControllerBase
 {
     /// <summary>
@@ -219,14 +221,10 @@ public class DeveloperController(
         var user = await context.Users.FindAsync(id);
         if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
-        // Ensure developers cannot demote or duplicate the master developer via this endpoint
-        // (Assuming developer is highest role, but let's just make sure they don't break themselves)
         if (user.Role == UserRole.Developer && role != UserRole.Developer)
             return BadRequest(new ApiError(400, "Cannot demote a Developer", HttpContext.TraceIdentifier));
 
-        user.Role = role;
-        user.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await userProc.UpdateUserRoleAsync(id, role.ToString());
 
         return Ok(new { message = $"User updated to {role}" });
     }

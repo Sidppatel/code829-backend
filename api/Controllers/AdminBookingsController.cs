@@ -46,14 +46,10 @@ public class AdminBookingsController(
         if (cached.HasValue)
             return Content(cached.ToString(), "application/json");
 
-        var query = context.Bookings
-            .Include(b => b.User).Include(b => b.Event)
-            .Include(b => b.Table)
-            .Include(b => b.Payment)
-            .AsQueryable();
+        var query = context.BookingViews.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<BookingStatus>(status, true, out var s))
-            query = query.Where(b => b.Status == s);
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(b => b.Status == status);
         if (eventId.HasValue)
             query = query.Where(b => b.EventId == eventId.Value);
 
@@ -62,9 +58,9 @@ public class AdminBookingsController(
             var term = search.Trim().ToLower();
             query = query.Where(b =>
                 b.BookingNumber.ToLower().Contains(term) ||
-                (b.User.FirstName + " " + b.User.LastName).ToLower().Contains(term) ||
-                b.User.Email.ToLower().Contains(term) ||
-                b.Event.Title.ToLower().Contains(term)
+                (b.UserFirstName + " " + b.UserLastName).ToLower().Contains(term) ||
+                b.UserEmail.ToLower().Contains(term) ||
+                b.EventTitle.ToLower().Contains(term)
             );
         }
 
@@ -73,13 +69,13 @@ public class AdminBookingsController(
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
         var dtos = items.Select(b => new BookingDto(
-            b.Id, b.BookingNumber, b.Status.ToString(),
-            b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
-            b.Event.StartDate, b.Event.EndDate, b.Event.Category.ToString(), b.Event.ImagePath,
-            null, null,
+            b.Id, b.BookingNumber, b.Status,
+            b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
+            b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
+            b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
             b.SubtotalCents, b.FeeCents, b.TotalCents, null,
-            b.TableId, b.Table?.Label, b.SeatsReserved, 0,
-            b.Payment is not null ? new PaymentDto(b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(), b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt) : null,
+            b.TableId, b.TableLabel, b.SeatsReserved, b.TicketCount,
+            b.PaymentId.HasValue ? new PaymentDto(b.PaymentId.Value, b.PaymentIntentId!, b.PaymentStatus!, b.PaymentAmountCents ?? 0, b.PaidAt, b.RefundedAt) : null,
             b.CreatedAt
         )).ToList();
 
@@ -99,15 +95,15 @@ public class AdminBookingsController(
         if (cached.HasValue)
             return Content(cached.ToString(), "application/json");
 
-        var query = context.Bookings.AsQueryable();
+        var query = context.BookingViews.AsNoTracking().AsQueryable();
         if (eventId.HasValue)
             query = query.Where(b => b.EventId == eventId.Value);
 
         var total = await query.CountAsync();
-        var paid = await query.CountAsync(b => b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn);
-        var checkedIn = await query.CountAsync(b => b.Status == BookingStatus.CheckedIn);
+        var paid = await query.CountAsync(b => b.Status == "Paid" || b.Status == "CheckedIn");
+        var checkedIn = await query.CountAsync(b => b.Status == "CheckedIn");
         var revenue = await query
-            .Where(b => b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn)
+            .Where(b => b.Status == "Paid" || b.Status == "CheckedIn")
             .SumAsync(b => (long)b.TotalCents);
 
         var result = new { total, paid, checkedIn, revenue };
@@ -178,20 +174,19 @@ public class AdminBookingsController(
 
     private async Task<List<BookingExportRow>> GetExportRows(Guid? eventId)
     {
-        var query = context.Bookings
-            .Include(b => b.User).Include(b => b.Event).Include(b => b.Table)
-            .AsQueryable();
+        var query = context.BookingViews.AsNoTracking().AsQueryable();
 
         if (eventId.HasValue)
             query = query.Where(b => b.EventId == eventId.Value);
 
         return await query.OrderByDescending(b => b.CreatedAt)
             .Select(b => new BookingExportRow(
-                b.BookingNumber, b.Status.ToString(), b.User.FirstName + " " + b.User.LastName, b.Event.Title,
-                b.Table != null ? b.Table.Label : "",
+                b.BookingNumber, b.Status, b.UserFirstName + " " + b.UserLastName, b.EventTitle,
+                b.TableLabel ?? "",
                 b.SeatsReserved ?? 0,
-                $"${b.SubtotalCents / 100.0:F2}", $"${b.FeeCents / 100.0:F2}",
-                $"${b.TotalCents / 100.0:F2}",
+                "$" + (b.SubtotalCents / 100.0).ToString("F2"),
+                "$" + (b.FeeCents / 100.0).ToString("F2"),
+                "$" + (b.TotalCents / 100.0).ToString("F2"),
                 b.CreatedAt.ToString("yyyy-MM-dd HH:mm")
             )).ToListAsync();
     }

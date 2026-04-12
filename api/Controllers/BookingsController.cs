@@ -56,21 +56,20 @@ public class BookingsController(
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         try
         {
-            var payment = await context.Payments
-                .Include(p => p.Booking)
-                .FirstOrDefaultAsync(p => p.PaymentIntentId == request.PaymentIntentId);
+            var booking = await context.BookingViews.AsNoTracking()
+                .FirstOrDefaultAsync(b => b.PaymentIntentId == request.PaymentIntentId);
 
-            if (payment is null)
+            if (booking is null)
                 return NotFound(new ApiError(404, "Payment not found", HttpContext.TraceIdentifier));
 
-            if (payment.Booking.UserId != userId)
+            if (booking.UserId != userId)
                 return StatusCode(403, new ApiError(403, "Not your booking", HttpContext.TraceIdentifier));
 
-            if (payment.Booking.Status != BookingStatus.Pending)
-                return Ok(await bookingService.GetByIdAsync(payment.BookingId));
+            if (booking.Status != "Pending")
+                return Ok(await bookingService.GetByIdAsync(booking.Id));
 
-            var booking = await bookingService.ConfirmPaymentAsync(payment.BookingId, userId);
-            return Ok(booking);
+            var result = await bookingService.ConfirmPaymentAsync(booking.Id, userId);
+            return Ok(result);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] ConfirmByIntent failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
@@ -131,20 +130,16 @@ public class BookingsController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 50) pageSize = 20;
 
-        var query = context.Bookings
-            .Include(b => b.Event)
-            .Include(b => b.Table)
-            .Include(b => b.Payment)
-            .Include(b => b.User)
+        var query = context.BookingViews.AsNoTracking()
             .Where(b => b.UserId == userId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();
             query = query.Where(b =>
-                b.Event.Title.ToLower().Contains(term) ||
+                b.EventTitle.ToLower().Contains(term) ||
                 b.BookingNumber.ToLower().Contains(term) ||
-                b.Status.ToString().ToLower().Contains(term));
+                b.Status.ToLower().Contains(term));
         }
 
         var total = await query.CountAsync();
@@ -155,15 +150,15 @@ public class BookingsController(
             .ToListAsync();
 
         var dtos = items.Select(b => new BookingDto(
-            b.Id, b.BookingNumber, b.Status.ToString(),
-            b.UserId, b.User.FirstName + " " + b.User.LastName, b.EventId, b.Event.Title,
-            b.Event.StartDate, b.Event.EndDate, b.Event.Category.ToString(), b.Event.ImagePath,
-            null, null,
+            b.Id, b.BookingNumber, b.Status,
+            b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
+            b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
+            b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
             b.SubtotalCents, b.FeeCents, b.TotalCents, null,
-            b.TableId, b.Table?.Label, b.SeatsReserved, 0,
-            b.Payment is not null ? new PaymentDto(
-                b.Payment.Id, b.Payment.PaymentIntentId, b.Payment.Status.ToString(),
-                b.Payment.AmountCents, b.Payment.PaidAt, b.Payment.RefundedAt
+            b.TableId, b.TableLabel, b.SeatsReserved, b.TicketCount,
+            b.PaymentId.HasValue ? new PaymentDto(
+                b.PaymentId.Value, b.PaymentIntentId!, b.PaymentStatus!,
+                b.PaymentAmountCents ?? 0, b.PaidAt, b.RefundedAt
             ) : null,
             b.CreatedAt
         )).ToList();

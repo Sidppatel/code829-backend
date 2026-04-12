@@ -8,6 +8,8 @@ using Contracts.DTOs.Venues;
 using Contracts.Enums;
 using Db;
 using Db.Entities;
+using Db.Entities.Views;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +22,8 @@ namespace Api.Controllers;
 [RequireRole(UserRole.Admin)]
 public class AdminEventsController(
     EventPlatformDbContext context,
+    IEventProcedures eventProc,
+    ITableProcedures tableProc,
     IFileStorageService fileStorage,
     IAdminLogService adminLog
 ) : ControllerBase
@@ -35,13 +39,13 @@ public class AdminEventsController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var query = context.Events.Include(e => e.Venue).ThenInclude(v => v.Address).AsQueryable();
+        var query = context.EventViews.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<EventStatus>(status, true, out var s))
-            query = query.Where(e => e.Status == s);
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(e => e.Status == status);
 
-        if (!string.IsNullOrWhiteSpace(category) && Enum.TryParse<EventCategory>(category, true, out var cat))
-            query = query.Where(e => e.Category == cat);
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(e => e.Category == category);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -49,8 +53,8 @@ public class AdminEventsController(
             query = query.Where(e =>
                 e.Title.ToLower().Contains(term) ||
                 e.Slug.ToLower().Contains(term) ||
-                e.Venue.Name.ToLower().Contains(term) ||
-                (e.Venue.Address != null && e.Venue.Address.City.ToLower().Contains(term))
+                e.VenueName.ToLower().Contains(term) ||
+                e.VenueCity.ToLower().Contains(term)
             );
         }
 
@@ -61,56 +65,28 @@ public class AdminEventsController(
             .Take(pageSize)
             .ToListAsync();
 
-        var pagedEventIds = items.Select(e => e.Id).ToList();
-        var bookingCounts = await context.Bookings
-            .Where(b => pagedEventIds.Contains(b.EventId) && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn))
-            .GroupBy(b => b.EventId)
-            .Select(g => new { EventId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.EventId, x => x.Count);
-
-        var tableStats = await context.Tables
-            .Where(t => pagedEventIds.Contains(t.EventId) && t.IsActive && t.Status == TableStatus.Available)
-            .GroupBy(t => t.EventId)
-            .Select(g => new { 
-                EventId = g.Key, 
-                Count = g.Count(),
-                MinPrice = (int?)g.Min(t => t.EventTable.PriceCents)
-            })
-            .ToDictionaryAsync(x => x.EventId, x => x);
-
-        var dtos = items.Select(e => MapToDto(
-            e,
-            e.MaxCapacity ?? 0,
-            bookingCounts.GetValueOrDefault(e.Id, 0),
-            tableStats.TryGetValue(e.Id, out var stats) ? stats.Count : 0,
-            tableStats.TryGetValue(e.Id, out var s) ? s.MinPrice : null
-        )).ToList();
+        var dtos = items.Select(MapToDto).ToList();
         return Ok(new PagedResponse<EventDto>(dtos, totalCount, page, pageSize));
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .Include(e => e.Organizer)
+        var ev = await context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-
-        var totalSold = await context.Bookings
-            .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-        var (availableCount, minPrice) = await GetTableStatsAsync(id);
-        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, availableCount, minPrice));
+        return Ok(MapToDto(ev));
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
-        var venue = await context.Venues.FindAsync(request.VenueId);
+        var venue = await context.VenueViews.AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == request.VenueId);
         if (venue is null) return BadRequest(new ApiError(400, "Venue not found", HttpContext.TraceIdentifier));
 
-        if (!Enum.TryParse<EventCategory>(request.Category, true, out var category))
+        if (!Enum.TryParse<EventCategory>(request.Category, true, out _))
             return BadRequest(new ApiError(400, "Invalid category", HttpContext.TraceIdentifier));
 
         if (!Enum.TryParse<LayoutMode>(request.LayoutMode, true, out var layoutMode))
@@ -122,39 +98,20 @@ public class AdminEventsController(
         var baseSlug = slug;
         var counter = 1;
         while (await context.Events.AnyAsync(e => e.Slug == slug))
-        {
             slug = $"{baseSlug}-{counter++}";
-        }
 
-        var ev = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = request.Title,
-            Slug = slug,
-            Description = request.Description,
-            Status = EventStatus.Draft,
-            Category = category,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
-            IsFeatured = request.IsFeatured,
-            LayoutMode = layoutMode,
-            MaxCapacity = request.MaxCapacity,
-            PricePerPersonCents = layoutMode == LayoutMode.Open ? request.PricePerPersonCents : null,
-            PlatformFeePercent = request.PlatformFeePercent,
-            ImagePath = request.BannerImageUrl,
-            VenueId = request.VenueId,
-            OrganizerId = organizerId
-        };
+        var eventId = await eventProc.CreateEventAsync(
+            request.Title, slug, request.Description, "Draft", request.Category,
+            request.StartDate, request.EndDate, request.BannerImageUrl, request.IsFeatured,
+            request.LayoutMode, request.MaxCapacity,
+            layoutMode == LayoutMode.Open ? request.PricePerPersonCents : null,
+            request.PlatformFeePercent, null, null, null,
+            request.VenueId, organizerId, null);
 
-        context.Events.Add(ev);
-        await context.SaveChangesAsync();
+        await adminLog.LogAsync("event.created", "Event", eventId, $"Event '{request.Title}' created");
 
-        var created = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .FirstAsync(e => e.Id == ev.Id);
-
-        await adminLog.LogAsync("event.created", "Event", ev.Id, $"Event '{ev.Title}' created");
-        return CreatedAtAction(nameof(GetById), new { id = ev.Id }, MapToDto(created, ev.MaxCapacity ?? 0, 0, 0, null));
+        var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == eventId);
+        return CreatedAtAction(nameof(GetById), new { id = eventId }, MapToDto(created));
     }
 
     private Guid GetCurrentUserId() =>
@@ -168,64 +125,54 @@ public class AdminEventsController(
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
-        var ev = await context.Events.Include(e => e.Venue).ThenInclude(v => v.Address)
-            .FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
+        string? newSlug = null;
         if (request.Title is not null)
+            newSlug = GenerateSlug(request.Title);
+
+        string? newStatus = null;
+        if (request.Status is not null && Enum.TryParse<EventStatus>(request.Status, true, out var newS))
         {
-            ev.Title = request.Title;
-            ev.Slug = GenerateSlug(request.Title);
+            if (!IsValidTransition(Enum.Parse<EventStatus>(ev.Status), newS))
+                return BadRequest(new ApiError(400, $"Cannot transition from {ev.Status} to {newS}", HttpContext.TraceIdentifier));
+            newStatus = newS.ToString();
         }
-        if (request.Description is not null) ev.Description = request.Description;
-        if (request.Category is not null && Enum.TryParse<EventCategory>(request.Category, true, out var cat))
-            ev.Category = cat;
-        if (request.StartDate.HasValue) ev.StartDate = request.StartDate.Value;
-        if (request.EndDate.HasValue) ev.EndDate = request.EndDate.Value;
-        if (request.VenueId.HasValue) ev.VenueId = request.VenueId.Value;
-        if (request.IsFeatured.HasValue) ev.IsFeatured = request.IsFeatured.Value;
+
         if (request.LayoutMode is not null && Enum.TryParse<LayoutMode>(request.LayoutMode, true, out var lm))
         {
-            if (lm != ev.LayoutMode)
+            if (lm.ToString() != ev.LayoutMode)
             {
-                var hasBookings = await context.Bookings
-                    .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
+                var hasBookings = await context.BookingViews.AsNoTracking()
+                    .AnyAsync(b => b.EventId == id && b.Status != "Cancelled" && b.Status != "Refunded");
                 if (hasBookings)
                     return BadRequest(new ApiError(400, "Cannot change layout mode — active bookings exist for this event", HttpContext.TraceIdentifier));
             }
-            ev.LayoutMode = lm;
-        }
-        if (request.MaxCapacity.HasValue) ev.MaxCapacity = request.MaxCapacity.Value;
-        if (request.PricePerPersonCents.HasValue) ev.PricePerPersonCents = request.PricePerPersonCents.Value;
-        if (request.PlatformFeePercent.HasValue) ev.PlatformFeePercent = request.PlatformFeePercent.Value;
-        if (request.BannerImageUrl is not null) ev.ImagePath = request.BannerImageUrl;
-
-        if (request.Status is not null && Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
-        {
-            if (!IsValidTransition(ev.Status, newStatus))
-                return BadRequest(new ApiError(400, $"Cannot transition from {ev.Status} to {newStatus}", HttpContext.TraceIdentifier));
-            ev.Status = newStatus;
-            if (newStatus == EventStatus.Published) ev.PublishedAt = DateTime.UtcNow;
         }
 
-        ev.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await eventProc.UpdateEventAsync(
+            id, request.Title, newSlug, request.Description, request.Category,
+            request.StartDate, request.EndDate, request.BannerImageUrl, request.IsFeatured,
+            request.LayoutMode, request.MaxCapacity, request.PricePerPersonCents,
+            request.PlatformFeePercent, null, null, null, request.VenueId, null);
 
-        var totalSold = await context.Bookings
-            .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-        var (availableCount, minPrice) = await GetTableStatsAsync(id);
-        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, availableCount, minPrice));
+        if (newStatus is not null)
+            await eventProc.ChangeEventStatusAsync(id, newStatus, null);
+
+        var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == id);
+        return Ok(MapToDto(updated));
     }
 
     [HttpGet("{id:guid}/layout-locked")]
     public async Task<IActionResult> IsLayoutModeLocked(Guid id)
     {
-        var ev = await context.Events.FindAsync(id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var hasBookings = await context.Bookings
-            .AnyAsync(b => b.EventId == id && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Refunded);
+        var hasBookings = await context.BookingViews.AsNoTracking()
+            .AnyAsync(b => b.EventId == id && b.Status != "Cancelled" && b.Status != "Refunded");
 
         return Ok(new { locked = hasBookings });
     }
@@ -238,9 +185,8 @@ public class AdminEventsController(
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "events", file.FileName);
-        ev.ImagePath = path;
-        ev.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await eventProc.UpdateEventAsync(id, null, null, null, null, null, null, path,
+            null, null, null, null, null, null, null, null, null, null);
 
         return Ok(new { imageUrl = fileStorage.GetPublicUrl(path) });
     }
@@ -248,16 +194,14 @@ public class AdminEventsController(
     [HttpPut("{id:guid}/status")]
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeEventStatusRequest request)
     {
-        var ev = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         if (!Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
             return BadRequest(new ApiError(400, "Invalid status", HttpContext.TraceIdentifier));
 
-        if (!IsValidTransition(ev.Status, newStatus))
+        if (!IsValidTransition(Enum.Parse<EventStatus>(ev.Status), newStatus))
             return BadRequest(new ApiError(400, $"Cannot transition from {ev.Status} to {newStatus}", HttpContext.TraceIdentifier));
 
         if (newStatus == EventStatus.Published)
@@ -271,18 +215,13 @@ public class AdminEventsController(
         if (newStatus == EventStatus.Completed && ev.EndDate > DateTime.UtcNow)
             return BadRequest(new ApiError(400, "Cannot complete an event before its end date", HttpContext.TraceIdentifier));
 
-        ev.Status = newStatus;
-        if (newStatus == EventStatus.Published) ev.PublishedAt = DateTime.UtcNow;
-        ev.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await eventProc.ChangeEventStatusAsync(id, newStatus.ToString(), null);
 
-        await adminLog.LogAsync($"event.{newStatus.ToString().ToLower()}", "Event", ev.Id,
+        await adminLog.LogAsync($"event.{newStatus.ToString().ToLower()}", "Event", id,
             $"Event '{ev.Title}' status changed to {newStatus}");
 
-        var totalSold = await context.Bookings
-            .CountAsync(b => b.EventId == id && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn));
-        var (availableCount, minPrice) = await GetTableStatsAsync(id);
-        return Ok(MapToDto(ev, ev.MaxCapacity ?? 0, totalSold, availableCount, minPrice));
+        var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == id);
+        return Ok(MapToDto(updated));
     }
 
     [HttpDelete("{id:guid}")]
@@ -295,7 +234,7 @@ public class AdminEventsController(
         if (ev.Status != EventStatus.Draft)
             return BadRequest(new ApiError(400, "Only draft events can be deleted", HttpContext.TraceIdentifier));
 
-        var hasBookings = await context.Bookings.AnyAsync(b => b.EventId == id);
+        var hasBookings = await context.BookingViews.AsNoTracking().AnyAsync(b => b.EventId == id);
         if (hasBookings)
             return BadRequest(new ApiError(400, "Cannot delete an event with bookings", HttpContext.TraceIdentifier));
 
@@ -307,41 +246,23 @@ public class AdminEventsController(
     [HttpPost("{id:guid}/duplicate")]
     public async Task<IActionResult> Duplicate(Guid id, [FromBody] DuplicateEventRequest request)
     {
-        var original = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .FirstOrDefaultAsync(e => e.Id == id);
+        var original = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (original is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(original.OrganizerId)) return Forbid();
 
-        var organizerId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var organizerId = GetCurrentUserId();
         var slug = GenerateSlug(original.Title + " copy");
         var baseSlug = slug;
         var counter = 1;
         while (await context.Events.AnyAsync(e => e.Slug == slug))
             slug = $"{baseSlug}-{counter++}";
 
-        var copy = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = original.Title + " (Copy)",
-            Slug = slug,
-            Description = original.Description,
-            Status = EventStatus.Draft,
-            Category = original.Category,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
-            ImagePath = original.ImagePath,
-            IsFeatured = false,
-            LayoutMode = original.LayoutMode,
-            MaxCapacity = original.MaxCapacity,
-            PricePerPersonCents = original.PricePerPersonCents,
-            PlatformFeePercent = original.PlatformFeePercent,
-            GridRows = original.GridRows,
-            GridCols = original.GridCols,
-            VenueId = original.VenueId,
-            OrganizerId = organizerId
-        };
-        context.Events.Add(copy);
+        var copyId = await eventProc.CreateEventAsync(
+            original.Title + " (Copy)", slug, original.Description, "Draft", original.Category,
+            request.StartDate, request.EndDate, original.ImagePath, false,
+            original.LayoutMode, original.MaxCapacity, original.PricePerPersonCents,
+            original.PlatformFeePercent, original.PlatformFeeCents,
+            original.GridRows, original.GridCols, original.VenueId, organizerId, null);
 
         // Copy event tables and their table instances
         var eventTables = await context.EventTables
@@ -350,83 +271,47 @@ public class AdminEventsController(
             .ToListAsync();
         foreach (var et in eventTables)
         {
-            var newEventTable = new EventTable
-            {
-                Id = Guid.NewGuid(),
-                Label = et.Label,
-                Capacity = et.Capacity,
-                Shape = et.Shape,
-                Color = et.Color,
-                PriceCents = et.PriceCents,
-                IsActive = et.IsActive,
-                EventId = copy.Id,
-                TableTemplateId = et.TableTemplateId
-            };
-            context.EventTables.Add(newEventTable);
+            var newEtId = await tableProc.CreateEventTableAsync(
+                copyId, et.Label, et.Capacity, et.Shape.ToString(), et.Color,
+                et.PriceCents, et.PlatformFeeCents, et.TableTemplateId);
 
             foreach (var t in et.Tables)
             {
-                context.Tables.Add(new Table
-                {
-                    Id = Guid.NewGuid(),
-                    Label = t.Label,
-                    GridRow = t.GridRow,
-                    GridCol = t.GridCol,
-                    IsActive = t.IsActive,
-                    SortOrder = t.SortOrder,
-                    EventTableId = newEventTable.Id,
-                    EventId = copy.Id
-                });
+                await tableProc.CreateTableAsync(newEtId, copyId, t.Label, t.GridRow, t.GridCol, t.SortOrder);
             }
         }
 
-        await context.SaveChangesAsync();
+        await adminLog.LogAsync("event.duplicated", "Event", copyId,
+            $"Event duplicated from '{original.Title}'");
 
-        await adminLog.LogAsync("event.duplicated", "Event", copy.Id,
-            $"Event '{copy.Title}' duplicated from '{original.Title}'");
-
-        var created = await context.Events
-            .Include(e => e.Venue).ThenInclude(v => v.Address)
-            .FirstAsync(e => e.Id == copy.Id);
-
-        var (availableCount, minPrice) = await GetTableStatsAsync(copy.Id);
-        return Created("", MapToDto(created, copy.MaxCapacity ?? 0, 0, availableCount, minPrice));
+        var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == copyId);
+        return Created("", MapToDto(created));
     }
 
-    private EventDto MapToDto(Event e, int totalCapacity, int totalSold, int noOfAvailableTables, int? minPricePerTableCents) => new(
+    private EventDto MapToDto(EventView e) => new(
         e.Id, e.Title, e.Slug, e.Description,
-        e.Status.ToString(), (e.Category?.ToString() ?? ""),
+        e.Status, e.Category,
         e.StartDate, e.EndDate,
         e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
         e.IsFeatured,
-        e.LayoutMode.ToString(), e.MaxCapacity, e.PricePerPersonCents, e.PlatformFeePercent, e.PlatformFeeCents,
+        e.LayoutMode, e.MaxCapacity, e.PricePerPersonCents, e.PlatformFeePercent, e.PlatformFeeCents,
         e.GridRows, e.GridCols, e.PublishedAt,
         e.VenueId,
-        e.Venue is not null ? new VenueDto(
-            e.Venue.Id, e.Venue.Name, e.Venue.Address?.Line1 ?? "", e.Venue.Address?.City ?? "", e.Venue.Address?.State ?? "",
-            e.Venue.Address?.ZipCode ?? "", e.Venue.Description,
-            e.Venue.ImagePath is not null ? fileStorage.GetPublicUrl(e.Venue.ImagePath) : null,
-            e.Venue.Phone, e.Venue.Email, e.Venue.Website,
-            e.Venue.IsActive, e.Venue.CreatedAt
-        ) : null,
+        new VenueDto(
+            e.VenueId, e.VenueName, e.VenueAddress, e.VenueCity, e.VenueState,
+            e.VenueZipCode, e.VenueDescription,
+            e.VenueImagePath is not null ? fileStorage.GetPublicUrl(e.VenueImagePath) : null,
+            e.VenuePhone, e.VenueEmail, e.VenueWebsite,
+            e.VenueIsActive, e.VenueCreatedAt
+        ),
         e.OrganizerId,
-        e.Organizer is not null ? $"{e.Organizer.FirstName} {e.Organizer.LastName}" : null,
+        $"{e.OrganizerFirstName} {e.OrganizerLastName}",
         e.CreatedAt,
-        totalCapacity,
-        totalSold,
-        noOfAvailableTables,
-        minPricePerTableCents
+        e.MaxCapacity ?? 0,
+        e.TotalSold,
+        e.AvailableTables,
+        e.MinTablePriceCents
     );
-
-    private async Task<(int count, int? minPrice)> GetTableStatsAsync(Guid eventId)
-    {
-        var stats = await context.Tables
-            .Where(t => t.EventId == eventId && t.IsActive && t.Status == TableStatus.Available)
-            .Select(t => (int?)t.EventTable.PriceCents)
-            .ToListAsync();
-
-        return (stats.Count, stats.Any() ? stats.Min() : null);
-    }
 
     private static bool IsValidTransition(EventStatus current, EventStatus target) => (current, target) switch
     {
