@@ -1,5 +1,7 @@
 using Contracts.DTOs;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs.Auth;
@@ -20,13 +22,11 @@ public class AuthController(
     IImageService imageService
 ) : ControllerBase
 {
+    private const string SessionCookieName = "session";
+    private const int SessionMaxAgeDays = 90;
     private const int MagicLinkLimit = 2;
     private static readonly TimeSpan MagicLinkWindow = TimeSpan.FromMinutes(2);
 
-    /// <summary>
-    /// Request a magic link email for passwordless login.
-    /// Rate limited to 2 requests per email per 2 minutes.
-    /// </summary>
     [HttpPost("magic-link")]
     public async Task<IActionResult> RequestMagicLink(
         [FromBody] MagicLinkRequest request,
@@ -35,7 +35,6 @@ public class AuthController(
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
 
-        // Per-email rate limit
         var emailKey = $"ratelimit:magic-link:{request.Email.Trim().ToLowerInvariant()}";
         var db = redis.GetDatabase();
         var count = await db.StringIncrementAsync(emailKey);
@@ -53,9 +52,6 @@ public class AuthController(
         return Ok(response);
     }
 
-    /// <summary>
-    /// Verify a magic link token and return a JWT.
-    /// </summary>
     [HttpPost("magic-link/verify")]
     public async Task<IActionResult> VerifyMagicLink([FromBody] MagicLinkVerifyRequest request)
     {
@@ -64,8 +60,13 @@ public class AuthController(
 
         try
         {
-            var response = await authService.VerifyMagicLinkAsync(request.Token);
-            return Ok(response);
+            var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+            var (user, sessionToken) = await authService.VerifyMagicLinkAsync(request.Token, deviceName, ip);
+            SetSessionCookie(sessionToken);
+
+            return Ok(new AuthResponse(User: user));
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -74,9 +75,6 @@ public class AuthController(
         }
     }
 
-    /// <summary>
-    /// Development-only instant login. Returns 404 in production.
-    /// </summary>
     [HttpPost("dev-login")]
     public async Task<IActionResult> DevLogin([FromBody] DevLoginRequest request)
     {
@@ -88,8 +86,13 @@ public class AuthController(
 
         try
         {
-            var response = await authService.DevLoginAsync(request.Email);
-            return Ok(response);
+            var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+            var (user, sessionToken) = await authService.DevLoginAsync(request.Email, deviceName, ip);
+            SetSessionCookie(sessionToken);
+
+            return Ok(new AuthResponse(User: user));
         }
         catch (KeyNotFoundException ex)
         {
@@ -98,19 +101,79 @@ public class AuthController(
         }
     }
 
-    /// <summary>
-    /// Get the current authenticated user's profile.
-    /// </summary>
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout()
+    {
+        var sessionToken = Request.Cookies[SessionCookieName];
+        if (!string.IsNullOrEmpty(sessionToken))
+        {
+            var sessionHash = HashToken(sessionToken);
+            await authService.LogoutAsync(sessionHash);
+        }
+
+        Response.Cookies.Delete(SessionCookieName);
+        return NoContent();
+    }
+
+    [HttpGet("sessions")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> GetSessions()
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var sessionToken = Request.Cookies[SessionCookieName];
+        var currentHash = sessionToken is not null ? HashToken(sessionToken) : null;
+
+        var sessions = await authService.GetSessionsAsync(userId.Value, currentHash);
+        return Ok(sessions);
+    }
+
+    [HttpDelete("sessions/{id:guid}")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> RevokeSession(Guid id)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        try
+        {
+            await authService.RevokeSessionAsync(id, userId.Value);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new ApiError(404, "Session not found", HttpContext.TraceIdentifier));
+        }
+    }
+
+    [HttpDelete("sessions")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> RevokeAllSessions()
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var sessionToken = Request.Cookies[SessionCookieName];
+        var currentHash = sessionToken is not null ? HashToken(sessionToken) : null;
+
+        await authService.RevokeAllSessionsAsync(userId.Value, currentHash);
+        return NoContent();
+    }
+
     [HttpGet("me")]
     [Authorize]
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> GetMe()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
-        var user = await authService.GetCurrentUserAsync(userId);
+        var user = await authService.GetCurrentUserAsync(userId.Value);
         if (user is null)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
@@ -122,12 +185,10 @@ public class AuthController(
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
         var user = await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == userId);
-
         if (user is null)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
@@ -136,7 +197,6 @@ public class AuthController(
         if (!string.IsNullOrWhiteSpace(request.LastName))
             user.LastName = request.LastName;
 
-        // Update address fields
         if (request.Address is not null || request.City is not null || request.State is not null || request.ZipCode is not null)
         {
             if (user.Address is null)
@@ -175,28 +235,23 @@ public class AuthController(
         return Ok(new { message = "Profile updated successfully" });
     }
 
-    /// <summary>
-    /// Upload or replace the current user's avatar.
-    /// </summary>
     [HttpPost("me/avatar")]
     [Authorize]
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> UploadAvatar(IFormFile file)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
         var user = await context.Users.FindAsync(userId);
         if (user is null)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
-        // Delete old avatar images if any
-        var oldImages = await imageService.GetByEntityAsync("user", userId);
+        var oldImages = await imageService.GetByEntityAsync("user", userId.Value);
         foreach (var old in oldImages)
             await imageService.DeleteAsync(old.Id);
 
-        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId, userId);
+        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId.Value, userId.Value);
 
         user.AvatarPath = result.StorageKey;
         user.UpdatedAt = DateTime.UtcNow;
@@ -205,23 +260,19 @@ public class AuthController(
         return Ok(result);
     }
 
-    /// <summary>
-    /// Delete the current user's avatar.
-    /// </summary>
     [HttpDelete("me/avatar")]
     [Authorize]
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> DeleteAvatar()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
         var user = await context.Users.FindAsync(userId);
         if (user is null)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
-        var images = await imageService.GetByEntityAsync("user", userId);
+        var images = await imageService.GetByEntityAsync("user", userId.Value);
         foreach (var img in images)
             await imageService.DeleteAsync(img.Id);
 
@@ -230,6 +281,53 @@ public class AuthController(
         await context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────
+
+    private void SetSessionCookie(string sessionToken)
+    {
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !environment.IsDevelopment(),
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            MaxAge = TimeSpan.FromDays(SessionMaxAgeDays)
+        };
+        Response.Cookies.Append(SessionCookieName, sessionToken, cookieOptions);
+    }
+
+    private Guid? GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return claim is not null && Guid.TryParse(claim, out var id) ? id : null;
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexStringLower(bytes);
+    }
+
+    private static string ParseDeviceName(string userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent)) return "Unknown";
+
+        var browser = "Browser";
+        if (userAgent.Contains("Chrome") && !userAgent.Contains("Edg")) browser = "Chrome";
+        else if (userAgent.Contains("Edg")) browser = "Edge";
+        else if (userAgent.Contains("Firefox")) browser = "Firefox";
+        else if (userAgent.Contains("Safari") && !userAgent.Contains("Chrome")) browser = "Safari";
+
+        var os = "Unknown";
+        if (userAgent.Contains("Windows")) os = "Windows";
+        else if (userAgent.Contains("Mac")) os = "macOS";
+        else if (userAgent.Contains("Linux")) os = "Linux";
+        else if (userAgent.Contains("Android")) os = "Android";
+        else if (userAgent.Contains("iPhone") || userAgent.Contains("iPad")) os = "iOS";
+
+        return $"{browser} on {os}";
     }
 }
 

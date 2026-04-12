@@ -1,13 +1,15 @@
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Api.Services;
 using Contracts.Enums;
 using Db;
 using Db.Entities;
 using Db.Repositories;
+using Db.Repositories.StoredProcedures;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.EntityFrameworkCore;
 using Moq;
+using StackExchange.Redis;
 
 namespace Api.Tests;
 
@@ -18,6 +20,8 @@ public class AuthServiceTests : IDisposable
     private readonly Mock<IEmailService> _emailService;
     private readonly Mock<IEncryptionService> _encryptionService;
     private readonly Mock<IWebHostEnvironment> _environment;
+    private readonly Mock<IAuthProcedures> _authProc;
+    private readonly Mock<IConnectionMultiplexer> _redis;
     private readonly IUserRepository _userRepository;
     private readonly AuthService _service;
 
@@ -29,6 +33,8 @@ public class AuthServiceTests : IDisposable
         _emailService = new Mock<IEmailService>();
         _encryptionService = new Mock<IEncryptionService>();
         _environment = new Mock<IWebHostEnvironment>();
+        _authProc = new Mock<IAuthProcedures>();
+        _redis = new Mock<IConnectionMultiplexer>();
 
         _userRepository = new UserRepository(_context);
 
@@ -38,14 +44,18 @@ public class AuthServiceTests : IDisposable
             .ReturnsAsync("http://localhost:5173");
         _settingsService.Setup(s => s.GetOrDefaultAsync("app_name", "Code829"))
             .ReturnsAsync("Code829");
-        _settingsService.Setup(s => s.GetAsync("jwt_secret"))
-            .ReturnsAsync("a-very-long-jwt-secret-key-that-is-at-least-32-bytes-long-for-hmac256");
         _encryptionService.Setup(e => e.HashEmail(It.IsAny<string>()))
             .Returns((string email) => email.GetHashCode().ToString());
 
+        _authProc.Setup(a => a.CreateMagicLinkAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
+
         var fileStorage = new Mock<IFileStorageService>();
-        _service = new AuthService(_context, _userRepository, _settingsService.Object,
-            _emailService.Object, _encryptionService.Object, _environment.Object, fileStorage.Object);
+        _service = new AuthService(
+            _context, _userRepository, _authProc.Object, _settingsService.Object,
+            _emailService.Object, _encryptionService.Object, _environment.Object,
+            fileStorage.Object, _redis.Object);
     }
 
     [Fact]
@@ -57,81 +67,71 @@ public class AuthServiceTests : IDisposable
 
         await _service.SendMagicLinkAsync("test@example.com");
 
-        var token = await _context.MagicLinkTokens.FirstAsync();
-        // Token hash should be a hex string (SHA256 = 64 hex chars)
-        token.TokenHash.Should().HaveLength(64);
-        token.TokenHash.Should().MatchRegex("^[0-9a-f]+$");
+        _authProc.Verify(a => a.CreateMagicLinkAsync(
+            "test@example.com",
+            It.Is<string>(h => h.Length == 64 && Regex.IsMatch(h, "^[0-9a-f]+$")),
+            It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
     public async Task VerifyMagicLinkAsync_WithExpiredToken_ThrowsUnauthorizedAccessException()
     {
+        _authProc.Setup(a => a.ConsumeMagicLinkAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MagicLinkResult?)null);
+
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var hash = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(rawToken));
-        var tokenHash = Convert.ToHexStringLower(hash);
-
-        _context.MagicLinkTokens.Add(new MagicLinkToken
-        {
-            Id = Guid.NewGuid(),
-            TokenHash = tokenHash,
-            Email = "test@example.com",
-            ExpiresAt = DateTime.UtcNow.AddMinutes(-1), // expired
-            IsUsed = false
-        });
-        await _context.SaveChangesAsync();
-
-        var act = () => _service.VerifyMagicLinkAsync(rawToken);
+        var act = () => _service.VerifyMagicLinkAsync(rawToken, "Chrome on Windows", "127.0.0.1");
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
     public async Task VerifyMagicLinkAsync_WithUsedToken_ThrowsUnauthorizedAccessException()
     {
+        _authProc.Setup(a => a.ConsumeMagicLinkAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MagicLinkResult?)null);
+
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var hash = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(rawToken));
-        var tokenHash = Convert.ToHexStringLower(hash);
-
-        _context.MagicLinkTokens.Add(new MagicLinkToken
-        {
-            Id = Guid.NewGuid(),
-            TokenHash = tokenHash,
-            Email = "test@example.com",
-            ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-            IsUsed = true // already used
-        });
-        await _context.SaveChangesAsync();
-
-        var act = () => _service.VerifyMagicLinkAsync(rawToken);
+        var act = () => _service.VerifyMagicLinkAsync(rawToken, "Chrome on Windows", "127.0.0.1");
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
     [Fact]
     public async Task VerifyMagicLinkAsync_ValidToken_CreatesUserIfNotExists()
     {
+        var userId = Guid.NewGuid();
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var hash = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(rawToken));
-        var tokenHash = Convert.ToHexStringLower(hash);
 
-        _context.MagicLinkTokens.Add(new MagicLinkToken
+        _authProc.Setup(a => a.ConsumeMagicLinkAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MagicLinkResult(Guid.NewGuid(), "newuser@example.com", DateTime.UtcNow.AddMinutes(15)));
+
+        _authProc.Setup(a => a.UpsertUserAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(userId);
+
+        _authProc.Setup(a => a.CreateDeviceSessionAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
+
+        _context.Users.Add(new User
         {
-            Id = Guid.NewGuid(),
-            TokenHash = tokenHash,
+            Id = userId,
             Email = "newuser@example.com",
-            ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-            IsUsed = false
+            EmailHash = "testhash",
+            FirstName = "newuser",
+            LastName = "",
+            Role = UserRole.User
         });
         await _context.SaveChangesAsync();
 
-        var result = await _service.VerifyMagicLinkAsync(rawToken);
+        var result = await _service.VerifyMagicLinkAsync(rawToken, "Chrome on Windows", "127.0.0.1");
 
-        result.Should().NotBeNull();
+        result.User.Should().NotBeNull();
         result.User.Email.Should().Be("newuser@example.com");
-
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == "newuser@example.com");
-        user.Should().NotBeNull();
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class AuthServiceTests : IDisposable
     {
         _environment.Setup(e => e.EnvironmentName).Returns("Production");
 
-        var act = () => _service.DevLoginAsync("test@example.com");
+        var act = () => _service.DevLoginAsync("test@example.com", "Chrome on Windows", "127.0.0.1");
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not available*");
     }

@@ -1,5 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Contracts.DTOs.Auth;
@@ -7,27 +5,29 @@ using Contracts.Enums;
 using Db;
 using Db.Entities;
 using Db.Repositories;
+using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using StackExchange.Redis;
 
 namespace Api.Services;
 
 public class AuthService(
     EventPlatformDbContext context,
     IUserRepository userRepository,
+    IAuthProcedures authProc,
     ISettingsService settingsService,
     IEmailService emailService,
     IEncryptionService encryptionService,
     IWebHostEnvironment environment,
-    IFileStorageService fileStorage
+    IFileStorageService fileStorage,
+    IConnectionMultiplexer redis
 ) : IAuthService
 {
     public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? frontendOrigin = null)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
-        // Generate cryptographically random token (32 bytes = 256 bits)
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var rawToken = Convert.ToBase64String(tokenBytes);
         var tokenHash = HashToken(rawToken);
@@ -35,17 +35,7 @@ public class AuthService(
         var expiryMinutes = int.Parse(
             await settingsService.GetOrDefaultAsync("magic_link_expiry_minutes", "15") ?? "15");
 
-        var magicLink = new MagicLinkToken
-        {
-            Id = Guid.NewGuid(),
-            TokenHash = tokenHash,
-            Email = normalizedEmail,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes),
-            IsUsed = false
-        };
-
-        context.MagicLinkTokens.Add(magicLink);
-        await context.SaveChangesAsync();
+        await authProc.CreateMagicLinkAsync(normalizedEmail, tokenHash, DateTime.UtcNow.AddMinutes(expiryMinutes));
 
         var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
@@ -61,52 +51,38 @@ public class AuthService(
 
         Log.Information("[Auth] Magic link sent to {Email}", normalizedEmail);
 
-        // In development, return the raw token for easy testing
         if (environment.IsDevelopment())
             return new MagicLinkResponse("Magic link sent. Check your email.", rawToken);
 
         return new MagicLinkResponse("Magic link sent. Check your email.");
     }
 
-    public async Task<AuthResponse> VerifyMagicLinkAsync(string token)
+    public async Task<(UserDto User, string SessionToken)> VerifyMagicLinkAsync(string token, string? deviceName, string? ip)
     {
         var tokenHash = HashToken(token);
 
-        var magicLink = await context.MagicLinkTokens
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow);
-
-        if (magicLink is null)
+        var result = await authProc.ConsumeMagicLinkAsync(tokenHash);
+        if (result is null)
             throw new UnauthorizedAccessException("Invalid or expired magic link token");
 
-        // Mark as used (single-use)
-        magicLink.IsUsed = true;
-        magicLink.UsedAt = DateTime.UtcNow;
+        var userId = await authProc.UpsertUserAsync(
+            result.Email,
+            encryptionService.HashEmail(result.Email),
+            result.Email.Split('@')[0],
+            "",
+            UserRole.User.ToString());
 
-        // Find or create user
-        var user = await userRepository.GetByEmailAsync(magicLink.Email);
-        if (user is null)
-        {
-            // Auto-create user on first magic link login
-            user = new User
-            {
-                Id = Guid.NewGuid(),
-                Email = magicLink.Email,
-                EmailHash = encryptionService.HashEmail(magicLink.Email),
-                FirstName = magicLink.Email.Split('@')[0],
-                LastName = "",
-                Role = UserRole.User,
-                IsActive = true
-            };
-            context.Users.Add(user);
-        }
+        var user = await userRepository.GetByIdAsync(userId)
+            ?? throw new InvalidOperationException("User creation failed");
 
-        user.LastLoginAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        var (sessionToken, _) = await CreateDeviceSessionAsync(userId, deviceName, ip);
+        var userDto = MapUserDto(user);
 
-        return await GenerateAuthResponseAsync(user);
+        Log.Information("[Auth] Magic link verified for {Email}", result.Email);
+        return (userDto, sessionToken);
     }
 
-    public async Task<AuthResponse> DevLoginAsync(string email)
+    public async Task<(UserDto User, string SessionToken)> DevLoginAsync(string email, string? deviceName, string? ip)
     {
         if (!environment.IsDevelopment())
             throw new InvalidOperationException("Dev login is not available in this environment");
@@ -115,88 +91,106 @@ public class AuthService(
         var user = await userRepository.GetByEmailAsync(normalizedEmail)
             ?? throw new KeyNotFoundException($"Dev user '{normalizedEmail}' not found. Run seed first.");
 
-        user.LastLoginAt = DateTime.UtcNow;
-        await userRepository.UpdateAsync(user);
+        await authProc.UpdateUserLastLoginAsync(user.Id);
+
+        var (sessionToken, _) = await CreateDeviceSessionAsync(user.Id, deviceName, ip);
+        var userDto = MapUserDto(user);
 
         Log.Information("[Auth] Dev login for {Email} ({Role})", user.Email, user.Role);
-        return await GenerateAuthResponseAsync(user);
+        return (userDto, sessionToken);
     }
 
     public async Task<UserDto?> GetCurrentUserAsync(Guid userId)
     {
         var user = await userRepository.GetByIdAsync(userId);
-        if (user is null) return null;
-
-        return new UserDto(
-            Id: user.Id,
-            Email: user.Email,
-            FirstName: user.FirstName,
-            LastName: user.LastName,
-            Role: user.Role.ToString(),
-            CreatedAt: user.CreatedAt,
-            Address: user.Address?.Line1,
-            City: user.Address?.City,
-            State: user.Address?.State,
-            ZipCode: user.Address?.ZipCode,
-            Phone: user.Phone,
-            OptInLocationEmail: user.OptInLocationEmail,
-            HasCompletedOnboarding: user.HasCompletedOnboarding,
-            AvatarUrl: user.AvatarPath is not null
-                ? (user.AvatarPath.StartsWith("http") ? user.AvatarPath : fileStorage.GetPublicUrl(user.AvatarPath))
-                : null
-        );
+        return user is null ? null : MapUserDto(user);
     }
 
-    private async Task<AuthResponse> GenerateAuthResponseAsync(User user)
+    public async Task LogoutAsync(string sessionHash)
     {
-        var jwtSecret = await settingsService.GetAsync("jwt_secret");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var expiresAt = DateTime.UtcNow.AddHours(24);
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}".Trim()),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
-        };
-
-        var token = new JwtSecurityToken(
-            issuer: "code829-api",
-            audience: "code829-client",
-            claims: claims,
-            expires: expiresAt,
-            signingCredentials: credentials
-        );
-
-        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-        var userDto = new UserDto(
-            Id: user.Id,
-            Email: user.Email,
-            FirstName: user.FirstName,
-            LastName: user.LastName,
-            Role: user.Role.ToString(),
-            CreatedAt: user.CreatedAt,
-            Address: user.Address?.Line1,
-            City: user.Address?.City,
-            State: user.Address?.State,
-            ZipCode: user.Address?.ZipCode,
-            Phone: user.Phone,
-            OptInLocationEmail: user.OptInLocationEmail,
-            HasCompletedOnboarding: user.HasCompletedOnboarding,
-            AvatarUrl: user.AvatarPath is not null
-                ? (user.AvatarPath.StartsWith("http") ? user.AvatarPath : fileStorage.GetPublicUrl(user.AvatarPath))
-                : null
-        );
-
-        return new AuthResponse(
-            Token: tokenString,
-            User: userDto,
-            ExpiresAt: expiresAt
-        );
+        await authProc.RevokeDeviceSessionAsync(sessionHash);
+        var db = redis.GetDatabase();
+        await db.KeyDeleteAsync($"session:{sessionHash}");
     }
+
+    public async Task<List<DeviceSessionDto>> GetSessionsAsync(Guid userId, string? currentSessionHash)
+    {
+        var sessions = await context.DeviceSessions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(s => s.LastActivityAt)
+            .ToListAsync();
+
+        return sessions.Select(s => new DeviceSessionDto(
+            Id: s.Id,
+            DeviceName: s.DeviceName,
+            IpAddress: s.IpAddress,
+            LastActivityAt: s.LastActivityAt,
+            CreatedAt: s.CreatedAt,
+            IsCurrent: s.SessionHash == currentSessionHash
+        )).ToList();
+    }
+
+    public async Task RevokeSessionAsync(Guid sessionId, Guid userId)
+    {
+        var session = await context.DeviceSessions
+            .FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId && s.RevokedAt == null);
+
+        if (session is null)
+            throw new KeyNotFoundException("Session not found");
+
+        await authProc.RevokeDeviceSessionAsync(session.SessionHash);
+        var db = redis.GetDatabase();
+        await db.KeyDeleteAsync($"session:{session.SessionHash}");
+    }
+
+    public async Task RevokeAllSessionsAsync(Guid userId, string? exceptSessionHash)
+    {
+        // Get all active session hashes for Redis cleanup
+        var hashes = await context.DeviceSessions
+            .Where(s => s.UserId == userId && s.RevokedAt == null && (exceptSessionHash == null || s.SessionHash != exceptSessionHash))
+            .Select(s => s.SessionHash)
+            .ToListAsync();
+
+        await authProc.RevokeAllUserSessionsAsync(userId, exceptSessionHash);
+
+        var db = redis.GetDatabase();
+        var keys = hashes.Select(h => (RedisKey)$"session:{h}").ToArray();
+        if (keys.Length > 0)
+            await db.KeyDeleteAsync(keys);
+    }
+
+    private async Task<(string RawToken, string Hash)> CreateDeviceSessionAsync(Guid userId, string? deviceName, string? ip)
+    {
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var rawToken = Convert.ToBase64String(tokenBytes);
+        var sessionHash = HashToken(rawToken);
+
+        await authProc.CreateDeviceSessionAsync(
+            userId, sessionHash, null, deviceName, ip,
+            DateTime.UtcNow.AddDays(90));
+
+        return (rawToken, sessionHash);
+    }
+
+    private UserDto MapUserDto(User user) => new(
+        Id: user.Id,
+        Email: user.Email,
+        FirstName: user.FirstName,
+        LastName: user.LastName,
+        Role: user.Role.ToString(),
+        CreatedAt: user.CreatedAt,
+        Address: user.Address?.Line1,
+        City: user.Address?.City,
+        State: user.Address?.State,
+        ZipCode: user.Address?.ZipCode,
+        Phone: user.Phone,
+        OptInLocationEmail: user.OptInLocationEmail,
+        HasCompletedOnboarding: user.HasCompletedOnboarding,
+        AvatarUrl: user.AvatarPath is not null
+            ? (user.AvatarPath.StartsWith("http") ? user.AvatarPath : fileStorage.GetPublicUrl(user.AvatarPath))
+            : null
+    );
 
     private static string HashToken(string token)
     {

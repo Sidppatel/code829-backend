@@ -119,6 +119,20 @@ try
     builder.Services.AddScoped<IAppSettingRepository, AppSettingRepository>();
     builder.Services.AddScoped<ILogRepository, LogRepository>();
 
+    // SP Repositories
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAuthProcedures, Db.Repositories.StoredProcedures.AuthProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IUserProcedures, Db.Repositories.StoredProcedures.UserProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventProcedures, Db.Repositories.StoredProcedures.EventProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IVenueProcedures, Db.Repositories.StoredProcedures.VenueProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITableProcedures, Db.Repositories.StoredProcedures.TableProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBookingProcedures, Db.Repositories.StoredProcedures.BookingProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITicketProcedures, Db.Repositories.StoredProcedures.TicketProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IPaymentProcedures, Db.Repositories.StoredProcedures.PaymentProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IImageProcedures, Db.Repositories.StoredProcedures.ImageProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.ISettingsProcedures, Db.Repositories.StoredProcedures.SettingsProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IFeedbackProcedures, Db.Repositories.StoredProcedures.FeedbackProcedures>();
+
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
@@ -128,6 +142,7 @@ try
     builder.Services.AddScoped<IImageRepository, ImageRepository>();
     builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
     builder.Services.AddScoped<IImageService, ImageService>();
+    builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
     // Conditional service registration: mock in dev, real in prod
     // Payment service uses real Stripe when a valid key is configured, even in dev
@@ -281,6 +296,7 @@ try
         RequestPath = "/uploads"
     });
 
+    app.UseMiddleware<DeviceSessionMiddleware>();
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseMiddleware<RoleAuthorizationMiddleware>();

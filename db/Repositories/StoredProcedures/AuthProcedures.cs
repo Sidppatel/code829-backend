@@ -45,12 +45,16 @@ public class AuthProcedures(EventPlatformDbContext context) : IAuthProcedures
                 [userId], ct);
     }
 
-    public async Task<Guid> CreateDeviceSessionAsync(Guid userId, string sessionHash, string fingerprint, string deviceName, string ip, DateTime expiresAt, CancellationToken ct = default)
+    public async Task<Guid> CreateDeviceSessionAsync(Guid userId, string sessionHash, string? fingerprint, string? deviceName, string? ip, DateTime expiresAt, CancellationToken ct = default)
     {
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_device_session(@p0, @p1, @p2, @p3, @p4, @p5) AS \"Value\"",
-                userId, sessionHash, fingerprint, deviceName, ip, expiresAt)
+                userId, sessionHash,
+                (object?)fingerprint ?? DBNull.Value,
+                (object?)deviceName ?? DBNull.Value,
+                (object?)ip ?? DBNull.Value,
+                expiresAt)
             .FirstAsync(ct);
 
         return result;
