@@ -1,0 +1,23 @@
+namespace Db.Repositories.StoredProcedures;
+
+public interface IEventProcedures
+{
+    Task<Guid> CreateEventAsync(
+        string? title, string? slug, string? description, string? status, string? category,
+        DateTime? startDate, DateTime? endDate, string? imagePath, bool? isFeatured,
+        string? layoutMode, int? maxCapacity, int? pricePerPersonCents,
+        int? platformFeePercent, int? platformFeeCents,
+        int? gridRows, int? gridCols, Guid? venueId, Guid? organizerId,
+        DateTime? scheduledPublishAt);
+
+    Task UpdateEventAsync(
+        Guid id, string? title, string? slug, string? description, string? category,
+        DateTime? startDate, DateTime? endDate, string? imagePath, bool? isFeatured,
+        string? layoutMode, int? maxCapacity, int? pricePerPersonCents,
+        int? platformFeePercent, int? platformFeeCents,
+        int? gridRows, int? gridCols, Guid? venueId, DateTime? scheduledPublishAt);
+
+    Task ChangeEventStatusAsync(Guid id, string? status, DateTime? scheduledPublishAt);
+
+    Task<int> PublishScheduledEventsAsync();
+}
