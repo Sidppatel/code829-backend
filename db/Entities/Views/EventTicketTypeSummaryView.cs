@@ -1,0 +1,17 @@
+namespace Db.Entities.Views;
+
+public class EventTicketTypeSummaryView
+{
+    public Guid Id { get; set; }
+    public Guid EventId { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public int PriceCents { get; set; }
+    public int? PlatformFeeCents { get; set; }
+    public int? MaxQuantity { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; }
+
+    // Aggregates
+    public int SoldCount { get; set; }
+    public int AvailableCount { get; set; }
+}

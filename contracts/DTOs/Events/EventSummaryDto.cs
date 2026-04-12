@@ -18,5 +18,6 @@ public record EventSummaryDto(
     int TotalCapacity,
     int TotalSold,
     int NoOfAvailableTables,
-    int? MinPricePerTableCents
+    int? MinPricePerTableCents,
+    int? MinTicketTypePriceCents = null
 );

@@ -139,7 +139,8 @@ public class EventsController(
             e.MaxCapacity ?? 0,
             e.TotalSold,
             e.AvailableTables,
-            e.MinTablePriceCents
+            e.MinTablePriceCents,
+            e.MinTicketTypePriceCents
         )).ToList();
 
         var result = new PagedResponse<EventSummaryDto>(dtos, totalCount, page, pageSize);
@@ -393,6 +394,25 @@ public class EventsController(
         return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, eventTableTypes, dtos));
     }
 
+    [HttpGet("{id:guid}/ticket-types")]
+    public async Task<IActionResult> GetTicketTypes(Guid id)
+    {
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+
+        var types = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .Where(tt => tt.EventId == id && tt.IsActive)
+            .OrderBy(tt => tt.SortOrder)
+            .Select(tt => new EventTicketTypeDto(
+                tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+                tt.MaxQuantity, tt.SortOrder, tt.IsActive,
+                tt.SoldCount, tt.AvailableCount))
+            .ToListAsync();
+
+        return Ok(new EventTicketTypesResponse(id, types));
+    }
+
     private EventDto MapEventDto(Db.Entities.Views.EventView ev, string? imageUrl) => new(
         ev.Id, ev.Title, ev.Slug, ev.Description,
         ev.Status, ev.Category,
@@ -415,7 +435,8 @@ public class EventsController(
         ev.MaxCapacity ?? 0,
         ev.TotalSold,
         ev.AvailableTables,
-        ev.MinTablePriceCents
+        ev.MinTablePriceCents,
+        ev.MinTicketTypePriceCents
     );
 
     private async Task<string?> ResolveEventImageUrlAsync(Guid eventId)

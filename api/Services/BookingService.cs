@@ -68,7 +68,7 @@ public class BookingService(
 
         var bookingNumber = GenerateBookingNumber();
         var bookingId = await bookingProc.CreateBookingAsync(
-            userId, request.EventId, table.Id, null, subtotal, fee, total, bookingNumber);
+            userId, request.EventId, table.Id, null, null, subtotal, fee, total, bookingNumber);
 
         await paymentProc.CreatePaymentAsync(bookingId, intentId, total);
 
@@ -87,10 +87,33 @@ public class BookingService(
         if (!ev.MaxCapacity.HasValue || ev.MaxCapacity <= 0)
             throw new InvalidOperationException("Event has no capacity configured");
 
-        if (!ev.PricePerPersonCents.HasValue)
-            throw new InvalidOperationException("Event has no price per person configured");
-
         var seatsRequested = request.SeatsReserved!.Value;
+
+        // Check if event has ticket types
+        var ticketTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .Where(tt => tt.EventId == request.EventId && tt.IsActive)
+            .ToListAsync();
+
+        EventTicketTypeSummaryView? selectedType = null;
+
+        if (ticketTypes.Count > 0)
+        {
+            if (!request.EventTicketTypeId.HasValue)
+                throw new InvalidOperationException("This event requires a ticket type selection");
+
+            selectedType = ticketTypes.FirstOrDefault(tt => tt.Id == request.EventTicketTypeId.Value)
+                ?? throw new KeyNotFoundException("Ticket type not found or inactive");
+
+            if (selectedType.MaxQuantity.HasValue &&
+                selectedType.SoldCount + seatsRequested > selectedType.MaxQuantity.Value)
+                throw new InvalidOperationException(
+                    $"Not enough availability for {selectedType.Label}. Available: {selectedType.AvailableCount}");
+        }
+        else
+        {
+            if (!ev.PricePerPersonCents.HasValue)
+                throw new InvalidOperationException("Event has no price configured");
+        }
 
         var redisDb = redis.GetDatabase();
         var lockKey = $"capacity:{request.EventId}";
@@ -111,10 +134,10 @@ public class BookingService(
                 throw new InvalidOperationException(
                     $"Not enough capacity. Available: {ev.MaxCapacity.Value - totalReserved}, requested: {seatsRequested}");
 
-            var pricePerPerson = ev.PricePerPersonCents.Value;
+            var pricePerPerson = selectedType?.PriceCents ?? ev.PricePerPersonCents!.Value;
             var subtotal = pricePerPerson * seatsRequested;
             var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
-            var fee = ev.PlatformFeeCents ?? defaultFeeCents;
+            var fee = selectedType?.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
             var total = subtotal + fee;
 
             var organizer = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == ev.OrganizerId);
@@ -123,7 +146,7 @@ public class BookingService(
 
             var bookingNumber = GenerateBookingNumber();
             var bookingId = await bookingProc.CreateBookingAsync(
-                userId, request.EventId, null, seatsRequested, subtotal, fee, total, bookingNumber);
+                userId, request.EventId, null, seatsRequested, request.EventTicketTypeId, subtotal, fee, total, bookingNumber);
 
             await paymentProc.CreatePaymentAsync(bookingId, intentId, total);
 
@@ -239,6 +262,7 @@ public class BookingService(
             b.VenueName, venueAddress,
             b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
             b.TableId, b.TableLabel, b.SeatsReserved,
+            b.EventTicketTypeId, b.EventTicketTypeLabel,
             b.TicketCount,
             b.PaymentId.HasValue ? new PaymentDto(
                 b.PaymentId.Value, b.PaymentIntentId!, b.PaymentStatus!,

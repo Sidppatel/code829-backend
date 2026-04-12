@@ -24,6 +24,9 @@ public class Booking : BaseEntity
 
     public int? SeatsReserved { get; set; }
 
+    public Guid? EventTicketTypeId { get; set; }
+    public EventTicketType? EventTicketType { get; set; }
+
     public Payment? Payment { get; set; }
 
     public ICollection<BookingTicket> Tickets { get; set; } = [];

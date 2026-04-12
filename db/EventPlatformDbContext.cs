@@ -22,6 +22,7 @@ public class EventPlatformDbContext(
     // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
     public DbSet<EventTable> EventTables => Set<EventTable>();
+    public DbSet<EventTicketType> EventTicketTypes => Set<EventTicketType>();
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<BookingTicket> BookingTickets => Set<BookingTicket>();
@@ -48,6 +49,7 @@ public class EventPlatformDbContext(
     public DbSet<VenueView> VenueViews => Set<VenueView>();
     public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
+    public DbSet<EventTicketTypeSummaryView> EventTicketTypeSummaryViews => Set<EventTicketTypeSummaryView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -200,7 +202,26 @@ public class EventPlatformDbContext(
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
-        // ─── Instance/child entities ─────────────────────────────
+        modelBuilder.Entity<EventTicketType>(entity =>
+        {
+            entity.ToTable("event_ticket_types", t =>
+            {
+                t.HasCheckConstraint("CK_event_ticket_types_PriceCents",
+                    "\"PriceCents\" >= 0");
+                t.HasCheckConstraint("CK_event_ticket_types_MaxQuantity",
+                    "\"MaxQuantity\" IS NULL OR \"MaxQuantity\" > 0");
+                t.HasCheckConstraint("CK_event_ticket_types_SortOrder",
+                    "\"SortOrder\" >= 0");
+            });
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EventId, e.Label });
+            entity.HasIndex(e => new { e.EventId, e.SortOrder });
+            entity.Property(e => e.Label).HasMaxLength(128);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ─── Instance/child entities ──────���──────────────────────
 
         modelBuilder.Entity<Event>(entity =>
         {
@@ -317,6 +338,8 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Table).WithMany().HasForeignKey(e => e.TableId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.EventTicketType).WithMany().HasForeignKey(e => e.EventTicketTypeId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -524,6 +547,12 @@ public class EventPlatformDbContext(
         modelBuilder.Entity<EventTablesSummaryView>(entity =>
         {
             entity.ToView("v_event_tables_summary");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<EventTicketTypeSummaryView>(entity =>
+        {
+            entity.ToView("v_event_ticket_types_summary");
             entity.HasKey(e => e.Id);
         });
     }

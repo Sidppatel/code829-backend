@@ -67,7 +67,7 @@ public static class BookingSeeder
                 var bn = $"BK-SEED-{bookingNumber++:D4}";
 
                 var bookingId = await bookingProc.CreateBookingAsync(
-                    user.Id, ev.Id, table.Id, null,
+                    user.Id, ev.Id, table.Id, null, null,
                     tablePrice, fee, tablePrice + fee, bn, status.ToString());
 
                 // Mark table as booked for confirmed bookings
@@ -78,10 +78,13 @@ public static class BookingSeeder
             }
         }
 
-        // Open event bookings (capacity-based)
+        // Open event bookings (capacity-based, with ticket types when available)
         foreach (var ev in openEvents)
         {
-            var pricePerPerson = ev.PricePerPersonCents ?? 0;
+            var ticketTypes = await context.EventTicketTypes
+                .Where(tt => tt.EventId == ev.Id && tt.IsActive)
+                .ToListAsync();
+
             var maxCap = ev.MaxCapacity ?? 200;
             var totalSeatsBooked = 0;
 
@@ -94,12 +97,27 @@ public static class BookingSeeder
 
                 var user = users[rng.Next(users.Count)];
                 var status = PickStatus(rng);
+
+                Guid? ticketTypeId = null;
+                int pricePerPerson;
+
+                if (ticketTypes.Count > 0)
+                {
+                    var selectedType = ticketTypes[rng.Next(ticketTypes.Count)];
+                    ticketTypeId = selectedType.Id;
+                    pricePerPerson = selectedType.PriceCents;
+                }
+                else
+                {
+                    pricePerPerson = ev.PricePerPersonCents ?? 0;
+                }
+
                 var subtotal = pricePerPerson * seatsReserved;
                 var fee = (int)Math.Ceiling(subtotal * 0.08);
                 var bn = $"BK-SEED-{bookingNumber++:D4}";
 
                 var bookingId = await bookingProc.CreateBookingAsync(
-                    user.Id, ev.Id, null, seatsReserved,
+                    user.Id, ev.Id, null, seatsReserved, ticketTypeId,
                     subtotal, fee, subtotal + fee, bn, status.ToString());
 
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)

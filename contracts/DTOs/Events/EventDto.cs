@@ -29,5 +29,6 @@ public record EventDto(
     int TotalCapacity,
     int TotalSold,
     int NoOfAvailableTables,
-    int? MinPricePerTableCents
+    int? MinPricePerTableCents,
+    int? MinTicketTypePriceCents = null
 );

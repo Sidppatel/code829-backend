@@ -48,4 +48,5 @@ public class EventView
     public int TotalSold { get; set; }
     public int AvailableTables { get; set; }
     public int? MinTablePriceCents { get; set; }
+    public int? MinTicketTypePriceCents { get; set; }
 }

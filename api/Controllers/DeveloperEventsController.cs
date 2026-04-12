@@ -18,10 +18,11 @@ public class DeveloperEventsController(
     EventPlatformDbContext context,
     IEventProcedures eventProc,
     ITableProcedures tableProc,
+    IEventTicketTypeProcedures ticketTypeProc,
     IFileStorageService fileStorage,
     IAdminLogService adminLog,
     ISettingsService settings
-) : AdminEventsController(context, eventProc, tableProc, fileStorage, adminLog)
+) : AdminEventsController(context, eventProc, tableProc, ticketTypeProc, fileStorage, adminLog)
 {
     [HttpGet("{id:guid}/fees")]
     public async Task<IActionResult> GetEventFees(Guid id)

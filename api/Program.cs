@@ -132,6 +132,7 @@ try
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ISettingsProcedures, Db.Repositories.StoredProcedures.SettingsProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IFeedbackProcedures, Db.Repositories.StoredProcedures.FeedbackProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventTicketTypeProcedures, Db.Repositories.StoredProcedures.EventTicketTypeProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
@@ -256,6 +257,7 @@ try
     await DataSeeder.SeedAsync(app.Services);
     await VenueEventSeeder.SeedAsync(app.Services);
     await LayoutSeeder.SeedAsync(app.Services);
+    await TicketTypeSeeder.SeedAsync(app.Services);
     await BookingSeeder.SeedAsync(app.Services);
 
     // Configure JWT signing key from DB settings

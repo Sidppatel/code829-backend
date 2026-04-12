@@ -37,6 +37,10 @@ public class BookingView
     public Guid? TableId { get; set; }
     public string? TableLabel { get; set; }
 
+    // Ticket type (Open events)
+    public Guid? EventTicketTypeId { get; set; }
+    public string? EventTicketTypeLabel { get; set; }
+
     // Payment
     public Guid? PaymentId { get; set; }
     public string? PaymentIntentId { get; set; }

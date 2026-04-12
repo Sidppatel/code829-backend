@@ -21,6 +21,8 @@ public record BookingDto(
     Guid? TableId,
     string? TableLabel,
     int? SeatsReserved,
+    Guid? EventTicketTypeId,
+    string? EventTicketTypeLabel,
     int TicketCount,
     PaymentDto? Payment,
     DateTime CreatedAt,

@@ -24,6 +24,7 @@ public class AdminEventsController(
     EventPlatformDbContext context,
     IEventProcedures eventProc,
     ITableProcedures tableProc,
+    IEventTicketTypeProcedures ticketTypeProc,
     IFileStorageService fileStorage,
     IAdminLogService adminLog
 ) : ControllerBase
@@ -281,12 +282,120 @@ public class AdminEventsController(
             }
         }
 
+        // Copy ticket types (Open events)
+        var ticketTypes = await context.EventTicketTypes
+            .Where(tt => tt.EventId == id && tt.IsActive)
+            .ToListAsync();
+        foreach (var tt in ticketTypes)
+        {
+            await ticketTypeProc.CreateAsync(copyId, tt.Label, tt.PriceCents,
+                tt.PlatformFeeCents, tt.MaxQuantity, tt.SortOrder);
+        }
+
         await adminLog.LogAsync("event.duplicated", "Event", copyId,
             $"Event duplicated from '{original.Title}'");
 
         var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == copyId);
         return Created("", MapToDto(created));
     }
+
+    // ─── Ticket Type CRUD (Open events) ─────────────────────────
+
+    [HttpGet("{id:guid}/ticket-types")]
+    public async Task<IActionResult> GetTicketTypes(Guid id)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+
+        var types = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .Where(tt => tt.EventId == id)
+            .OrderBy(tt => tt.SortOrder)
+            .Select(tt => new EventTicketTypeDto(
+                tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+                tt.MaxQuantity, tt.SortOrder, tt.IsActive,
+                tt.SoldCount, tt.AvailableCount))
+            .ToListAsync();
+
+        return Ok(new EventTicketTypesResponse(id, types));
+    }
+
+    [HttpPost("{id:guid}/ticket-types")]
+    public async Task<IActionResult> CreateTicketType(Guid id, [FromBody] CreateEventTicketTypeRequest request)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+        if (ev.LayoutMode != "Open")
+            return BadRequest(new ApiError(400, "Ticket types are only available for Open layout events", HttpContext.TraceIdentifier));
+
+        var typeId = await ticketTypeProc.CreateAsync(
+            id, request.Label, request.PriceCents,
+            request.PlatformFeeCents, request.MaxQuantity, request.SortOrder);
+
+        await adminLog.LogAsync("event.ticket_type.created", "EventTicketType", typeId,
+            $"Ticket type '{request.Label}' created for event '{ev.Title}'");
+
+        var created = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .FirstAsync(tt => tt.Id == typeId);
+
+        return Created("", new EventTicketTypeDto(
+            created.Id, created.Label, created.PriceCents, created.PlatformFeeCents,
+            created.MaxQuantity, created.SortOrder, created.IsActive,
+            created.SoldCount, created.AvailableCount));
+    }
+
+    [HttpPut("{id:guid}/ticket-types/{typeId:guid}")]
+    public async Task<IActionResult> UpdateTicketType(Guid id, Guid typeId, [FromBody] UpdateEventTicketTypeRequest request)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
+        var existing = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .FirstOrDefaultAsync(tt => tt.Id == typeId && tt.EventId == id);
+        if (existing is null) return NotFound(new ApiError(404, "Ticket type not found", HttpContext.TraceIdentifier));
+
+        if (request.PriceCents.HasValue && request.PriceCents != existing.PriceCents)
+        {
+            var hasPaidBookings = await context.BookingViews.AsNoTracking()
+                .AnyAsync(b => b.EventTicketTypeId == typeId && (b.Status == "Paid" || b.Status == "CheckedIn"));
+            if (hasPaidBookings)
+                return BadRequest(new ApiError(400, "Cannot change price — paid bookings exist for this ticket type", HttpContext.TraceIdentifier));
+        }
+
+        await ticketTypeProc.UpdateAsync(typeId, request.Label, request.PriceCents,
+            request.PlatformFeeCents, request.MaxQuantity, request.SortOrder, request.IsActive);
+
+        var updated = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .FirstAsync(tt => tt.Id == typeId);
+
+        return Ok(new EventTicketTypeDto(
+            updated.Id, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
+            updated.MaxQuantity, updated.SortOrder, updated.IsActive,
+            updated.SoldCount, updated.AvailableCount));
+    }
+
+    [HttpDelete("{id:guid}/ticket-types/{typeId:guid}")]
+    public async Task<IActionResult> DeleteTicketType(Guid id, Guid typeId)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
+        var existing = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .FirstOrDefaultAsync(tt => tt.Id == typeId && tt.EventId == id);
+        if (existing is null) return NotFound(new ApiError(404, "Ticket type not found", HttpContext.TraceIdentifier));
+
+        var hasActiveBookings = await context.BookingViews.AsNoTracking()
+            .AnyAsync(b => b.EventTicketTypeId == typeId && (b.Status == "Pending" || b.Status == "Paid" || b.Status == "CheckedIn"));
+        if (hasActiveBookings)
+            return BadRequest(new ApiError(400, "Cannot delete — active bookings exist for this ticket type", HttpContext.TraceIdentifier));
+
+        await ticketTypeProc.DeleteAsync(typeId);
+        return NoContent();
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────
 
     private EventDto MapToDto(EventView e) => new(
         e.Id, e.Title, e.Slug, e.Description,
@@ -310,7 +419,8 @@ public class AdminEventsController(
         e.MaxCapacity ?? 0,
         e.TotalSold,
         e.AvailableTables,
-        e.MinTablePriceCents
+        e.MinTablePriceCents,
+        e.MinTicketTypePriceCents
     );
 
     private static bool IsValidTransition(EventStatus current, EventStatus target) => (current, target) switch
