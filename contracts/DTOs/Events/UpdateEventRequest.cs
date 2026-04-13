@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Contracts.DTOs.Events;
 
 public record UpdateEventRequest(
@@ -13,5 +15,15 @@ public record UpdateEventRequest(
     int? MaxCapacity = null,
     int? PricePerPersonCents = null,
     int? PlatformFeePercent = null,
-    string? BannerImageUrl = null
+    string? BannerImageUrl = null,
+    List<NestedTicketTypeUpdate>? TicketTypes = null
 );
+
+public record NestedTicketTypeUpdate(
+    Guid? Id,
+    string Name,
+    int PriceCents,
+    int? Capacity,
+    string? Description = null
+);
+

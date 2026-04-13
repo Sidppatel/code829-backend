@@ -154,6 +154,16 @@ public class AdminEventsController(
             request.VenueId, organizerId, null);
 
         await adminLog.LogAsync("event.created", "Event", eventId, $"Event '{request.Title}' created");
+        
+        if (layoutMode == LayoutMode.Open && request.TicketTypes != null)
+        {
+            var sortOrder = 0;
+            foreach (var tt in request.TicketTypes)
+            {
+                await ticketTypeProc.CreateAsync(eventId, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++);
+            }
+        }
+
 
         var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == eventId);
         return CreatedAtAction(nameof(GetById), new { id = eventId }, MapToDto(created));
@@ -205,6 +215,37 @@ public class AdminEventsController(
 
         if (newStatus is not null)
             await eventProc.ChangeEventStatusAsync(id, newStatus, null);
+
+        // Sync Ticket Types (Pricing Tiers) for Open events
+        if (request.TicketTypes != null && (request.LayoutMode == "Open" || (request.LayoutMode == null && ev.LayoutMode == "Open")))
+        {
+            var existingTiers = await context.EventTicketTypes
+                .Where(tt => tt.EventId == id)
+                .ToListAsync();
+
+            var requestIds = request.TicketTypes.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToList();
+            
+            // Delete tiers not in request
+            var toDelete = existingTiers.Where(et => !requestIds.Contains(et.Id)).ToList();
+            foreach (var td in toDelete)
+            {
+                await ticketTypeProc.DeleteAsync(td.Id);
+            }
+
+            // Upsert remaining
+            var sortOrder = 0;
+            foreach (var tt in request.TicketTypes)
+            {
+                if (tt.Id.HasValue && existingTiers.Any(et => et.Id == tt.Id.Value))
+                {
+                    await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, true);
+                }
+                else
+                {
+                    await ticketTypeProc.CreateAsync(id, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++);
+                }
+            }
+        }
 
         var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == id);
         return Ok(MapToDto(updated));

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Contracts.DTOs.Events;
 
 public record CreateEventRequest(
@@ -12,5 +14,14 @@ public record CreateEventRequest(
     int? MaxCapacity = null,
     int? PricePerPersonCents = null,
     int? PlatformFeePercent = null,
-    string? BannerImageUrl = null
+    string? BannerImageUrl = null,
+    List<NestedTicketTypeRequest>? TicketTypes = null
 );
+
+public record NestedTicketTypeRequest(
+    string Name,
+    int PriceCents,
+    int? Capacity,
+    string? Description = null
+);
+
