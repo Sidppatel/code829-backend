@@ -5,5 +5,6 @@ public record EventPricingTierDto(
     int PriceCents,
     int? Capacity,
     int Count,
-    int SoldCount
+    int SoldCount,
+    int? TotalCapacity
 );

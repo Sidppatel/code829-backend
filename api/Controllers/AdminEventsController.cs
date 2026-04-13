@@ -90,14 +90,15 @@ public class AdminEventsController(
                     tt.PriceCents,
                     tt.MaxQuantity,
                     tt.MaxQuantity ?? -1, // -1 means no limit displayed, but usually we sum it
-                    tt.SoldCount
+                    tt.SoldCount,
+                    tt.MaxQuantity
                 ))
                 .ToListAsync();
             
             // If no tiers exist but there's a base price, add a default tier
             if (tiers.Count == 0 && ev.PricePerPersonCents > 0)
             {
-                tiers.Add(new EventPricingTierDto("Standard Entry", ev.PricePerPersonCents.Value, ev.MaxCapacity, ev.MaxCapacity ?? 0, ev.TotalSold));
+                tiers.Add(new EventPricingTierDto("Standard Entry", ev.PricePerPersonCents.Value, ev.MaxCapacity, ev.MaxCapacity ?? 0, ev.TotalSold, ev.MaxCapacity));
             }
 
             dto = dto with { PricingTiers = tiers };
@@ -112,7 +113,8 @@ public class AdminEventsController(
                     et.PriceCents,
                     et.Capacity,
                     et.TotalTables,
-                    et.BookedTables
+                    et.BookedTables,
+                    et.Capacity * et.TotalTables
                 ))
                 .ToListAsync();
             
