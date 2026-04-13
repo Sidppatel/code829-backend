@@ -11,6 +11,7 @@ public class EventPlatformDbContext(
     // Core entities
     public DbSet<User> Users => Set<User>();
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+    public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
@@ -118,6 +119,28 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.AvatarPath).HasMaxLength(512);
             entity.Property(e => e.Phone).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<Invitation>(entity =>
+        {
+            entity.ToTable("invitations", t =>
+            {
+                t.HasCheckConstraint("CK_invitations_Status",
+                    "\"Status\" IN ('Pending','Accepted','Revoked','Expired')");
+                t.HasCheckConstraint("CK_invitations_Role",
+                    "\"Role\" IN ('Staff','Admin','Developer')");
+            });
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.Email);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.InvitedBy)
+                .WithMany()
+                .HasForeignKey(e => e.InvitedByAdminUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AppSetting>(entity =>

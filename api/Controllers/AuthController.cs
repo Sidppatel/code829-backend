@@ -63,10 +63,10 @@ public class AuthController(
             var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            var (user, sessionToken) = await authService.VerifyMagicLinkAsync(request.Token, deviceName, ip);
+            var (user, sessionToken, jwt) = await authService.VerifyMagicLinkAsync(request.Token, deviceName, ip);
             SetSessionCookie(sessionToken);
 
-            return Ok(new AuthResponse(User: user));
+            return Ok(new AuthResponse(User: user, Token: jwt));
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -89,10 +89,10 @@ public class AuthController(
             var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            var (user, sessionToken) = await authService.DevLoginAsync(request.Email, deviceName, ip);
+            var (user, sessionToken, jwt) = await authService.DevLoginAsync(request.Email, deviceName, ip);
             SetSessionCookie(sessionToken);
 
-            return Ok(new AuthResponse(User: user));
+            return Ok(new AuthResponse(User: user, Token: jwt));
         }
         catch (KeyNotFoundException ex)
         {

@@ -20,7 +20,8 @@ public class AuthService(
     IEncryptionService encryptionService,
     IWebHostEnvironment environment,
     IFileStorageService fileStorage,
-    IConnectionMultiplexer redis
+    IConnectionMultiplexer redis,
+    IJwtService jwtService
 ) : IAuthService
 {
     public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? frontendOrigin = null)
@@ -56,7 +57,7 @@ public class AuthService(
         return new MagicLinkResponse("Magic link sent. Check your email.");
     }
 
-    public async Task<(UserDto User, string SessionToken)> VerifyMagicLinkAsync(string token, string? deviceName, string? ip)
+    public async Task<(UserDto User, string SessionToken, string Jwt)> VerifyMagicLinkAsync(string token, string? deviceName, string? ip)
     {
         var tokenHash = HashToken(token);
 
@@ -75,12 +76,13 @@ public class AuthService(
 
         var (sessionToken, _) = await CreateDeviceSessionAsync(userId, deviceName, ip);
         var userDto = MapUserDto(user);
+        var jwt = await jwtService.GenerateUserJwtAsync(user);
 
         Log.Information("[Auth] Magic link verified for {Email}", result.Email);
-        return (userDto, sessionToken);
+        return (userDto, sessionToken, jwt);
     }
 
-    public async Task<(UserDto User, string SessionToken)> DevLoginAsync(string email, string? deviceName, string? ip)
+    public async Task<(UserDto User, string SessionToken, string Jwt)> DevLoginAsync(string email, string? deviceName, string? ip)
     {
         if (!environment.IsDevelopment())
             throw new InvalidOperationException("Dev login is not available in this environment");
@@ -93,9 +95,10 @@ public class AuthService(
 
         var (sessionToken, _) = await CreateDeviceSessionAsync(user.Id, deviceName, ip);
         var userDto = MapUserDto(user);
+        var jwt = await jwtService.GenerateUserJwtAsync(user);
 
         Log.Information("[Auth] Dev login for {Email}", user.Email);
-        return (userDto, sessionToken);
+        return (userDto, sessionToken, jwt);
     }
 
     public async Task<UserDto?> GetCurrentUserAsync(Guid userId)

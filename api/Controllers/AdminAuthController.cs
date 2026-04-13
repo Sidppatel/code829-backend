@@ -14,11 +14,53 @@ namespace Api.Controllers;
 [ApiController]
 [Route("admin/auth")]
 public class AdminAuthController(
-    IAdminAuthService adminAuthService
+    IAdminAuthService adminAuthService,
+    IInvitationService invitationService
 ) : ControllerBase
 {
     private const string SessionCookieName = "session";
     private const int SessionMaxAgeDays = 90;
+
+    [HttpGet("invitation/{token}")]
+    public async Task<IActionResult> GetInvitationInfo(string token)
+    {
+        var info = await invitationService.GetInfoAsync(Uri.UnescapeDataString(token));
+        if (info is null)
+            return NotFound(new ApiError(404, "Invalid or expired invitation", HttpContext.TraceIdentifier));
+        return Ok(info);
+    }
+
+    [HttpPost("signup")]
+    public async Task<IActionResult> Signup([FromBody] AcceptInvitationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.Password)
+            || string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            return BadRequest(new ApiError(400, "All fields are required", HttpContext.TraceIdentifier));
+
+        if (request.Password.Length < 8)
+            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+
+        try
+        {
+            var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+            var (user, sessionToken, jwt) = await invitationService.AcceptAsync(
+                request.Token, request.Password, request.FirstName, request.LastName,
+                deviceName, ip);
+
+            SetSessionCookie(sessionToken);
+            return Ok(new AdminAuthResponse(user, jwt));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
@@ -31,12 +73,12 @@ public class AdminAuthController(
             var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            var (user, sessionToken) = await adminAuthService.LoginAsync(
+            var (user, sessionToken, jwt) = await adminAuthService.LoginAsync(
                 request.Email, request.Password, deviceName, ip);
 
             SetSessionCookie(sessionToken);
 
-            return Ok(new AdminAuthResponse(user));
+            return Ok(new AdminAuthResponse(user, jwt));
         }
         catch (UnauthorizedAccessException)
         {

@@ -1,0 +1,54 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Db.Entities;
+using Microsoft.IdentityModel.Tokens;
+
+namespace Api.Services;
+
+public class JwtService(ISettingsService settingsService) : IJwtService
+{
+    public async Task<string> GenerateUserJwtAsync(User user)
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}".Trim()),
+            new Claim(ClaimTypes.Role, "User"),
+            new Claim("user_type", "user")
+        };
+
+        return await GenerateJwtAsync(claims);
+    }
+
+    public async Task<string> GenerateAdminJwtAsync(AdminUser admin)
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, admin.Id.ToString()),
+            new Claim(ClaimTypes.Email, admin.Email),
+            new Claim(ClaimTypes.Name, $"{admin.FirstName} {admin.LastName}".Trim()),
+            new Claim(ClaimTypes.Role, admin.Role.ToString()),
+            new Claim("user_type", "admin")
+        };
+
+        return await GenerateJwtAsync(claims);
+    }
+
+    private async Task<string> GenerateJwtAsync(Claim[] claims)
+    {
+        var jwtSecret = await settingsService.GetAsync("jwt_secret");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: "code829-api",
+            audience: "code829-client",
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}

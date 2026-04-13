@@ -104,6 +104,8 @@ try
     builder.Services.AddDbContext<EventPlatformDbContext>((sp, options) =>
     {
         options.UseNpgsql(connStr);
+        options.ConfigureWarnings(w =>
+            w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.FirstWithoutOrderByAndFilterWarning));
     });
 
     // Redis
@@ -137,8 +139,10 @@ try
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
+    builder.Services.AddScoped<IJwtService, JwtService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IAdminAuthService, AdminAuthService>();
+    builder.Services.AddScoped<IInvitationService, InvitationService>();
     builder.Services.AddScoped<ITableBookingService, TableBookingService>();
     builder.Services.AddScoped<IBookingService, BookingService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
@@ -271,7 +275,7 @@ try
         using var scope = app.Services.CreateScope();
         var settingsSvc = scope.ServiceProvider.GetRequiredService<ISettingsService>();
         var defaultOrigins = app.Environment.IsDevelopment()
-            ? "http://localhost:5173,http://localhost:5174"  // Dev: support both default and Vite ports
+            ? "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176"  // Dev: public, admin, staff, developer ports
             : "http://localhost:5173";
         var originsStr = await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins) ?? defaultOrigins;
         corsOrigins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

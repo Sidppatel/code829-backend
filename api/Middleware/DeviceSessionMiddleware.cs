@@ -1,11 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Api.Services;
 using Db;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using StackExchange.Redis;
 
@@ -20,7 +17,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
     public async Task InvokeAsync(
         HttpContext httpContext,
         EventPlatformDbContext dbContext,
-        ISettingsService settingsService,
+        IJwtService jwtService,
         IConnectionMultiplexer redis)
     {
         var sessionToken = httpContext.Request.Cookies[CookieName];
@@ -71,7 +68,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
                 await next(httpContext);
                 return;
             }
-            jwt = await GenerateUserJwtAsync(user, settingsService);
+            jwt = await jwtService.GenerateUserJwtAsync(user);
         }
         else if (session.AdminUserId.HasValue)
         {
@@ -82,7 +79,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
                 await next(httpContext);
                 return;
             }
-            jwt = await GenerateAdminJwtAsync(admin, settingsService);
+            jwt = await jwtService.GenerateAdminJwtAsync(admin);
         }
 
         if (jwt is null)
@@ -120,50 +117,6 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         }
 
         await next(httpContext);
-    }
-
-    private static async Task<string> GenerateUserJwtAsync(Db.Entities.User user, ISettingsService settingsService)
-    {
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}".Trim()),
-            new Claim(ClaimTypes.Role, "User"),
-            new Claim("user_type", "user")
-        };
-
-        return await GenerateJwtAsync(claims, settingsService);
-    }
-
-    private static async Task<string> GenerateAdminJwtAsync(Db.Entities.AdminUser admin, ISettingsService settingsService)
-    {
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, admin.Id.ToString()),
-            new Claim(ClaimTypes.Email, admin.Email),
-            new Claim(ClaimTypes.Name, $"{admin.FirstName} {admin.LastName}".Trim()),
-            new Claim(ClaimTypes.Role, admin.Role.ToString()),
-            new Claim("user_type", "admin")
-        };
-
-        return await GenerateJwtAsync(claims, settingsService);
-    }
-
-    private static async Task<string> GenerateJwtAsync(Claim[] claims, ISettingsService settingsService)
-    {
-        var jwtSecret = await settingsService.GetAsync("jwt_secret");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: "code829-api",
-            audience: "code829-client",
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(15),
-            signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private static string HashToken(string token)

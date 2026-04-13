@@ -19,7 +19,9 @@ namespace Api.Controllers;
 public class AdminStaffController(
     EventPlatformDbContext context,
     IAdminUserProcedures adminUserProc,
-    IEncryptionService encryptionService
+    IEncryptionService encryptionService,
+    IInvitationService invitationService,
+    IAdminAuthService adminAuthService
 ) : ControllerBase
 {
     /// <summary>
@@ -118,6 +120,72 @@ public class AdminStaffController(
             firstName: request.FirstName, lastName: request.LastName,
             phone: request.Phone, role: isDeveloper ? request.Role : null, isActive: request.IsActive);
 
+        // When disabling an account, revoke all their sessions to force immediate logout
+        if (request.IsActive == false)
+            await adminAuthService.RevokeAllSessionsAsync(id, exceptSessionHash: null);
+
         return Ok(new { message = "Staff user updated" });
+    }
+
+    /// <summary>
+    /// Admin invites a Staff user via email. Developers can also invite Admin users.
+    /// </summary>
+    [HttpPost("invite")]
+    public async Task<IActionResult> InviteStaff([FromBody] CreateInvitationRequest request)
+    {
+        var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
+
+        if (!Enum.TryParse<AdminRole>(request.Role, true, out var role))
+            return BadRequest(new ApiError(400, "Invalid role", HttpContext.TraceIdentifier));
+
+        if (!isDeveloper && role != AdminRole.Staff)
+            return StatusCode(403, new ApiError(403, "Admins can only invite Staff users", HttpContext.TraceIdentifier));
+
+        try
+        {
+            var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            var invitation = await invitationService.CreateAsync(request.Email, role, adminUserId);
+            return Created($"/admin/staff/invitations/{invitation.Id}", invitation);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
+    /// <summary>
+    /// List invitations sent by the current admin user.
+    /// </summary>
+    [HttpGet("invitations")]
+    public async Task<IActionResult> GetInvitations(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
+    {
+        var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
+        var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+
+        // Developers see all invitations, admins see only theirs
+        var invitations = await invitationService.ListAsync(
+            isDeveloper ? null : adminUserId,
+            Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
+
+        return Ok(new { items = invitations });
+    }
+
+    /// <summary>
+    /// Revoke a pending invitation.
+    /// </summary>
+    [HttpDelete("invitations/{id:guid}")]
+    public async Task<IActionResult> RevokeInvitation(Guid id)
+    {
+        try
+        {
+            var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            await invitationService.RevokeAsync(id, adminUserId);
+            return Ok(new { message = "Invitation revoked" });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new ApiError(404, "Invitation not found", HttpContext.TraceIdentifier));
+        }
     }
 }

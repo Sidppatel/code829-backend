@@ -15,10 +15,11 @@ public class AdminAuthService(
     IAdminUserProcedures adminProc,
     IAuthProcedures authProc,
     IFileStorageService fileStorage,
-    IConnectionMultiplexer redis
+    IConnectionMultiplexer redis,
+    IJwtService jwtService
 ) : IAdminAuthService
 {
-    public async Task<(AdminUserDto User, string SessionToken)> LoginAsync(string email, string password, string? deviceName, string? ip)
+    public async Task<(AdminUserDto User, string SessionToken, string Jwt)> LoginAsync(string email, string password, string? deviceName, string? ip)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
@@ -35,9 +36,10 @@ public class AdminAuthService(
 
         var (sessionToken, _) = await CreateDeviceSessionAsync(admin.Id, deviceName, ip);
         var dto = MapAdminUserDto(admin);
+        var jwt = await jwtService.GenerateAdminJwtAsync(admin);
 
         Log.Information("[AdminAuth] Login for {Email} ({Role})", admin.Email, admin.Role);
-        return (dto, sessionToken);
+        return (dto, sessionToken, jwt);
     }
 
     public async Task<AdminUserDto?> GetCurrentAdminAsync(Guid adminUserId)

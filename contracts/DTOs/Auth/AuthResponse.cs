@@ -1,5 +1,6 @@
 namespace Contracts.DTOs.Auth;
 
 public record AuthResponse(
-    UserDto User
+    UserDto User,
+    string? Token = null
 );

@@ -52,10 +52,13 @@ public class AuthServiceTests : IDisposable
             .ReturnsAsync(Guid.NewGuid());
 
         var fileStorage = new Mock<IFileStorageService>();
+        var jwtService = new Mock<IJwtService>();
+        jwtService.Setup(j => j.GenerateUserJwtAsync(It.IsAny<Db.Entities.User>()))
+            .ReturnsAsync("test-jwt-token");
         _service = new AuthService(
             _context, _userRepository, _authProc.Object, _settingsService.Object,
             _emailService.Object, _encryptionService.Object, _environment.Object,
-            fileStorage.Object, _redis.Object);
+            fileStorage.Object, _redis.Object, jwtService.Object);
     }
 
     [Fact]

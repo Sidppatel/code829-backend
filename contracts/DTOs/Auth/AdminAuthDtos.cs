@@ -7,7 +7,7 @@ public record AdminUserDto(
     string Role, bool IsActive, DateTime CreatedAt, DateTime? LastLoginAt,
     string? Phone, string? AvatarUrl);
 
-public record AdminAuthResponse(AdminUserDto User);
+public record AdminAuthResponse(AdminUserDto User, string? Token = null);
 
 public record CreateAdminUserRequest(
     string Email, string FirstName, string LastName,

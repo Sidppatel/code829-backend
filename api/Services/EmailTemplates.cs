@@ -34,4 +34,12 @@ public static class EmailTemplates
         $"Claim your ticket: {claimUrl}\n\n" +
         $"This invitation expires in 7 days." +
         Sign(brandName);
+
+    public static string Invitation(string brandName, string inviterName, string role, string signupUrl, int expiryDays) =>
+        $"You've been invited to {brandName}\n\n" +
+        $"{inviterName} has invited you to join {brandName} as {(role == "Admin" ? "an" : "a")} {role}.\n\n" +
+        $"Click the link below to create your account:\n\n" +
+        $"{signupUrl}\n\n" +
+        $"This invitation expires in {expiryDays} days. If you weren't expecting this, you can safely ignore this email." +
+        Sign(brandName);
 }

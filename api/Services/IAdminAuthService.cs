@@ -4,7 +4,7 @@ namespace Api.Services;
 
 public interface IAdminAuthService
 {
-    Task<(AdminUserDto User, string SessionToken)> LoginAsync(string email, string password, string? deviceName, string? ip);
+    Task<(AdminUserDto User, string SessionToken, string Jwt)> LoginAsync(string email, string password, string? deviceName, string? ip);
     Task<AdminUserDto?> GetCurrentAdminAsync(Guid adminUserId);
     Task LogoutAsync(string sessionHash);
     Task<List<DeviceSessionDto>> GetSessionsAsync(Guid adminUserId, string? currentSessionHash);
