@@ -124,7 +124,9 @@ WHERE ""UserId"" IN (SELECT ""Id"" FROM admin_users);
 DELETE FROM users WHERE ""Role"" IN ('Developer', 'Admin', 'Staff');
 ");
 
-            // ─── Step 6: Remove Role column from users ───────────────
+            // ─── Step 6: Drop view that depends on Role, then remove Role column ──
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_user_profile;");
+
             migrationBuilder.DropCheckConstraint(
                 name: "CK_users_Role",
                 table: "users");
@@ -133,9 +135,9 @@ DELETE FROM users WHERE ""Role"" IN ('Developer', 'Admin', 'Staff');
                 name: "Role",
                 table: "users");
 
-            // ─── Step 7: Update v_user_profile to remove Role ────────
+            // ─── Step 7: Recreate v_user_profile without Role ────────
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_user_profile AS
+CREATE VIEW v_user_profile AS
 SELECT
     u.""Id"", u.""Email"", u.""FirstName"", u.""LastName"",
     u.""IsActive"", u.""LastLoginAt"",
@@ -148,8 +150,9 @@ LEFT JOIN addresses a ON u.""AddressId"" = a.""Id"";
 ");
 
             // ─── Step 8: Update event views to join admin_users ──────
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_events AS
+CREATE VIEW v_events AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
@@ -199,8 +202,9 @@ LEFT JOIN LATERAL (
 ) ettp ON true;
 ");
 
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_summary AS
+CREATE VIEW v_event_summary AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
@@ -437,9 +441,10 @@ WHERE ""AdminUserId"" IS NOT NULL AND ""UserId"" IS NULL;
                 table: "users",
                 sql: "\"Role\" IN ('User','Staff','Admin','Developer')");
 
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_user_profile;");
             // ─── Restore v_user_profile with Role ────────────────────
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_user_profile AS
+CREATE VIEW v_user_profile AS
 SELECT
     u.""Id"", u.""Email"", u.""FirstName"", u.""LastName"",
     u.""Role""::text, u.""IsActive"", u.""LastLoginAt"",
@@ -451,9 +456,10 @@ FROM users u
 LEFT JOIN addresses a ON u.""AddressId"" = a.""Id"";
 ");
 
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events;");
             // ─── Restore views with users join ───────────────────────
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_events AS
+CREATE VIEW v_events AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
@@ -504,7 +510,7 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_summary AS
+CREATE VIEW v_event_summary AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",

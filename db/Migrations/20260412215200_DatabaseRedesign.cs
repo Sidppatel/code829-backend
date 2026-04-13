@@ -1274,12 +1274,13 @@ BEGIN
         ""StartDate"", ""EndDate"", ""ImagePath"", ""IsFeatured"", ""LayoutMode"",
         ""MaxCapacity"", ""PricePerPersonCents"", ""PlatformFeePercent"", ""PlatformFeeCents"",
         ""GridRows"", ""GridCols"", ""VenueId"", ""OrganizerId"", ""ScheduledPublishAt"",
-        ""CreatedAt"", ""UpdatedAt"")
+        ""PublishedAt"", ""CreatedAt"", ""UpdatedAt"")
     VALUES (gen_random_uuid(), p_title, p_slug, p_description, p_status,
         CASE WHEN p_category = '' THEN NULL ELSE p_category END,
         p_start_date, p_end_date, p_image_path, COALESCE(p_is_featured, false), p_layout_mode,
         p_max_capacity, p_price_per_person_cents, p_platform_fee_percent, p_platform_fee_cents,
         p_grid_rows, p_grid_cols, p_venue_id, p_organizer_id, p_scheduled_publish_at,
+        CASE WHEN p_status = 'Published' THEN now() ELSE NULL END,
         now(), now())
     RETURNING ""Id"" INTO v_id;
     RETURN v_id;
@@ -1428,11 +1429,9 @@ END; $$;
 
             migrationBuilder.Sql(@"
 CREATE OR REPLACE FUNCTION sp_release_table_lock(p_user_id uuid, p_event_id uuid, p_table_id uuid) RETURNS bool LANGUAGE plpgsql AS $$
-DECLARE v_released bool;
 BEGIN
     UPDATE tables SET ""Status"" = 'Available', ""LockedByUserId"" = NULL, ""LockExpiresAt"" = NULL, ""UpdatedAt"" = now()
     WHERE ""Id"" = p_table_id AND ""EventId"" = p_event_id AND ""LockedByUserId"" = p_user_id AND ""Status"" = 'Locked';
-    GET DIAGNOSTICS v_released = ROW_COUNT > 0;
     RETURN FOUND;
 END; $$;
 ");

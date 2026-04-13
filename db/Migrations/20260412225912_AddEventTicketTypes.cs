@@ -71,7 +71,7 @@ namespace db.Migrations
 
             // ─── New view: v_event_ticket_types_summary ─────────────
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_ticket_types_summary AS
+CREATE VIEW v_event_ticket_types_summary AS
 SELECT
     ett.""Id"", ett.""EventId"", ett.""Label"", ett.""PriceCents"",
     ett.""PlatformFeeCents"", ett.""MaxQuantity"", ett.""SortOrder"", ett.""IsActive"",
@@ -90,8 +90,9 @@ LEFT JOIN LATERAL (
 ");
 
             // ─── Update v_bookings to include ticket type ───────────
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_bookings;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_bookings AS
+CREATE VIEW v_bookings AS
 SELECT
     b.""Id"", b.""BookingNumber"", b.""Status""::text,
     b.""SubtotalCents"", b.""FeeCents"", b.""TotalCents"",
@@ -136,8 +137,9 @@ LEFT JOIN LATERAL (
 ");
 
             // ─── Update v_events to include MinTicketTypePriceCents ──
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_events AS
+CREATE VIEW v_events AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
@@ -188,8 +190,9 @@ LEFT JOIN LATERAL (
 ");
 
             // ─── Update v_event_summary to include MinTicketTypePriceCents ──
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_summary AS
+CREATE VIEW v_event_summary AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
@@ -312,8 +315,9 @@ END; $$;
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS sp_delete_event_ticket_type(uuid);");
 
             // Restore original v_bookings (without EventTicketTypeId columns)
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_bookings;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_bookings AS
+CREATE VIEW v_bookings AS
 SELECT
     b.""Id"", b.""BookingNumber"", b.""Status""::text,
     b.""SubtotalCents"", b.""FeeCents"", b.""TotalCents"",
@@ -355,8 +359,9 @@ LEFT JOIN LATERAL (
 ");
 
             // Restore original v_events (without MinTicketTypePriceCents)
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_events;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_events AS
+CREATE VIEW v_events AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
@@ -401,8 +406,9 @@ LEFT JOIN LATERAL (
 ");
 
             // Restore original v_event_summary (without MinTicketTypePriceCents)
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_event_summary;");
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_summary AS
+CREATE VIEW v_event_summary AS
 SELECT
     e.""Id"", e.""Title"", e.""Slug"", e.""Status""::text,
     COALESCE(e.""Category""::text, '') AS ""Category"",
