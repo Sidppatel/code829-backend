@@ -22,8 +22,8 @@ public static class VenueEventSeeder
         if (await context.Venues.AnyAsync())
             return;
 
-        var organizer = await context.Users.FirstAsync(u => u.Email == "organizer@code829.local");
-        var admin = await context.Users.FirstAsync(u => u.Email == "admin@code829.local");
+        var organizer = await context.AdminUsers.FirstAsync(u => u.Email == "organizer@code829.local");
+        var admin = await context.AdminUsers.FirstAsync(u => u.Email == "admin@code829.local");
 
         var venueIds = await SeedVenuesAsync(venueProc);
         Log.Information("[Seed] Created {Count} venues via SP", venueIds.Count);

@@ -26,11 +26,4 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
                 [userId, avatarPath], ct);
     }
 
-    public async Task UpdateUserRoleAsync(Guid userId, string role, CancellationToken ct = default)
-    {
-        await context.Database
-            .ExecuteSqlRawAsync(
-                "SELECT sp_update_user_role(@p0, @p1)",
-                [userId, role], ct);
-    }
 }

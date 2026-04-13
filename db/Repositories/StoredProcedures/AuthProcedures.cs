@@ -26,12 +26,12 @@ public class AuthProcedures(EventPlatformDbContext context) : IAuthProcedures
         return results.FirstOrDefault();
     }
 
-    public async Task<Guid> UpsertUserAsync(string email, string emailHash, string firstName, string lastName, string role, CancellationToken ct = default)
+    public async Task<Guid> UpsertUserAsync(string email, string emailHash, string firstName, string lastName, CancellationToken ct = default)
     {
         var result = await context.Database
             .SqlQueryRaw<Guid>(
-                "SELECT sp_upsert_user(@p0, @p1, @p2, @p3, @p4) AS \"Value\"",
-                email, emailHash, firstName, lastName, role)
+                "SELECT sp_upsert_user(@p0, @p1, @p2, @p3) AS \"Value\"",
+                email, emailHash, firstName, lastName)
             .FirstAsync(ct);
 
         return result;

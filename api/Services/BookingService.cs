@@ -62,7 +62,7 @@ public class BookingService(
         var fee = table.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
         var total = subtotal + fee;
 
-        var organizer = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == ev.OrganizerId);
+        var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
             total, fee, organizer?.StripeConnectedAccountId);
 
@@ -140,7 +140,7 @@ public class BookingService(
             var fee = selectedType?.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
             var total = subtotal + fee;
 
-            var organizer = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == ev.OrganizerId);
+            var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
             var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
                 total, fee, organizer?.StripeConnectedAccountId);
 

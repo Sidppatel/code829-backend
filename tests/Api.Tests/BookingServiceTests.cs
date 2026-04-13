@@ -66,7 +66,6 @@ public class BookingServiceTests : IDisposable
             EmailHash = "hash",
             FirstName = "Test",
             LastName = "User",
-            Role = UserRole.User,
             IsActive = true
         };
         _context.Users.Add(user);

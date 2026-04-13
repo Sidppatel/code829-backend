@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using Contracts.DTOs.Auth;
-using Contracts.Enums;
 using Db;
 using Db.Entities;
 using Db.Repositories;
@@ -69,8 +68,7 @@ public class AuthService(
             result.Email,
             encryptionService.HashEmail(result.Email),
             result.Email.Split('@')[0],
-            "",
-            UserRole.User.ToString());
+            "");
 
         var user = await userRepository.GetByIdAsync(userId)
             ?? throw new InvalidOperationException("User creation failed");
@@ -96,7 +94,7 @@ public class AuthService(
         var (sessionToken, _) = await CreateDeviceSessionAsync(user.Id, deviceName, ip);
         var userDto = MapUserDto(user);
 
-        Log.Information("[Auth] Dev login for {Email} ({Role})", user.Email, user.Role);
+        Log.Information("[Auth] Dev login for {Email}", user.Email);
         return (userDto, sessionToken);
     }
 
@@ -178,7 +176,7 @@ public class AuthService(
         Email: user.Email,
         FirstName: user.FirstName,
         LastName: user.LastName,
-        Role: user.Role.ToString(),
+        Role: "User",
         CreatedAt: user.CreatedAt,
         Address: user.Address?.Line1,
         City: user.Address?.City,

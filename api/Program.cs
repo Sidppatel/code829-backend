@@ -133,10 +133,12 @@ try
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IFeedbackProcedures, Db.Repositories.StoredProcedures.FeedbackProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventTicketTypeProcedures, Db.Repositories.StoredProcedures.EventTicketTypeProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminUserProcedures, Db.Repositories.StoredProcedures.AdminUserProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<IAdminAuthService, AdminAuthService>();
     builder.Services.AddScoped<ITableBookingService, TableBookingService>();
     builder.Services.AddScoped<IBookingService, BookingService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();

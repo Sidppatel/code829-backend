@@ -27,7 +27,6 @@ public static class BookingSeeder
             return;
 
         var users = await context.Users
-            .Where(u => u.Role == UserRole.User)
             .ToListAsync();
 
         var events = await context.Events

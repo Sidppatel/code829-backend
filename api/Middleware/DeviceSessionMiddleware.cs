@@ -59,17 +59,38 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             return;
         }
 
-        // Load user
-        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == session.UserId);
-        if (user is null || !user.IsActive)
+        // Resolve user or admin user based on session type
+        string? jwt = null;
+
+        if (session.UserId.HasValue)
+        {
+            var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == session.UserId);
+            if (user is null || !user.IsActive)
+            {
+                httpContext.Response.Cookies.Delete(CookieName);
+                await next(httpContext);
+                return;
+            }
+            jwt = await GenerateUserJwtAsync(user, settingsService);
+        }
+        else if (session.AdminUserId.HasValue)
+        {
+            var admin = await dbContext.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == session.AdminUserId);
+            if (admin is null || !admin.IsActive)
+            {
+                httpContext.Response.Cookies.Delete(CookieName);
+                await next(httpContext);
+                return;
+            }
+            jwt = await GenerateAdminJwtAsync(admin, settingsService);
+        }
+
+        if (jwt is null)
         {
             httpContext.Response.Cookies.Delete(CookieName);
             await next(httpContext);
             return;
         }
-
-        // Generate fresh JWT
-        var jwt = await GenerateJwtAsync(user, settingsService);
 
         // Cache in Redis
         await db.StringSetAsync(cacheKey, jwt, JwtCacheTtl);
@@ -101,19 +122,39 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         await next(httpContext);
     }
 
-    private static async Task<string> GenerateJwtAsync(Db.Entities.User user, ISettingsService settingsService)
+    private static async Task<string> GenerateUserJwtAsync(Db.Entities.User user, ISettingsService settingsService)
     {
-        var jwtSecret = await settingsService.GetAsync("jwt_secret");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}".Trim()),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
+            new Claim(ClaimTypes.Role, "User"),
+            new Claim("user_type", "user")
         };
+
+        return await GenerateJwtAsync(claims, settingsService);
+    }
+
+    private static async Task<string> GenerateAdminJwtAsync(Db.Entities.AdminUser admin, ISettingsService settingsService)
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, admin.Id.ToString()),
+            new Claim(ClaimTypes.Email, admin.Email),
+            new Claim(ClaimTypes.Name, $"{admin.FirstName} {admin.LastName}".Trim()),
+            new Claim(ClaimTypes.Role, admin.Role.ToString()),
+            new Claim("user_type", "admin")
+        };
+
+        return await GenerateJwtAsync(claims, settingsService);
+    }
+
+    private static async Task<string> GenerateJwtAsync(Claim[] claims, ISettingsService settingsService)
+    {
+        var jwtSecret = await settingsService.GetAsync("jwt_secret");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             issuer: "code829-api",

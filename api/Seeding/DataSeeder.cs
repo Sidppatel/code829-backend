@@ -21,10 +21,34 @@ public static class DataSeeder
         var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
         var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
         var authProc = scope.ServiceProvider.GetRequiredService<IAuthProcedures>();
+        var adminProc = scope.ServiceProvider.GetRequiredService<IAdminUserProcedures>();
 
+        await SeedAdminUsersAsync(context, encryption, adminProc);
         await SeedUsersAsync(context, encryption, authProc);
         await SeedSettingsAsync(settingsService);
         await SeedTableTemplatesAsync(context);
+    }
+
+    private static async Task SeedAdminUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IAdminUserProcedures adminProc)
+    {
+        if (await context.AdminUsers.AnyAsync())
+            return;
+
+        var admins = new (string Email, string FirstName, string LastName, AdminRole Role, string Password)[]
+        {
+            ("developer@code829.local", "Dev", "Admin", AdminRole.Developer, "Dev@12345"),
+            ("admin@code829.local", "Sarah", "Mitchell", AdminRole.Admin, "Admin@12345"),
+            ("staff@code829.local", "Marcus", "Johnson", AdminRole.Staff, "Staff@12345"),
+            ("organizer@code829.local", "Gulf Events", "Co.", AdminRole.Admin, "Admin@12345"),
+        };
+
+        foreach (var (email, firstName, lastName, role, password) in admins)
+        {
+            var hash = BCrypt.Net.BCrypt.HashPassword(password);
+            await adminProc.CreateAsync(email, encryption.HashEmail(email), firstName, lastName, hash, role.ToString());
+        }
+
+        Log.Information("[Seed] Created {Count} admin users via SP", admins.Length);
     }
 
     private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IAuthProcedures authProc)
@@ -32,20 +56,16 @@ public static class DataSeeder
         if (await context.Users.AnyAsync())
             return;
 
-        var users = new (string Email, string FirstName, string LastName, UserRole Role)[]
+        var users = new (string Email, string FirstName, string LastName)[]
         {
-            ("developer@code829.local", "Dev", "Admin", UserRole.Developer),
-            ("admin@code829.local", "Sarah", "Mitchell", UserRole.Admin),
-            ("staff@code829.local", "Marcus", "Johnson", UserRole.Staff),
-            ("user@code829.local", "Jamie", "Rivera", UserRole.User),
-            ("user2@code829.local", "Taylor", "Brooks", UserRole.User),
-            ("user3@code829.local", "Alex", "Chen", UserRole.User),
-            ("organizer@code829.local", "Gulf Events", "Co.", UserRole.Admin),
+            ("user@code829.local", "Jamie", "Rivera"),
+            ("user2@code829.local", "Taylor", "Brooks"),
+            ("user3@code829.local", "Alex", "Chen"),
         };
 
-        foreach (var (email, firstName, lastName, role) in users)
+        foreach (var (email, firstName, lastName) in users)
         {
-            await authProc.UpsertUserAsync(email, encryption.HashEmail(email), firstName, lastName, role.ToString());
+            await authProc.UpsertUserAsync(email, encryption.HashEmail(email), firstName, lastName);
         }
 
         Log.Information("[Seed] Created {Count} users via SP", users.Length);

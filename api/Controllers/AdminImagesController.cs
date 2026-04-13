@@ -98,9 +98,9 @@ public class AdminImagesController(
 
     private async Task<bool> CanManageEntityAsync(string entityType, Guid entityId, Guid userId)
     {
-        var user = await context.Users.FindAsync(userId);
-        if (user is null) return false;
-        if (user.Role == UserRole.Developer || user.Role == UserRole.Admin) return true;
+        // Admin/Developer users always have access (this controller requires Admin role minimum)
+        if (User.IsInRole(UserRole.Developer.ToString()) || User.IsInRole(UserRole.Admin.ToString()))
+            return true;
 
         return entityType switch
         {

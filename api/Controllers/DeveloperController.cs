@@ -2,6 +2,7 @@ using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
 using Contracts.DTOs.Admin;
+using Contracts.DTOs.Auth;
 using Contracts.DTOs.Logs;
 using Contracts.Enums;
 using Db;
@@ -22,7 +23,8 @@ public class DeveloperController(
     ISettingsService settingsService,
     IAppSettingRepository settingsRepo,
     IImageService imageService,
-    IUserProcedures userProc
+    IAdminUserProcedures adminUserProc,
+    IEncryptionService encryptionService
 ) : ControllerBase
 {
     /// <summary>
@@ -201,7 +203,6 @@ public class DeveloperController(
                 u.FirstName,
                 u.LastName,
                 u.Email,
-                Role = u.Role.ToString(),
                 u.CreatedAt
             })
             .ToListAsync();
@@ -210,23 +211,130 @@ public class DeveloperController(
     }
 
     /// <summary>
-    /// Update a user's role (e.g. promoting them to Admin).
+    /// Get all admin users (paginated, searchable).
     /// </summary>
-    [HttpPut("users/{id:guid}/role")]
-    public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
+    [HttpGet("admin-users")]
+    public async Task<IActionResult> GetAdminUsers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        [FromQuery] string? role = null)
     {
-        if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        page = Math.Max(1, page);
+
+        var query = context.AdminUsers.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(a =>
+                a.Email.ToLower().Contains(term) ||
+                a.FirstName.ToLower().Contains(term) ||
+                a.LastName.ToLower().Contains(term));
+        }
+
+        if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<AdminRole>(role, true, out var adminRole))
+            query = query.Where(a => a.Role == adminRole);
+
+        var totalCount = await query.CountAsync();
+
+        var admins = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new
+            {
+                a.Id, a.FirstName, a.LastName, a.Email,
+                Role = a.Role.ToString(),
+                a.IsActive, a.CreatedAt, a.LastLoginAt, a.Phone
+            })
+            .ToListAsync();
+
+        return Ok(new { items = admins, totalCount, page, pageSize });
+    }
+
+    /// <summary>
+    /// Create a new admin user.
+    /// </summary>
+    [HttpPost("admin-users")]
+    public async Task<IActionResult> CreateAdminUser([FromBody] CreateAdminUserRequest request)
+    {
+        if (!Enum.TryParse<AdminRole>(request.Role, true, out var role))
+            return BadRequest(new ApiError(400, "Invalid role. Must be Staff, Admin, or Developer", HttpContext.TraceIdentifier));
+
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+        if (await context.AdminUsers.AnyAsync(a => a.Email == normalizedEmail))
+            return Conflict(new ApiError(409, "An admin user with this email already exists", HttpContext.TraceIdentifier));
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        var emailHash = encryptionService.HashEmail(normalizedEmail);
+
+        var id = await adminUserProc.CreateAsync(
+            normalizedEmail, emailHash, request.FirstName.Trim(), request.LastName.Trim(),
+            passwordHash, role.ToString());
+
+        return Created($"/developer/admin-users/{id}", new { id, message = $"{role} user created" });
+    }
+
+    /// <summary>
+    /// Update an admin user (role, active status, profile).
+    /// </summary>
+    [HttpPut("admin-users/{id:guid}")]
+    public async Task<IActionResult> UpdateAdminUser(Guid id, [FromBody] UpdateAdminUserRequest request)
+    {
+        var admin = await context.AdminUsers.FindAsync(id);
+        if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
+
+        if (request.Role is not null && !Enum.TryParse<AdminRole>(request.Role, true, out _))
             return BadRequest(new ApiError(400, "Invalid role", HttpContext.TraceIdentifier));
 
-        var user = await context.Users.FindAsync(id);
-        if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
-
-        if (user.Role == UserRole.Developer && role != UserRole.Developer)
+        if (admin.Role == AdminRole.Developer && request.Role is not null && request.Role != "Developer")
             return BadRequest(new ApiError(400, "Cannot demote a Developer", HttpContext.TraceIdentifier));
 
-        await userProc.UpdateUserRoleAsync(id, role.ToString());
+        await adminUserProc.UpdateAsync(id,
+            firstName: request.FirstName, lastName: request.LastName,
+            phone: request.Phone, role: request.Role, isActive: request.IsActive);
 
-        return Ok(new { message = $"User updated to {role}" });
+        return Ok(new { message = "Admin user updated" });
+    }
+
+    /// <summary>
+    /// Reset an admin user's password (developer privilege, no current password needed).
+    /// </summary>
+    [HttpPut("admin-users/{id:guid}/reset-password")]
+    public async Task<IActionResult> ResetAdminPassword(Guid id, [FromBody] ResetAdminPasswordRequest request)
+    {
+        var admin = await context.AdminUsers.FindAsync(id);
+        if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await adminUserProc.UpdatePasswordAsync(id, passwordHash);
+
+        return Ok(new { message = "Password reset" });
+    }
+
+    /// <summary>
+    /// Deactivate an admin user.
+    /// </summary>
+    [HttpDelete("admin-users/{id:guid}")]
+    public async Task<IActionResult> DeactivateAdminUser(Guid id)
+    {
+        var admin = await context.AdminUsers.FindAsync(id);
+        if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
+
+        if (admin.Role == AdminRole.Developer)
+            return BadRequest(new ApiError(400, "Cannot deactivate a Developer", HttpContext.TraceIdentifier));
+
+        await adminUserProc.UpdateAsync(id, isActive: false);
+        return Ok(new { message = "Admin user deactivated" });
     }
 
     /// <summary>

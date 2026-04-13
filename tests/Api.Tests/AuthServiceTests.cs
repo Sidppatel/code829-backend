@@ -108,7 +108,7 @@ public class AuthServiceTests : IDisposable
 
         _authProc.Setup(a => a.UpsertUserAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(userId);
 
         _authProc.Setup(a => a.CreateDeviceSessionAsync(
@@ -123,8 +123,7 @@ public class AuthServiceTests : IDisposable
             Email = "newuser@example.com",
             EmailHash = "testhash",
             FirstName = "newuser",
-            LastName = "",
-            Role = UserRole.User
+            LastName = ""
         });
         await _context.SaveChangesAsync();
 

@@ -2,8 +2,10 @@ namespace Db.Entities;
 
 public class DeviceSession : BaseEntity
 {
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
+    public Guid? AdminUserId { get; set; }
+    public AdminUser? AdminUser { get; set; }
     public string SessionHash { get; set; } = string.Empty;
     public string? DeviceFingerprint { get; set; }
     public string? DeviceName { get; set; }

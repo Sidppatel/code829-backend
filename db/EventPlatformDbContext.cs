@@ -10,6 +10,7 @@ public class EventPlatformDbContext(
 {
     // Core entities
     public DbSet<User> Users => Set<User>();
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
@@ -86,10 +87,25 @@ public class EventPlatformDbContext(
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.ToTable("users", t =>
+            entity.ToTable("users");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.EmailHash).IsUnique();
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.EmailHash).HasMaxLength(128);
+            entity.Property(e => e.FirstName).HasMaxLength(128);
+            entity.Property(e => e.LastName).HasMaxLength(128);
+            entity.Property(e => e.AvatarPath).HasMaxLength(512);
+            entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AdminUser>(entity =>
+        {
+            entity.ToTable("admin_users", t =>
             {
-                t.HasCheckConstraint("CK_users_Role",
-                    "\"Role\" IN ('User','Staff','Admin','Developer')");
+                t.HasCheckConstraint("CK_admin_users_Role",
+                    "\"Role\" IN ('Staff','Admin','Developer')");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.EmailHash).IsUnique();
@@ -98,10 +114,10 @@ public class EventPlatformDbContext(
             entity.Property(e => e.EmailHash).HasMaxLength(128);
             entity.Property(e => e.FirstName).HasMaxLength(128);
             entity.Property(e => e.LastName).HasMaxLength(128);
+            entity.Property(e => e.PasswordHash).HasMaxLength(256);
             entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.AvatarPath).HasMaxLength(512);
-            entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.Property(e => e.Phone).HasMaxLength(20);
         });
 
         modelBuilder.Entity<AppSetting>(entity =>
@@ -131,10 +147,13 @@ public class EventPlatformDbContext(
 
         modelBuilder.Entity<DeviceSession>(entity =>
         {
-            entity.ToTable("device_sessions");
+            entity.ToTable("device_sessions", t =>
+            {
+                t.HasCheckConstraint("CK_device_sessions_UserType",
+                    "(\"UserId\" IS NOT NULL AND \"AdminUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"AdminUserId\" IS NOT NULL)");
+            });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.SessionHash).IsUnique();
-            entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => new { e.ExpiresAt, e.RevokedAt })
                 .HasFilter("\"RevokedAt\" IS NULL")
                 .HasDatabaseName("IX_device_sessions_Active");
@@ -142,7 +161,10 @@ public class EventPlatformDbContext(
             entity.Property(e => e.DeviceFingerprint).HasMaxLength(256);
             entity.Property(e => e.DeviceName).HasMaxLength(256);
             entity.Property(e => e.IpAddress).HasMaxLength(45);
-            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         });
 
         // ─── Template/parent entities ────────────────────────────
