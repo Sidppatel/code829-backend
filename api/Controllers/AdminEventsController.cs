@@ -77,7 +77,49 @@ public class AdminEventsController(
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        return Ok(MapToDto(ev));
+        
+        var dto = MapToDto(ev);
+
+        if (ev.LayoutMode == "Open")
+        {
+            var tiers = await context.EventTicketTypeSummaryViews.AsNoTracking()
+                .Where(tt => tt.EventId == id)
+                .OrderBy(tt => tt.SortOrder)
+                .Select(tt => new EventPricingTierDto(
+                    tt.Label,
+                    tt.PriceCents,
+                    tt.MaxQuantity,
+                    tt.MaxQuantity ?? -1, // -1 means no limit displayed, but usually we sum it
+                    tt.SoldCount
+                ))
+                .ToListAsync();
+            
+            // If no tiers exist but there's a base price, add a default tier
+            if (tiers.Count == 0 && ev.PricePerPersonCents > 0)
+            {
+                tiers.Add(new EventPricingTierDto("Standard Entry", ev.PricePerPersonCents.Value, ev.MaxCapacity, ev.MaxCapacity ?? 0, ev.TotalSold));
+            }
+
+            dto = dto with { PricingTiers = tiers };
+        }
+        else if (ev.LayoutMode == "Grid")
+        {
+            var tiers = await context.EventTablesSummaryViews.AsNoTracking()
+                .Where(et => et.EventId == id)
+                .OrderBy(et => et.Label)
+                .Select(et => new EventPricingTierDto(
+                    et.Label,
+                    et.PriceCents,
+                    et.Capacity,
+                    et.TotalTables,
+                    et.BookedTables
+                ))
+                .ToListAsync();
+            
+            dto = dto with { PricingTiers = tiers };
+        }
+
+        return Ok(dto);
     }
 
     [HttpPost]
