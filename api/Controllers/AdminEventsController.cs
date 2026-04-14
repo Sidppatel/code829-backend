@@ -103,11 +103,13 @@ public class AdminEventsController(
             }
 
             dto = dto with { 
-                PricingTiers = tiers,
+                PricingTiers = ticketTypeViews.Select(tt => new EventPricingTierDto(
+                    tt.Label, tt.PriceCents, tt.MaxQuantity, tt.MaxQuantity ?? -1,
+                    tt.SoldCount, tt.MaxQuantity, tt.Description)).ToList(),
                 TicketTypes = ticketTypeViews.Select(tt => new EventTicketTypeDto(
                     tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                     tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-                    tt.SoldCount, tt.AvailableCount)).ToList()
+                    tt.SoldCount, tt.AvailableCount, tt.Description)).ToList()
             };
         }
         else if (ev.LayoutMode == "Grid")
@@ -167,7 +169,7 @@ public class AdminEventsController(
             var sortOrder = 0;
             foreach (var tt in request.TicketTypes)
             {
-                await ticketTypeProc.CreateAsync(eventId, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++);
+                await ticketTypeProc.CreateAsync(eventId, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, tt.Description);
             }
         }
 
@@ -245,11 +247,11 @@ public class AdminEventsController(
             {
                 if (tt.Id.HasValue && existingTiers.Any(et => et.Id == tt.Id.Value))
                 {
-                    await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, true);
+                    await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, true, tt.Description);
                 }
                 else
                 {
-                    await ticketTypeProc.CreateAsync(id, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++);
+                    await ticketTypeProc.CreateAsync(id, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, tt.Description);
                 }
             }
         }
@@ -381,7 +383,7 @@ public class AdminEventsController(
         foreach (var tt in ticketTypes)
         {
             await ticketTypeProc.CreateAsync(copyId, tt.Label, tt.PriceCents,
-                tt.PlatformFeeCents, tt.MaxQuantity, tt.SortOrder);
+                tt.PlatformFeeCents, tt.MaxQuantity, tt.SortOrder, tt.Description);
         }
 
         await adminLog.LogAsync("event.duplicated", "Event", copyId,
@@ -405,7 +407,7 @@ public class AdminEventsController(
             .Select(tt => new EventTicketTypeDto(
                 tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                 tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-                tt.SoldCount, tt.AvailableCount))
+                tt.SoldCount, tt.AvailableCount, tt.Description))
             .ToListAsync();
 
         return Ok(new EventTicketTypesResponse(id, types));
@@ -422,7 +424,7 @@ public class AdminEventsController(
 
         var typeId = await ticketTypeProc.CreateAsync(
             id, request.Label, request.PriceCents,
-            request.PlatformFeeCents, request.MaxQuantity, request.SortOrder);
+            request.PlatformFeeCents, request.MaxQuantity, request.SortOrder, request.Description);
 
         await adminLog.LogAsync("event.ticket_type.created", "EventTicketType", typeId,
             $"Ticket type '{request.Label}' created for event '{ev.Title}'");
@@ -433,7 +435,7 @@ public class AdminEventsController(
         return Created("", new EventTicketTypeDto(
             created.Id, created.Label, created.PriceCents, created.PlatformFeeCents,
             created.MaxQuantity, created.SortOrder, created.IsActive,
-            created.SoldCount, created.AvailableCount));
+            created.SoldCount, created.AvailableCount, created.Description));
     }
 
     [HttpPut("{id:guid}/ticket-types/{typeId:guid}")]
@@ -456,7 +458,7 @@ public class AdminEventsController(
         }
 
         await ticketTypeProc.UpdateAsync(typeId, request.Label, request.PriceCents,
-            request.PlatformFeeCents, request.MaxQuantity, request.SortOrder, request.IsActive);
+            request.PlatformFeeCents, request.MaxQuantity, request.SortOrder, request.IsActive, request.Description);
 
         var updated = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstAsync(tt => tt.Id == typeId);
@@ -464,7 +466,7 @@ public class AdminEventsController(
         return Ok(new EventTicketTypeDto(
             updated.Id, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
             updated.MaxQuantity, updated.SortOrder, updated.IsActive,
-            updated.SoldCount, updated.AvailableCount));
+            updated.SoldCount, updated.AvailableCount, updated.Description));
     }
 
     [HttpDelete("{id:guid}/ticket-types/{typeId:guid}")]

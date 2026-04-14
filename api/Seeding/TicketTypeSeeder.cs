@@ -34,7 +34,7 @@ public static class TicketTypeSeeder
             var sortOrder = 0;
             foreach (var (label, priceCents, maxQty) in tiers)
             {
-                await ticketTypeProc.CreateAsync(ev.Id, label, priceCents, null, maxQty, sortOrder++);
+                await ticketTypeProc.CreateAsync(ev.Id, label, priceCents, null, maxQty, sortOrder++, null);
             }
         }
 

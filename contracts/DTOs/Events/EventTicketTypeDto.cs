@@ -9,7 +9,8 @@ public record EventTicketTypeDto(
     int SortOrder,
     bool IsActive,
     int SoldCount,
-    int AvailableCount
+    int AvailableCount,
+    string? Description = null
 );
 
 public record CreateEventTicketTypeRequest(
@@ -17,7 +18,8 @@ public record CreateEventTicketTypeRequest(
     int PriceCents,
     int? PlatformFeeCents = null,
     int? MaxQuantity = null,
-    int SortOrder = 0
+    int SortOrder = 0,
+    string? Description = null
 );
 
 public record UpdateEventTicketTypeRequest(
@@ -26,7 +28,8 @@ public record UpdateEventTicketTypeRequest(
     int? PlatformFeeCents = null,
     int? MaxQuantity = null,
     int? SortOrder = null,
-    bool? IsActive = null
+    bool? IsActive = null,
+    string? Description = null
 );
 
 public record EventTicketTypesResponse(

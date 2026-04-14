@@ -6,5 +6,6 @@ public record EventPricingTierDto(
     int? Capacity,
     int Count,
     int SoldCount,
-    int? TotalCapacity
+    int? TotalCapacity,
+    string? Description = null
 );
