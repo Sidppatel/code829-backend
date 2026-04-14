@@ -26,7 +26,8 @@ public class AdminEventsController(
     ITableProcedures tableProc,
     IEventTicketTypeProcedures ticketTypeProc,
     IFileStorageService fileStorage,
-    IAdminLogService adminLog
+    IAdminLogService adminLog,
+    ISettingsService settingsService
 ) : ControllerBase
 {
     [HttpGet]
@@ -131,10 +132,12 @@ public class AdminEventsController(
         
         if (layoutMode == LayoutMode.Open && request.TicketTypes != null)
         {
+            var defaultFeeStr = await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000");
+            var defaultFee = int.TryParse(defaultFeeStr, out var f) ? f : 1000;
             var sortOrder = 0;
             foreach (var tt in request.TicketTypes)
             {
-                await ticketTypeProc.CreateAsync(eventId, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, tt.Description);
+                await ticketTypeProc.CreateAsync(eventId, tt.Name, tt.PriceCents, defaultFee, tt.Capacity, sortOrder++, tt.Description);
             }
         }
 
@@ -206,17 +209,19 @@ public class AdminEventsController(
                 await ticketTypeProc.DeleteAsync(td.Id);
             }
 
-            // Upsert remaining
+            // Upsert remaining — preserve existing platform fees, assign default to new tiers
+            var defaultFeeStr = await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000");
+            var defaultFee = int.TryParse(defaultFeeStr, out var df) ? df : 1000;
             var sortOrder = 0;
             foreach (var tt in request.TicketTypes)
             {
-                if (tt.Id.HasValue && existingTiers.Any(et => et.Id == tt.Id.Value))
+                if (tt.Id.HasValue && existingTiers.FirstOrDefault(et => et.Id == tt.Id.Value) is { } existing)
                 {
-                    await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, true, tt.Description);
+                    await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, existing.PlatformFeeCents, tt.Capacity, sortOrder++, true, tt.Description);
                 }
                 else
                 {
-                    await ticketTypeProc.CreateAsync(id, tt.Name, tt.PriceCents, null, tt.Capacity, sortOrder++, tt.Description);
+                    await ticketTypeProc.CreateAsync(id, tt.Name, tt.PriceCents, defaultFee, tt.Capacity, sortOrder++, tt.Description);
                 }
             }
         }
