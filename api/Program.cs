@@ -216,7 +216,12 @@ try
     // Controllers + OpenAPI + Validation
     // CSRF note: Antiforgery tokens are designed for server-rendered forms, not SPA + JWT APIs.
     // This API is protected by JWT auth + SameSite cookies + CORS origin checks instead.
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+            options.JsonSerializerOptions.DictionaryKeyPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        });
     builder.Services.AddOpenApi();
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
