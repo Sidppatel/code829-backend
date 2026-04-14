@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Contracts.DTOs.Events;
 
@@ -19,9 +20,9 @@ public record CreateEventRequest(
 );
 
 public record NestedTicketTypeRequest(
-    string Name,
-    int PriceCents,
-    int? Capacity,
-    string? Description = null
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("priceCents")] int PriceCents,
+    [property: JsonPropertyName("capacity")] int? Capacity,
+    [property: JsonPropertyName("description")] string? Description = null
 );
 

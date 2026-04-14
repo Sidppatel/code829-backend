@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Contracts.DTOs.Events;
 
@@ -20,10 +21,10 @@ public record UpdateEventRequest(
 );
 
 public record NestedTicketTypeUpdate(
-    Guid? Id,
-    string Name,
-    int PriceCents,
-    int? Capacity,
-    string? Description = null
+    [property: JsonPropertyName("id")] Guid? Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("priceCents")] int PriceCents,
+    [property: JsonPropertyName("capacity")] int? Capacity,
+    [property: JsonPropertyName("description")] string? Description = null
 );
 
