@@ -43,6 +43,7 @@ public class EventView
     public string OrganizerLastName { get; set; } = null!;
 
     // Aggregates
+    public int TotalCapacity { get; set; }
     public int TotalSold { get; set; }
     public int AvailableTables { get; set; }
     public int? MinTablePriceCents { get; set; }

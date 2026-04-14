@@ -432,7 +432,7 @@ public class EventsController(
         ev.OrganizerId,
         $"{ev.OrganizerFirstName} {ev.OrganizerLastName}",
         ev.CreatedAt,
-        ev.MaxCapacity ?? 0,
+        ev.TotalCapacity,
         ev.TotalSold,
         ev.AvailableTables,
         ev.MinTablePriceCents,
