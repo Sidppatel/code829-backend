@@ -424,6 +424,7 @@ public class EventsController(
         ev.PricePerPersonCents,
         ev.GridRows, ev.GridCols, ev.PublishedAt,
         ev.VenueId,
+        ev.VenueName,
         new VenueDto(
             ev.VenueId, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
             ev.VenueZipCode, ev.VenueDescription,

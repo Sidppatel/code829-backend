@@ -20,6 +20,7 @@ public record EventDto(
     int? GridCols,
     DateTime? PublishedAt,
     Guid VenueId,
+    string? VenueName,
     VenueDto? Venue,
     Guid OrganizerId,
     string? OrganizerName,
@@ -29,6 +30,5 @@ public record EventDto(
     int NoOfAvailableTables,
     int? MinPricePerTableCents,
     int? MinTicketTypePriceCents = null,
-    List<EventPricingTierDto>? PricingTiers = null,
     List<EventTicketTypeDto>? TicketTypes = null
 );

@@ -87,47 +87,12 @@ public class AdminEventsController(
                 .OrderBy(tt => tt.SortOrder)
                 .ToListAsync();
 
-            var tiers = ticketTypeViews.Select(tt => new EventPricingTierDto(
-                tt.Label,
-                tt.PriceCents,
-                tt.MaxQuantity,
-                tt.MaxQuantity ?? -1,
-                tt.SoldCount,
-                tt.MaxQuantity
-            )).ToList();
-            
-            // If no tiers exist but there's a base price, add a default tier
-            if (tiers.Count == 0 && ev.PricePerPersonCents > 0)
-            {
-                tiers.Add(new EventPricingTierDto("Standard Entry", ev.PricePerPersonCents.Value, ev.MaxCapacity, ev.MaxCapacity ?? 0, ev.TotalSold, ev.MaxCapacity));
-            }
-
-            dto = dto with { 
-                PricingTiers = ticketTypeViews.Select(tt => new EventPricingTierDto(
-                    tt.Label, tt.PriceCents, tt.MaxQuantity, tt.MaxQuantity ?? -1,
-                    tt.SoldCount, tt.MaxQuantity, tt.Description)).ToList(),
+            dto = dto with {
                 TicketTypes = ticketTypeViews.Select(tt => new EventTicketTypeDto(
                     tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                     tt.MaxQuantity, tt.SortOrder, tt.IsActive,
                     tt.SoldCount, tt.AvailableCount, tt.Description)).ToList()
             };
-        }
-        else if (ev.LayoutMode == "Grid")
-        {
-            var tiers = await context.EventTablesSummaryViews.AsNoTracking()
-                .Where(et => et.EventId == id)
-                .OrderBy(et => et.Label)
-                .Select(et => new EventPricingTierDto(
-                    et.Label,
-                    et.PriceCents,
-                    et.Capacity,
-                    et.TotalTables,
-                    et.BookedTables,
-                    et.Capacity * et.TotalTables
-                ))
-                .ToListAsync();
-            
-            dto = dto with { PricingTiers = tiers };
         }
 
         return Ok(dto);
@@ -503,13 +468,8 @@ public class AdminEventsController(
         e.LayoutMode, e.MaxCapacity, e.PricePerPersonCents,
         e.GridRows, e.GridCols, e.PublishedAt,
         e.VenueId,
-        new VenueDto(
-            e.VenueId, e.VenueName, e.VenueAddress, e.VenueCity, e.VenueState,
-            e.VenueZipCode, e.VenueDescription,
-            e.VenueImagePath is not null ? fileStorage.GetPublicUrl(e.VenueImagePath) : null,
-            e.VenuePhone, e.VenueEmail, e.VenueWebsite,
-            e.VenueIsActive, e.VenueCreatedAt
-        ),
+        e.VenueName,
+        null,
         e.OrganizerId,
         $"{e.OrganizerFirstName} {e.OrganizerLastName}",
         e.CreatedAt,
