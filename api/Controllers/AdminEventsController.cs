@@ -83,7 +83,7 @@ public class AdminEventsController(
         if (ev.LayoutMode == "Open")
         {
             var ticketTypeViews = await context.EventTicketTypeSummaryViews.AsNoTracking()
-                .Where(tt => tt.EventId == id)
+                .Where(tt => tt.EventId == id && tt.IsActive)
                 .OrderBy(tt => tt.SortOrder)
                 .ToListAsync();
 
@@ -227,7 +227,7 @@ public class AdminEventsController(
         if (request.TicketTypes != null && (request.LayoutMode == "Open" || (request.LayoutMode == null && ev.LayoutMode == "Open")))
         {
             var existingTiers = await context.EventTicketTypes
-                .Where(tt => tt.EventId == id)
+                .Where(tt => tt.EventId == id && tt.IsActive)
                 .ToListAsync();
 
             var requestIds = request.TicketTypes.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToList();
