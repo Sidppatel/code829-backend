@@ -82,18 +82,19 @@ public class AdminEventsController(
 
         if (ev.LayoutMode == "Open")
         {
-            var tiers = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            var ticketTypeViews = await context.EventTicketTypeSummaryViews.AsNoTracking()
                 .Where(tt => tt.EventId == id)
                 .OrderBy(tt => tt.SortOrder)
-                .Select(tt => new EventPricingTierDto(
-                    tt.Label,
-                    tt.PriceCents,
-                    tt.MaxQuantity,
-                    tt.MaxQuantity ?? -1, // -1 means no limit displayed, but usually we sum it
-                    tt.SoldCount,
-                    tt.MaxQuantity
-                ))
                 .ToListAsync();
+
+            var tiers = ticketTypeViews.Select(tt => new EventPricingTierDto(
+                tt.Label,
+                tt.PriceCents,
+                tt.MaxQuantity,
+                tt.MaxQuantity ?? -1,
+                tt.SoldCount,
+                tt.MaxQuantity
+            )).ToList();
             
             // If no tiers exist but there's a base price, add a default tier
             if (tiers.Count == 0 && ev.PricePerPersonCents > 0)
@@ -101,7 +102,13 @@ public class AdminEventsController(
                 tiers.Add(new EventPricingTierDto("Standard Entry", ev.PricePerPersonCents.Value, ev.MaxCapacity, ev.MaxCapacity ?? 0, ev.TotalSold, ev.MaxCapacity));
             }
 
-            dto = dto with { PricingTiers = tiers };
+            dto = dto with { 
+                PricingTiers = tiers,
+                TicketTypes = ticketTypeViews.Select(tt => new EventTicketTypeDto(
+                    tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+                    tt.MaxQuantity, tt.SortOrder, tt.IsActive,
+                    tt.SoldCount, tt.AvailableCount)).ToList()
+            };
         }
         else if (ev.LayoutMode == "Grid")
         {
