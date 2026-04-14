@@ -632,15 +632,6 @@ namespace db.Migrations
                     b.Property<Guid>("OrganizerId")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("PlatformFeeCents")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PlatformFeePercent")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PricePerPersonCents")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1867,6 +1858,9 @@ namespace db.Migrations
 
                     b.Property<int>("AvailableCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");

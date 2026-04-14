@@ -77,39 +77,33 @@ public static class BookingSeeder
             }
         }
 
-        // Open event bookings (capacity-based, with ticket types when available)
+        // Open event bookings (capacity-based, with ticket types)
         foreach (var ev in openEvents)
         {
             var ticketTypes = await context.EventTicketTypes
                 .Where(tt => tt.EventId == ev.Id && tt.IsActive)
                 .ToListAsync();
 
+            if (ticketTypes.Count == 0) continue;
+
             var maxCap = ev.MaxCapacity ?? 200;
             var totalSeatsBooked = 0;
 
-            var bookingCount = rng.Next(5, 13);
+            // More bookings for featured events
+            var bookingCount = ev.IsFeatured ? rng.Next(25, 45) : rng.Next(10, 25);
+            
             for (var i = 0; i < bookingCount; i++)
             {
-                var seatsReserved = rng.Next(1, 7);
-                if (totalSeatsBooked + seatsReserved > maxCap * 0.6)
+                var seatsReserved = rng.Next(1, 5);
+                if (totalSeatsBooked + seatsReserved > maxCap * 0.85)
                     break;
 
                 var user = users[rng.Next(users.Count)];
-                var status = PickStatus(rng);
+                var status = PickStatus(rng, ev.IsFeatured);
 
-                Guid? ticketTypeId = null;
-                int pricePerPerson;
-
-                if (ticketTypes.Count > 0)
-                {
-                    var selectedType = ticketTypes[rng.Next(ticketTypes.Count)];
-                    ticketTypeId = selectedType.Id;
-                    pricePerPerson = selectedType.PriceCents;
-                }
-                else
-                {
-                    pricePerPerson = 0;
-                }
+                var selectedType = ticketTypes[rng.Next(ticketTypes.Count)];
+                var pricePerPerson = selectedType.PriceCents;
+                var ticketTypeId = selectedType.Id;
 
                 var subtotal = pricePerPerson * seatsReserved;
                 var fee = (int)Math.Ceiling(subtotal * 0.08);
@@ -130,9 +124,22 @@ public static class BookingSeeder
         Log.Information("[Seed] Created {Total} bookings via SP", total);
     }
 
-    private static BookingStatus PickStatus(Random rng)
+    private static BookingStatus PickStatus(Random rng, bool isFeatured = false)
     {
         var roll = rng.NextDouble();
+        // Featured events have more successful payments
+        if (isFeatured)
+        {
+            return roll switch
+            {
+                < 0.75 => BookingStatus.Paid,
+                < 0.85 => BookingStatus.Pending,
+                < 0.95 => BookingStatus.CheckedIn,
+                < 0.98 => BookingStatus.Cancelled,
+                _ => BookingStatus.Refunded
+            };
+        }
+
         return roll switch
         {
             < 0.60 => BookingStatus.Paid,

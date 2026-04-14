@@ -61,6 +61,11 @@ public static class DataSeeder
             ("user@code829.local", "Jamie", "Rivera"),
             ("user2@code829.local", "Taylor", "Brooks"),
             ("user3@code829.local", "Alex", "Chen"),
+            ("luxury.guest@code829.local", "Sophia", "Vanderbilt"),
+            ("tech.enthusiast@code829.local", "Jordan", "Lee"),
+            ("local.foodie@code829.local", "Carla", "Sanchez"),
+            ("music.lover@code829.local", "Miles", "Davis"),
+            ("family.explorer@code829.local", "David", "Miller"),
         };
 
         foreach (var (email, firstName, lastName) in users)

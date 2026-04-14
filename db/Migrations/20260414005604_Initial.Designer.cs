@@ -13,8 +13,8 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260413085319_FixSpCreateEvent")]
-    partial class FixSpCreateEvent
+    [Migration("20260414005604_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -635,15 +635,6 @@ namespace db.Migrations
                     b.Property<Guid>("OrganizerId")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("PlatformFeeCents")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PlatformFeePercent")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PricePerPersonCents")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -805,6 +796,9 @@ namespace db.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
@@ -1867,6 +1861,9 @@ namespace db.Migrations
 
                     b.Property<int>("AvailableCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
