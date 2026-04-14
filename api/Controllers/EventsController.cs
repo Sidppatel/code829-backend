@@ -136,7 +136,7 @@ public class EventsController(
             e.LayoutMode,
             e.VenueName, e.VenueCity, e.VenueState,
             e.PricePerPersonCents,
-            e.MaxCapacity ?? 0,
+            e.TotalCapacity,
             e.TotalSold,
             e.AvailableTables,
             e.MinTablePriceCents,
@@ -419,7 +419,9 @@ public class EventsController(
         ev.StartDate, ev.EndDate,
         imageUrl,
         ev.IsFeatured,
-        ev.LayoutMode, ev.MaxCapacity, ev.PricePerPersonCents,
+        ev.LayoutMode, 
+        ev.MaxCapacity ?? ev.TotalCapacity, // Use aggregated TotalCapacity as MaxCapacity if null
+        ev.PricePerPersonCents,
         ev.GridRows, ev.GridCols, ev.PublishedAt,
         ev.VenueId,
         new VenueDto(
