@@ -30,8 +30,8 @@ public class TableBookingService(
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId)
             ?? throw new InvalidOperationException("Table lock succeeded but table not found in view");
 
-        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
-        var feeCents = table.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
+        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
+        var feeCents = table.PlatformFeeCents ?? defaultFeeCents;
 
         Log.Information("[TableLock] User {UserId} locked table {TableLabel} for event {EventId}, expires {ExpiresAt}",
             userId, result.Label, eventId, result.LockExpiresAt);
@@ -64,8 +64,8 @@ public class TableBookingService(
         var now = DateTime.UtcNow;
         var ev = await context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == eventId);
-        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
-        var eventFeeFallback = ev?.PlatformFeeCents ?? defaultFeeCents;
+        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
+        var eventFeeFallback = defaultFeeCents;
 
         var tables = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId

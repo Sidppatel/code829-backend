@@ -361,7 +361,7 @@ public class EventsController(
         var eventTableTypes = await context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id)
             .Select(et => new EventTableTypeInfo(
-                et.Id, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents, et.PlatformFeeCents))
+                et.Id, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents))
             .ToListAsync();
 
         var dtos = tables.Select(t =>
@@ -405,7 +405,7 @@ public class EventsController(
             .Where(tt => tt.EventId == id && tt.IsActive)
             .OrderBy(tt => tt.SortOrder)
             .Select(tt => new EventTicketTypeDto(
-                tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+                tt.Id, tt.Label, tt.PriceCents, null,
                 tt.MaxQuantity, tt.SortOrder, tt.IsActive,
                 tt.SoldCount, tt.AvailableCount))
             .ToListAsync();
@@ -419,7 +419,7 @@ public class EventsController(
         ev.StartDate, ev.EndDate,
         imageUrl,
         ev.IsFeatured,
-        ev.LayoutMode, ev.MaxCapacity, ev.PricePerPersonCents, ev.PlatformFeePercent, ev.PlatformFeeCents,
+        ev.LayoutMode, ev.MaxCapacity, ev.PricePerPersonCents,
         ev.GridRows, ev.GridCols, ev.PublishedAt,
         ev.VenueId,
         new VenueDto(

@@ -174,13 +174,21 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             .FirstOrDefaultAsync(x => x.Id == id && x.EventId == eventId);
         if (et is null) return NotFound(new ApiError(404, "Event table not found", HttpContext.TraceIdentifier));
 
-        // Block if any tables have active bookings
+        // Block pricing changes if any tables have been sold or locked
         var tableIds = et.Tables.Select(t => t.Id).ToList();
         var hasActiveBookings = await context.Bookings.AnyAsync(b =>
             b.EventId == eventId && b.TableId.HasValue && tableIds.Contains(b.TableId.Value)
             && (b.Status == BookingStatus.Paid || b.Status == BookingStatus.CheckedIn || b.Status == BookingStatus.Pending));
-        if (hasActiveBookings)
-            return BadRequest(new ApiError(400, "Cannot modify — tables have active bookings", HttpContext.TraceIdentifier));
+        var hasLockedTables = await context.Tables.AnyAsync(t =>
+            t.EventTableId == id && t.Status == TableStatus.Locked && t.LockExpiresAt > DateTime.UtcNow);
+        var hasSalesOrLocks = hasActiveBookings || hasLockedTables;
+
+        if (hasSalesOrLocks)
+        {
+            // Block structural and pricing changes; only allow non-pricing updates
+            if (request.PriceCents.HasValue || request.Capacity.HasValue)
+                return BadRequest(new ApiError(400, "Cannot change pricing or capacity — tickets have been sold or locked", HttpContext.TraceIdentifier));
+        }
 
         if (request.Shape is not null && !Enum.TryParse<TableShape>(request.Shape, true, out _))
             return BadRequest(new ApiError(400, "Invalid shape", HttpContext.TraceIdentifier));

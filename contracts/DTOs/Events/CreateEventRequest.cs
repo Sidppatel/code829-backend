@@ -14,7 +14,6 @@ public record CreateEventRequest(
     bool IsFeatured = false,
     int? MaxCapacity = null,
     int? PricePerPersonCents = null,
-    int? PlatformFeePercent = null,
     string? BannerImageUrl = null,
     List<NestedTicketTypeRequest>? TicketTypes = null
 );

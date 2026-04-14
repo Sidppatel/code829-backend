@@ -15,7 +15,6 @@ public record UpdateEventRequest(
     string? LayoutMode = null,
     int? MaxCapacity = null,
     int? PricePerPersonCents = null,
-    int? PlatformFeePercent = null,
     string? BannerImageUrl = null,
     List<NestedTicketTypeUpdate>? TicketTypes = null
 );

@@ -6,18 +6,27 @@ public record EventFeeResponse(
     string LayoutMode,
     int? PricePerPersonCents,
     int? MaxCapacity,
-    int? PlatformFeeCents,
     int DefaultFeeCents,
-    List<TableTypeFee> TableTypes
+    List<TableTypeFee> TableTypes,
+    List<TicketTypeFee> TicketTypes
 );
 
 public record TableTypeFee(
     Guid Id,
     string Label,
     int PriceCents,
-    int? PlatformFeeCents
+    int? PlatformFeeCents,
+    bool IsLocked
 );
 
-public record UpdateEventFeeRequest(int? PlatformFeeCents);
+public record TicketTypeFee(
+    Guid Id,
+    string Label,
+    int PriceCents,
+    int? PlatformFeeCents,
+    bool IsLocked
+);
 
 public record UpdateTableTypeFeesRequest(Dictionary<Guid, int?> TableTypeFees);
+
+public record UpdateTicketTypeFeesRequest(Dictionary<Guid, int?> TicketTypeFees);

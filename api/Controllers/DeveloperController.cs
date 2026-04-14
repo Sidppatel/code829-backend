@@ -149,7 +149,7 @@ public class DeveloperController(
     /// </summary>
     private static readonly HashSet<string> MutableSettings = new(StringComparer.OrdinalIgnoreCase)
     {
-        "app_name", "default_platform_fee_cents",
+        "app_name", "default_platform_fee_open_cents", "default_platform_fee_grid_cents",
         // Email
         "resend_api_key", "email_from_address",
         // Stripe

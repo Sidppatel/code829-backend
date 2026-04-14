@@ -13,9 +13,6 @@ public class CreateEventRequestValidator : AbstractValidator<CreateEventRequest>
         RuleFor(x => x.StartDate).GreaterThan(DateTime.UtcNow).WithMessage("Start date must be in the future");
         RuleFor(x => x.EndDate).GreaterThanOrEqualTo(x => x.StartDate).WithMessage("End date must be after start date");
         RuleFor(x => x.VenueId).NotEmpty().WithMessage("Venue ID is required");
-        RuleFor(x => x.PlatformFeePercent)
-            .GreaterThanOrEqualTo(0).When(x => x.PlatformFeePercent.HasValue)
-            .WithMessage("Platform fee must be non-negative");
         RuleFor(x => x.PricePerPersonCents)
             .GreaterThanOrEqualTo(0).When(x => x.PricePerPersonCents.HasValue)
             .WithMessage("Price per person must be non-negative");

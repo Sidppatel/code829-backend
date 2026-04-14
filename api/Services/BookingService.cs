@@ -58,8 +58,8 @@ public class BookingService(
             throw new InvalidOperationException("Table lock has expired");
 
         var subtotal = table.PriceCents;
-        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
-        var fee = table.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
+        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
+        var fee = table.PlatformFeeCents ?? defaultFeeCents;
         var total = subtotal + fee;
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
@@ -136,8 +136,8 @@ public class BookingService(
 
             var pricePerPerson = selectedType?.PriceCents ?? ev.PricePerPersonCents!.Value;
             var subtotal = pricePerPerson * seatsRequested;
-            var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_cents", "1500") ?? "1500");
-            var fee = selectedType?.PlatformFeeCents ?? ev.PlatformFeeCents ?? defaultFeeCents;
+            var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
+            var fee = selectedType?.PlatformFeeCents ?? defaultFeeCents;
             var total = subtotal + fee;
 
             var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);

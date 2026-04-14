@@ -101,34 +101,34 @@ public static class VenueEventSeeder
         }
 
         // Open events
-        var openEvents = new (string Title, string Desc, EventCategory Cat, EventStatus Status, int VenueIdx, Guid OrgId, int WeeksOut, bool Featured, List<(string Label, int PriceCents, int? MaxQty, string? Desc)> Tiers)[]
+        var openEvents = new (string Title, string Desc, EventCategory Cat, EventStatus Status, int VenueIdx, Guid OrgId, int WeeksOut, bool Featured, List<(string Label, int PriceCents, int? PlatformFeeCents, int? MaxQty, string? Desc)> Tiers)[]
         {
             ("Sunset Rhythm & Blues Festival", "A high-energy outdoor music festival featuring legendary blues artists and rising Southern soul stars. Food trucks, local artisans, and sunset views over the water.",
                 EventCategory.Music, EventStatus.Published, 8, organizerId, 6, true,
                 [
-                    ("VIP Lounge", 12500, 100, "Includes front-of-stage access, private bar, and 2 complimentary drink tokens."),
-                    ("Premium Reserved", 7500, 250, "Fixed seating in the first 10 rows with dedicated entry."),
-                    ("General Admission", 3500, null, "Outdoor lawn seating. Bring your own blanket or low chair.")
+                    ("VIP Lounge", 12500, 2000, 100, "Includes front-of-stage access, private bar, and 2 complimentary drink tokens."),
+                    ("Premium Reserved", 7500, 1500, 250, "Fixed seating in the first 10 rows with dedicated entry."),
+                    ("General Admission", 3500, null, null, "Outdoor lawn seating. Bring your own blanket or low chair.")
                 ]),
             ("Gulf Coast Coding Bootcamp", "Intensive two-week coding program designed to launch your career in tech. Learn full-stack development using modern frameworks and participate in a final capstone showcase.",
                 EventCategory.Tech, EventStatus.Published, 1, organizerId, 8, false,
                 [
-                    ("Early Bird Professional", 85000, 20, "Early discounted rate for professionals and career changers."),
-                    ("Standard Registration", 120000, 30, "Standard two-week bootcamp tuition including all materials."),
-                    ("Student Scholarship Rate", 45000, 5, "Highly discounted rate for currently enrolled university students.")
+                    ("Early Bird Professional", 85000, null, 20, "Early discounted rate for professionals and career changers."),
+                    ("Standard Registration", 120000, null, 30, "Standard two-week bootcamp tuition including all materials."),
+                    ("Student Scholarship Rate", 45000, null, 5, "Highly discounted rate for currently enrolled university students.")
                 ]),
             ("Mobile Arts & Crafts Fair", "Celebrating over 100 local artisans and creators. Walk through a vibrant marketplace of handmade pottery, jewelry, paintings, and textiles in the heart of Fairhope.",
                 EventCategory.Social, EventStatus.Published, 9, organizerId, 2, false,
                 [
-                    ("Weekend Pass", 1500, null, "Full access to both days of the fair plus a commemorative tote bag."),
-                    ("Single Day Entry", 1000, null, "Standard admission for one day.")
+                    ("Weekend Pass", 1500, null, null, "Full access to both days of the fair plus a commemorative tote bag."),
+                    ("Single Day Entry", 1000, null, null, "Standard admission for one day.")
                 ]),
             ("Mardi Gras Coronation Ball", "The most prestigious event of the Carnival season. Witness the crowning of the 2026 King and Queen followed by an evening of orchestral music and ballroom dancing.",
                 EventCategory.Social, EventStatus.Published, 0, organizerId, 4, true,
                 [
-                    ("Royal Tier (Front)", 25000, 50, "Front row seating and invitation to the private after-party."),
-                    ("Inner Circle", 15000, 150, "Premium seating within the coronation circle."),
-                    ("General Gallery", 5000, 500, "Reserved seating in the elevated gallery section.")
+                    ("Royal Tier (Front)", 25000, 5000, 50, "Front row seating and invitation to the private after-party."),
+                    ("Inner Circle", 15000, null, 150, "Premium seating within the coronation circle."),
+                    ("General Gallery", 5000, null, 500, "Reserved seating in the elevated gallery section.")
                 ]),
         };
 
@@ -141,11 +141,11 @@ public static class VenueEventSeeder
                 DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
                 null, featured, LayoutMode.Open.ToString(), null, null, null, null,
                 null, null, venueIds[venueIdx], orgId, null);
-            
+
             var sortOrder = 0;
-            foreach (var (label, price, maxQty, tDesc) in tiers)
+            foreach (var (label, price, platformFee, maxQty, tDesc) in tiers)
             {
-                await ticketTypeProc.CreateAsync(eventId, label, price, null, maxQty, sortOrder++, tDesc);
+                await ticketTypeProc.CreateAsync(eventId, label, price, platformFee, maxQty, sortOrder++, tDesc);
             }
         }
 

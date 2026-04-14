@@ -159,7 +159,7 @@ public class AdminEventsController(
             request.StartDate, request.EndDate, request.BannerImageUrl, request.IsFeatured,
             request.LayoutMode, request.MaxCapacity,
             layoutMode == LayoutMode.Open ? request.PricePerPersonCents : null,
-            request.PlatformFeePercent, null, null, null,
+            null, null, null, null,
             request.VenueId, organizerId, null);
 
         await adminLog.LogAsync("event.created", "Event", eventId, $"Event '{request.Title}' created");
@@ -220,7 +220,7 @@ public class AdminEventsController(
             id, request.Title, newSlug, request.Description, request.Category,
             request.StartDate, request.EndDate, request.BannerImageUrl, request.IsFeatured,
             request.LayoutMode, request.MaxCapacity, request.PricePerPersonCents,
-            request.PlatformFeePercent, null, null, null, request.VenueId, null);
+            null, null, null, null, request.VenueId, null);
 
         if (newStatus is not null)
             await eventProc.ChangeEventStatusAsync(id, newStatus, null);
@@ -356,7 +356,7 @@ public class AdminEventsController(
             original.Title + " (Copy)", slug, original.Description, "Draft", original.Category,
             request.StartDate, request.EndDate, original.ImagePath, false,
             original.LayoutMode, original.MaxCapacity, original.PricePerPersonCents,
-            original.PlatformFeePercent, original.PlatformFeeCents,
+            null, null,
             original.GridRows, original.GridCols, original.VenueId, organizerId, null);
 
         // Copy event tables and their table instances
@@ -449,12 +449,15 @@ public class AdminEventsController(
             .FirstOrDefaultAsync(tt => tt.Id == typeId && tt.EventId == id);
         if (existing is null) return NotFound(new ApiError(404, "Ticket type not found", HttpContext.TraceIdentifier));
 
-        if (request.PriceCents.HasValue && request.PriceCents != existing.PriceCents)
+        var isPriceChange = (request.PriceCents.HasValue && request.PriceCents != existing.PriceCents)
+            || (request.PlatformFeeCents.HasValue && request.PlatformFeeCents != existing.PlatformFeeCents);
+        if (isPriceChange)
         {
-            var hasPaidBookings = await context.BookingViews.AsNoTracking()
-                .AnyAsync(b => b.EventTicketTypeId == typeId && (b.Status == "Paid" || b.Status == "CheckedIn"));
-            if (hasPaidBookings)
-                return BadRequest(new ApiError(400, "Cannot change price — paid bookings exist for this ticket type", HttpContext.TraceIdentifier));
+            var hasActiveBookings = await context.BookingViews.AsNoTracking()
+                .AnyAsync(b => b.EventTicketTypeId == typeId
+                    && b.Status != "Cancelled" && b.Status != "Expired" && b.Status != "Refunded");
+            if (hasActiveBookings)
+                return BadRequest(new ApiError(400, "Cannot change pricing — tickets have been sold or locked for this ticket type", HttpContext.TraceIdentifier));
         }
 
         await ticketTypeProc.UpdateAsync(typeId, request.Label, request.PriceCents,
@@ -497,7 +500,7 @@ public class AdminEventsController(
         e.StartDate, e.EndDate,
         e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
         e.IsFeatured,
-        e.LayoutMode, e.MaxCapacity, e.PricePerPersonCents, e.PlatformFeePercent, e.PlatformFeeCents,
+        e.LayoutMode, e.MaxCapacity, e.PricePerPersonCents,
         e.GridRows, e.GridCols, e.PublishedAt,
         e.VenueId,
         new VenueDto(
