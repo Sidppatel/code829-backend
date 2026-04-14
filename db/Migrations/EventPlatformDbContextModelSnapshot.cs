@@ -707,10 +707,6 @@ namespace db.Migrations
 
                             t.HasCheckConstraint("CK_events_MaxCapacity", "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
 
-                            t.HasCheckConstraint("CK_events_PlatformFeePercent", "\"PlatformFeePercent\" IS NULL OR (\"PlatformFeePercent\" >= 0 AND \"PlatformFeePercent\" <= 100)");
-
-                            t.HasCheckConstraint("CK_events_PricePerPersonCents", "\"PricePerPersonCents\" IS NULL OR \"PricePerPersonCents\" >= 0");
-
                             t.HasCheckConstraint("CK_events_PublishLifecycle", "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
 
                             t.HasCheckConstraint("CK_events_Status", "\"Status\" IN ('Draft','Published','Completed','Cancelled')");
@@ -1950,12 +1946,6 @@ namespace db.Migrations
                     b.Property<string>("OrganizerLastName")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<int?>("PlatformFeeCents")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PlatformFeePercent")
-                        .HasColumnType("integer");
 
                     b.Property<int?>("PricePerPersonCents")
                         .HasColumnType("integer");

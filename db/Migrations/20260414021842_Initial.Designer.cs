@@ -13,7 +13,7 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260414005604_Initial")]
+    [Migration("20260414021842_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -709,10 +709,6 @@ namespace db.Migrations
                             t.HasCheckConstraint("CK_events_LayoutMode", "\"LayoutMode\" IN ('Grid','Open')");
 
                             t.HasCheckConstraint("CK_events_MaxCapacity", "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
-
-                            t.HasCheckConstraint("CK_events_PlatformFeePercent", "\"PlatformFeePercent\" IS NULL OR (\"PlatformFeePercent\" >= 0 AND \"PlatformFeePercent\" <= 100)");
-
-                            t.HasCheckConstraint("CK_events_PricePerPersonCents", "\"PricePerPersonCents\" IS NULL OR \"PricePerPersonCents\" >= 0");
 
                             t.HasCheckConstraint("CK_events_PublishLifecycle", "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
 
@@ -1953,12 +1949,6 @@ namespace db.Migrations
                     b.Property<string>("OrganizerLastName")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<int?>("PlatformFeeCents")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PlatformFeePercent")
-                        .HasColumnType("integer");
 
                     b.Property<int?>("PricePerPersonCents")
                         .HasColumnType("integer");
