@@ -46,19 +46,6 @@ public class DeveloperEventsController(
         ));
     }
 
-    [HttpPut("{id:guid}/fees")]
-    public async Task<IActionResult> UpdateEventFee(Guid id, [FromBody] UpdateEventFeeRequest request)
-    {
-        var ev = await context.Events.FindAsync(id);
-        if (ev is null) return NotFound();
-
-        ev.PlatformFeeCents = request.PlatformFeeCents;
-        ev.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
-
-        return Ok(new { message = "Event platform fee updated" });
-    }
-
     [HttpPut("{id:guid}/table-fees")]
     public async Task<IActionResult> UpdateTableTypeFees(Guid id, [FromBody] UpdateTableTypeFeesRequest request)
     {

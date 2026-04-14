@@ -108,7 +108,7 @@ public static class BookingSeeder
                 }
                 else
                 {
-                    pricePerPerson = ev.PricePerPersonCents ?? 0;
+                    pricePerPerson = 0;
                 }
 
                 var subtotal = pricePerPerson * seatsReserved;

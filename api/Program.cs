@@ -263,7 +263,6 @@ try
     await DataSeeder.SeedAsync(app.Services);
     await VenueEventSeeder.SeedAsync(app.Services);
     await LayoutSeeder.SeedAsync(app.Services);
-    await TicketTypeSeeder.SeedAsync(app.Services);
     await BookingSeeder.SeedAsync(app.Services);
 
     // Configure JWT signing key from DB settings

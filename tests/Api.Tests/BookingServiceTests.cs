@@ -86,7 +86,6 @@ public class BookingServiceTests : IDisposable
             Status = EventStatus.Published,
             LayoutMode = LayoutMode.Open,
             MaxCapacity = 100,
-            PricePerPersonCents = 5000,
             StartDate = DateTime.UtcNow.AddDays(1),
             EndDate = DateTime.UtcNow.AddDays(2),
             VenueId = venue.Id,
