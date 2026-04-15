@@ -108,7 +108,7 @@ public static class VenueEventSeeder
                 [
                     ("VIP Lounge", 12500, 2000, 100, "Includes front-of-stage access, private bar, and 2 complimentary drink tokens."),
                     ("Premium Reserved", 7500, 1500, 250, "Fixed seating in the first 10 rows with dedicated entry."),
-                    ("General Admission", 3500, 1000, null, "Outdoor lawn seating. Bring your own blanket or low chair.")
+                    ("General Admission", 3500, 1000, 650, "Outdoor lawn seating. Bring your own blanket or low chair.")
                 ]),
             ("Gulf Coast Coding Bootcamp", "Intensive two-week coding program designed to launch your career in tech. Learn full-stack development using modern frameworks and participate in a final capstone showcase.",
                 EventCategory.Tech, EventStatus.Published, 1, organizerId, 8, false,
@@ -120,8 +120,8 @@ public static class VenueEventSeeder
             ("Mobile Arts & Crafts Fair", "Celebrating over 100 local artisans and creators. Walk through a vibrant marketplace of handmade pottery, jewelry, paintings, and textiles in the heart of Fairhope.",
                 EventCategory.Social, EventStatus.Published, 9, organizerId, 2, false,
                 [
-                    ("Weekend Pass", 1500, 500, null, "Full access to both days of the fair plus a commemorative tote bag."),
-                    ("Single Day Entry", 1000, 300, null, "Standard admission for one day.")
+                    ("Weekend Pass", 1500, 500, 200, "Full access to both days of the fair plus a commemorative tote bag."),
+                    ("Single Day Entry", 1000, 300, 500, "Standard admission for one day.")
                 ]),
             ("Mardi Gras Coronation Ball", "The most prestigious event of the Carnival season. Witness the crowning of the 2026 King and Queen followed by an evening of orchestral music and ballroom dancing.",
                 EventCategory.Social, EventStatus.Published, 0, organizerId, 4, true,
