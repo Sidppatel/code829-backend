@@ -108,27 +108,27 @@ public static class VenueEventSeeder
                 [
                     ("VIP Lounge", 12500, 2000, 100, "Includes front-of-stage access, private bar, and 2 complimentary drink tokens."),
                     ("Premium Reserved", 7500, 1500, 250, "Fixed seating in the first 10 rows with dedicated entry."),
-                    ("General Admission", 3500, null, null, "Outdoor lawn seating. Bring your own blanket or low chair.")
+                    ("General Admission", 3500, 1000, null, "Outdoor lawn seating. Bring your own blanket or low chair.")
                 ]),
             ("Gulf Coast Coding Bootcamp", "Intensive two-week coding program designed to launch your career in tech. Learn full-stack development using modern frameworks and participate in a final capstone showcase.",
                 EventCategory.Tech, EventStatus.Published, 1, organizerId, 8, false,
                 [
-                    ("Early Bird Professional", 85000, null, 20, "Early discounted rate for professionals and career changers."),
-                    ("Standard Registration", 120000, null, 30, "Standard two-week bootcamp tuition including all materials."),
-                    ("Student Scholarship Rate", 45000, null, 5, "Highly discounted rate for currently enrolled university students.")
+                    ("Early Bird Professional", 85000, 5000, 20, "Early discounted rate for professionals and career changers."),
+                    ("Standard Registration", 120000, 7500, 30, "Standard two-week bootcamp tuition including all materials."),
+                    ("Student Scholarship Rate", 45000, 2500, 5, "Highly discounted rate for currently enrolled university students.")
                 ]),
             ("Mobile Arts & Crafts Fair", "Celebrating over 100 local artisans and creators. Walk through a vibrant marketplace of handmade pottery, jewelry, paintings, and textiles in the heart of Fairhope.",
                 EventCategory.Social, EventStatus.Published, 9, organizerId, 2, false,
                 [
-                    ("Weekend Pass", 1500, null, null, "Full access to both days of the fair plus a commemorative tote bag."),
-                    ("Single Day Entry", 1000, null, null, "Standard admission for one day.")
+                    ("Weekend Pass", 1500, 500, null, "Full access to both days of the fair plus a commemorative tote bag."),
+                    ("Single Day Entry", 1000, 300, null, "Standard admission for one day.")
                 ]),
             ("Mardi Gras Coronation Ball", "The most prestigious event of the Carnival season. Witness the crowning of the 2026 King and Queen followed by an evening of orchestral music and ballroom dancing.",
                 EventCategory.Social, EventStatus.Published, 0, organizerId, 4, true,
                 [
                     ("Royal Tier (Front)", 25000, 5000, 50, "Front row seating and invitation to the private after-party."),
-                    ("Inner Circle", 15000, null, 150, "Premium seating within the coronation circle."),
-                    ("General Gallery", 5000, null, 500, "Reserved seating in the elevated gallery section.")
+                    ("Inner Circle", 15000, 3000, 150, "Premium seating within the coronation circle."),
+                    ("General Gallery", 5000, 1000, 500, "Reserved seating in the elevated gallery section.")
                 ]),
         };
 
@@ -159,7 +159,7 @@ public static class VenueEventSeeder
             null, false, LayoutMode.Open.ToString(), null, null, null, null,
             null, null, venueIds[9], organizerId, null);
         
-        await ticketTypeProc.CreateAsync(draftEventId, "Standard Enrollment", 29900, null, 30, 0, "Includes all course materials and daily lunch.");
+        await ticketTypeProc.CreateAsync(draftEventId, "Standard Enrollment", 29900, 2000, 30, 0, "Includes all course materials and daily lunch.");
     }
 
     private static string GenerateSlug(string title)

@@ -57,7 +57,7 @@ public static class LayoutSeeder
         {
             var etId = await tableProc.CreateEventTableAsync(
                 ev.Id, etDef.Label, etDef.Capacity, etDef.Shape.ToString(),
-                etDef.Template.DefaultColor, etDef.PriceCents, null, etDef.Template.Id);
+                etDef.Template.DefaultColor, etDef.PriceCents, etDef.PlatformFeeCents, etDef.Template.Id);
             eventTableMap[etDef.Key] = etId;
         }
 
@@ -88,10 +88,10 @@ public static class LayoutSeeder
     {
         var eventTables = new EventTableDef[]
         {
-            new("vip", "VIP Table", 6, TableShape.Rectangle, rect, 15000),
-            new("standard", "Standard Table", 4, TableShape.Round, round, 7500),
-            new("back", "Back Row Table", 4, TableShape.Round, round, 5000),
-            new("cocktail", "Cocktail High-Top", 2, TableShape.Cocktail, cocktail, 3000),
+            new("vip", "VIP Table", 6, TableShape.Rectangle, rect, 15000, 3000),
+            new("standard", "Standard Table", 4, TableShape.Round, round, 7500, 2500),
+            new("back", "Back Row Table", 4, TableShape.Round, round, 5000, 1500),
+            new("cocktail", "Cocktail High-Top", 2, TableShape.Cocktail, cocktail, 3000, 1000),
         };
 
         var tables = new List<TableInstanceDef>
@@ -110,9 +110,9 @@ public static class LayoutSeeder
     {
         var eventTables = new EventTableDef[]
         {
-            new("chef", "Chef's Table", 6, TableShape.Rectangle, rect, 12000),
-            new("garden", "Garden Table", 4, TableShape.Round, round, 8500),
-            new("cocktail", "Herb Garden High-Top", 2, TableShape.Cocktail, cocktail, 4500),
+            new("chef", "Chef's Table", 6, TableShape.Rectangle, rect, 12000, 3000),
+            new("garden", "Garden Table", 4, TableShape.Round, round, 8500, 2500),
+            new("cocktail", "Herb Garden High-Top", 2, TableShape.Cocktail, cocktail, 4500, 1500),
         };
 
         var tables = new List<TableInstanceDef>
@@ -130,8 +130,8 @@ public static class LayoutSeeder
     {
         var eventTables = new EventTableDef[]
         {
-            new("head", "Head Table", 8, TableShape.Rectangle, rect, 10000),
-            new("standard", "Standard Table", 4, TableShape.Round, round, 3500),
+            new("head", "Head Table", 8, TableShape.Rectangle, rect, 10000, 2500),
+            new("standard", "Standard Table", 4, TableShape.Round, round, 3500, 1000),
         };
 
         var tables = new List<TableInstanceDef>
@@ -149,9 +149,9 @@ public static class LayoutSeeder
     {
         var eventTables = new EventTableDef[]
         {
-            new("front", "Front Row Table", 4, TableShape.Rectangle, rect, 5000),
-            new("middle", "Middle Table", 4, TableShape.Round, round, 3000),
-            new("back", "Bar High-Top", 2, TableShape.Cocktail, cocktail, 1500),
+            new("front", "Front Row Table", 4, TableShape.Rectangle, rect, 5000, 1500),
+            new("middle", "Middle Table", 4, TableShape.Round, round, 3000, 1000),
+            new("back", "Bar High-Top", 2, TableShape.Cocktail, cocktail, 1500, 500),
         };
 
         var tables = new List<TableInstanceDef>
@@ -169,10 +169,10 @@ public static class LayoutSeeder
     {
         var eventTables = new EventTableDef[]
         {
-            new("vip", "VIP Wine Table", 6, TableShape.Rectangle, rect, 12000),
-            new("standard", "Dining Table", 4, TableShape.Round, round, 8000),
-            new("value", "Garden Table", 4, TableShape.Round, round, 6000),
-            new("lounge", "Lounge Section", 8, TableShape.Square, square, 15000),
+            new("vip", "VIP Wine Table", 6, TableShape.Rectangle, rect, 12000, 3000),
+            new("standard", "Dining Table", 4, TableShape.Round, round, 8000, 2500),
+            new("value", "Garden Table", 4, TableShape.Round, round, 6000, 2000),
+            new("lounge", "Lounge Section", 8, TableShape.Square, square, 15000, 3500),
         };
 
         var tables = new List<TableInstanceDef>
@@ -190,9 +190,9 @@ public static class LayoutSeeder
     {
         var eventTables = new EventTableDef[]
         {
-            new("premium", "Premium Table", 6, TableShape.Rectangle, rect, 10000),
-            new("standard", "Standard Table", 4, TableShape.Round, round, 5000),
-            new("cocktail", "Cocktail Table", 2, TableShape.Cocktail, cocktail, 3000),
+            new("premium", "Premium Table", 6, TableShape.Rectangle, rect, 10000, 2500),
+            new("standard", "Standard Table", 4, TableShape.Round, round, 5000, 1500),
+            new("cocktail", "Cocktail Table", 2, TableShape.Cocktail, cocktail, 3000, 1000),
         };
 
         var rows = ev.GridRows ?? 6;
@@ -222,7 +222,7 @@ public static class LayoutSeeder
         return new EventLayout(eventTables, tables.ToArray());
     }
 
-    private record EventTableDef(string Key, string Label, int Capacity, TableShape Shape, TableTemplate Template, int PriceCents);
+    private record EventTableDef(string Key, string Label, int Capacity, TableShape Shape, TableTemplate Template, int PriceCents, int PlatformFeeCents);
     private record TableInstanceDef(string Label, int Row, int Col, string EventTableKey);
     private record EventLayout(EventTableDef[] EventTableDefs, TableInstanceDef[] TableDefs);
 }

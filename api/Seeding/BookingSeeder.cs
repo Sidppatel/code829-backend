@@ -62,7 +62,7 @@ public static class BookingSeeder
                 var user = users[rng.Next(users.Count)];
                 var status = PickStatus(rng);
                 var tablePrice = table.EventTable.PriceCents;
-                var fee = (int)Math.Ceiling(tablePrice * 0.08);
+                var fee = table.EventTable.PlatformFeeCents ?? 0;
                 var bn = $"BK-SEED-{bookingNumber++:D4}";
 
                 var bookingId = await bookingProc.CreateBookingAsync(
@@ -106,7 +106,7 @@ public static class BookingSeeder
                 var ticketTypeId = selectedType.Id;
 
                 var subtotal = pricePerPerson * seatsReserved;
-                var fee = (int)Math.Ceiling(subtotal * 0.08);
+                var fee = (selectedType.PlatformFeeCents ?? 0) * seatsReserved;
                 var bn = $"BK-SEED-{bookingNumber++:D4}";
 
                 var bookingId = await bookingProc.CreateBookingAsync(

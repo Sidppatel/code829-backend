@@ -13,7 +13,7 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260414021842_Initial")]
+    [Migration("20260415081819_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1973,6 +1973,9 @@ namespace db.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("TotalCapacity")
+                        .HasColumnType("integer");
 
                     b.Property<int>("TotalSold")
                         .HasColumnType("integer");
