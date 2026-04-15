@@ -1011,14 +1011,27 @@ namespace db.Migrations
             migrationBuilder.Sql(@"
 CREATE OR REPLACE VIEW v_events AS
 SELECT
-    e.""Id"", e.""Title"", e.""Slug"", e.""Description"", e.""Status""::text,
+    e.""Id"" AS ""Id"",
+    e.""Title"" AS ""Title"",
+    e.""Slug"" AS ""Slug"",
+    e.""Description"" AS ""Description"",
+    e.""Status""::text AS ""Status"",
     COALESCE(e.""Category""::text, '') AS ""Category"",
-    e.""StartDate"", e.""EndDate"", e.""ImagePath"", e.""IsFeatured"",
-    e.""LayoutMode""::text, e.""MaxCapacity"",
+    e.""StartDate"" AS ""StartDate"",
+    e.""EndDate"" AS ""EndDate"",
+    e.""ImagePath"" AS ""ImagePath"",
+    e.""IsFeatured"" AS ""IsFeatured"",
+    e.""LayoutMode""::text AS ""LayoutMode"",
+    e.""MaxCapacity"" AS ""MaxCapacity"",
     ettp.min_price::int AS ""PricePerPersonCents"",
-    e.""GridRows"", e.""GridCols"", e.""PublishedAt"", e.""ScheduledPublishAt"",
-    e.""VenueId"", e.""OrganizerId"",
-    e.""CreatedAt"", e.""UpdatedAt"",
+    e.""GridRows"" AS ""GridRows"",
+    e.""GridCols"" AS ""GridCols"",
+    e.""PublishedAt"" AS ""PublishedAt"",
+    e.""ScheduledPublishAt"" AS ""ScheduledPublishAt"",
+    e.""VenueId"" AS ""VenueId"",
+    e.""OrganizerId"" AS ""OrganizerId"",
+    e.""CreatedAt"" AS ""CreatedAt"",
+    e.""UpdatedAt"" AS ""UpdatedAt"",
     v.""Name"" AS ""VenueName"",
     COALESCE(a.""Line1"", '') AS ""VenueAddress"",
     COALESCE(a.""City"", '') AS ""VenueCity"",
@@ -1033,6 +1046,14 @@ SELECT
     v.""CreatedAt"" AS ""VenueCreatedAt"",
     COALESCE(au.""FirstName"", '') AS ""OrganizerFirstName"",
     COALESCE(au.""LastName"", '') AS ""OrganizerLastName"",
+    COALESCE(
+        e.""MaxCapacity"",
+        CASE
+            WHEN e.""LayoutMode""::text = 'Grid' THEN table_cap.total_seats
+            ELSE ett_cap.total_qty
+        END,
+        0
+    )::int AS ""TotalCapacity"",
     COALESCE(bs.sold, 0)::int AS ""TotalSold"",
     COALESCE(ts.available, 0)::int AS ""AvailableTables"",
     ts.min_price::int AS ""MinTablePriceCents"",
@@ -1042,7 +1063,7 @@ JOIN venues v ON e.""VenueId"" = v.""Id""
 LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
 LEFT JOIN admin_users au ON e.""OrganizerId"" = au.""Id""
 LEFT JOIN LATERAL (
-    SELECT COUNT(*)::int AS sold
+    SELECT COALESCE(SUM(b.""SeatsReserved""), COUNT(*))::int AS sold
     FROM bookings b
     WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid','CheckedIn')
 ) bs ON true
@@ -1056,32 +1077,55 @@ LEFT JOIN LATERAL (
     SELECT MIN(ett.""PriceCents"") AS min_price
     FROM event_ticket_types ett
     WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
-) ettp ON true;
+) ettp ON true
+LEFT JOIN LATERAL (
+    SELECT SUM(ett.""MaxQuantity"") AS total_qty
+    FROM event_ticket_types ett
+    WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
+) ett_cap ON true
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(et.""Capacity""), 0)::int AS total_seats
+    FROM tables t
+    JOIN event_tables et ON t.""EventTableId"" = et.""Id""
+    WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true
+) table_cap ON true;
 ");
 
             migrationBuilder.Sql(@"
 CREATE OR REPLACE VIEW v_event_summary AS
 SELECT
-    e.""Id"", e.""Title"", e.""Slug"", e.""Status""::text,
+    e.""Id"" AS ""Id"",
+    e.""Title"" AS ""Title"",
+    e.""Slug"" AS ""Slug"",
+    e.""Status""::text AS ""Status"",
     COALESCE(e.""Category""::text, '') AS ""Category"",
-    e.""StartDate"", e.""EndDate"", e.""ImagePath"",
+    e.""StartDate"" AS ""StartDate"",
+    e.""EndDate"" AS ""EndDate"",
+    e.""ImagePath"" AS ""ImagePath"",
     img.""StorageKey"" AS ""PrimaryImageKey"",
-    e.""IsFeatured"",
-    e.""LayoutMode""::text,
+    e.""IsFeatured"" AS ""IsFeatured"",
+    e.""LayoutMode""::text AS ""LayoutMode"",
     ettp.min_price::int AS ""PricePerPersonCents"",
-    e.""MaxCapacity"",
-    e.""VenueId"",
+    e.""MaxCapacity"" AS ""MaxCapacity"",
+    e.""VenueId"" AS ""VenueId"",
     v.""Name"" AS ""VenueName"",
     COALESCE(a.""City"", '') AS ""VenueCity"",
     COALESCE(a.""State"", '') AS ""VenueState"",
-    e.""OrganizerId"",
+    e.""OrganizerId"" AS ""OrganizerId"",
     COALESCE(au.""FirstName"" || ' ' || au.""LastName"", '') AS ""OrganizerName"",
-    COALESCE(e.""MaxCapacity"", 0)::int AS ""TotalCapacity"",
+    COALESCE(
+        e.""MaxCapacity"",
+        CASE
+            WHEN e.""LayoutMode""::text = 'Grid' THEN table_cap.total_seats
+            ELSE ett_cap.total_qty
+        END,
+        0
+    )::int AS ""TotalCapacity"",
     COALESCE(bs.sold, 0)::int AS ""TotalSold"",
     COALESCE(ts.available, 0)::int AS ""AvailableTables"",
     ts.min_price::int AS ""MinTablePriceCents"",
     ettp.min_price::int AS ""MinTicketTypePriceCents"",
-    e.""CreatedAt""
+    e.""CreatedAt"" AS ""CreatedAt""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
 LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
@@ -1093,7 +1137,7 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) img ON true
 LEFT JOIN LATERAL (
-    SELECT COUNT(*)::int AS sold
+    SELECT COALESCE(SUM(b.""SeatsReserved""), COUNT(*))::int AS sold
     FROM bookings b
     WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid','CheckedIn')
 ) bs ON true
@@ -1107,7 +1151,18 @@ LEFT JOIN LATERAL (
     SELECT MIN(ett.""PriceCents"") AS min_price
     FROM event_ticket_types ett
     WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
-) ettp ON true;
+) ettp ON true
+LEFT JOIN LATERAL (
+    SELECT SUM(ett.""MaxQuantity"") AS total_qty
+    FROM event_ticket_types ett
+    WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
+) ett_cap ON true
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(et.""Capacity""), 0)::int AS total_seats
+    FROM tables t
+    JOIN event_tables et ON t.""EventTableId"" = et.""Id""
+    WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true
+) table_cap ON true;
 ");
 
             migrationBuilder.Sql(@"
