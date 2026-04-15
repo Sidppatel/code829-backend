@@ -14,7 +14,7 @@ namespace Api.Services;
 public class BookingService(
     EventPlatformDbContext context,
     IBookingProcedures bookingProc,
-    IPaymentProcedures paymentProc,
+    IStripeTransactionProcedures stripeTransactionProc,
     IPaymentService paymentService,
     IEmailService emailService,
     ISettingsService settings,
@@ -63,14 +63,15 @@ public class BookingService(
         var total = subtotal + fee;
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
+        var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            total, fee, organizer?.StripeConnectedAccountId);
+            total, subtotal, organizer?.StripeConnectedAccountId, stripeTaxEnabled);
 
         var bookingNumber = GenerateBookingNumber();
         var bookingId = await bookingProc.CreateBookingAsync(
             userId, request.EventId, table.Id, null, null, subtotal, fee, total, bookingNumber);
 
-        await paymentProc.CreatePaymentAsync(bookingId, intentId, total);
+        await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal);
 
         Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}",
             bookingNumber, table.Label, request.EventId, total / 100.0);
@@ -137,18 +138,20 @@ public class BookingService(
             var pricePerPerson = selectedType?.PriceCents ?? ev.PricePerPersonCents!.Value;
             var subtotal = pricePerPerson * seatsRequested;
             var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
-            var fee = selectedType?.PlatformFeeCents ?? defaultFeeCents;
+            var feePerTicket = selectedType?.PlatformFeeCents ?? defaultFeeCents;
+            var fee = feePerTicket * seatsRequested;
             var total = subtotal + fee;
 
             var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
+            var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
             var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-                total, fee, organizer?.StripeConnectedAccountId);
+                total, subtotal, organizer?.StripeConnectedAccountId, stripeTaxEnabled);
 
             var bookingNumber = GenerateBookingNumber();
             var bookingId = await bookingProc.CreateBookingAsync(
                 userId, request.EventId, null, seatsRequested, request.EventTicketTypeId, subtotal, fee, total, bookingNumber);
 
-            await paymentProc.CreatePaymentAsync(bookingId, intentId, total);
+            await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal);
 
             Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}",
                 bookingNumber, seatsRequested, request.EventId, total / 100.0);
@@ -190,7 +193,7 @@ public class BookingService(
         if (paymentStatus != "succeeded")
             throw new InvalidOperationException($"Payment has not succeeded (status: {paymentStatus}). Please complete payment before confirming.");
 
-        await paymentProc.UpdatePaymentStatusAsync(booking.PaymentIntentId, "Succeeded");
+        await stripeTransactionProc.UpdateStatusAsync(booking.PaymentIntentId, "Succeeded");
 
         var qrToken = GenerateQrToken();
         await bookingProc.ConfirmBookingAsync(bookingId, qrToken);
@@ -264,9 +267,10 @@ public class BookingService(
             b.TableId, b.TableLabel, b.SeatsReserved,
             b.EventTicketTypeId, b.EventTicketTypeLabel,
             b.TicketCount,
-            b.PaymentId.HasValue ? new PaymentDto(
-                b.PaymentId.Value, b.PaymentIntentId!, b.PaymentStatus!,
-                b.PaymentAmountCents ?? 0, b.PaidAt, b.RefundedAt
+            b.StripeTransactionId.HasValue ? new StripeTransactionDto(
+                b.StripeTransactionId.Value, b.PaymentIntentId!, b.PaymentStatus!,
+                b.PaymentAmountCents ?? 0, b.TotalChargedCents, b.TaxAmountCents,
+                b.StripeFeesCents, b.TransferAmountCents, b.PaidAt, b.RefundedAt
             ) : null,
             b.CreatedAt
         );

@@ -27,7 +27,7 @@ public class Booking : BaseEntity
     public Guid? EventTicketTypeId { get; set; }
     public EventTicketType? EventTicketType { get; set; }
 
-    public Payment? Payment { get; set; }
+    public StripeTransaction? StripeTransaction { get; set; }
 
     public ICollection<BookingTicket> Tickets { get; set; } = [];
 }

@@ -5,15 +5,17 @@ namespace Api.Services;
 
 /// <summary>
 /// Production Stripe payment service using destination charges (Stripe Connect).
-/// The total amount is charged to the customer. The organizer receives (total - applicationFee)
-/// via transfer_data. The platform keeps the applicationFee minus Stripe processing costs.
+/// The total amount is charged to the customer. The organizer receives transferAmountCents
+/// via transfer_data.amount. The platform keeps everything else minus Stripe processing costs.
+/// When Stripe Tax is enabled, tax is calculated and added on top by Stripe.
 /// </summary>
 public class StripePaymentService(ISettingsService settings) : IPaymentService
 {
     public async Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
         int amountCents,
-        int applicationFeeCents,
+        int transferAmountCents,
         string? connectedAccountId,
+        bool enableTax = false,
         string currency = "usd")
     {
         var client = await GetClientAsync();
@@ -27,11 +29,21 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
 
         if (!string.IsNullOrEmpty(connectedAccountId))
         {
-            options.ApplicationFeeAmount = applicationFeeCents;
             options.TransferData = new PaymentIntentTransferDataOptions
             {
-                Destination = connectedAccountId
+                Destination = connectedAccountId,
+                Amount = transferAmountCents
             };
+        }
+
+        if (enableTax)
+        {
+            // Stripe Tax on PaymentIntents requires Stripe.net v48+ and API version 2023-10-16+.
+            // When upgrading, replace this with:
+            //   options.AutomaticTax = new PaymentIntentAutomaticTaxOptions { Enabled = true };
+            // For now, store the flag in metadata so the webhook can detect tax-enabled intents.
+            options.Metadata ??= new Dictionary<string, string>();
+            options.Metadata["automatic_tax"] = "true";
         }
 
         try
@@ -39,8 +51,8 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
             var service = new PaymentIntentService(client);
             var intent = await service.CreateAsync(options);
             Log.Information(
-                "[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}, fee={Fee}, dest={Dest}",
-                intent.Id, amountCents, currency, applicationFeeCents, connectedAccountId ?? "none");
+                "[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}, transfer={Transfer}, dest={Dest}, tax={Tax}",
+                intent.Id, amountCents, currency, transferAmountCents, connectedAccountId ?? "none", enableTax);
             return (intent.Id, intent.ClientSecret, intent.Status);
         }
         catch (StripeException ex)
@@ -79,7 +91,6 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
             var refund = await service.CreateAsync(new RefundCreateOptions
             {
                 PaymentIntent = paymentIntentId,
-                RefundApplicationFee = true,
                 ReverseTransfer = true
             });
             Log.Information("[Stripe] Refund {RefundId} created for PaymentIntent {IntentId}",

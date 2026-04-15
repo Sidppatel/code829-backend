@@ -24,16 +24,20 @@ public record BookingDto(
     Guid? EventTicketTypeId,
     string? EventTicketTypeLabel,
     int TicketCount,
-    PaymentDto? Payment,
+    StripeTransactionDto? Transaction,
     DateTime CreatedAt,
     string? ClientSecret = null
 );
 
-public record PaymentDto(
+public record StripeTransactionDto(
     Guid Id,
     string PaymentIntentId,
     string Status,
     int AmountCents,
+    int? TotalChargedCents,
+    int? TaxAmountCents,
+    int? StripeFeesCents,
+    int? TransferAmountCents,
     DateTime? PaidAt,
     DateTime? RefundedAt
 );

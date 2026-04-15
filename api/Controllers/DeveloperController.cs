@@ -153,7 +153,7 @@ public class DeveloperController(
         // Email
         "resend_api_key", "email_from_address",
         // Stripe
-        "stripe_secret_key", "stripe_publishable_key", "stripe_webhook_secret",
+        "stripe_secret_key", "stripe_publishable_key", "stripe_webhook_secret", "stripe_tax_enabled",
         // URLs (for deployment changes)
         "frontend_url", "cors_origins"
     };

@@ -20,7 +20,7 @@ public static class BookingSeeder
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
         var bookingProc = scope.ServiceProvider.GetRequiredService<IBookingProcedures>();
-        var paymentProc = scope.ServiceProvider.GetRequiredService<IPaymentProcedures>();
+        var stripeTransactionProc = scope.ServiceProvider.GetRequiredService<IStripeTransactionProcedures>();
         var tableProc = scope.ServiceProvider.GetRequiredService<ITableProcedures>();
 
         if (await context.Bookings.AnyAsync())
@@ -63,17 +63,18 @@ public static class BookingSeeder
                 var status = PickStatus(rng);
                 var tablePrice = table.EventTable.PriceCents;
                 var fee = table.EventTable.PlatformFeeCents ?? 0;
+                var total = tablePrice + fee;
                 var bn = $"BK-SEED-{bookingNumber++:D4}";
 
                 var bookingId = await bookingProc.CreateBookingAsync(
                     user.Id, ev.Id, table.Id, null, null,
-                    tablePrice, fee, tablePrice + fee, bn, status.ToString());
+                    tablePrice, fee, total, bn, status.ToString());
 
                 // Mark table as booked for confirmed bookings
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
                     await tableProc.MarkTableBookedAsync(table.Id);
 
-                await AddPaymentAsync(paymentProc, bookingId, status);
+                await AddStripeTransactionAsync(stripeTransactionProc, bookingId, total, tablePrice, status);
             }
         }
 
@@ -91,7 +92,7 @@ public static class BookingSeeder
 
             // More bookings for featured events
             var bookingCount = ev.IsFeatured ? rng.Next(25, 45) : rng.Next(10, 25);
-            
+
             for (var i = 0; i < bookingCount; i++)
             {
                 var seatsReserved = rng.Next(1, 5);
@@ -107,21 +108,22 @@ public static class BookingSeeder
 
                 var subtotal = pricePerPerson * seatsReserved;
                 var fee = (selectedType.PlatformFeeCents ?? 0) * seatsReserved;
+                var total = subtotal + fee;
                 var bn = $"BK-SEED-{bookingNumber++:D4}";
 
                 var bookingId = await bookingProc.CreateBookingAsync(
                     user.Id, ev.Id, null, seatsReserved, ticketTypeId,
-                    subtotal, fee, subtotal + fee, bn, status.ToString());
+                    subtotal, fee, total, bn, status.ToString());
 
                 if (status is BookingStatus.Paid or BookingStatus.CheckedIn)
                     totalSeatsBooked += seatsReserved;
 
-                await AddPaymentAsync(paymentProc, bookingId, status);
+                await AddStripeTransactionAsync(stripeTransactionProc, bookingId, total, subtotal, status);
             }
         }
 
-        var total = await context.Bookings.CountAsync();
-        Log.Information("[Seed] Created {Total} bookings via SP", total);
+        var seedTotal = await context.Bookings.CountAsync();
+        Log.Information("[Seed] Created {Total} bookings via SP", seedTotal);
     }
 
     private static BookingStatus PickStatus(Random rng, bool isFeatured = false)
@@ -150,7 +152,9 @@ public static class BookingSeeder
         };
     }
 
-    private static async Task AddPaymentAsync(IPaymentProcedures paymentProc, Guid bookingId, BookingStatus status)
+    private static async Task AddStripeTransactionAsync(
+        IStripeTransactionProcedures stripeTransactionProc, Guid bookingId,
+        int amountCents, int transferAmountCents, BookingStatus status)
     {
         var paymentStatus = status switch
         {
@@ -161,9 +165,9 @@ public static class BookingSeeder
         };
 
         var intentId = $"pi_seed_{Guid.NewGuid():N}";
-        await paymentProc.CreatePaymentAsync(bookingId, intentId, 0);
+        await stripeTransactionProc.CreateAsync(bookingId, intentId, amountCents, transferAmountCents);
 
         if (paymentStatus != "RequiresConfirmation")
-            await paymentProc.UpdatePaymentStatusAsync(intentId, paymentStatus);
+            await stripeTransactionProc.UpdateStatusAsync(intentId, paymentStatus);
     }
 }

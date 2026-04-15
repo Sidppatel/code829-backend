@@ -91,6 +91,7 @@ public static class DataSeeder
             ["app_name"] = ("Code829", "Application name used in emails and SEO"),
             ["default_platform_fee_open_cents"] = ("1000", "Default platform fee for Open events in cents ($10.00)"),
             ["default_platform_fee_grid_cents"] = ("2500", "Default platform fee for Grid events in cents ($25.00)"),
+            ["stripe_tax_enabled"] = ("false", "Enable Stripe Tax for automatic tax calculation"),
             ["frontend_url"] = ("http://localhost:5173", "Frontend URL for magic link emails"),
             ["cors_origins"] = ("http://localhost:5173", "Comma-separated allowed CORS origins"),
             ["search_results_per_page"] = ("20", "Search pagination page size"),

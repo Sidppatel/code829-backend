@@ -1,4 +1,5 @@
 using Api.Middleware;
+using Contracts.DTOs;
 using Contracts.DTOs.Admin;
 using Contracts.Enums;
 using Db;
@@ -53,6 +54,49 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
             totalEvents, publishedEvents, totalBookings, paidBookings, checkedIn,
             totalRevenue, totalUsers, totalVenues, topEvents, bookingsByStatus, eventsByCategory
         ));
+    }
+
+    [HttpGet("reports/monthly")]
+    public async Task<IActionResult> GetMonthlyReport([FromQuery] int year, [FromQuery] int month)
+    {
+        if (month < 1 || month > 12)
+            return BadRequest(new ApiError(400, "Month must be between 1 and 12", HttpContext.TraceIdentifier));
+
+        var from = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = from.AddMonths(1);
+
+        var bookings = await context.BookingViews.AsNoTracking()
+            .Where(b => (b.Status == "Paid" || b.Status == "CheckedIn")
+                && b.PaidAt >= from && b.PaidAt < to)
+            .ToListAsync();
+
+        var totalBookings = bookings.Count;
+        var totalChargedCents = bookings.Sum(b => (long)(b.TotalChargedCents ?? b.TotalCents));
+        var totalAdminPayoutsCents = bookings.Sum(b => (long)(b.TransferAmountCents ?? b.SubtotalCents));
+        var totalPlatformFeesCents = bookings.Sum(b => (long)b.FeeCents);
+        var totalStripeFeesCents = bookings.Sum(b => (long)(b.StripeFeesCents ?? 0));
+        var totalTaxCollectedCents = bookings.Sum(b => (long)(b.TaxAmountCents ?? 0));
+        var netPlatformRevenueCents = totalPlatformFeesCents - totalStripeFeesCents;
+
+        var byEvent = bookings
+            .GroupBy(b => new { b.EventId, b.EventTitle })
+            .Select(g => new EventMonthlyBreakdown(
+                g.Key.EventId,
+                g.Key.EventTitle,
+                g.Count(),
+                g.Sum(b => (long)(b.TotalChargedCents ?? b.TotalCents)),
+                g.Sum(b => (long)(b.TransferAmountCents ?? b.SubtotalCents)),
+                g.Sum(b => (long)b.FeeCents),
+                g.Sum(b => (long)(b.StripeFeesCents ?? 0)),
+                g.Sum(b => (long)(b.TaxAmountCents ?? 0))
+            ))
+            .OrderByDescending(e => e.ChargedCents)
+            .ToList();
+
+        return Ok(new MonthlyReportDto(
+            year, month, totalBookings, totalChargedCents, totalAdminPayoutsCents,
+            totalPlatformFeesCents, totalStripeFeesCents, totalTaxCollectedCents,
+            netPlatformRevenueCents, byEvent));
     }
 
     [HttpGet("dashboard/next-event")]

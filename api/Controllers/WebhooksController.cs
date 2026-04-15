@@ -14,7 +14,7 @@ namespace Api.Controllers;
 public class WebhooksController(
     EventPlatformDbContext context,
     ISettingsService settings,
-    IPaymentProcedures paymentProc,
+    IStripeTransactionProcedures stripeTransactionProc,
     IBookingProcedures bookingProc
 ) : ControllerBase
 {
@@ -73,24 +73,57 @@ public class WebhooksController(
         var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
         if (paymentIntent is null) return;
 
-        var payment = await context.Payments
-            .FirstOrDefaultAsync(p => p.PaymentIntentId == paymentIntent.Id);
+        var txn = await context.StripeTransactions
+            .FirstOrDefaultAsync(t => t.PaymentIntentId == paymentIntent.Id);
 
-        if (payment is null)
+        if (txn is null)
         {
-            Log.Warning("[Webhook] No payment found for intent {IntentId}", paymentIntent.Id);
+            Log.Warning("[Webhook] No stripe transaction found for intent {IntentId}", paymentIntent.Id);
             return;
         }
 
-        if (payment.Status == PaymentStatus.Succeeded)
+        if (txn.Status == PaymentStatus.Succeeded)
         {
-            Log.Information("[Webhook] Payment {IntentId} already confirmed (idempotent skip)", paymentIntent.Id);
+            Log.Information("[Webhook] Transaction {IntentId} already confirmed (idempotent skip)", paymentIntent.Id);
             return;
         }
 
-        await paymentProc.UpdatePaymentStatusAsync(paymentIntent.Id, "Succeeded");
-        await bookingProc.ConfirmBookingAsync(payment.BookingId, "");
-        Log.Information("[Webhook] Payment confirmed for booking {BookingId}", payment.BookingId);
+        await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Succeeded");
+        await bookingProc.ConfirmBookingAsync(txn.BookingId, "");
+        Log.Information("[Webhook] Payment confirmed for booking {BookingId}", txn.BookingId);
+
+        // Enrich with Stripe fee and tax data
+        await EnrichTransactionAsync(paymentIntent.Id);
+    }
+
+    private async Task EnrichTransactionAsync(string paymentIntentId)
+    {
+        try
+        {
+            var stripeKey = await settings.GetOrDefaultAsync("stripe_secret_key", "");
+            if (string.IsNullOrEmpty(stripeKey) || stripeKey == "MOCK_DEV") return;
+
+            var client = new StripeClient(stripeKey);
+            var piService = new PaymentIntentService(client);
+            var expanded = await piService.GetAsync(paymentIntentId, new PaymentIntentGetOptions
+            {
+                Expand = ["latest_charge.balance_transaction"]
+            });
+
+            var stripeFees = (int)(expanded.LatestCharge?.BalanceTransaction?.Fee ?? 0);
+            // Tax amount: when Stripe Tax is enabled (API v2023-10-16+), use expanded.AutomaticTax.TotalAmount.
+            // For current API version, tax amount comes from the charge's tax data if available.
+            var taxAmount = 0;
+            var totalCharged = (int)expanded.AmountReceived;
+
+            await stripeTransactionProc.EnrichAsync(paymentIntentId, totalCharged, taxAmount, stripeFees);
+            Log.Information("[Webhook] Enriched transaction {IntentId}: charged={Charged}, tax={Tax}, fees={Fees}",
+                paymentIntentId, totalCharged, taxAmount, stripeFees);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[Webhook] Failed to enrich transaction {IntentId} — non-critical", paymentIntentId);
+        }
     }
 
     private async Task HandlePaymentIntentFailed(Event stripeEvent)
@@ -98,19 +131,19 @@ public class WebhooksController(
         var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
         if (paymentIntent is null) return;
 
-        var payment = await context.Payments
-            .FirstOrDefaultAsync(p => p.PaymentIntentId == paymentIntent.Id);
+        var txn = await context.StripeTransactions
+            .FirstOrDefaultAsync(t => t.PaymentIntentId == paymentIntent.Id);
 
-        if (payment is null) return;
+        if (txn is null) return;
 
-        if (payment.Status == PaymentStatus.Failed)
+        if (txn.Status == PaymentStatus.Failed)
             return;
 
-        await paymentProc.UpdatePaymentStatusAsync(paymentIntent.Id, "Failed");
-        await bookingProc.CancelBookingAsync(payment.BookingId);
+        await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Failed");
+        await bookingProc.CancelBookingAsync(txn.BookingId);
 
         Log.Warning("[Webhook] Payment failed for booking {BookingId}: {Reason}",
-            payment.BookingId, paymentIntent.LastPaymentError?.Message ?? "unknown");
+            txn.BookingId, paymentIntent.LastPaymentError?.Message ?? "unknown");
     }
 
     private async Task HandleRefundUpdated(Event stripeEvent)
@@ -118,16 +151,16 @@ public class WebhooksController(
         var refund = stripeEvent.Data.Object as Refund;
         if (refund?.PaymentIntentId is null) return;
 
-        var payment = await context.Payments
-            .FirstOrDefaultAsync(p => p.PaymentIntentId == refund.PaymentIntentId);
+        var txn = await context.StripeTransactions
+            .FirstOrDefaultAsync(t => t.PaymentIntentId == refund.PaymentIntentId);
 
-        if (payment is null) return;
+        if (txn is null) return;
 
-        if (refund.Status == "succeeded" && payment.Status != PaymentStatus.Refunded)
+        if (refund.Status == "succeeded" && txn.Status != PaymentStatus.Refunded)
         {
-            await paymentProc.UpdatePaymentStatusAsync(refund.PaymentIntentId, "Refunded");
-            await bookingProc.RefundBookingAsync(payment.BookingId);
-            Log.Information("[Webhook] Refund synced for booking {BookingId}", payment.BookingId);
+            await stripeTransactionProc.UpdateStatusAsync(refund.PaymentIntentId, "Refunded");
+            await bookingProc.RefundBookingAsync(txn.BookingId);
+            Log.Information("[Webhook] Refund synced for booking {BookingId}", txn.BookingId);
         }
     }
 }

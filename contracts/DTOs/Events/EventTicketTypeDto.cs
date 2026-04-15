@@ -5,6 +5,7 @@ public record EventTicketTypeDto(
     string Label,
     int PriceCents,
     int? PlatformFeeCents,
+    int DisplayPriceCents,
     int? MaxQuantity,
     int SortOrder,
     bool IsActive,

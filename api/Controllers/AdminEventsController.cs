@@ -88,9 +88,11 @@ public class AdminEventsController(
                 .OrderBy(tt => tt.SortOrder)
                 .ToListAsync();
 
+            var defaultFeeCents = int.Parse(await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
             dto = dto with {
                 TicketTypes = ticketTypeViews.Select(tt => new EventTicketTypeDto(
                     tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+                    tt.PriceCents + (tt.PlatformFeeCents ?? defaultFeeCents),
                     tt.MaxQuantity, tt.SortOrder, tt.IsActive,
                     tt.SoldCount, tt.AvailableCount, tt.Description)).ToList()
             };
@@ -371,14 +373,17 @@ public class AdminEventsController(
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var types = await context.EventTicketTypeSummaryViews.AsNoTracking()
+        var defaultFeeCents = int.Parse(await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
+        var rawTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .Where(tt => tt.EventId == id)
             .OrderBy(tt => tt.SortOrder)
-            .Select(tt => new EventTicketTypeDto(
-                tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
-                tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-                tt.SoldCount, tt.AvailableCount, tt.Description))
             .ToListAsync();
+
+        var types = rawTypes.Select(tt => new EventTicketTypeDto(
+            tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+            tt.PriceCents + (tt.PlatformFeeCents ?? defaultFeeCents),
+            tt.MaxQuantity, tt.SortOrder, tt.IsActive,
+            tt.SoldCount, tt.AvailableCount, tt.Description)).ToList();
 
         return Ok(new EventTicketTypesResponse(id, types));
     }
@@ -402,8 +407,10 @@ public class AdminEventsController(
         var created = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstAsync(tt => tt.Id == typeId);
 
+        var defaultFeeCents = int.Parse(await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
         return Created("", new EventTicketTypeDto(
             created.Id, created.Label, created.PriceCents, created.PlatformFeeCents,
+            created.PriceCents + (created.PlatformFeeCents ?? defaultFeeCents),
             created.MaxQuantity, created.SortOrder, created.IsActive,
             created.SoldCount, created.AvailableCount, created.Description));
     }
@@ -436,8 +443,10 @@ public class AdminEventsController(
         var updated = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstAsync(tt => tt.Id == typeId);
 
+        var defaultFeeCents = int.Parse(await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
         return Ok(new EventTicketTypeDto(
             updated.Id, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
+            updated.PriceCents + (updated.PlatformFeeCents ?? defaultFeeCents),
             updated.MaxQuantity, updated.SortOrder, updated.IsActive,
             updated.SoldCount, updated.AvailableCount, updated.Description));
     }

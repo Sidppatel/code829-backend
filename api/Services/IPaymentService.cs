@@ -4,8 +4,9 @@ public interface IPaymentService
 {
     Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
         int amountCents,
-        int applicationFeeCents,
+        int transferAmountCents,
         string? connectedAccountId,
+        bool enableTax = false,
         string currency = "usd");
 
     Task<string> ConfirmPaymentAsync(string paymentIntentId);

@@ -20,7 +20,7 @@ public class BookingServiceTests : IDisposable
 {
     private readonly EventPlatformDbContext _context;
     private readonly Mock<IBookingProcedures> _bookingProc;
-    private readonly Mock<IPaymentProcedures> _paymentProc;
+    private readonly Mock<IStripeTransactionProcedures> _stripeTransactionProc;
     private readonly Mock<IPaymentService> _paymentService;
     private readonly Mock<IEmailService> _emailService;
     private readonly Mock<ISettingsService> _settingsService;
@@ -36,7 +36,7 @@ public class BookingServiceTests : IDisposable
         _context = TestDbContextFactory.Create();
 
         _bookingProc = new Mock<IBookingProcedures>();
-        _paymentProc = new Mock<IPaymentProcedures>();
+        _stripeTransactionProc = new Mock<IStripeTransactionProcedures>();
         _paymentService = new Mock<IPaymentService>();
         _emailService = new Mock<IEmailService>();
         _settingsService = new Mock<ISettingsService>();
@@ -47,7 +47,7 @@ public class BookingServiceTests : IDisposable
         _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync("10");
 
-        _service = new BookingService(_context, _bookingProc.Object, _paymentProc.Object,
+        _service = new BookingService(_context, _bookingProc.Object, _stripeTransactionProc.Object,
             _paymentService.Object, _emailService.Object, _settingsService.Object, _redis.Object);
 
         _userId = Guid.NewGuid();
@@ -98,10 +98,6 @@ public class BookingServiceTests : IDisposable
     [Fact]
     public async Task CancelAsync_WhenAlreadyRefunded_ThrowsInvalidOperationException()
     {
-        // Seed a refunded booking directly into entity table + BookingView won't exist in SQLite,
-        // but CancelAsync reads from BookingViews. We mock at the view level by inserting into
-        // the Bookings entity and relying on the view mapping.
-        // Since views don't work in SQLite, we test this via the refund status check.
         var bookingId = Guid.NewGuid();
         _context.Bookings.Add(new Booking
         {
@@ -114,7 +110,7 @@ public class BookingServiceTests : IDisposable
             FeeCents = 0,
             TotalCents = 5000
         });
-        _context.Payments.Add(new Payment
+        _context.StripeTransactions.Add(new StripeTransaction
         {
             Id = Guid.NewGuid(),
             BookingId = bookingId,

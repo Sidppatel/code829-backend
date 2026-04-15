@@ -45,6 +45,7 @@ public class TableBookingService(
             table.Capacity,
             table.PriceCents,
             feeCents,
+            table.PriceCents + feeCents,
             result.LockExpiresAt
         );
     }
@@ -74,17 +75,22 @@ public class TableBookingService(
                 && t.LockExpiresAt > now)
             .ToListAsync();
 
-        return tables.Select(t => new TableLockDto(
-            t.Id,
-            t.Label,
-            eventId,
-            userId,
-            "Locked",
-            t.Capacity,
-            t.PriceCents,
-            t.PlatformFeeCents ?? eventFeeFallback,
-            t.LockExpiresAt!.Value
-        )).ToList();
+        return tables.Select(t =>
+        {
+            var fee = t.PlatformFeeCents ?? eventFeeFallback;
+            return new TableLockDto(
+                t.Id,
+                t.Label,
+                eventId,
+                userId,
+                "Locked",
+                t.Capacity,
+                t.PriceCents,
+                fee,
+                t.PriceCents + fee,
+                t.LockExpiresAt!.Value
+            );
+        }).ToList();
     }
 
     public async Task<int> CleanupExpiredLocksAsync()

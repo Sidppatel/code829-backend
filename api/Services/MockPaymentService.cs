@@ -10,14 +10,15 @@ public class MockPaymentService : IPaymentService
 {
     public Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
         int amountCents,
-        int applicationFeeCents,
+        int transferAmountCents,
         string? connectedAccountId,
+        bool enableTax = false,
         string currency = "usd")
     {
         var intentId = $"pi_mock_{Guid.NewGuid():N}";
         var clientSecret = $"{intentId}_secret_mock";
-        Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents, fee={Fee}, dest={Dest}",
-            intentId, amountCents, applicationFeeCents, connectedAccountId ?? "none");
+        Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents, transfer={Transfer}, dest={Dest}, tax={Tax}",
+            intentId, amountCents, transferAmountCents, connectedAccountId ?? "none", enableTax);
         return Task.FromResult((intentId, clientSecret, "requires_payment_method"));
     }
 

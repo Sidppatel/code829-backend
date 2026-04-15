@@ -129,7 +129,7 @@ try
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITableProcedures, Db.Repositories.StoredProcedures.TableProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBookingProcedures, Db.Repositories.StoredProcedures.BookingProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITicketProcedures, Db.Repositories.StoredProcedures.TicketProcedures>();
-    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IPaymentProcedures, Db.Repositories.StoredProcedures.PaymentProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeTransactionProcedures, Db.Repositories.StoredProcedures.StripeTransactionProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IImageProcedures, Db.Repositories.StoredProcedures.ImageProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ISettingsProcedures, Db.Repositories.StoredProcedures.SettingsProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();

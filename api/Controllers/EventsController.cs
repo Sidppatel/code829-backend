@@ -401,14 +401,18 @@ public class EventsController(
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var types = await context.EventTicketTypeSummaryViews.AsNoTracking()
+        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
+
+        var rawTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .Where(tt => tt.EventId == id && tt.IsActive)
             .OrderBy(tt => tt.SortOrder)
-            .Select(tt => new EventTicketTypeDto(
-                tt.Id, tt.Label, tt.PriceCents, null,
-                tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-                tt.SoldCount, tt.AvailableCount))
             .ToListAsync();
+
+        var types = rawTypes.Select(tt => new EventTicketTypeDto(
+            tt.Id, tt.Label, tt.PriceCents, null,
+            tt.PriceCents + (tt.PlatformFeeCents ?? defaultFeeCents),
+            tt.MaxQuantity, tt.SortOrder, tt.IsActive,
+            tt.SoldCount, tt.AvailableCount)).ToList();
 
         return Ok(new EventTicketTypesResponse(id, types));
     }

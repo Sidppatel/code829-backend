@@ -28,7 +28,7 @@ public class EventPlatformDbContext(
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<BookingTicket> BookingTickets => Set<BookingTicket>();
-    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<StripeTransaction> StripeTransactions => Set<StripeTransaction>();
 
     // Images
     public DbSet<Image> Images => Set<Image>();
@@ -411,24 +411,32 @@ public class EventPlatformDbContext(
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<Payment>(entity =>
+        modelBuilder.Entity<StripeTransaction>(entity =>
         {
-            entity.ToTable("payments", t =>
+            entity.ToTable("stripe_transactions", t =>
             {
-                t.HasCheckConstraint("CK_payments_Status",
+                t.HasCheckConstraint("CK_stripe_transactions_Status",
                     "\"Status\" IN ('RequiresConfirmation','Succeeded','Failed','Refunded')");
-                t.HasCheckConstraint("CK_payments_AmountCents",
+                t.HasCheckConstraint("CK_stripe_transactions_AmountCents",
                     "\"AmountCents\" >= 0");
-                t.HasCheckConstraint("CK_payments_Currency",
+                t.HasCheckConstraint("CK_stripe_transactions_Currency",
                     "\"Currency\" IN ('usd')");
-                t.HasCheckConstraint("CK_payments_RefundLifecycle",
+                t.HasCheckConstraint("CK_stripe_transactions_RefundLifecycle",
                     "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
-                t.HasCheckConstraint("CK_payments_PaidLifecycle",
+                t.HasCheckConstraint("CK_stripe_transactions_PaidLifecycle",
                     "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
-                t.HasCheckConstraint("CK_payments_PendingNoPaidDate",
+                t.HasCheckConstraint("CK_stripe_transactions_PendingNoPaidDate",
                     "\"Status\" NOT IN ('RequiresConfirmation','Failed') OR \"PaidAt\" IS NULL");
-                t.HasCheckConstraint("CK_payments_NotRefundedNoRefundDate",
+                t.HasCheckConstraint("CK_stripe_transactions_NotRefundedNoRefundDate",
                     "\"Status\" = 'Refunded' OR \"RefundedAt\" IS NULL");
+                t.HasCheckConstraint("CK_stripe_transactions_TransferAmount",
+                    "\"TransferAmountCents\" IS NULL OR \"TransferAmountCents\" >= 0");
+                t.HasCheckConstraint("CK_stripe_transactions_TaxAmount",
+                    "\"TaxAmountCents\" IS NULL OR \"TaxAmountCents\" >= 0");
+                t.HasCheckConstraint("CK_stripe_transactions_StripeFees",
+                    "\"StripeFeesCents\" IS NULL OR \"StripeFeesCents\" >= 0");
+                t.HasCheckConstraint("CK_stripe_transactions_TotalCharged",
+                    "\"TotalChargedCents\" IS NULL OR \"TotalChargedCents\" >= 0");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.PaymentIntentId).IsUnique();
@@ -437,7 +445,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
             entity.Property(e => e.Currency).HasMaxLength(3);
             entity.Property(e => e.RefundId).HasMaxLength(128);
-            entity.HasOne(e => e.Booking).WithOne(b => b.Payment).HasForeignKey<Payment>(e => e.BookingId)
+            entity.HasOne(e => e.Booking).WithOne(b => b.StripeTransaction)
+                .HasForeignKey<StripeTransaction>(e => e.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
