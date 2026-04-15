@@ -135,11 +135,12 @@ public static class VenueEventSeeder
         foreach (var (title, desc, cat, status, venueIdx, orgId, weeksOut, featured, tiers) in openEvents)
         {
             var startDate = now.AddDays(weeksOut * 7).Date.AddHours(18);
+            var totalCapacity = tiers.Sum(t => t.MaxQty ?? 0);
             var eventId = await eventProc.CreateEventAsync(
                 title, GenerateSlug(title), desc, status.ToString(), cat.ToString(),
                 DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
                 DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
-                null, featured, LayoutMode.Open.ToString(), null, null, null, null,
+                null, featured, LayoutMode.Open.ToString(), totalCapacity, null, null, null,
                 null, null, venueIds[venueIdx], orgId, null);
 
             var sortOrder = 0;
@@ -156,9 +157,9 @@ public static class VenueEventSeeder
             "Two-week intensive coding program for ages 10-16. Learn Python, web development, and game design.",
             EventStatus.Draft.ToString(), EventCategory.Tech.ToString(),
             draftOpenStart, draftOpenStart.AddHours(7),
-            null, false, LayoutMode.Open.ToString(), null, null, null, null,
+            null, false, LayoutMode.Open.ToString(), 30, null, null, null,
             null, null, venueIds[9], organizerId, null);
-        
+
         await ticketTypeProc.CreateAsync(draftEventId, "Standard Enrollment", 29900, 2000, 30, 0, "Includes all course materials and daily lunch.");
     }
 

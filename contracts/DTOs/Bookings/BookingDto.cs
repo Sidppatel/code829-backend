@@ -15,7 +15,6 @@ public record BookingDto(
     string? VenueName,
     string? VenueAddress,
     int SubtotalCents,
-    int FeeCents,
     int TotalCents,
     string? QrToken,
     Guid? TableId,
@@ -26,7 +25,8 @@ public record BookingDto(
     int TicketCount,
     StripeTransactionDto? Transaction,
     DateTime CreatedAt,
-    string? ClientSecret = null
+    string? ClientSecret = null,
+    int? FeeCents = null
 );
 
 public record StripeTransactionDto(

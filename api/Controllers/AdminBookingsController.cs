@@ -73,10 +73,10 @@ public class AdminBookingsController(
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
-            b.SubtotalCents, b.FeeCents, b.TotalCents, null,
+            b.SubtotalCents, b.TotalCents, null,
             b.TableId, b.TableLabel, b.SeatsReserved, b.EventTicketTypeId, b.EventTicketTypeLabel, b.TicketCount,
             b.StripeTransactionId.HasValue ? new StripeTransactionDto(b.StripeTransactionId.Value, b.PaymentIntentId!, b.PaymentStatus!, b.PaymentAmountCents ?? 0, b.TotalChargedCents, b.TaxAmountCents, b.StripeFeesCents, b.TransferAmountCents, b.PaidAt, b.RefundedAt) : null,
-            b.CreatedAt
+            b.CreatedAt, FeeCents: b.FeeCents
         )).ToList();
 
         var result = new PagedResponse<BookingDto>(dtos, total, page, pageSize);

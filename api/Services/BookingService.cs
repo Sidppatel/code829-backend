@@ -299,7 +299,7 @@ public class BookingService(
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, venueAddress,
-            b.SubtotalCents, b.FeeCents, b.TotalCents, b.QrToken,
+            b.SubtotalCents, b.TotalCents, b.QrToken,
             b.TableId, b.TableLabel, b.SeatsReserved,
             b.EventTicketTypeId, b.EventTicketTypeLabel,
             b.TicketCount,

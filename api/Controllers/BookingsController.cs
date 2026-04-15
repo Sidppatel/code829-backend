@@ -154,7 +154,7 @@ public class BookingsController(
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
-            b.SubtotalCents, b.FeeCents, b.TotalCents, null,
+            b.SubtotalCents, b.TotalCents, null,
             b.TableId, b.TableLabel, b.SeatsReserved, b.EventTicketTypeId, b.EventTicketTypeLabel, b.TicketCount,
             b.StripeTransactionId.HasValue ? new StripeTransactionDto(
                 b.StripeTransactionId.Value, b.PaymentIntentId!, b.PaymentStatus!,
