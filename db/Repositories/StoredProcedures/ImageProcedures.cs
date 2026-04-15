@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace Db.Repositories.StoredProcedures;
 
@@ -9,8 +11,16 @@ public class ImageProcedures(EventPlatformDbContext context) : IImageProcedures
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_image(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9) AS \"Value\"",
-                entityType, entityId, storageKey, originalName, sizeBytes,
-                width, height, isPrimary, sortOrder, (object?)uploadedBy ?? DBNull.Value)
+                new NpgsqlParameter("p0", entityType),
+                new NpgsqlParameter("p1", entityId),
+                new NpgsqlParameter("p2", storageKey),
+                new NpgsqlParameter("p3", originalName),
+                new NpgsqlParameter("p4", sizeBytes),
+                new NpgsqlParameter("p5", width),
+                new NpgsqlParameter("p6", height),
+                new NpgsqlParameter("p7", isPrimary),
+                new NpgsqlParameter("p8", sortOrder),
+                new NpgsqlParameter("p9", NpgsqlDbType.Uuid) { Value = (object?)uploadedBy ?? DBNull.Value })
             .FirstAsync(ct);
 
         return result;

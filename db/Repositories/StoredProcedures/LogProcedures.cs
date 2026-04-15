@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace Db.Repositories.StoredProcedures;
 
@@ -9,12 +11,15 @@ public class LogProcedures(EventPlatformDbContext context) : ILogProcedures
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_admin_log(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8) AS \"Value\"",
-                action,
-                (object?)actorId ?? DBNull.Value, (object?)actorEmail ?? DBNull.Value,
-                (object?)actorRole ?? DBNull.Value,
-                (object?)entityType ?? DBNull.Value, (object?)entityId ?? DBNull.Value,
-                (object?)description ?? DBNull.Value, (object?)metadataJson ?? DBNull.Value,
-                (object?)ip ?? DBNull.Value)
+                new NpgsqlParameter("p0", action),
+                new NpgsqlParameter("p1", NpgsqlDbType.Uuid) { Value = (object?)actorId ?? DBNull.Value },
+                new NpgsqlParameter("p2", NpgsqlDbType.Text) { Value = (object?)actorEmail ?? DBNull.Value },
+                new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)actorRole ?? DBNull.Value },
+                new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)entityType ?? DBNull.Value },
+                new NpgsqlParameter("p5", NpgsqlDbType.Uuid) { Value = (object?)entityId ?? DBNull.Value },
+                new NpgsqlParameter("p6", NpgsqlDbType.Text) { Value = (object?)description ?? DBNull.Value },
+                new NpgsqlParameter("p7", NpgsqlDbType.Text) { Value = (object?)metadataJson ?? DBNull.Value },
+                new NpgsqlParameter("p8", NpgsqlDbType.Text) { Value = (object?)ip ?? DBNull.Value })
             .FirstAsync(ct);
 
         return result;
@@ -25,12 +30,17 @@ public class LogProcedures(EventPlatformDbContext context) : ILogProcedures
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_developer_log(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10) AS \"Value\"",
-                severity, message,
-                (object?)exceptionType ?? DBNull.Value, (object?)stackTrace ?? DBNull.Value,
-                (object?)requestPath ?? DBNull.Value, (object?)requestMethod ?? DBNull.Value,
-                (object?)statusCode ?? DBNull.Value, (object?)userId ?? DBNull.Value,
-                (object?)ip ?? DBNull.Value, (object?)correlationId ?? DBNull.Value,
-                (object?)metadataJson ?? DBNull.Value)
+                new NpgsqlParameter("p0", severity),
+                new NpgsqlParameter("p1", message),
+                new NpgsqlParameter("p2", NpgsqlDbType.Text) { Value = (object?)exceptionType ?? DBNull.Value },
+                new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)stackTrace ?? DBNull.Value },
+                new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)requestPath ?? DBNull.Value },
+                new NpgsqlParameter("p5", NpgsqlDbType.Text) { Value = (object?)requestMethod ?? DBNull.Value },
+                new NpgsqlParameter("p6", NpgsqlDbType.Integer) { Value = (object?)statusCode ?? DBNull.Value },
+                new NpgsqlParameter("p7", NpgsqlDbType.Uuid) { Value = (object?)userId ?? DBNull.Value },
+                new NpgsqlParameter("p8", NpgsqlDbType.Text) { Value = (object?)ip ?? DBNull.Value },
+                new NpgsqlParameter("p9", NpgsqlDbType.Text) { Value = (object?)correlationId ?? DBNull.Value },
+                new NpgsqlParameter("p10", NpgsqlDbType.Text) { Value = (object?)metadataJson ?? DBNull.Value })
             .FirstAsync(ct);
 
         return result;
@@ -41,12 +51,17 @@ public class LogProcedures(EventPlatformDbContext context) : ILogProcedures
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_system_log(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10) AS \"Value\"",
-                category, action,
-                (object?)source ?? DBNull.Value, (object?)entityType ?? DBNull.Value,
-                (object?)entityId ?? DBNull.Value, (object?)beforeJson ?? DBNull.Value,
-                (object?)afterJson ?? DBNull.Value, (object?)actorId ?? DBNull.Value,
-                (object?)correlationId ?? DBNull.Value, (object?)durationMs ?? DBNull.Value,
-                (object?)metadataJson ?? DBNull.Value)
+                new NpgsqlParameter("p0", category),
+                new NpgsqlParameter("p1", action),
+                new NpgsqlParameter("p2", NpgsqlDbType.Text) { Value = (object?)source ?? DBNull.Value },
+                new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)entityType ?? DBNull.Value },
+                new NpgsqlParameter("p4", NpgsqlDbType.Uuid) { Value = (object?)entityId ?? DBNull.Value },
+                new NpgsqlParameter("p5", NpgsqlDbType.Text) { Value = (object?)beforeJson ?? DBNull.Value },
+                new NpgsqlParameter("p6", NpgsqlDbType.Text) { Value = (object?)afterJson ?? DBNull.Value },
+                new NpgsqlParameter("p7", NpgsqlDbType.Uuid) { Value = (object?)actorId ?? DBNull.Value },
+                new NpgsqlParameter("p8", NpgsqlDbType.Text) { Value = (object?)correlationId ?? DBNull.Value },
+                new NpgsqlParameter("p9", NpgsqlDbType.Integer) { Value = (object?)durationMs ?? DBNull.Value },
+                new NpgsqlParameter("p10", NpgsqlDbType.Text) { Value = (object?)metadataJson ?? DBNull.Value })
             .FirstAsync(ct);
 
         return result;
@@ -57,7 +72,10 @@ public class LogProcedures(EventPlatformDbContext context) : ILogProcedures
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_email_log(@p0, @p1, @p2, @p3) AS \"Value\"",
-                recipient, subject, (object?)body ?? DBNull.Value, status)
+                new NpgsqlParameter("p0", recipient),
+                new NpgsqlParameter("p1", subject),
+                new NpgsqlParameter("p2", NpgsqlDbType.Text) { Value = (object?)body ?? DBNull.Value },
+                new NpgsqlParameter("p3", status))
             .FirstAsync(ct);
 
         return result;

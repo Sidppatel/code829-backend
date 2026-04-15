@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace Db.Repositories.StoredProcedures;
 
@@ -9,9 +11,16 @@ public class BookingProcedures(EventPlatformDbContext context) : IBookingProcedu
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_booking(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9) AS \"Value\"",
-                userId, eventId, (object?)tableId ?? DBNull.Value, (object?)seats ?? DBNull.Value,
-                (object?)eventTicketTypeId ?? DBNull.Value,
-                subtotalCents, feeCents, totalCents, bookingNumber, status)
+                new NpgsqlParameter("p0", userId),
+                new NpgsqlParameter("p1", eventId),
+                new NpgsqlParameter("p2", NpgsqlDbType.Uuid) { Value = (object?)tableId ?? DBNull.Value },
+                new NpgsqlParameter("p3", NpgsqlDbType.Integer) { Value = (object?)seats ?? DBNull.Value },
+                new NpgsqlParameter("p4", NpgsqlDbType.Uuid) { Value = (object?)eventTicketTypeId ?? DBNull.Value },
+                new NpgsqlParameter("p5", subtotalCents),
+                new NpgsqlParameter("p6", feeCents),
+                new NpgsqlParameter("p7", totalCents),
+                new NpgsqlParameter("p8", bookingNumber),
+                new NpgsqlParameter("p9", status))
             .FirstAsync(ct);
 
         return result;

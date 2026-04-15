@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace Db.Repositories.StoredProcedures;
 
@@ -50,11 +52,12 @@ public class AuthProcedures(EventPlatformDbContext context) : IAuthProcedures
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_device_session(@p0, @p1, @p2, @p3, @p4, @p5) AS \"Value\"",
-                userId, sessionHash,
-                (object?)fingerprint ?? DBNull.Value,
-                (object?)deviceName ?? DBNull.Value,
-                (object?)ip ?? DBNull.Value,
-                expiresAt)
+                new NpgsqlParameter("p0", userId),
+                new NpgsqlParameter("p1", sessionHash),
+                new NpgsqlParameter("p2", NpgsqlDbType.Text) { Value = (object?)fingerprint ?? DBNull.Value },
+                new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)deviceName ?? DBNull.Value },
+                new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)ip ?? DBNull.Value },
+                new NpgsqlParameter("p5", expiresAt))
             .FirstAsync(ct);
 
         return result;
@@ -73,7 +76,8 @@ public class AuthProcedures(EventPlatformDbContext context) : IAuthProcedures
         var result = await context.Database
             .SqlQueryRaw<int>(
                 "SELECT sp_revoke_all_user_sessions(@p0, @p1) AS \"Value\"",
-                userId, (object?)exceptHash ?? DBNull.Value)
+                new NpgsqlParameter("p0", userId),
+                new NpgsqlParameter("p1", NpgsqlDbType.Text) { Value = (object?)exceptHash ?? DBNull.Value })
             .FirstAsync(ct);
 
         return result;

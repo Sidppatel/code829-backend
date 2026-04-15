@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace Db.Repositories.StoredProcedures;
 
@@ -9,6 +11,10 @@ public class SettingsProcedures(EventPlatformDbContext context) : ISettingsProce
         await context.Database
             .ExecuteSqlRawAsync(
                 "SELECT sp_upsert_setting(@p0, @p1, @p2)",
-                [key, encryptedValue, (object?)description ?? DBNull.Value], ct);
+                [
+                    new NpgsqlParameter("p0", key),
+                    new NpgsqlParameter("p1", encryptedValue),
+                    new NpgsqlParameter("p2", NpgsqlDbType.Text) { Value = (object?)description ?? DBNull.Value }
+                ], ct);
     }
 }
