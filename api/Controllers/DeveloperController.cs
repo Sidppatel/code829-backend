@@ -6,6 +6,8 @@ using Contracts.DTOs.Auth;
 using Contracts.DTOs.Logs;
 using Contracts.Enums;
 using Db;
+using Serilog;
+using Stripe;
 using Db.Repositories;
 using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
@@ -166,6 +168,142 @@ public class DeveloperController(
 
         await settingsService.SetAsync(request.Key, request.Value);
         return Ok(new { message = $"Setting '{request.Key}' updated" });
+    }
+
+    /// <summary>
+    /// Get Stripe integration status — verifies all keys by making a live API call.
+    /// </summary>
+    [HttpGet("stripe/status")]
+    public async Task<IActionResult> GetStripeStatus()
+    {
+        var secretKey = await settingsService.GetOrDefaultAsync("stripe_secret_key") ?? "";
+        var publishableKey = await settingsService.GetOrDefaultAsync("stripe_publishable_key") ?? "";
+        var webhookSecret = await settingsService.GetOrDefaultAsync("stripe_webhook_secret") ?? "";
+        var taxEnabled = (await settingsService.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
+
+        var secretStatus = ClassifyKey(secretKey, "sk_");
+        var publishableStatus = ClassifyKey(publishableKey, "pk_");
+        var webhookStatus = ClassifyKey(webhookSecret, "whsec_");
+
+        StripeAccountInfo? account = null;
+        var verified = false;
+        string? verificationError = null;
+
+        // Verify by calling Stripe Balance API (lightweight) then fetch account info
+        if (secretStatus.Configured)
+        {
+            try
+            {
+                var client = new StripeClient(secretKey);
+
+                // Step 1: Verify key is valid via Balance API (no ID required)
+                var balanceService = new BalanceService(client);
+                await balanceService.GetAsync();
+
+                // Step 2: Fetch account details via raw request to GET /v1/account
+                var response = await client.RawRequestAsync(HttpMethod.Get, "/v1/account");
+                var doc = System.Text.Json.JsonDocument.Parse(response.Content);
+                var root = doc.RootElement;
+
+                account = new StripeAccountInfo(
+                    root.GetProperty("id").GetString()!,
+                    root.TryGetProperty("business_profile", out var bp) && bp.TryGetProperty("name", out var name)
+                        ? name.ValueKind == System.Text.Json.JsonValueKind.Null ? null : name.GetString()
+                        : null,
+                    root.TryGetProperty("country", out var country) ? country.GetString() : null,
+                    root.TryGetProperty("charges_enabled", out var ce) && ce.GetBoolean(),
+                    root.TryGetProperty("payouts_enabled", out var pe) && pe.GetBoolean(),
+                    root.TryGetProperty("details_submitted", out var ds) && ds.GetBoolean());
+                verified = true;
+
+                Log.Information("[StripeStatus] Verified account {AccountId} ({Country})", account.Id, account.Country);
+            }
+            catch (StripeException ex)
+            {
+                verified = false;
+                verificationError = ex.StripeError?.Message ?? ex.Message;
+                Log.Warning("[StripeStatus] Verification failed: {Error}", verificationError);
+            }
+        }
+        else
+        {
+            verificationError = secretKey == "MOCK_DEV"
+                ? "Using mock payment service (development mode)"
+                : "Stripe secret key not configured";
+        }
+
+        var dto = new StripeStatusDto(
+            secretStatus, publishableStatus, webhookStatus,
+            taxEnabled, verified, verificationError, account);
+
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// Update one or more Stripe keys at once.
+    /// </summary>
+    [HttpPut("stripe/keys")]
+    public async Task<IActionResult> UpdateStripeKeys([FromBody] UpdateStripeKeysRequest request)
+    {
+        var updated = new List<string>();
+
+        if (request.SecretKey is not null)
+        {
+            if (request.SecretKey != "MOCK_DEV" && !request.SecretKey.StartsWith("sk_"))
+                return BadRequest(new ApiError(400, "Secret key must start with 'sk_test_' or 'sk_live_'", HttpContext.TraceIdentifier));
+            await settingsService.SetAsync("stripe_secret_key", request.SecretKey);
+            updated.Add("stripe_secret_key");
+        }
+
+        if (request.PublishableKey is not null)
+        {
+            if (request.PublishableKey != "MOCK_DEV" && !request.PublishableKey.StartsWith("pk_"))
+                return BadRequest(new ApiError(400, "Publishable key must start with 'pk_test_' or 'pk_live_'", HttpContext.TraceIdentifier));
+            await settingsService.SetAsync("stripe_publishable_key", request.PublishableKey);
+            updated.Add("stripe_publishable_key");
+        }
+
+        if (request.WebhookSecret is not null)
+        {
+            if (request.WebhookSecret != "MOCK_DEV" && !request.WebhookSecret.StartsWith("whsec_"))
+                return BadRequest(new ApiError(400, "Webhook secret must start with 'whsec_'", HttpContext.TraceIdentifier));
+            await settingsService.SetAsync("stripe_webhook_secret", request.WebhookSecret);
+            updated.Add("stripe_webhook_secret");
+        }
+
+        if (request.TaxEnabled is not null)
+        {
+            await settingsService.SetAsync("stripe_tax_enabled", request.TaxEnabled.Value ? "true" : "false");
+            updated.Add("stripe_tax_enabled");
+        }
+
+        if (updated.Count == 0)
+            return BadRequest(new ApiError(400, "No keys provided to update", HttpContext.TraceIdentifier));
+
+        Log.Information("[StripeKeys] Updated: {Keys}", string.Join(", ", updated));
+        return Ok(new { message = $"Updated {updated.Count} Stripe setting(s)", updated });
+    }
+
+    private static StripeKeyStatus ClassifyKey(string value, string expectedPrefix)
+    {
+        if (string.IsNullOrEmpty(value) || value == "MOCK_DEV")
+        {
+            return new StripeKeyStatus(
+                Configured: false,
+                Mode: value == "MOCK_DEV" ? "mock" : "not_set",
+                Masked: value == "MOCK_DEV" ? "MOCK_DEV" : "");
+        }
+
+        var mode = value.Contains("_live_") ? "live"
+                 : value.Contains("_test_") ? "test"
+                 : value.StartsWith(expectedPrefix) ? "unknown"
+                 : "invalid_format";
+
+        var masked = value.Length > 8
+            ? value[..7] + new string('*', value.Length - 11) + value[^4..]
+            : new string('*', value.Length);
+
+        return new StripeKeyStatus(Configured: true, Mode: mode, Masked: masked);
     }
 
     /// <summary>

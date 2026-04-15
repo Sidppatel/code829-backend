@@ -11,3 +11,10 @@ public record UpdateSettingRequest(
     string Key,
     string Value
 );
+
+public record UpdateStripeKeysRequest(
+    string? SecretKey = null,
+    string? PublishableKey = null,
+    string? WebhookSecret = null,
+    bool? TaxEnabled = null
+);
