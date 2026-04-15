@@ -16,6 +16,7 @@ public class BookingService(
     IBookingProcedures bookingProc,
     IStripeTransactionProcedures stripeTransactionProc,
     IPaymentService paymentService,
+    ITaxService taxService,
     IEmailService emailService,
     ISettingsService settings,
     IConnectionMultiplexer redis
@@ -64,14 +65,25 @@ public class BookingService(
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
         var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
+
+        var piAmount = total;
+        string? taxCalculationId = null;
+        if (stripeTaxEnabled)
+        {
+            var taxResult = await taxService.CalculateAsync(total, "usd",
+                ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode);
+            piAmount = taxResult.AmountTotal;
+            taxCalculationId = taxResult.CalculationId;
+        }
+
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            total, subtotal, organizer?.StripeConnectedAccountId, stripeTaxEnabled);
+            piAmount, subtotal, organizer?.StripeConnectedAccountId);
 
         var bookingNumber = GenerateBookingNumber();
         var bookingId = await bookingProc.CreateBookingAsync(
             userId, request.EventId, table.Id, null, null, subtotal, fee, total, bookingNumber);
 
-        await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal);
+        await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
 
         Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}",
             bookingNumber, table.Label, request.EventId, total / 100.0);
@@ -144,14 +156,25 @@ public class BookingService(
 
             var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
             var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
+
+            var piAmount = total;
+            string? taxCalculationId = null;
+            if (stripeTaxEnabled)
+            {
+                var taxResult = await taxService.CalculateAsync(total, "usd",
+                    ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode);
+                piAmount = taxResult.AmountTotal;
+                taxCalculationId = taxResult.CalculationId;
+            }
+
             var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-                total, subtotal, organizer?.StripeConnectedAccountId, stripeTaxEnabled);
+                piAmount, subtotal, organizer?.StripeConnectedAccountId);
 
             var bookingNumber = GenerateBookingNumber();
             var bookingId = await bookingProc.CreateBookingAsync(
                 userId, request.EventId, null, seatsRequested, request.EventTicketTypeId, subtotal, fee, total, bookingNumber);
 
-            await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal);
+            await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
 
             Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}",
                 bookingNumber, seatsRequested, request.EventId, total / 100.0);
@@ -241,6 +264,19 @@ public class BookingService(
 
         if (booking.PaymentIntentId is not null)
             await paymentService.RefundPaymentAsync(booking.PaymentIntentId);
+
+        // Reverse the tax transaction if one was recorded
+        if (!string.IsNullOrEmpty(booking.TaxTransactionId) && booking.PaymentIntentId is not null)
+        {
+            try
+            {
+                await taxService.CreateReversalAsync(booking.TaxTransactionId, $"{booking.PaymentIntentId}-refund");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[Booking] Failed to reverse tax transaction {TaxTxnId} — non-critical", booking.TaxTransactionId);
+            }
+        }
 
         await bookingProc.RefundBookingAsync(bookingId);
 

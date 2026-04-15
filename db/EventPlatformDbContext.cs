@@ -445,6 +445,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
             entity.Property(e => e.Currency).HasMaxLength(3);
             entity.Property(e => e.RefundId).HasMaxLength(128);
+            entity.Property(e => e.TaxCalculationId).HasMaxLength(128);
+            entity.Property(e => e.TaxTransactionId).HasMaxLength(128);
             entity.HasOne(e => e.Booking).WithOne(b => b.StripeTransaction)
                 .HasForeignKey<StripeTransaction>(e => e.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);

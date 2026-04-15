@@ -15,7 +15,6 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
         int amountCents,
         int transferAmountCents,
         string? connectedAccountId,
-        bool enableTax = false,
         string currency = "usd")
     {
         var client = await GetClientAsync();
@@ -36,23 +35,13 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
             };
         }
 
-        if (enableTax)
-        {
-            // Stripe Tax on PaymentIntents requires Stripe.net v48+ and API version 2023-10-16+.
-            // When upgrading, replace this with:
-            //   options.AutomaticTax = new PaymentIntentAutomaticTaxOptions { Enabled = true };
-            // For now, store the flag in metadata so the webhook can detect tax-enabled intents.
-            options.Metadata ??= new Dictionary<string, string>();
-            options.Metadata["automatic_tax"] = "true";
-        }
-
         try
         {
             var service = new PaymentIntentService(client);
             var intent = await service.CreateAsync(options);
             Log.Information(
-                "[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}, transfer={Transfer}, dest={Dest}, tax={Tax}",
-                intent.Id, amountCents, currency, transferAmountCents, connectedAccountId ?? "none", enableTax);
+                "[Stripe] Created PaymentIntent {IntentId} for {Amount} {Currency}, transfer={Transfer}, dest={Dest}",
+                intent.Id, amountCents, currency, transferAmountCents, connectedAccountId ?? "none");
             return (intent.Id, intent.ClientSecret, intent.Status);
         }
         catch (StripeException ex)

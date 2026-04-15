@@ -15,6 +15,10 @@ public class StripeTransaction : BaseEntity
     public int AmountCents { get; set; }
     public int? TransferAmountCents { get; set; }
 
+    // Stripe Tax
+    public string? TaxCalculationId { get; set; }
+    public string? TaxTransactionId { get; set; }
+
     // Set from webhook (Stripe-determined)
     public int? TotalChargedCents { get; set; }
     public int? TaxAmountCents { get; set; }

@@ -185,6 +185,15 @@ try
         return new MockPaymentService();
     });
 
+    builder.Services.AddScoped<ITaxService>(sp =>
+    {
+        var settingsService = sp.GetRequiredService<ISettingsService>();
+        var key = settingsService.GetOrDefaultAsync("stripe_secret_key").GetAwaiter().GetResult();
+        if (!string.IsNullOrEmpty(key) && key != "MOCK_DEV")
+            return new StripeTaxService(settingsService);
+        return new MockTaxService();
+    });
+
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
     builder.Services.AddHostedService<HoldCleanupWorker>();

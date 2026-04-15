@@ -1,0 +1,125 @@
+using Serilog;
+using Stripe;
+using Stripe.Tax;
+
+namespace Api.Services;
+
+public class StripeTaxService(ISettingsService settings) : ITaxService
+{
+    public async Task<TaxCalculationResult> CalculateAsync(
+        int amountCents,
+        string currency,
+        string line1,
+        string city,
+        string state,
+        string postalCode,
+        string country = "US",
+        CancellationToken ct = default)
+    {
+        var client = await GetClientAsync();
+        var service = new CalculationService(client);
+
+        var options = new CalculationCreateOptions
+        {
+            Currency = currency,
+            LineItems =
+            [
+                new CalculationLineItemOptions
+                {
+                    Amount = amountCents,
+                    Reference = "tickets"
+                }
+            ],
+            CustomerDetails = new CalculationCustomerDetailsOptions
+            {
+                Address = new AddressOptions
+                {
+                    Line1 = line1,
+                    City = city,
+                    State = state,
+                    PostalCode = postalCode,
+                    Country = country
+                },
+                AddressSource = "billing"
+            }
+        };
+
+        try
+        {
+            var calculation = await service.CreateAsync(options, cancellationToken: ct);
+
+            Log.Information(
+                "[StripeTax] Calculated tax for {Amount} cents at {Location}: total={Total}, tax={Tax}",
+                amountCents, $"{city}, {state} {postalCode}", calculation.AmountTotal, calculation.TaxAmountExclusive);
+
+            return new TaxCalculationResult(
+                calculation.Id,
+                (int)calculation.AmountTotal,
+                (int)calculation.TaxAmountExclusive);
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[StripeTax] Tax calculation failed for {Amount} cents", amountCents);
+            throw new InvalidOperationException($"Tax calculation failed: {ex.StripeError?.Message ?? ex.Message}", ex);
+        }
+    }
+
+    public async Task<string> CreateTransactionAsync(string calculationId, string reference, CancellationToken ct = default)
+    {
+        var client = await GetClientAsync();
+        var service = new TransactionService(client);
+
+        var options = new TransactionCreateFromCalculationOptions
+        {
+            Calculation = calculationId,
+            Reference = reference
+        };
+
+        try
+        {
+            var transaction = await service.CreateFromCalculationAsync(options, cancellationToken: ct);
+            Log.Information("[StripeTax] Created tax transaction {TxnId} from calculation {CalcId}",
+                transaction.Id, calculationId);
+            return transaction.Id;
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[StripeTax] Failed to create tax transaction from calculation {CalcId}", calculationId);
+            throw new InvalidOperationException($"Tax transaction creation failed: {ex.StripeError?.Message ?? ex.Message}", ex);
+        }
+    }
+
+    public async Task CreateReversalAsync(string taxTransactionId, string reference, CancellationToken ct = default)
+    {
+        var client = await GetClientAsync();
+        var service = new TransactionService(client);
+
+        var options = new TransactionCreateReversalOptions
+        {
+            OriginalTransaction = taxTransactionId,
+            Reference = reference,
+            Mode = "full"
+        };
+
+        try
+        {
+            var reversal = await service.CreateReversalAsync(options, cancellationToken: ct);
+            Log.Information("[StripeTax] Created tax reversal {RevId} for transaction {TxnId}",
+                reversal.Id, taxTransactionId);
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[StripeTax] Failed to reverse tax transaction {TxnId}", taxTransactionId);
+            throw new InvalidOperationException($"Tax reversal failed: {ex.StripeError?.Message ?? ex.Message}", ex);
+        }
+    }
+
+    private async Task<StripeClient> GetClientAsync()
+    {
+        var key = await settings.GetAsync("stripe_secret_key");
+        if (string.IsNullOrEmpty(key) || key == "MOCK_DEV")
+            throw new InvalidOperationException("Stripe is not configured — set stripe_secret_key in settings");
+
+        return new StripeClient(key);
+    }
+}

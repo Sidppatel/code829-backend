@@ -15,7 +15,8 @@ public class WebhooksController(
     EventPlatformDbContext context,
     ISettingsService settings,
     IStripeTransactionProcedures stripeTransactionProc,
-    IBookingProcedures bookingProc
+    IBookingProcedures bookingProc,
+    ITaxService taxService
 ) : ControllerBase
 {
     [HttpPost("stripe")]
@@ -92,11 +93,14 @@ public class WebhooksController(
         await bookingProc.ConfirmBookingAsync(txn.BookingId, "");
         Log.Information("[Webhook] Payment confirmed for booking {BookingId}", txn.BookingId);
 
-        // Enrich with Stripe fee and tax data
-        await EnrichTransactionAsync(paymentIntent.Id);
+        // Enrich with Stripe fee data
+        await EnrichTransactionAsync(paymentIntent.Id, txn.TaxCalculationId);
+
+        // Record tax transaction for Stripe Tax reporting
+        await RecordTaxTransactionAsync(paymentIntent.Id, txn.TaxCalculationId);
     }
 
-    private async Task EnrichTransactionAsync(string paymentIntentId)
+    private async Task EnrichTransactionAsync(string paymentIntentId, string? taxCalculationId)
     {
         try
         {
@@ -111,10 +115,16 @@ public class WebhooksController(
             });
 
             var stripeFees = (int)(expanded.LatestCharge?.BalanceTransaction?.Fee ?? 0);
-            // Tax amount: when Stripe Tax is enabled (API v2023-10-16+), use expanded.AutomaticTax.TotalAmount.
-            // For current API version, tax amount comes from the charge's tax data if available.
-            var taxAmount = 0;
             var totalCharged = (int)expanded.AmountReceived;
+
+            // Get tax amount from the tax calculation if one exists
+            var taxAmount = 0;
+            if (!string.IsNullOrEmpty(taxCalculationId))
+            {
+                var calcService = new Stripe.Tax.CalculationService(client);
+                var calculation = await calcService.GetAsync(taxCalculationId);
+                taxAmount = (int)calculation.TaxAmountExclusive;
+            }
 
             await stripeTransactionProc.EnrichAsync(paymentIntentId, totalCharged, taxAmount, stripeFees);
             Log.Information("[Webhook] Enriched transaction {IntentId}: charged={Charged}, tax={Tax}, fees={Fees}",
@@ -123,6 +133,23 @@ public class WebhooksController(
         catch (Exception ex)
         {
             Log.Warning(ex, "[Webhook] Failed to enrich transaction {IntentId} — non-critical", paymentIntentId);
+        }
+    }
+
+    private async Task RecordTaxTransactionAsync(string paymentIntentId, string? taxCalculationId)
+    {
+        if (string.IsNullOrEmpty(taxCalculationId)) return;
+
+        try
+        {
+            var taxTxnId = await taxService.CreateTransactionAsync(taxCalculationId, paymentIntentId);
+            await stripeTransactionProc.SetTaxTransactionIdAsync(paymentIntentId, taxTxnId);
+            Log.Information("[Webhook] Recorded tax transaction {TaxTxnId} for intent {IntentId}",
+                taxTxnId, paymentIntentId);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[Webhook] Failed to record tax transaction for intent {IntentId} — non-critical", paymentIntentId);
         }
     }
 

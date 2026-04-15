@@ -6,7 +6,6 @@ public interface IPaymentService
         int amountCents,
         int transferAmountCents,
         string? connectedAccountId,
-        bool enableTax = false,
         string currency = "usd");
 
     Task<string> ConfirmPaymentAsync(string paymentIntentId);

@@ -12,13 +12,12 @@ public class MockPaymentService : IPaymentService
         int amountCents,
         int transferAmountCents,
         string? connectedAccountId,
-        bool enableTax = false,
         string currency = "usd")
     {
         var intentId = $"pi_mock_{Guid.NewGuid():N}";
         var clientSecret = $"{intentId}_secret_mock";
-        Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents, transfer={Transfer}, dest={Dest}, tax={Tax}",
-            intentId, amountCents, transferAmountCents, connectedAccountId ?? "none", enableTax);
+        Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents, transfer={Transfer}, dest={Dest}",
+            intentId, amountCents, transferAmountCents, connectedAccountId ?? "none");
         return Task.FromResult((intentId, clientSecret, "requires_payment_method"));
     }
 
