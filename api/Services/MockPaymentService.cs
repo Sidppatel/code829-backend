@@ -15,7 +15,7 @@ public class MockPaymentService : IPaymentService
         string currency = "usd")
     {
         var intentId = $"pi_mock_{Guid.NewGuid():N}";
-        var clientSecret = $"{intentId}_secret_mock";
+        var clientSecret = $"{intentId}_secret_{Guid.NewGuid():N}";
         Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents, transfer={Transfer}, dest={Dest}",
             intentId, amountCents, transferAmountCents, connectedAccountId ?? "none");
         return Task.FromResult((intentId, clientSecret, "requires_payment_method"));
