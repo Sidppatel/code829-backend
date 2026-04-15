@@ -68,12 +68,14 @@ public class BookingService(
 
         var piAmount = total;
         string? taxCalculationId = null;
+        int estimatedTaxCents = 0;
         if (stripeTaxEnabled)
         {
             var taxResult = await taxService.CalculateAsync(total, "usd",
                 ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode);
             piAmount = taxResult.AmountTotal;
             taxCalculationId = taxResult.CalculationId;
+            estimatedTaxCents = taxResult.TaxAmountExclusive;
         }
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
@@ -85,10 +87,24 @@ public class BookingService(
 
         await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
 
-        Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}",
-            bookingNumber, table.Label, request.EventId, total / 100.0);
+        Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}, tax ${Tax}",
+            bookingNumber, table.Label, request.EventId, total / 100.0, estimatedTaxCents / 100.0);
 
         var dto = await GetByIdAsync(bookingId) ?? throw new InvalidOperationException("Booking creation failed");
+
+        // Pre-populate estimated tax so the checkout page can display it immediately
+        if (estimatedTaxCents > 0 && dto.Transaction is not null)
+        {
+            dto = dto with
+            {
+                Transaction = dto.Transaction with
+                {
+                    TaxAmountCents = estimatedTaxCents,
+                    TotalChargedCents = piAmount
+                }
+            };
+        }
+
         return dto with { ClientSecret = clientSecret };
     }
 
@@ -159,12 +175,14 @@ public class BookingService(
 
             var piAmount = total;
             string? taxCalculationId = null;
+            int estimatedTaxCents = 0;
             if (stripeTaxEnabled)
             {
                 var taxResult = await taxService.CalculateAsync(total, "usd",
                     ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode);
                 piAmount = taxResult.AmountTotal;
                 taxCalculationId = taxResult.CalculationId;
+                estimatedTaxCents = taxResult.TaxAmountExclusive;
             }
 
             var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
@@ -176,10 +194,24 @@ public class BookingService(
 
             await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
 
-            Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}",
-                bookingNumber, seatsRequested, request.EventId, total / 100.0);
+            Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}, tax ${Tax}",
+                bookingNumber, seatsRequested, request.EventId, total / 100.0, estimatedTaxCents / 100.0);
 
             var dto = await GetByIdAsync(bookingId) ?? throw new InvalidOperationException("Booking creation failed");
+
+            // Pre-populate estimated tax so the checkout page can display it immediately
+            if (estimatedTaxCents > 0 && dto.Transaction is not null)
+            {
+                dto = dto with
+                {
+                    Transaction = dto.Transaction with
+                    {
+                        TaxAmountCents = estimatedTaxCents,
+                        TotalChargedCents = piAmount
+                    }
+                };
+            }
+
             return dto with { ClientSecret = clientSecret };
         }
         finally
