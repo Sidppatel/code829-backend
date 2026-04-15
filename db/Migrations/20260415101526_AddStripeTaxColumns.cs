@@ -24,6 +24,9 @@ namespace db.Migrations
                 maxLength: 128,
                 nullable: true);
 
+            // Drop and recreate view — PostgreSQL can't add columns with CREATE OR REPLACE
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_bookings;");
+
             // Update sp_create_stripe_transaction to accept tax_calculation_id
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS sp_create_stripe_transaction;");
             migrationBuilder.Sql(@"

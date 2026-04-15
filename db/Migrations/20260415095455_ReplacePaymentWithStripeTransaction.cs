@@ -11,6 +11,9 @@ namespace db.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Drop the view first — it depends on the payments table
+            migrationBuilder.Sql("DROP VIEW IF EXISTS v_bookings;");
+
             migrationBuilder.DropTable(
                 name: "payments");
 
