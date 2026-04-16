@@ -207,11 +207,20 @@ public class BookingsController(
 
     [HttpGet("stripe-config")]
     [AllowAnonymous]
-    public Task<IActionResult> GetStripeConfig()
+    public IActionResult GetStripeConfig([FromServices] IHostEnvironment env)
     {
         var publishableKey = secrets.StripePublishableKey;
-        var isLive = !string.IsNullOrEmpty(publishableKey) && publishableKey.StartsWith("pk_live_");
-        return Task.FromResult<IActionResult>(Ok(new { publishableKey, mode = isLive ? "live" : "test" }));
+        if (string.IsNullOrEmpty(publishableKey))
+            return StatusCode(503, new ApiError(503, "Payment not configured", HttpContext.TraceIdentifier));
+
+        var keyIsLive = publishableKey.StartsWith("pk_live_");
+        if (env.IsProduction() && !keyIsLive)
+            return StatusCode(503, new ApiError(503, "Payment not configured", HttpContext.TraceIdentifier));
+        if (!env.IsProduction() && keyIsLive)
+            return StatusCode(503, new ApiError(503, "Live Stripe keys are not permitted outside production", HttpContext.TraceIdentifier));
+
+        var mode = env.IsProduction() && keyIsLive ? "live" : "test";
+        return Ok(new StripeConfigDto(publishableKey, mode));
     }
 
     [HttpGet("{id:guid}/qr")]

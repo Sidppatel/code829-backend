@@ -1,5 +1,7 @@
 namespace Api.Services;
 
+public record PaymentIntentDetails(string Id, int Amount, int AmountReceived, string Status);
+
 public interface IPaymentService
 {
     Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
@@ -9,5 +11,6 @@ public interface IPaymentService
         string currency = "usd");
 
     Task<string> ConfirmPaymentAsync(string paymentIntentId);
+    Task<PaymentIntentDetails> GetPaymentIntentAsync(string paymentIntentId);
     Task<string> RefundPaymentAsync(string paymentIntentId);
 }

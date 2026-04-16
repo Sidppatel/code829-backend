@@ -123,6 +123,15 @@ try
     // Secrets from environment variables
     builder.Services.AddSingleton<ISecretsProvider, SecretsProvider>();
 
+    // Fail-fast: Stripe is mandatory in every environment. No mock payment path exists.
+    var stripeSecret = builder.Configuration["STRIPE_SECRET_KEY"];
+    if (string.IsNullOrEmpty(stripeSecret))
+        throw new InvalidOperationException(
+            "STRIPE_SECRET_KEY is required. Set test keys in .env for development or live keys in production — see .env.example.");
+    if (builder.Environment.IsProduction() && !stripeSecret.StartsWith("sk_live_"))
+        throw new InvalidOperationException(
+            "Production environment requires a live Stripe secret key (sk_live_*). Refusing to start with test keys.");
+
     // Repositories
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IAppSettingRepository, AppSettingRepository>();
@@ -180,21 +189,8 @@ try
         return new MockEmailService(logProc);
     });
 
-    builder.Services.AddScoped<IPaymentService>(sp =>
-    {
-        var secretsProvider = sp.GetRequiredService<ISecretsProvider>();
-        if (!string.IsNullOrEmpty(secretsProvider.StripeSecretKey))
-            return new StripePaymentService(secretsProvider);
-        return new MockPaymentService();
-    });
-
-    builder.Services.AddScoped<ITaxService>(sp =>
-    {
-        var secretsProvider = sp.GetRequiredService<ISecretsProvider>();
-        if (!string.IsNullOrEmpty(secretsProvider.StripeSecretKey))
-            return new StripeTaxService(secretsProvider);
-        return new MockTaxService();
-    });
+    builder.Services.AddScoped<IPaymentService, StripePaymentService>();
+    builder.Services.AddScoped<ITaxService, StripeTaxService>();
 
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();

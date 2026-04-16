@@ -89,6 +89,17 @@ public class WebhooksController(
             return;
         }
 
+        var expectedAmount = txn.AmountCents;
+        if ((int)paymentIntent.AmountReceived != expectedAmount)
+        {
+            Log.Error(
+                "[Webhook] PAYMENT_AMOUNT_MISMATCH intent={IntentId} booking={BookingId} expected={Expected} received={Received}",
+                paymentIntent.Id, txn.BookingId, expectedAmount, paymentIntent.AmountReceived);
+            await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Failed");
+            await bookingProc.CancelBookingAsync(txn.BookingId);
+            return;
+        }
+
         await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Succeeded");
         await bookingProc.ConfirmBookingAsync(txn.BookingId, "");
         Log.Information("[Webhook] Payment confirmed for booking {BookingId}", txn.BookingId);

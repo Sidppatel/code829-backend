@@ -105,7 +105,7 @@ public class BookingService(
                 bookingId, table.Id);
         }
 
-        await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
+        await stripeTransactionProc.CreateAsync(bookingId, intentId, piAmount, subtotal, taxCalculationId);
 
         var tableLabels = string.Join(", ", tables.Select(t => t.Label));
         Log.Information("[Booking] Created multi-table booking {BookingNumber} for tables [{Tables}], event {EventId}, total ${Total}, tax ${Tax}",
@@ -212,7 +212,7 @@ public class BookingService(
             var bookingId = await bookingProc.CreateBookingAsync(
                 userId, request.EventId, null, seatsRequested, request.EventTicketTypeId, subtotal, fee, total, bookingNumber);
 
-            await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
+            await stripeTransactionProc.CreateAsync(bookingId, intentId, piAmount, subtotal, taxCalculationId);
 
             Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}, tax ${Tax}",
                 bookingNumber, seatsRequested, request.EventId, total / 100.0, estimatedTaxCents / 100.0);
@@ -264,9 +264,18 @@ public class BookingService(
         if (booking.PaymentIntentId is null)
             throw new InvalidOperationException("No payment associated with this booking");
 
-        var paymentStatus = await paymentService.ConfirmPaymentAsync(booking.PaymentIntentId);
-        if (paymentStatus != "succeeded")
-            throw new InvalidOperationException($"Payment has not succeeded (status: {paymentStatus}). Please complete payment before confirming.");
+        var intent = await paymentService.GetPaymentIntentAsync(booking.PaymentIntentId);
+        if (intent.Status != "succeeded")
+            throw new InvalidOperationException($"Payment has not succeeded (status: {intent.Status}). Please complete payment before confirming.");
+
+        var expectedAmount = booking.PaymentAmountCents ?? booking.TotalCents;
+        if (intent.AmountReceived != expectedAmount)
+        {
+            Log.Error(
+                "[Booking] PAYMENT_AMOUNT_MISMATCH booking={BookingNumber} intent={IntentId} expected={Expected} received={Received}",
+                booking.BookingNumber, booking.PaymentIntentId, expectedAmount, intent.AmountReceived);
+            throw new InvalidOperationException("Payment amount does not match booking total");
+        }
 
         await stripeTransactionProc.UpdateStatusAsync(booking.PaymentIntentId, "Succeeded");
 

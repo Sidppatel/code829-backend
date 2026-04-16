@@ -70,6 +70,27 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
         }
     }
 
+    public async Task<PaymentIntentDetails> GetPaymentIntentAsync(string paymentIntentId)
+    {
+        var client = await GetClientAsync();
+
+        try
+        {
+            var service = new PaymentIntentService(client);
+            var intent = await service.GetAsync(paymentIntentId);
+            return new PaymentIntentDetails(
+                intent.Id,
+                (int)intent.Amount,
+                (int)intent.AmountReceived,
+                intent.Status);
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Stripe] Failed to fetch PaymentIntent {IntentId}", paymentIntentId);
+            throw MapStripeException(ex);
+        }
+    }
+
     public async Task<string> RefundPaymentAsync(string paymentIntentId)
     {
         var client = await GetClientAsync();
