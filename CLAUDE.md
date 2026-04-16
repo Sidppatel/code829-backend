@@ -49,12 +49,13 @@ dotnet ef migrations add <Name> --project db --startup-project api
 - Role hierarchy: **Developer > Admin > Staff > User**
 - `[RequireRole(UserRole.X)]` attribute for endpoint authorization
 - `[AllowAnonymous]` only where explicitly needed (public endpoints, beacon)
-- JWT secret stored in DB settings, cached in Redis (30s TTL)
+- JWT secret loaded from `JWT_SECRET` environment variable via `ISecretsProvider`
 
 ### Key Patterns
 - `ApiError(statusCode, message, traceId)` for consistent error responses
-- Settings stored in DB (`AppSetting` entity), accessed via `ISettingsService`
-- Security-critical settings (jwt_secret, stripe keys, smtp credentials, frontend_url, cors_origins) are **immutable via API** — only cosmetic/fee settings are mutable
+- **Secrets** (JWT, Stripe, Resend, S3/CDN keys) are in environment variables, accessed via `ISecretsProvider` (singleton)
+- **Runtime config** (app_name, fees, feature flags, URLs) stored in DB (`AppSetting` entity), accessed via `ISettingsService`
+- Only non-sensitive settings are mutable via the Developer API — secrets require env var changes + restart
 - Stripe PaymentIntents for payment flow; webhook at `/webhooks/stripe`
 - File storage abstracted behind `IFileStorageService` (local dev / S3 prod)
 - Admin log auditing via `IAdminLogService`
