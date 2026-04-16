@@ -9,7 +9,7 @@ namespace Api.Services;
 /// Production file storage using S3-compatible object storage (AWS S3, Cloudflare R2, etc.).
 /// Reads configuration from ISettingsService.
 /// </summary>
-public class S3FileStorageService(ISettingsService settings) : IFileStorageService
+public class S3FileStorageService(ISecretsProvider secrets, ISettingsService settings) : IFileStorageService
 {
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
@@ -32,8 +32,8 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
             throw new InvalidOperationException($"File exceeds maximum size of {MaxFileSizeBytes / 1024 / 1024}MB");
 
         var key = $"{entityType}/{Guid.NewGuid()}{extension}";
-        var client = await GetClientAsync();
-        var bucket = await settings.GetAsync("s3_bucket");
+        var client = GetClient();
+        var bucket = secrets.S3Bucket;
 
         // Buffer into MemoryStream so the SDK knows Content-Length upfront.
         // R2 rejects chunked/streaming uploads (STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER).
@@ -57,8 +57,8 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
 
     public async Task SaveWithKeyAsync(Stream fileStream, string key, string contentType)
     {
-        var client = await GetClientAsync();
-        var bucket = await settings.GetAsync("s3_bucket");
+        var client = GetClient();
+        var bucket = secrets.S3Bucket;
 
         // Buffer into MemoryStream so the SDK knows Content-Length upfront.
         var ms = new MemoryStream();
@@ -81,8 +81,8 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
 
     public async Task<bool> DeleteAsync(string path)
     {
-        var client = await GetClientAsync();
-        var bucket = await settings.GetAsync("s3_bucket");
+        var client = GetClient();
+        var bucket = secrets.S3Bucket;
 
         try
         {
@@ -103,20 +103,18 @@ public class S3FileStorageService(ISettingsService settings) : IFileStorageServi
 
     public string GetPublicUrl(string path)
     {
-        // CDN base URL is loaded synchronously since this is called in mapping contexts.
-        // The setting should be cached by SettingsService (Redis 30s TTL).
-        var cdnBaseUrl = settings.GetOrDefaultAsync("cdn_base_url", "").GetAwaiter().GetResult();
+        var cdnBaseUrl = secrets.CdnBaseUrl;
         if (string.IsNullOrEmpty(cdnBaseUrl))
             return path;
         return $"{cdnBaseUrl.TrimEnd('/')}/{path}";
     }
 
-    private async Task<AmazonS3Client> GetClientAsync()
+    private AmazonS3Client GetClient()
     {
-        var accessKey = await settings.GetAsync("s3_access_key");
-        var secretKey = await settings.GetAsync("s3_secret_key");
-        var region = await settings.GetOrDefaultAsync("s3_region", "us-east-1") ?? "us-east-1";
-        var endpointUrl = await settings.GetOrDefaultAsync("s3_endpoint_url", "");
+        var accessKey = secrets.S3AccessKey;
+        var secretKey = secrets.S3SecretKey;
+        var region = settings.GetOrDefaultAsync("s3_region", "us-east-1").GetAwaiter().GetResult() ?? "us-east-1";
+        var endpointUrl = secrets.S3EndpointUrl;
 
         var config = new AmazonS3Config
         {

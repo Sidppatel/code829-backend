@@ -1,13 +1,12 @@
 namespace Db.Entities;
 
 /// <summary>
-/// Stores application settings as encrypted key-value pairs.
-/// Values are AES-256 encrypted before storage and decrypted on read.
-/// Cached in Redis with 30-second TTL.
+/// Stores non-sensitive application settings as key-value pairs.
+/// Cached in Redis with 30-second TTL. Secrets are stored in environment variables, not here.
 /// </summary>
 public class AppSetting : BaseEntity
 {
     public required string Key { get; set; }
-    public required string EncryptedValue { get; set; }
+    public required string Value { get; set; }
     public string? Description { get; set; }
 }

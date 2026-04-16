@@ -6,5 +6,5 @@ public interface IAppSettingRepository
 {
     Task<AppSetting?> GetByKeyAsync(string key);
     Task<List<AppSetting>> GetAllAsync();
-    Task UpsertAsync(string key, string encryptedValue, string? description = null);
+    Task UpsertAsync(string key, string value, string? description = null);
 }

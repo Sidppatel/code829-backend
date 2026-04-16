@@ -113,8 +113,11 @@ try
     var redisConfig = ConvertRedisUrl(redisUrl);
     builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConfig));
 
-    // Encryption
+    // Encryption (HashEmail only — secrets now come from env vars)
     builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
+
+    // Secrets from environment variables
+    builder.Services.AddSingleton<ISecretsProvider, SecretsProvider>();
 
     // Repositories
     builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -164,33 +167,28 @@ try
 
     builder.Services.AddScoped<IEmailService>(sp =>
     {
-        var settingsService = sp.GetRequiredService<ISettingsService>();
-
-        // Resend HTTP API
-        var resendKey = settingsService.GetOrDefaultAsync("resend_api_key").GetAwaiter().GetResult();
+        var secretsProvider = sp.GetRequiredService<ISecretsProvider>();
         var logProc = sp.GetRequiredService<Db.Repositories.StoredProcedures.ILogProcedures>();
-        if (!string.IsNullOrEmpty(resendKey) && resendKey != "MOCK_DEV")
-            return new ResendEmailService(settingsService, logProc);
 
-        // Fallback: Mock (logs to console + DB, no real emails)
+        if (!string.IsNullOrEmpty(secretsProvider.ResendApiKey))
+            return new ResendEmailService(secretsProvider, sp.GetRequiredService<ISettingsService>(), logProc);
+
         return new MockEmailService(logProc);
     });
 
     builder.Services.AddScoped<IPaymentService>(sp =>
     {
-        var settingsService = sp.GetRequiredService<ISettingsService>();
-        var key = settingsService.GetOrDefaultAsync("stripe_secret_key").GetAwaiter().GetResult();
-        if (!string.IsNullOrEmpty(key) && key != "MOCK_DEV")
-            return new StripePaymentService(settingsService);
+        var secretsProvider = sp.GetRequiredService<ISecretsProvider>();
+        if (!string.IsNullOrEmpty(secretsProvider.StripeSecretKey))
+            return new StripePaymentService(secretsProvider);
         return new MockPaymentService();
     });
 
     builder.Services.AddScoped<ITaxService>(sp =>
     {
-        var settingsService = sp.GetRequiredService<ISettingsService>();
-        var key = settingsService.GetOrDefaultAsync("stripe_secret_key").GetAwaiter().GetResult();
-        if (!string.IsNullOrEmpty(key) && key != "MOCK_DEV")
-            return new StripeTaxService(settingsService);
+        var secretsProvider = sp.GetRequiredService<ISecretsProvider>();
+        if (!string.IsNullOrEmpty(secretsProvider.StripeSecretKey))
+            return new StripeTaxService(secretsProvider);
         return new MockTaxService();
     });
 
@@ -199,7 +197,7 @@ try
     builder.Services.AddHostedService<HoldCleanupWorker>();
     builder.Services.AddHostedService<ScheduledPublishWorker>();
 
-    // JWT Authentication — uses a temporary key at startup, replaced by DB-stored secret after seeding
+    // JWT Authentication — signing key configured from JWT_SECRET env var after build
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
@@ -420,16 +418,16 @@ static string ConvertRedisUrl(string url)
 }
 
 /// <summary>
-/// Reads the JWT secret from DB settings and configures the JWT bearer middleware.
+/// Reads the JWT secret from environment variables and configures the JWT bearer middleware.
 /// </summary>
-static async Task ConfigureJwtSigningKey(WebApplication app)
+static Task ConfigureJwtSigningKey(WebApplication app)
 {
-    using var scope = app.Services.CreateScope();
-    var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
-    var jwtSecret = await settings.GetAsync("jwt_secret");
+    var secrets = app.Services.GetRequiredService<ISecretsProvider>();
 
     var jwtOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<JwtBearerOptions>>();
     var bearerOptions = jwtOptions.Get(JwtBearerDefaults.AuthenticationScheme);
     bearerOptions.TokenValidationParameters.IssuerSigningKey =
-        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secrets.JwtSecret));
+
+    return Task.CompletedTask;
 }

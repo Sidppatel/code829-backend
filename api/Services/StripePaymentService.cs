@@ -9,7 +9,7 @@ namespace Api.Services;
 /// via transfer_data.amount. The platform keeps everything else minus Stripe processing costs.
 /// When Stripe Tax is enabled, tax is calculated and added on top by Stripe.
 /// </summary>
-public class StripePaymentService(ISettingsService settings) : IPaymentService
+public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
 {
     public async Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
         int amountCents,
@@ -93,13 +93,13 @@ public class StripePaymentService(ISettingsService settings) : IPaymentService
         }
     }
 
-    private async Task<StripeClient> GetClientAsync()
+    private Task<StripeClient> GetClientAsync()
     {
-        var key = await settings.GetAsync("stripe_secret_key");
-        if (string.IsNullOrEmpty(key) || key == "MOCK_DEV")
-            throw new InvalidOperationException("Stripe is not configured — set stripe_secret_key in settings");
+        var key = secrets.StripeSecretKey;
+        if (string.IsNullOrEmpty(key))
+            throw new InvalidOperationException("Stripe is not configured — set STRIPE_SECRET_KEY environment variable");
 
-        return new StripeClient(key);
+        return Task.FromResult(new StripeClient(key));
     }
 
     private static Exception MapStripeException(StripeException ex)

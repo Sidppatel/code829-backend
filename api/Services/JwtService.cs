@@ -6,7 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Api.Services;
 
-public class JwtService(ISettingsService settingsService) : IJwtService
+public class JwtService(ISecretsProvider secrets) : IJwtService
 {
     public async Task<string> GenerateUserJwtAsync(User user)
     {
@@ -36,10 +36,9 @@ public class JwtService(ISettingsService settingsService) : IJwtService
         return await GenerateJwtAsync(claims);
     }
 
-    private async Task<string> GenerateJwtAsync(Claim[] claims)
+    private Task<string> GenerateJwtAsync(Claim[] claims)
     {
-        var jwtSecret = await settingsService.GetAsync("jwt_secret");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secrets.JwtSecret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
@@ -49,6 +48,6 @@ public class JwtService(ISettingsService settingsService) : IJwtService
             expires: DateTime.UtcNow.AddMinutes(15),
             signingCredentials: credentials);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return Task.FromResult(new JwtSecurityTokenHandler().WriteToken(token));
     }
 }

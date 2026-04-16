@@ -13,7 +13,7 @@ namespace Api.Controllers;
 [Route("webhooks")]
 public class WebhooksController(
     EventPlatformDbContext context,
-    ISettingsService settings,
+    ISecretsProvider secrets,
     IStripeTransactionProcedures stripeTransactionProc,
     IBookingProcedures bookingProc,
     ITaxService taxService
@@ -27,7 +27,7 @@ public class WebhooksController(
         Event stripeEvent;
         try
         {
-            var webhookSecret = await settings.GetOrDefaultAsync("stripe_webhook_secret", "");
+            var webhookSecret = secrets.StripeWebhookSecret;
             if (string.IsNullOrEmpty(webhookSecret))
             {
                 Log.Error("[Webhook] stripe_webhook_secret not configured — rejecting request");
@@ -104,8 +104,8 @@ public class WebhooksController(
     {
         try
         {
-            var stripeKey = await settings.GetOrDefaultAsync("stripe_secret_key", "");
-            if (string.IsNullOrEmpty(stripeKey) || stripeKey == "MOCK_DEV") return;
+            var stripeKey = secrets.StripeSecretKey;
+            if (string.IsNullOrEmpty(stripeKey)) return;
 
             var client = new StripeClient(stripeKey);
             var piService = new PaymentIntentService(client);

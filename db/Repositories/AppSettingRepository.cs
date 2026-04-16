@@ -11,12 +11,12 @@ public class AppSettingRepository(EventPlatformDbContext context) : IAppSettingR
     public async Task<List<AppSetting>> GetAllAsync()
         => await context.AppSettings.OrderBy(s => s.Key).ToListAsync();
 
-    public async Task UpsertAsync(string key, string encryptedValue, string? description = null)
+    public async Task UpsertAsync(string key, string value, string? description = null)
     {
         var existing = await GetByKeyAsync(key);
         if (existing is not null)
         {
-            existing.EncryptedValue = encryptedValue;
+            existing.Value = value;
             existing.UpdatedAt = DateTime.UtcNow;
             if (description is not null)
                 existing.Description = description;
@@ -27,7 +27,7 @@ public class AppSettingRepository(EventPlatformDbContext context) : IAppSettingR
             {
                 Id = Guid.NewGuid(),
                 Key = key,
-                EncryptedValue = encryptedValue,
+                Value = value,
                 Description = description
             });
         }

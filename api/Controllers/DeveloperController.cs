@@ -24,6 +24,7 @@ public class DeveloperController(
     EventPlatformDbContext context,
     ISettingsService settingsService,
     IAppSettingRepository settingsRepo,
+    ISecretsProvider secrets,
     IImageService imageService,
     IAdminUserProcedures adminUserProc,
     IEncryptionService encryptionService
@@ -127,36 +128,39 @@ public class DeveloperController(
     }
 
     /// <summary>
-    /// Get all settings (values masked for display).
+    /// Get all settings (non-sensitive from DB) and secret configuration status (from env vars).
     /// </summary>
     [HttpGet("settings")]
     public async Task<IActionResult> GetSettings()
     {
         var all = await settingsRepo.GetAllAsync();
-        var dtos = new List<SettingDto>();
-        foreach (var s in all)
-        {
-            var decrypted = await settingsService.GetOrDefaultAsync(s.Key) ?? "";
-            var masked = decrypted.Length > 4
-                ? new string('*', decrypted.Length - 4) + decrypted[^4..]
-                : "****";
-            dtos.Add(new SettingDto(s.Key, masked, s.Description, s.UpdatedAt));
-        }
+        var settingDtos = all.Select(s =>
+            new SettingDto(s.Key, s.Value, s.Description, s.UpdatedAt)).ToList();
 
-        return Ok(dtos);
+        var secretDtos = new List<SecretStatusDto>
+        {
+            new("JWT_SECRET", !string.IsNullOrEmpty(secrets.JwtSecret), "JWT signing secret"),
+            new("STRIPE_SECRET_KEY", !string.IsNullOrEmpty(secrets.StripeSecretKey), "Stripe secret key"),
+            new("STRIPE_PUBLISHABLE_KEY", !string.IsNullOrEmpty(secrets.StripePublishableKey), "Stripe publishable key"),
+            new("STRIPE_WEBHOOK_SECRET", !string.IsNullOrEmpty(secrets.StripeWebhookSecret), "Stripe webhook signing secret"),
+            new("RESEND_API_KEY", !string.IsNullOrEmpty(secrets.ResendApiKey), "Resend API key for sending emails"),
+            new("S3_ACCESS_KEY", !string.IsNullOrEmpty(secrets.S3AccessKey), "Cloudflare R2 access key ID"),
+            new("S3_SECRET_KEY", !string.IsNullOrEmpty(secrets.S3SecretKey), "Cloudflare R2 secret access key"),
+            new("S3_BUCKET", !string.IsNullOrEmpty(secrets.S3Bucket), "Cloudflare R2 bucket name"),
+            new("S3_ENDPOINT_URL", !string.IsNullOrEmpty(secrets.S3EndpointUrl), "Cloudflare R2 endpoint URL"),
+            new("CDN_BASE_URL", !string.IsNullOrEmpty(secrets.CdnBaseUrl), "Public CDN URL for serving images"),
+        };
+
+        return Ok(new SettingsResponse(settingDtos, secretDtos));
     }
 
     /// <summary>
-    /// Update a setting value.
+    /// Update a non-sensitive setting value. Secrets are managed via environment variables.
     /// </summary>
     private static readonly HashSet<string> MutableSettings = new(StringComparer.OrdinalIgnoreCase)
     {
         "app_name", "default_platform_fee_open_cents", "default_platform_fee_grid_cents",
-        // Email
-        "resend_api_key", "email_from_address",
-        // Stripe
-        "stripe_secret_key", "stripe_publishable_key", "stripe_webhook_secret", "stripe_tax_enabled",
-        // URLs (for deployment changes)
+        "email_from_address", "stripe_tax_enabled",
         "frontend_url", "cors_origins"
     };
 
@@ -176,9 +180,9 @@ public class DeveloperController(
     [HttpGet("stripe/status")]
     public async Task<IActionResult> GetStripeStatus()
     {
-        var secretKey = await settingsService.GetOrDefaultAsync("stripe_secret_key") ?? "";
-        var publishableKey = await settingsService.GetOrDefaultAsync("stripe_publishable_key") ?? "";
-        var webhookSecret = await settingsService.GetOrDefaultAsync("stripe_webhook_secret") ?? "";
+        var secretKey = secrets.StripeSecretKey;
+        var publishableKey = secrets.StripePublishableKey;
+        var webhookSecret = secrets.StripeWebhookSecret;
         var taxEnabled = (await settingsService.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
 
         var secretStatus = ClassifyKey(secretKey, "sk_");
@@ -227,9 +231,7 @@ public class DeveloperController(
         }
         else
         {
-            verificationError = secretKey == "MOCK_DEV"
-                ? "Using mock payment service (development mode)"
-                : "Stripe secret key not configured";
+            verificationError = "Stripe secret key not configured — set STRIPE_SECRET_KEY environment variable";
         }
 
         var dto = new StripeStatusDto(
@@ -240,58 +242,36 @@ public class DeveloperController(
     }
 
     /// <summary>
-    /// Update one or more Stripe keys at once.
+    /// Stripe keys are now managed via environment variables and cannot be updated via the API.
+    /// Only stripe_tax_enabled (a non-secret toggle) can still be changed.
     /// </summary>
     [HttpPut("stripe/keys")]
     public async Task<IActionResult> UpdateStripeKeys([FromBody] UpdateStripeKeysRequest request)
     {
-        var updated = new List<string>();
-
-        if (request.SecretKey is not null)
-        {
-            if (request.SecretKey != "MOCK_DEV" && !request.SecretKey.StartsWith("sk_"))
-                return BadRequest(new ApiError(400, "Secret key must start with 'sk_test_' or 'sk_live_'", HttpContext.TraceIdentifier));
-            await settingsService.SetAsync("stripe_secret_key", request.SecretKey);
-            updated.Add("stripe_secret_key");
-        }
-
-        if (request.PublishableKey is not null)
-        {
-            if (request.PublishableKey != "MOCK_DEV" && !request.PublishableKey.StartsWith("pk_"))
-                return BadRequest(new ApiError(400, "Publishable key must start with 'pk_test_' or 'pk_live_'", HttpContext.TraceIdentifier));
-            await settingsService.SetAsync("stripe_publishable_key", request.PublishableKey);
-            updated.Add("stripe_publishable_key");
-        }
-
-        if (request.WebhookSecret is not null)
-        {
-            if (request.WebhookSecret != "MOCK_DEV" && !request.WebhookSecret.StartsWith("whsec_"))
-                return BadRequest(new ApiError(400, "Webhook secret must start with 'whsec_'", HttpContext.TraceIdentifier));
-            await settingsService.SetAsync("stripe_webhook_secret", request.WebhookSecret);
-            updated.Add("stripe_webhook_secret");
-        }
+        if (request.SecretKey is not null || request.PublishableKey is not null || request.WebhookSecret is not null)
+            return BadRequest(new ApiError(400,
+                "Stripe keys are now managed via environment variables (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET). " +
+                "Update them in your deployment environment and restart the application.",
+                HttpContext.TraceIdentifier));
 
         if (request.TaxEnabled is not null)
         {
             await settingsService.SetAsync("stripe_tax_enabled", request.TaxEnabled.Value ? "true" : "false");
-            updated.Add("stripe_tax_enabled");
+            Log.Information("[StripeKeys] Updated stripe_tax_enabled to {Value}", request.TaxEnabled.Value);
+            return Ok(new { message = "Updated stripe_tax_enabled", updated = new[] { "stripe_tax_enabled" } });
         }
 
-        if (updated.Count == 0)
-            return BadRequest(new ApiError(400, "No keys provided to update", HttpContext.TraceIdentifier));
-
-        Log.Information("[StripeKeys] Updated: {Keys}", string.Join(", ", updated));
-        return Ok(new { message = $"Updated {updated.Count} Stripe setting(s)", updated });
+        return BadRequest(new ApiError(400, "No settings provided to update", HttpContext.TraceIdentifier));
     }
 
     private static StripeKeyStatus ClassifyKey(string value, string expectedPrefix)
     {
-        if (string.IsNullOrEmpty(value) || value == "MOCK_DEV")
+        if (string.IsNullOrEmpty(value))
         {
             return new StripeKeyStatus(
                 Configured: false,
-                Mode: value == "MOCK_DEV" ? "mock" : "not_set",
-                Masked: value == "MOCK_DEV" ? "MOCK_DEV" : "");
+                Mode: "not_set",
+                Masked: "");
         }
 
         var mode = value.Contains("_live_") ? "live"

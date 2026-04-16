@@ -4,7 +4,7 @@ using Stripe.Tax;
 
 namespace Api.Services;
 
-public class StripeTaxService(ISettingsService settings) : ITaxService
+public class StripeTaxService(ISecretsProvider secrets) : ITaxService
 {
     public async Task<TaxCalculationResult> CalculateAsync(
         int amountCents,
@@ -114,12 +114,12 @@ public class StripeTaxService(ISettingsService settings) : ITaxService
         }
     }
 
-    private async Task<StripeClient> GetClientAsync()
+    private Task<StripeClient> GetClientAsync()
     {
-        var key = await settings.GetAsync("stripe_secret_key");
-        if (string.IsNullOrEmpty(key) || key == "MOCK_DEV")
-            throw new InvalidOperationException("Stripe is not configured — set stripe_secret_key in settings");
+        var key = secrets.StripeSecretKey;
+        if (string.IsNullOrEmpty(key))
+            throw new InvalidOperationException("Stripe is not configured — set STRIPE_SECRET_KEY environment variable");
 
-        return new StripeClient(key);
+        return Task.FromResult(new StripeClient(key));
     }
 }

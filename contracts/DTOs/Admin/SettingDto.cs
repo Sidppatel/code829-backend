@@ -2,9 +2,20 @@ namespace Contracts.DTOs.Admin;
 
 public record SettingDto(
     string Key,
-    string MaskedValue,
+    string Value,
     string? Description,
     DateTime UpdatedAt
+);
+
+public record SecretStatusDto(
+    string Key,
+    bool Configured,
+    string? Description
+);
+
+public record SettingsResponse(
+    List<SettingDto> Settings,
+    List<SecretStatusDto> Secrets
 );
 
 public record UpdateSettingRequest(

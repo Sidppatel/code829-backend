@@ -4,12 +4,11 @@ using StackExchange.Redis;
 namespace Api.Services;
 
 /// <summary>
-/// Reads/writes AppSettings with AES-256 encryption and Redis caching (30s TTL).
-/// All DB settings are encrypted at rest and only decrypted when read.
+/// Reads/writes non-sensitive AppSettings with Redis caching (30s TTL).
+/// Sensitive secrets are handled by ISecretsProvider (env vars), not this service.
 /// </summary>
 public class SettingsService(
     IAppSettingRepository repository,
-    IEncryptionService encryption,
     IConnectionMultiplexer redis
 ) : ISettingsService
 {
@@ -33,15 +32,13 @@ public class SettingsService(
         if (setting is null)
             return defaultValue;
 
-        var decrypted = encryption.Decrypt(setting.EncryptedValue);
-        await db.StringSetAsync(CachePrefix + key, decrypted, CacheTtl);
-        return decrypted;
+        await db.StringSetAsync(CachePrefix + key, setting.Value, CacheTtl);
+        return setting.Value;
     }
 
     public async Task SetAsync(string key, string value, string? description = null)
     {
-        var encrypted = encryption.Encrypt(value);
-        await repository.UpsertAsync(key, encrypted, description);
+        await repository.UpsertAsync(key, value, description);
 
         var db = redis.GetDatabase();
         await db.KeyDeleteAsync(CachePrefix + key);
@@ -53,7 +50,7 @@ public class SettingsService(
         var result = new Dictionary<string, string>();
         foreach (var setting in settings)
         {
-            result[setting.Key] = encryption.Decrypt(setting.EncryptedValue);
+            result[setting.Key] = setting.Value;
         }
         return result;
     }

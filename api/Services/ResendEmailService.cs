@@ -6,13 +6,13 @@ using Serilog;
 
 namespace Api.Services;
 
-public class ResendEmailService(ISettingsService settings, ILogProcedures logProc) : IEmailService
+public class ResendEmailService(ISecretsProvider secrets, ISettingsService settings, ILogProcedures logProc) : IEmailService
 {
     private static readonly HttpClient Http = new();
 
     public async Task SendAsync(string recipient, string subject, string body)
     {
-        var apiKey = await settings.GetAsync("resend_api_key");
+        var apiKey = secrets.ResendApiKey;
         var fromAddress = await settings.GetOrDefaultAsync("email_from_address", "noreply@code829.com") ?? "noreply@code829.com";
 
         var isHtml = body.TrimStart().StartsWith('<');

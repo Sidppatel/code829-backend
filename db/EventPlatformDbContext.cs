@@ -149,7 +149,7 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Key).IsUnique();
             entity.Property(e => e.Key).HasMaxLength(128);
-            entity.Property(e => e.EncryptedValue).HasMaxLength(4096);
+            entity.Property(e => e.Value).HasMaxLength(4096);
             entity.Property(e => e.Description).HasMaxLength(512);
         });
 

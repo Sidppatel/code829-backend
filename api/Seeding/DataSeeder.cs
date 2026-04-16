@@ -78,15 +78,12 @@ public static class DataSeeder
 
     private static async Task SeedSettingsAsync(ISettingsService settings)
     {
+        // Only non-sensitive runtime config is stored in the database.
+        // Secrets (JWT, Stripe, Resend, S3) are now in environment variables via ISecretsProvider.
         var defaults = new Dictionary<string, (string Value, string Description)>
         {
-            ["jwt_secret"] = (Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"), "JWT signing secret"),
             ["magic_link_expiry_minutes"] = ("15", "Magic link token lifetime in minutes"),
             ["hold_expiry_minutes"] = ("10", "Seat hold duration in minutes"),
-            ["stripe_secret_key"] = ("MOCK_DEV", "Stripe secret key (sk_test_... or sk_live_...)"),
-            ["stripe_publishable_key"] = ("MOCK_DEV", "Stripe publishable key (pk_test_... or pk_live_...)"),
-            ["stripe_webhook_secret"] = ("MOCK_DEV", "Stripe webhook signing secret (whsec_...)"),
-            ["resend_api_key"] = ("MOCK_DEV", "Resend API key for sending emails (re_...)"),
             ["email_from_address"] = ("noreply@code829.local", "Sender email address"),
             ["app_name"] = ("Code829", "Application name used in emails and SEO"),
             ["default_platform_fee_open_cents"] = ("1000", "Default platform fee for Open events in cents ($10.00)"),
@@ -98,12 +95,7 @@ public static class DataSeeder
             ["dev_log_retention_days"] = ("90", "Developer log retention in days"),
             ["admin_log_retention_days"] = ("365", "Admin log retention in days"),
             ["system_log_retention_days"] = ("30", "System log retention in days"),
-            ["s3_bucket"] = ("MOCK_DEV", "Cloudflare R2 bucket name"),
-            ["s3_access_key"] = ("MOCK_DEV", "Cloudflare R2 access key ID"),
-            ["s3_secret_key"] = ("MOCK_DEV", "Cloudflare R2 secret access key"),
             ["s3_region"] = ("auto", "Cloudflare R2 region (always 'auto')"),
-            ["s3_endpoint_url"] = ("MOCK_DEV", "Cloudflare R2 endpoint (https://<account-id>.r2.cloudflarestorage.com)"),
-            ["cdn_base_url"] = ("MOCK_DEV", "Public CDN URL for serving uploaded images"),
         };
 
         foreach (var (key, (value, description)) in defaults)
@@ -118,46 +110,20 @@ public static class DataSeeder
         var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
         if (env == "Production")
         {
-            var frontendUrl = await settings.GetOrDefaultAsync("frontend_url");
-            if (frontendUrl is null || frontendUrl != "https://code829.com")
+            var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "https://code829.com";
+            var current = await settings.GetOrDefaultAsync("frontend_url");
+            if (current != frontendUrl)
             {
-                await settings.SetAsync("frontend_url", "https://code829.com", "Frontend URL for magic link emails");
-                Log.Information("[Seed] Updated frontend_url to production URL");
+                await settings.SetAsync("frontend_url", frontendUrl, "Frontend URL for magic link emails");
+                Log.Information("[Seed] Updated frontend_url to {Url}", frontendUrl);
             }
 
-            var corsOrigins = await settings.GetOrDefaultAsync("cors_origins");
-            if (corsOrigins is null || corsOrigins != "https://code829.com")
+            var corsOrigins = Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? "https://code829.com";
+            var currentCors = await settings.GetOrDefaultAsync("cors_origins");
+            if (currentCors != corsOrigins)
             {
-                await settings.SetAsync("cors_origins", "https://code829.com", "Comma-separated allowed CORS origins");
-                Log.Information("[Seed] Updated cors_origins to production URL");
-            }
-
-            var envOverrides = new (string EnvVar, string SettingKey, string Description)[]
-            {
-                ("RESEND_API_KEY", "resend_api_key", "Resend API key for sending emails"),
-                ("EMAIL_FROM_ADDRESS", "email_from_address", "Sender email address"),
-                ("STRIPE_SECRET_KEY", "stripe_secret_key", "Stripe secret key"),
-                ("STRIPE_PUBLISHABLE_KEY", "stripe_publishable_key", "Stripe publishable key"),
-                ("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret", "Stripe webhook signing secret"),
-                ("S3_BUCKET", "s3_bucket", "Cloudflare R2 bucket name"),
-                ("S3_ACCESS_KEY", "s3_access_key", "Cloudflare R2 access key ID"),
-                ("S3_SECRET_KEY", "s3_secret_key", "Cloudflare R2 secret access key"),
-                ("S3_ENDPOINT_URL", "s3_endpoint_url", "Cloudflare R2 endpoint URL"),
-                ("CDN_BASE_URL", "cdn_base_url", "Public CDN URL for serving images"),
-            };
-
-            foreach (var (envVar, settingKey, description) in envOverrides)
-            {
-                var envValue = Environment.GetEnvironmentVariable(envVar);
-                if (!string.IsNullOrEmpty(envValue))
-                {
-                    var current = await settings.GetOrDefaultAsync(settingKey);
-                    if (current != envValue)
-                    {
-                        await settings.SetAsync(settingKey, envValue, description);
-                        Log.Information("[Seed] Updated {SettingKey} from environment", settingKey);
-                    }
-                }
+                await settings.SetAsync("cors_origins", corsOrigins, "Comma-separated allowed CORS origins");
+                Log.Information("[Seed] Updated cors_origins to {Origins}", corsOrigins);
             }
         }
 
