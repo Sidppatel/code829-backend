@@ -2,44 +2,105 @@ namespace Api.Services;
 
 public static class EmailTemplates
 {
-    private static string Sign(string brandName) =>
-        $"\n\n— The {brandName} Team\nThis is an automated message. This mailbox is not monitored.";
+    private const string BrandColor = "#6366f1";
+    private const string BgColor = "#f4f4f5";
+
+    private static string Wrap(string brandName, string content) =>
+        $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="margin:0;padding:0;background:{BgColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:{BgColor};padding:40px 20px;">
+        <tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:{BrandColor};padding:24px 32px;text-align:center;">
+          <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.5px;">{brandName}</span>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          {content}
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;text-align:center;border-top:1px solid #e4e4e7;">
+          <p style="margin:0;color:#a1a1aa;font-size:12px;">This is an automated message from {brandName}. This mailbox is not monitored.</p>
+        </td></tr>
+        </table>
+        </td></tr>
+        </table>
+        </body>
+        </html>
+        """;
+
+    private static string Button(string text, string url) =>
+        $"""
+        <table cellpadding="0" cellspacing="0" style="margin:24px 0;">
+        <tr><td style="background:{BrandColor};border-radius:8px;padding:14px 32px;text-align:center;">
+          <a href="{url}" style="color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;display:inline-block;">{text}</a>
+        </td></tr>
+        </table>
+        """;
+
+    private static string InfoRow(string label, string value) =>
+        $"""
+        <tr>
+          <td style="padding:8px 12px;color:#71717a;font-size:14px;white-space:nowrap;">{label}</td>
+          <td style="padding:8px 12px;font-size:14px;font-weight:600;color:#18181b;">{value}</td>
+        </tr>
+        """;
+
+    private static string InfoTable(string rows) =>
+        $"""
+        <table cellpadding="0" cellspacing="0" style="margin:20px 0;width:100%;border:1px solid #e4e4e7;border-radius:8px;border-collapse:separate;">
+        {rows}
+        </table>
+        """;
 
     public static string MagicLink(string brandName, string verifyUrl, int expiryMinutes) =>
-        $"Sign in to {brandName}\n\n" +
-        $"Click the link below to log in. No password needed.\n\n" +
-        $"{verifyUrl}\n\n" +
-        $"This link expires in {expiryMinutes} minutes. If you didn't request this, you can safely ignore this email." +
-        Sign(brandName);
+        Wrap(brandName,
+            $"""
+            <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">Sign in to {brandName}</h2>
+            <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;line-height:1.6;">Click the button below to log in. No password needed.</p>
+            {Button("Sign In", verifyUrl)}
+            <p style="margin:0;color:#71717a;font-size:13px;line-height:1.5;">This link expires in {expiryMinutes} minutes. If you didn't request this, you can safely ignore this email.</p>
+            """);
 
     public static string BookingConfirmed(
         string brandName, string firstName, string bookingNumber,
         string eventTitle, string totalFormatted, string checkinLink) =>
-        $"Booking Confirmed!\n\n" +
-        $"Hi {firstName}, your booking is all set.\n\n" +
-        $"Booking #: {bookingNumber}\n" +
-        $"Event: {eventTitle}\n" +
-        $"Total: {totalFormatted}\n\n" +
-        $"View your check-in QR code: {checkinLink}" +
-        Sign(brandName);
+        Wrap(brandName,
+            $"""
+            <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">Booking Confirmed!</h2>
+            <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">Hi {firstName}, your booking is all set.</p>
+            {InfoTable(
+                InfoRow("Booking #", bookingNumber) +
+                InfoRow("Event", eventTitle) +
+                InfoRow("Total", totalFormatted)
+            )}
+            {Button("View Check-in QR Code", checkinLink)}
+            """);
 
     public static string TicketInvite(
         string brandName, string guestName, string inviterName,
         string eventTitle, string eventDate, int seatNumber, string claimUrl) =>
-        $"You're Invited!\n\n" +
-        $"Hi{(string.IsNullOrEmpty(guestName) ? "" : $" {guestName}")}, {inviterName} has invited you to an event!\n\n" +
-        $"Event: {eventTitle}\n" +
-        $"Date: {eventDate}\n" +
-        $"Seat: #{seatNumber}\n\n" +
-        $"Claim your ticket: {claimUrl}\n\n" +
-        $"This invitation expires in 7 days." +
-        Sign(brandName);
+        Wrap(brandName,
+            $"""
+            <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">You're Invited!</h2>
+            <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">Hi{(string.IsNullOrEmpty(guestName) ? "" : $" {guestName}")}, <strong>{inviterName}</strong> has invited you to an event!</p>
+            {InfoTable(
+                InfoRow("Event", eventTitle) +
+                InfoRow("Date", eventDate) +
+                InfoRow("Seat", $"#{seatNumber}")
+            )}
+            {Button("Claim Your Ticket", claimUrl)}
+            <p style="margin:0;color:#71717a;font-size:13px;line-height:1.5;">This invitation expires in 7 days.</p>
+            """);
 
     public static string Invitation(string brandName, string inviterName, string role, string signupUrl, int expiryDays) =>
-        $"You've been invited to {brandName}\n\n" +
-        $"{inviterName} has invited you to join {brandName} as {(role == "Admin" ? "an" : "a")} {role}.\n\n" +
-        $"Click the link below to create your account:\n\n" +
-        $"{signupUrl}\n\n" +
-        $"This invitation expires in {expiryDays} days. If you weren't expecting this, you can safely ignore this email." +
-        Sign(brandName);
+        Wrap(brandName,
+            $"""
+            <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">You've been invited to {brandName}</h2>
+            <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;line-height:1.6;"><strong>{inviterName}</strong> has invited you to join {brandName} as {(role == "Admin" ? "an" : "a")} <strong>{role}</strong>.</p>
+            <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;line-height:1.6;">Click the button below to create your account:</p>
+            {Button("Create Account", signupUrl)}
+            <p style="margin:0;color:#71717a;font-size:13px;line-height:1.5;">This invitation expires in {expiryDays} days. If you weren't expecting this, you can safely ignore this email.</p>
+            """);
 }

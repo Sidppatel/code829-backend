@@ -234,6 +234,15 @@ try
             options.JsonSerializerOptions.DictionaryKeyPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         });
+    builder.Services.AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new Asp.Versioning.ApiVersion(1, 0);
+        options.AssumeDefaultVersionWhenUnspecified = true;
+        options.ReportApiVersions = true;
+        options.ApiVersionReader = Asp.Versioning.ApiVersionReader.Combine(
+            new Asp.Versioning.HeaderApiVersionReader("X-Api-Version"),
+            new Asp.Versioning.QueryStringApiVersionReader("api-version"));
+    });
     builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
@@ -334,6 +343,7 @@ try
 
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<RateLimitingMiddleware>();
+    app.UseMiddleware<IdempotencyMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();
 
     // HTTPS redirect in production
