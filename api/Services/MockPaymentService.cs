@@ -14,7 +14,7 @@ public class MockPaymentService : IPaymentService
         string? connectedAccountId,
         string currency = "usd")
     {
-        var intentId = $"pi_mock_{Guid.NewGuid():N}";
+        var intentId = $"pi_mock{Guid.NewGuid():N}";
         var clientSecret = $"{intentId}_secret_{Guid.NewGuid():N}";
         Log.Information("[MockPayment] Created intent {IntentId} for {Amount} cents, transfer={Transfer}, dest={Dest}",
             intentId, amountCents, transferAmountCents, connectedAccountId ?? "none");
