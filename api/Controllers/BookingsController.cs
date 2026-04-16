@@ -172,7 +172,9 @@ public class BookingsController(
     public async Task<IActionResult> GetStripeConfig()
     {
         var publishableKey = await settingsService.GetOrDefaultAsync("stripe_publishable_key", "");
-        return Ok(new { publishableKey });
+        var secretKey = await settingsService.GetOrDefaultAsync("stripe_secret_key", "");
+        var isLive = !string.IsNullOrEmpty(secretKey) && secretKey != "MOCK_DEV";
+        return Ok(new { publishableKey, mode = isLive ? "live" : "mock" });
     }
 
     [HttpGet("{id:guid}/qr")]
