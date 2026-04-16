@@ -19,18 +19,45 @@ public class AdminAuthService(
     IJwtService jwtService
 ) : IAdminAuthService
 {
+    private const int MaxFailedAttempts = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
     public async Task<(AdminUserDto User, string SessionToken, string Jwt)> LoginAsync(string email, string password, string? deviceName, string? ip)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
-        var admin = await context.AdminUsers.AsNoTracking()
+        var admin = await context.AdminUsers
             .FirstOrDefaultAsync(a => a.Email == normalizedEmail);
 
         if (admin is null || !admin.IsActive)
             throw new UnauthorizedAccessException("Invalid email or password");
 
+        // Check account lockout
+        if (admin.LockedUntil.HasValue && admin.LockedUntil.Value > DateTime.UtcNow)
+        {
+            var remaining = (int)Math.Ceiling((admin.LockedUntil.Value - DateTime.UtcNow).TotalMinutes);
+            throw new UnauthorizedAccessException($"Account is locked. Try again in {remaining} minute(s).");
+        }
+
         if (!BCrypt.Net.BCrypt.Verify(password, admin.PasswordHash))
+        {
+            admin.FailedLoginAttempts++;
+            if (admin.FailedLoginAttempts >= MaxFailedAttempts)
+            {
+                admin.LockedUntil = DateTime.UtcNow.Add(LockoutDuration);
+                Log.Warning("[AdminAuth] Account locked for {Email} after {Attempts} failed attempts", admin.Email, admin.FailedLoginAttempts);
+            }
+            await context.SaveChangesAsync();
             throw new UnauthorizedAccessException("Invalid email or password");
+        }
+
+        // Reset lockout on successful login
+        if (admin.FailedLoginAttempts > 0)
+        {
+            admin.FailedLoginAttempts = 0;
+            admin.LockedUntil = null;
+            await context.SaveChangesAsync();
+        }
 
         await adminProc.UpdateLastLoginAsync(admin.Id);
 

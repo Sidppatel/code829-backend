@@ -82,8 +82,9 @@ public class AdminStaffController(
         if (!isDeveloper && role != AdminRole.Staff)
             return StatusCode(403, new ApiError(403, "Admins can only create Staff users", HttpContext.TraceIdentifier));
 
-        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
-            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+        var (pwValid, pwError) = Helpers.PasswordValidator.Validate(request.Password);
+        if (!pwValid)
+            return BadRequest(new ApiError(400, pwError!, HttpContext.TraceIdentifier));
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 

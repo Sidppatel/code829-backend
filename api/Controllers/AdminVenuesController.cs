@@ -80,6 +80,9 @@ public class AdminVenuesController(
     [HttpPost("{id:guid}/image")]
     public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
     {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
         var venue = await context.Venues.FindAsync(id);
         if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 

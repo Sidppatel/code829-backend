@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Contracts.DTOs;
 using System.Text.Json;
 using Api.Middleware;
@@ -102,6 +103,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         // Use summary view for read, but fall back to entity for full data including template name
         var eventTables = await context.EventTables
@@ -119,6 +121,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         TableTemplate? template = null;
         if (request.TableTemplateId.HasValue)
@@ -172,6 +175,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPut("admin/events/{eventId:guid}/event-tables/{id:guid}")]
     public async Task<IActionResult> UpdateEventTable(Guid eventId, Guid id, [FromBody] UpdateEventTableRequest request)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         var et = await context.EventTables
             .Include(x => x.TableTemplate)
             .Include(x => x.Tables)
@@ -212,6 +219,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpDelete("admin/events/{eventId:guid}/event-tables/{id:guid}")]
     public async Task<IActionResult> DeleteEventTable(Guid eventId, Guid id)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         var et = await context.EventTables
             .Include(x => x.Tables)
             .FirstOrDefaultAsync(x => x.Id == id && x.EventId == eventId);
@@ -240,6 +251,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var tables = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId)
@@ -256,6 +268,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var locked = await GetLockedTableIdsAsync(eventId);
 
@@ -335,6 +348,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPost("admin/events/{eventId:guid}/layout/draft")]
     public async Task<IActionResult> SaveDraft(Guid eventId, [FromBody] SaveLayoutRequest request)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         // Drafts are ephemeral Redis data — allow saving even when some tables are locked.
         // Actual constraint enforcement happens in SaveLayout.
         var db = redis.GetDatabase();
@@ -346,6 +363,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpGet("admin/events/{eventId:guid}/layout/draft")]
     public async Task<IActionResult> LoadDraft(Guid eventId)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(DraftKey(eventId));
         if (cached.HasValue)
@@ -373,6 +394,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var locked = await GetLockedTableIdsAsync(eventId);
 
@@ -433,6 +455,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var eventTable = await context.EventTables.FindAsync(request.EventTableId);
         if (eventTable is null || eventTable.EventId != eventId)
@@ -461,6 +484,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpPut("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
     public async Task<IActionResult> UpdateTable(Guid eventId, Guid tableId, [FromBody] Contracts.DTOs.Layout.UpdateTableRequest request)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         var table = await context.Tables
             .Include(t => t.EventTable)
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
@@ -494,6 +521,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpDelete("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
     public async Task<IActionResult> DeleteTable(Guid eventId, Guid tableId)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         var table = await context.Tables
             .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId);
         if (table is null) return NotFound(new ApiError(404, "Table not found", HttpContext.TraceIdentifier));
@@ -514,6 +545,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var tables = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId && t.IsActive)
@@ -574,6 +606,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var stats = await context.TableViews.AsNoTracking()
             .Where(t => t.EventId == eventId && t.IsActive)
@@ -596,6 +629,10 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     [HttpGet("admin/events/{eventId:guid}/layout/locked")]
     public async Task<IActionResult> GetLockedTables(Guid eventId)
     {
+        var ev = await context.Events.FindAsync(eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
         var locked = await GetLockedTableIdsAsync(eventId);
         var layoutLocked = await IsLayoutLockedAsync(eventId);
         return Ok(new { layoutLocked, lockedTableIds = locked });
@@ -608,6 +645,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     {
         var ev = await context.Events.FindAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         // Find which templates already have an EventTable for this event
         var existingTemplateIds = await context.EventTables
@@ -657,6 +695,17 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
 
         return Ok(new BulkInsertResponse(0, []));
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Auth helpers
+    // ═══════════════════════════════════════════════════════════
+
+    private Guid GetCurrentUserId() =>
+        Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    private bool IsOwnerOrDeveloper(Guid organizerId) =>
+        organizerId == GetCurrentUserId()
+        || User.IsInRole(UserRole.Developer.ToString());
 
     // ═══════════════════════════════════════════════════════════
     //  Helpers

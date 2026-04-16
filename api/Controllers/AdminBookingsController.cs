@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Text.Json;
 using Api.Middleware;
 using Api.Services;
@@ -116,6 +117,14 @@ public class AdminBookingsController(
     [HttpPost("{id:guid}/refund")]
     public async Task<IActionResult> Refund(Guid id)
     {
+        var booking = await context.BookingViews.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        if (booking is null) return NotFound(new ApiError(404, "Booking not found", HttpContext.TraceIdentifier));
+
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var ev = await context.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == booking.EventId);
+        if (ev is not null && ev.OrganizerId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
+            return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
+
         await InvalidateBookingCaches();
         try { return Ok(await bookingService.RefundAsync(id)); }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminBookings] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }

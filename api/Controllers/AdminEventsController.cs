@@ -261,6 +261,9 @@ public class AdminEventsController(
     [HttpPost("{id:guid}/image")]
     public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
     {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
         var ev = await context.Events.FindAsync(id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();

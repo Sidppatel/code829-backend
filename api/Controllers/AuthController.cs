@@ -240,6 +240,9 @@ public class AuthController(
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> UploadAvatar(IFormFile file)
     {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
         var userId = GetUserId();
         if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 

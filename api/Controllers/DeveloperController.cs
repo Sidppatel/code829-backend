@@ -381,8 +381,9 @@ public class DeveloperController(
         if (!Enum.TryParse<AdminRole>(request.Role, true, out var role))
             return BadRequest(new ApiError(400, "Invalid role. Must be Staff, Admin, or Developer", HttpContext.TraceIdentifier));
 
-        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
-            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+        var (pwValid, pwError) = Api.Helpers.PasswordValidator.Validate(request.Password);
+        if (!pwValid)
+            return BadRequest(new ApiError(400, pwError!, HttpContext.TraceIdentifier));
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
@@ -430,8 +431,9 @@ public class DeveloperController(
         var admin = await context.AdminUsers.FindAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
-        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
-            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+        var (pwValid2, pwError2) = Api.Helpers.PasswordValidator.Validate(request.NewPassword);
+        if (!pwValid2)
+            return BadRequest(new ApiError(400, pwError2!, HttpContext.TraceIdentifier));
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         await adminUserProc.UpdatePasswordAsync(id, passwordHash);
@@ -461,6 +463,9 @@ public class DeveloperController(
     [HttpPost("logo")]
     public async Task<IActionResult> UploadLogo(IFormFile file)
     {
+        var (valid, error) = Api.Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
         var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
 
         // Use a fixed entity ID for the platform logo so there's only ever one

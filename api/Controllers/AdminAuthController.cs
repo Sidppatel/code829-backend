@@ -37,8 +37,9 @@ public class AdminAuthController(
             || string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
             return BadRequest(new ApiError(400, "All fields are required", HttpContext.TraceIdentifier));
 
-        if (request.Password.Length < 8)
-            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+        var (pwValid, pwError) = Helpers.PasswordValidator.Validate(request.Password);
+        if (!pwValid)
+            return BadRequest(new ApiError(400, pwError!, HttpContext.TraceIdentifier));
 
         try
         {
@@ -135,8 +136,9 @@ public class AdminAuthController(
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
             return BadRequest(new ApiError(400, "Both current and new passwords are required", HttpContext.TraceIdentifier));
 
-        if (request.NewPassword.Length < 8)
-            return BadRequest(new ApiError(400, "Password must be at least 8 characters", HttpContext.TraceIdentifier));
+        var (pwValid, pwError) = Helpers.PasswordValidator.Validate(request.NewPassword);
+        if (!pwValid)
+            return BadRequest(new ApiError(400, pwError!, HttpContext.TraceIdentifier));
 
         try
         {

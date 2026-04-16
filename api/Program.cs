@@ -272,11 +272,14 @@ try
         }
     }
 
-    // Seed data
-    await DataSeeder.SeedAsync(app.Services);
-    await VenueEventSeeder.SeedAsync(app.Services);
-    await LayoutSeeder.SeedAsync(app.Services);
-    await BookingSeeder.SeedAsync(app.Services);
+    // Seed data — only in development to prevent test data in production
+    if (app.Environment.IsDevelopment())
+    {
+        await DataSeeder.SeedAsync(app.Services);
+        await VenueEventSeeder.SeedAsync(app.Services);
+        await LayoutSeeder.SeedAsync(app.Services);
+        await BookingSeeder.SeedAsync(app.Services);
+    }
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);

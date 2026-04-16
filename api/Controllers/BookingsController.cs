@@ -125,10 +125,18 @@ public class BookingsController(
     [RequireRole(UserRole.Admin)]
     public async Task<IActionResult> Refund(Guid id)
     {
+        var booking = await context.BookingViews.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        if (booking is null) return NotFound(new ApiError(404, "Booking not found", HttpContext.TraceIdentifier));
+
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var ev = await context.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == booking.EventId);
+        if (ev is not null && ev.OrganizerId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
+            return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
+
         try
         {
-            var booking = await bookingService.RefundAsync(id);
-            return Ok(booking);
+            var result = await bookingService.RefundAsync(id);
+            return Ok(result);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
@@ -202,9 +210,8 @@ public class BookingsController(
     public Task<IActionResult> GetStripeConfig()
     {
         var publishableKey = secrets.StripePublishableKey;
-        var secretKey = secrets.StripeSecretKey;
-        var isLive = !string.IsNullOrEmpty(secretKey);
-        return Task.FromResult<IActionResult>(Ok(new { publishableKey, mode = isLive ? "live" : "mock" }));
+        var isLive = !string.IsNullOrEmpty(publishableKey) && publishableKey.StartsWith("pk_live_");
+        return Task.FromResult<IActionResult>(Ok(new { publishableKey, mode = isLive ? "live" : "test" }));
     }
 
     [HttpGet("{id:guid}/qr")]

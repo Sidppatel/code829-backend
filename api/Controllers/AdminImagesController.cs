@@ -30,6 +30,9 @@ public class AdminImagesController(
         [FromQuery] string entityType,
         [FromQuery] Guid entityId)
     {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
         if (entityType is not ("venue" or "event"))
             return BadRequest(new ApiError(400, "entityType must be 'venue' or 'event'", HttpContext.TraceIdentifier));
 

@@ -12,6 +12,8 @@ public class AdminUser : BaseEntity
     public AdminRole Role { get; set; } = AdminRole.Staff;
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
+    public int FailedLoginAttempts { get; set; }
+    public DateTime? LockedUntil { get; set; }
     public string? AvatarPath { get; set; }
     public string? Phone { get; set; }
 
