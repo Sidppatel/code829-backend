@@ -120,6 +120,7 @@ public class AuthService(
             .AsNoTracking()
             .Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
             .OrderByDescending(s => s.LastActivityAt)
+            .Take(50)
             .ToListAsync();
 
         return sessions.Select(s => new DeviceSessionDto(

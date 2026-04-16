@@ -89,6 +89,7 @@ public class AdminAuthService(
             .AsNoTracking()
             .Where(s => s.AdminUserId == adminUserId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
             .OrderByDescending(s => s.LastActivityAt)
+            .Take(50)
             .ToListAsync();
 
         return sessions.Select(s => new DeviceSessionDto(

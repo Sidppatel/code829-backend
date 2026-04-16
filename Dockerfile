@@ -13,4 +13,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV PORT=10000
 EXPOSE 10000
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health/live || exit 1
+
 ENTRYPOINT ["dotnet", "api.dll"]

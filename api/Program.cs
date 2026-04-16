@@ -234,6 +234,25 @@ try
             options.JsonSerializerOptions.DictionaryKeyPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         });
+    builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(e => e.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    e => e.Key,
+                    e => e.Value!.Errors.Select(er => er.ErrorMessage).ToArray());
+
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(new
+            {
+                statusCode = 400,
+                message = "Validation failed",
+                errors,
+                correlationId = context.HttpContext.TraceIdentifier,
+            });
+        };
+    });
     builder.Services.AddOpenApi();
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();

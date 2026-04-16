@@ -1,6 +1,7 @@
 using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Api.Helpers;
 using Serilog;
 
 namespace Api.Services;
@@ -50,7 +51,9 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
             DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
         };
 
-        await client.PutObjectAsync(request);
+        await RetryHelper.WithRetryAsync(
+            () => client.PutObjectAsync(request),
+            context: "S3 upload");
         Log.Information("[S3] Uploaded {Key} to {Bucket}", key, bucket);
         return key;
     }
@@ -75,7 +78,9 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
             Headers = { CacheControl = "public, max-age=31536000, immutable" }
         };
 
-        await client.PutObjectAsync(request);
+        await RetryHelper.WithRetryAsync(
+            () => client.PutObjectAsync(request),
+            context: "S3 upload");
         Log.Information("[S3] Uploaded {Key} to {Bucket}", key, bucket);
     }
 
@@ -86,11 +91,13 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
 
         try
         {
-            await client.DeleteObjectAsync(new DeleteObjectRequest
-            {
-                BucketName = bucket,
-                Key = path
-            });
+            await RetryHelper.WithRetryAsync(
+                () => client.DeleteObjectAsync(new DeleteObjectRequest
+                {
+                    BucketName = bucket,
+                    Key = path
+                }),
+                context: "S3 delete");
             Log.Information("[S3] Deleted {Path} from {Bucket}", path, bucket);
             return true;
         }

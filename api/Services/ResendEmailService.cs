@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Api.Helpers;
 using Db.Repositories.StoredProcedures;
 using Serilog;
 
@@ -20,11 +21,13 @@ public class ResendEmailService(ISecretsProvider secrets, ISettingsService setti
             ? JsonSerializer.Serialize(new { from = fromAddress, to = new[] { recipient }, subject, html = body })
             : JsonSerializer.Serialize(new { from = fromAddress, to = new[] { recipient }, subject, text = body });
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        var response = await Http.SendAsync(request);
+        var response = await RetryHelper.WithRetryAsync(async () =>
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            return await Http.SendAsync(request);
+        }, context: "Resend email");
         var responseBody = await response.Content.ReadAsStringAsync();
 
         var status = response.IsSuccessStatusCode ? "sent" : "failed";

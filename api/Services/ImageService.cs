@@ -66,7 +66,7 @@ public class ImageService(
     public async Task<List<ImageDto>> GetByEntityAsync(string entityType, Guid entityId)
     {
         var images = await imageRepo.GetByEntityAsync(entityType, entityId);
-        return images.Select(i => MapToDto(i)).ToList();
+        return images.Take(50).Select(i => MapToDto(i)).ToList();
     }
 
     public async Task<bool> DeleteAsync(Guid imageId)
