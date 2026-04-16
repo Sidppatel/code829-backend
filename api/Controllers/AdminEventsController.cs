@@ -96,6 +96,21 @@ public class AdminEventsController(
                     tt.SoldCount, tt.AvailableCount, tt.Description)).ToList()
             };
         }
+        else if (ev.LayoutMode == "Grid")
+        {
+            var tableTypeViews = await context.EventTablesSummaryViews.AsNoTracking()
+                .Where(t => t.EventId == id && t.IsActive)
+                .OrderBy(t => t.Label)
+                .ToListAsync();
+
+            dto = dto with {
+                TableTypes = tableTypeViews.Select(t => new EventTableTypeSummaryDto(
+                    t.Id, t.Label, t.Capacity, t.Shape, t.Color,
+                    t.PriceCents, t.PlatformFeeCents,
+                    t.PriceCents + (t.PlatformFeeCents ?? 0),
+                    t.TotalTables, t.AvailableTables, t.BookedTables)).ToList()
+            };
+        }
 
         return Ok(dto);
     }

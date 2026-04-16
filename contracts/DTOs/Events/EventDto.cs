@@ -33,5 +33,6 @@ public record EventDto(
     int? DisplayPricePerPersonCents = null,
     int? DisplayMinPricePerTableCents = null,
     int? DisplayMinTicketTypePriceCents = null,
-    List<EventTicketTypeDto>? TicketTypes = null
+    List<EventTicketTypeDto>? TicketTypes = null,
+    List<EventTableTypeSummaryDto>? TableTypes = null
 );
