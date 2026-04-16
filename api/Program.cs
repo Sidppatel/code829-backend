@@ -92,9 +92,13 @@ try
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
     });
 
-    // Kestrel on configurable port
+    // Kestrel on configurable port with request size limits
     var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 15 * 1024 * 1024; // 15 MB global limit
+    });
 
     // Database
     var dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
