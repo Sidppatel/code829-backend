@@ -191,6 +191,7 @@ try
 
     builder.Services.AddScoped<IPaymentService, StripePaymentService>();
     builder.Services.AddScoped<ITaxService, StripeTaxService>();
+    builder.Services.AddScoped<IPricingService, PricingService>();
 
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();

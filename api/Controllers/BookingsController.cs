@@ -17,6 +17,7 @@ namespace Api.Controllers;
 [Route("bookings")]
 public class BookingsController(
     IBookingService bookingService,
+    IPricingService pricingService,
     EventPlatformDbContext context,
     ISecretsProvider secrets
 ) : ControllerBase
@@ -33,6 +34,19 @@ public class BookingsController(
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+    }
+
+    [HttpPost("quote")]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> GetQuote([FromBody] PricingQuoteRequest request)
+    {
+        try
+        {
+            var quote = await pricingService.CalculateQuoteAsync(request);
+            return Ok(quote);
+        }
+        catch (KeyNotFoundException ex) { return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/confirm")]

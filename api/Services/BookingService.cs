@@ -17,6 +17,7 @@ public class BookingService(
     IStripeTransactionProcedures stripeTransactionProc,
     IPaymentService paymentService,
     ITaxService taxService,
+    IPricingService pricingService,
     IEmailService emailService,
     ISettingsService settings,
     IConnectionMultiplexer redis
@@ -57,8 +58,6 @@ public class BookingService(
         if (tables.Count != tableIds.Count)
             throw new KeyNotFoundException("One or more tables not found for this event");
 
-        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
-
         foreach (var table in tables)
         {
             if (table.Status != "Locked")
@@ -69,25 +68,17 @@ public class BookingService(
                 throw new InvalidOperationException($"Lock on table {table.Label} has expired");
         }
 
-        var subtotal = tables.Sum(t => t.PriceCents);
-        var fee = tables.Sum(t => t.PlatformFeeCents ?? defaultFeeCents);
-        var total = subtotal + fee;
+        var pricing = await pricingService.ComputeForBookingAsync(
+            new PricingQuoteRequest(ev.Id, TableIds: tableIds));
+        var subtotal = pricing.SubtotalCents;
+        var fee = pricing.FeeCents;
+        var total = pricing.TotalCents;
+        var piAmount = pricing.PaymentIntentAmountCents;
+        var taxCalculationId = pricing.TaxCalculationId;
+        var estimatedTaxCents = pricing.TaxCents;
         var totalSeats = tables.Sum(t => t.Capacity);
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
-        var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
-
-        var piAmount = total;
-        string? taxCalculationId = null;
-        int estimatedTaxCents = 0;
-        if (stripeTaxEnabled)
-        {
-            var taxResult = await taxService.CalculateAsync(total, "usd",
-                ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode);
-            piAmount = taxResult.AmountTotal;
-            taxCalculationId = taxResult.CalculationId;
-            estimatedTaxCents = taxResult.TaxAmountExclusive;
-        }
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
             piAmount, subtotal, organizer?.StripeConnectedAccountId);
@@ -183,27 +174,16 @@ public class BookingService(
                 throw new InvalidOperationException(
                     $"Not enough capacity. Available: {ev.MaxCapacity.Value - totalReserved}, requested: {seatsRequested}");
 
-            var pricePerPerson = selectedType?.PriceCents ?? ev.PricePerPersonCents!.Value;
-            var subtotal = pricePerPerson * seatsRequested;
-            var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
-            var feePerTicket = selectedType?.PlatformFeeCents ?? defaultFeeCents;
-            var fee = feePerTicket * seatsRequested;
-            var total = subtotal + fee;
+            var pricing = await pricingService.ComputeForBookingAsync(
+                new PricingQuoteRequest(ev.Id, SeatCount: seatsRequested, EventTicketTypeId: request.EventTicketTypeId));
+            var subtotal = pricing.SubtotalCents;
+            var fee = pricing.FeeCents;
+            var total = pricing.TotalCents;
+            var piAmount = pricing.PaymentIntentAmountCents;
+            var taxCalculationId = pricing.TaxCalculationId;
+            var estimatedTaxCents = pricing.TaxCents;
 
             var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
-            var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
-
-            var piAmount = total;
-            string? taxCalculationId = null;
-            int estimatedTaxCents = 0;
-            if (stripeTaxEnabled)
-            {
-                var taxResult = await taxService.CalculateAsync(total, "usd",
-                    ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode);
-                piAmount = taxResult.AmountTotal;
-                taxCalculationId = taxResult.CalculationId;
-                estimatedTaxCents = taxResult.TaxAmountExclusive;
-            }
 
             var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
                 piAmount, subtotal, organizer?.StripeConnectedAccountId);

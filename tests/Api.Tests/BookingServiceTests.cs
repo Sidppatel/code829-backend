@@ -23,6 +23,7 @@ public class BookingServiceTests : IDisposable
     private readonly Mock<IStripeTransactionProcedures> _stripeTransactionProc;
     private readonly Mock<IPaymentService> _paymentService;
     private readonly Mock<ITaxService> _taxService;
+    private readonly Mock<IPricingService> _pricingService;
     private readonly Mock<IEmailService> _emailService;
     private readonly Mock<ISettingsService> _settingsService;
     private readonly Mock<IConnectionMultiplexer> _redis;
@@ -40,6 +41,7 @@ public class BookingServiceTests : IDisposable
         _stripeTransactionProc = new Mock<IStripeTransactionProcedures>();
         _paymentService = new Mock<IPaymentService>();
         _taxService = new Mock<ITaxService>();
+        _pricingService = new Mock<IPricingService>();
         _emailService = new Mock<IEmailService>();
         _settingsService = new Mock<ISettingsService>();
         _redis = new Mock<IConnectionMultiplexer>();
@@ -50,7 +52,8 @@ public class BookingServiceTests : IDisposable
             .ReturnsAsync("10");
 
         _service = new BookingService(_context, _bookingProc.Object, _stripeTransactionProc.Object,
-            _paymentService.Object, _taxService.Object, _emailService.Object, _settingsService.Object, _redis.Object);
+            _paymentService.Object, _taxService.Object, _pricingService.Object,
+            _emailService.Object, _settingsService.Object, _redis.Object);
 
         _userId = Guid.NewGuid();
         _eventId = Guid.NewGuid();
