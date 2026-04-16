@@ -31,37 +31,48 @@ public class BookingService(
         if (ev.Status != "Published")
             throw new InvalidOperationException("Event is not available for booking");
 
-        if (request.TableId.HasValue)
-            return await CreateTableBookingAsync(userId, request, ev);
+        // Normalize: TableIds takes precedence, fall back to single TableId
+        var tableIds = request.TableIds is { Count: > 0 }
+            ? request.TableIds
+            : request.TableId.HasValue ? [request.TableId.Value] : null;
+
+        if (tableIds is { Count: > 0 })
+            return await CreateTableBookingAsync(userId, tableIds, ev);
 
         if (request.SeatsReserved.HasValue)
             return await CreateCapacityBookingAsync(userId, request, ev);
 
-        throw new InvalidOperationException("Either TableId (for Grid events) or SeatsReserved (for Open events) is required");
+        throw new InvalidOperationException("Either TableId/TableIds (for Grid events) or SeatsReserved (for Open events) is required");
     }
 
-    private async Task<BookingDto> CreateTableBookingAsync(Guid userId, CreateBookingRequest request, EventView ev)
+    private async Task<BookingDto> CreateTableBookingAsync(Guid userId, List<Guid> tableIds, EventView ev)
     {
         if (ev.LayoutMode != "Grid")
             throw new InvalidOperationException("Table bookings are only available for Grid events");
 
-        var table = await context.TableViews.AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == request.TableId!.Value && t.EventId == request.EventId)
-            ?? throw new KeyNotFoundException("Table not found for this event");
+        var tables = await context.TableViews.AsNoTracking()
+            .Where(t => tableIds.Contains(t.Id) && t.EventId == ev.Id)
+            .ToListAsync();
 
-        if (table.Status != "Locked")
-            throw new InvalidOperationException("Table must be locked before booking");
+        if (tables.Count != tableIds.Count)
+            throw new KeyNotFoundException("One or more tables not found for this event");
 
-        if (table.LockedByUserId != userId)
-            throw new InvalidOperationException("You do not hold this table");
-
-        if (table.LockExpiresAt <= DateTime.UtcNow)
-            throw new InvalidOperationException("Table lock has expired");
-
-        var subtotal = table.PriceCents;
         var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
-        var fee = table.PlatformFeeCents ?? defaultFeeCents;
+
+        foreach (var table in tables)
+        {
+            if (table.Status != "Locked")
+                throw new InvalidOperationException($"Table {table.Label} must be locked before booking");
+            if (table.LockedByUserId != userId)
+                throw new InvalidOperationException($"You do not hold table {table.Label}");
+            if (table.LockExpiresAt <= DateTime.UtcNow)
+                throw new InvalidOperationException($"Lock on table {table.Label} has expired");
+        }
+
+        var subtotal = tables.Sum(t => t.PriceCents);
+        var fee = tables.Sum(t => t.PlatformFeeCents ?? defaultFeeCents);
         var total = subtotal + fee;
+        var totalSeats = tables.Sum(t => t.Capacity);
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
         var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
@@ -81,18 +92,27 @@ public class BookingService(
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
             piAmount, subtotal, organizer?.StripeConnectedAccountId);
 
+        // Create booking with the first table as primary (for backward compat)
         var bookingNumber = GenerateBookingNumber();
         var bookingId = await bookingProc.CreateBookingAsync(
-            userId, request.EventId, table.Id, null, null, subtotal, fee, total, bookingNumber);
+            userId, ev.Id, tables[0].Id, totalSeats, null, subtotal, fee, total, bookingNumber);
+
+        // Insert additional tables into junction table
+        foreach (var table in tables.Skip(1))
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO booking_tables (\"BookingId\", \"TableId\") VALUES (@p0, @p1) ON CONFLICT DO NOTHING",
+                bookingId, table.Id);
+        }
 
         await stripeTransactionProc.CreateAsync(bookingId, intentId, total, subtotal, taxCalculationId);
 
-        Log.Information("[Booking] Created table booking {BookingNumber} for table {TableLabel}, event {EventId}, total ${Total}, tax ${Tax}",
-            bookingNumber, table.Label, request.EventId, total / 100.0, estimatedTaxCents / 100.0);
+        var tableLabels = string.Join(", ", tables.Select(t => t.Label));
+        Log.Information("[Booking] Created multi-table booking {BookingNumber} for tables [{Tables}], event {EventId}, total ${Total}, tax ${Tax}",
+            bookingNumber, tableLabels, ev.Id, total / 100.0, estimatedTaxCents / 100.0);
 
         var dto = await GetByIdAsync(bookingId) ?? throw new InvalidOperationException("Booking creation failed");
 
-        // Pre-populate estimated tax so the checkout page can display it immediately
         if (estimatedTaxCents > 0 && dto.Transaction is not null)
         {
             dto = dto with

@@ -19,6 +19,11 @@ public record ReleaseBeaconRequest(
     public Guid EventTableId => TableId;
 };
 
+public record CancelBeaconRequest(
+    Guid BookingId,
+    string Token
+);
+
 public record TableLockDto(
     Guid TableId,
     string TableLabel,

@@ -7,6 +7,7 @@ public record EventTableDto(
     string Shape,
     string? Color,
     int PriceCents,
+    int DisplayPriceCents,
     int GridRow,
     int GridCol,
     int SortOrder,
@@ -24,6 +25,7 @@ public record EventTableTypeInfo(
     string Shape,
     string? Color,
     int PriceCents,
+    int DisplayPriceCents,
     int? PlatformFeeCents = null
 );
 

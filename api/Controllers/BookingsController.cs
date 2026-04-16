@@ -3,6 +3,7 @@ using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
 using Contracts.DTOs.Bookings;
+using Contracts.DTOs.Tables;
 using Contracts.Enums;
 using Db;
 using Microsoft.AspNetCore.Authorization;
@@ -89,6 +90,35 @@ public class BookingsController(
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Bookings] Cancel failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
         catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Bookings] Cancel forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
+    }
+
+    /// <summary>
+    /// Fire-and-forget booking cancellation via navigator.sendBeacon (no auth header possible).
+    /// JWT is passed in the request body. Also releases the table lock via sp_cancel_booking.
+    /// </summary>
+    [HttpPost("cancel-beacon")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CancelBeacon([FromBody] CancelBeaconRequest request)
+    {
+        try
+        {
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtOptions = HttpContext.RequestServices
+                .GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>()
+                .Get(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
+            var principal = handler.ValidateToken(request.Token, jwtOptions.TokenValidationParameters, out _);
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized();
+
+            await bookingService.CancelAsync(request.BookingId, userId);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[Bookings] Beacon cancel failed for booking {BookingId}", request.BookingId);
+            return Ok(); // Still return 200 for beacon (fire-and-forget)
+        }
     }
 
     [HttpPost("{id:guid}/refund")]

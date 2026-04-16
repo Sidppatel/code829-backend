@@ -368,7 +368,8 @@ public class EventsController(
         var eventTableTypes = await context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id)
             .Select(et => new EventTableTypeInfo(
-                et.Id, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents))
+                et.Id, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents,
+                et.PriceCents + (et.PlatformFeeCents ?? 0)))
             .ToListAsync();
 
         var dtos = tables.Select(t =>
@@ -393,7 +394,7 @@ public class EventsController(
             }
 
             return new EventTableDto(t.Id, t.Label, t.Capacity,
-                t.Shape, t.Color, t.PriceCents,
+                t.Shape, t.Color, t.PriceCents, t.TotalPriceCents,
                 t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt, isLockedByYou,
                 t.EventTableId, t.EventTableLabel);
         }).ToList();
