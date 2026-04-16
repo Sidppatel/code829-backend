@@ -13,7 +13,7 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260415081819_Initial")]
+    [Migration("20260416012157_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1076,7 +1076,7 @@ namespace db.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Db.Entities.Payment", b =>
+            modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1119,6 +1119,26 @@ namespace db.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<int?>("StripeFeesCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TaxAmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TaxCalculationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("TaxTransactionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("TotalChargedCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TransferAmountCents")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1134,21 +1154,29 @@ namespace db.Migrations
 
                     b.HasIndex("Status", "PaidAt");
 
-                    b.ToTable("payments", null, t =>
+                    b.ToTable("stripe_transactions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_payments_AmountCents", "\"AmountCents\" >= 0");
+                            t.HasCheckConstraint("CK_stripe_transactions_AmountCents", "\"AmountCents\" >= 0");
 
-                            t.HasCheckConstraint("CK_payments_Currency", "\"Currency\" IN ('usd')");
+                            t.HasCheckConstraint("CK_stripe_transactions_Currency", "\"Currency\" IN ('usd')");
 
-                            t.HasCheckConstraint("CK_payments_NotRefundedNoRefundDate", "\"Status\" = 'Refunded' OR \"RefundedAt\" IS NULL");
+                            t.HasCheckConstraint("CK_stripe_transactions_NotRefundedNoRefundDate", "\"Status\" = 'Refunded' OR \"RefundedAt\" IS NULL");
 
-                            t.HasCheckConstraint("CK_payments_PaidLifecycle", "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
+                            t.HasCheckConstraint("CK_stripe_transactions_PaidLifecycle", "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
 
-                            t.HasCheckConstraint("CK_payments_PendingNoPaidDate", "\"Status\" NOT IN ('RequiresConfirmation','Failed') OR \"PaidAt\" IS NULL");
+                            t.HasCheckConstraint("CK_stripe_transactions_PendingNoPaidDate", "\"Status\" NOT IN ('RequiresConfirmation','Failed') OR \"PaidAt\" IS NULL");
 
-                            t.HasCheckConstraint("CK_payments_RefundLifecycle", "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
+                            t.HasCheckConstraint("CK_stripe_transactions_RefundLifecycle", "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
 
-                            t.HasCheckConstraint("CK_payments_Status", "\"Status\" IN ('RequiresConfirmation','Succeeded','Failed','Refunded')");
+                            t.HasCheckConstraint("CK_stripe_transactions_Status", "\"Status\" IN ('RequiresConfirmation','Succeeded','Failed','Refunded')");
+
+                            t.HasCheckConstraint("CK_stripe_transactions_StripeFees", "\"StripeFeesCents\" IS NULL OR \"StripeFeesCents\" >= 0");
+
+                            t.HasCheckConstraint("CK_stripe_transactions_TaxAmount", "\"TaxAmountCents\" IS NULL OR \"TaxAmountCents\" >= 0");
+
+                            t.HasCheckConstraint("CK_stripe_transactions_TotalCharged", "\"TotalChargedCents\" IS NULL OR \"TotalChargedCents\" >= 0");
+
+                            t.HasCheckConstraint("CK_stripe_transactions_TransferAmount", "\"TransferAmountCents\" IS NULL OR \"TransferAmountCents\" >= 0");
                         });
                 });
 
@@ -1632,9 +1660,6 @@ namespace db.Migrations
                     b.Property<int?>("PaymentAmountCents")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("PaymentId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("PaymentIntentId")
                         .HasColumnType("text");
 
@@ -1654,6 +1679,12 @@ namespace db.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("StripeFeesCents")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StripeTransactionId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("SubtotalCents")
                         .HasColumnType("integer");
 
@@ -1663,10 +1694,25 @@ namespace db.Migrations
                     b.Property<string>("TableLabel")
                         .HasColumnType("text");
 
+                    b.Property<int?>("TaxAmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TaxCalculationId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TaxTransactionId")
+                        .HasColumnType("text");
+
                     b.Property<int>("TicketCount")
                         .HasColumnType("integer");
 
                     b.Property<int>("TotalCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TotalChargedCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TransferAmountCents")
                         .HasColumnType("integer");
 
                     b.Property<string>("UserEmail")
@@ -1721,6 +1767,12 @@ namespace db.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DisplayMinTablePriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DisplayMinTicketTypePriceCents")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");
@@ -1886,6 +1938,9 @@ namespace db.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<int>("TotalPriceCents")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.ToTable((string)null);
@@ -1910,6 +1965,12 @@ namespace db.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<int?>("DisplayMinTablePriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DisplayMinTicketTypePriceCents")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");
@@ -2093,6 +2154,9 @@ namespace db.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("TotalPriceCents")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2367,11 +2431,11 @@ namespace db.Migrations
                     b.Navigation("InvitedBy");
                 });
 
-            modelBuilder.Entity("Db.Entities.Payment", b =>
+            modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.HasOne("Db.Entities.Booking", "Booking")
-                        .WithOne("Payment")
-                        .HasForeignKey("Db.Entities.Payment", "BookingId")
+                        .WithOne("StripeTransaction")
+                        .HasForeignKey("Db.Entities.StripeTransaction", "BookingId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -2426,7 +2490,7 @@ namespace db.Migrations
 
             modelBuilder.Entity("Db.Entities.Booking", b =>
                 {
-                    b.Navigation("Payment");
+                    b.Navigation("StripeTransaction");
 
                     b.Navigation("Tickets");
                 });

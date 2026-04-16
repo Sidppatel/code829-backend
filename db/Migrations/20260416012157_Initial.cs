@@ -638,33 +638,43 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "payments",
+                name: "stripe_transactions",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
                     BookingId = table.Column<Guid>(type: "uuid", nullable: false),
                     PaymentIntentId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
-                    AmountCents = table.Column<int>(type: "integer", nullable: false),
                     Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
-                    RefundId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    AmountCents = table.Column<int>(type: "integer", nullable: false),
+                    TransferAmountCents = table.Column<int>(type: "integer", nullable: true),
+                    TaxCalculationId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    TaxTransactionId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    TotalChargedCents = table.Column<int>(type: "integer", nullable: true),
+                    TaxAmountCents = table.Column<int>(type: "integer", nullable: true),
+                    StripeFeesCents = table.Column<int>(type: "integer", nullable: true),
                     PaidAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    RefundId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     RefundedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_payments", x => x.Id);
-                    table.CheckConstraint("CK_payments_AmountCents", "\"AmountCents\" >= 0");
-                    table.CheckConstraint("CK_payments_Currency", "\"Currency\" IN ('usd')");
-                    table.CheckConstraint("CK_payments_NotRefundedNoRefundDate", "\"Status\" = 'Refunded' OR \"RefundedAt\" IS NULL");
-                    table.CheckConstraint("CK_payments_PaidLifecycle", "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
-                    table.CheckConstraint("CK_payments_PendingNoPaidDate", "\"Status\" NOT IN ('RequiresConfirmation','Failed') OR \"PaidAt\" IS NULL");
-                    table.CheckConstraint("CK_payments_RefundLifecycle", "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
-                    table.CheckConstraint("CK_payments_Status", "\"Status\" IN ('RequiresConfirmation','Succeeded','Failed','Refunded')");
+                    table.PrimaryKey("PK_stripe_transactions", x => x.Id);
+                    table.CheckConstraint("CK_stripe_transactions_AmountCents", "\"AmountCents\" >= 0");
+                    table.CheckConstraint("CK_stripe_transactions_Currency", "\"Currency\" IN ('usd')");
+                    table.CheckConstraint("CK_stripe_transactions_NotRefundedNoRefundDate", "\"Status\" = 'Refunded' OR \"RefundedAt\" IS NULL");
+                    table.CheckConstraint("CK_stripe_transactions_PaidLifecycle", "\"Status\" NOT IN ('Succeeded','Refunded') OR \"PaidAt\" IS NOT NULL");
+                    table.CheckConstraint("CK_stripe_transactions_PendingNoPaidDate", "\"Status\" NOT IN ('RequiresConfirmation','Failed') OR \"PaidAt\" IS NULL");
+                    table.CheckConstraint("CK_stripe_transactions_RefundLifecycle", "\"Status\" <> 'Refunded' OR \"RefundedAt\" IS NOT NULL");
+                    table.CheckConstraint("CK_stripe_transactions_Status", "\"Status\" IN ('RequiresConfirmation','Succeeded','Failed','Refunded')");
+                    table.CheckConstraint("CK_stripe_transactions_StripeFees", "\"StripeFeesCents\" IS NULL OR \"StripeFeesCents\" >= 0");
+                    table.CheckConstraint("CK_stripe_transactions_TaxAmount", "\"TaxAmountCents\" IS NULL OR \"TaxAmountCents\" >= 0");
+                    table.CheckConstraint("CK_stripe_transactions_TotalCharged", "\"TotalChargedCents\" IS NULL OR \"TotalChargedCents\" >= 0");
+                    table.CheckConstraint("CK_stripe_transactions_TransferAmount", "\"TransferAmountCents\" IS NULL OR \"TransferAmountCents\" >= 0");
                     table.ForeignKey(
-                        name: "FK_payments_bookings_BookingId",
+                        name: "FK_stripe_transactions_bookings_BookingId",
                         column: x => x.BookingId,
                         principalTable: "bookings",
                         principalColumn: "Id",
@@ -923,20 +933,20 @@ namespace db.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_payments_BookingId",
-                table: "payments",
+                name: "IX_stripe_transactions_BookingId",
+                table: "stripe_transactions",
                 column: "BookingId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_payments_PaymentIntentId",
-                table: "payments",
+                name: "IX_stripe_transactions_PaymentIntentId",
+                table: "stripe_transactions",
                 column: "PaymentIntentId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_payments_Status_PaidAt",
-                table: "payments",
+                name: "IX_stripe_transactions_Status_PaidAt",
+                table: "stripe_transactions",
                 columns: new[] { "Status", "PaidAt" });
 
             migrationBuilder.CreateIndex(
@@ -1007,7 +1017,6 @@ namespace db.Migrations
                 name: "IX_venues_Name",
                 table: "venues",
                 column: "Name");
-
             migrationBuilder.Sql(@"
 CREATE OR REPLACE VIEW v_events AS
 SELECT
@@ -1057,7 +1066,9 @@ SELECT
     COALESCE(bs.sold, 0)::int AS ""TotalSold"",
     COALESCE(ts.available, 0)::int AS ""AvailableTables"",
     ts.min_price::int AS ""MinTablePriceCents"",
-    ettp.min_price::int AS ""MinTicketTypePriceCents""
+    ettp.min_price::int AS ""MinTicketTypePriceCents"",
+    ts.min_total_price::int AS ""DisplayMinTablePriceCents"",
+    ettp.min_total_price::int AS ""DisplayMinTicketTypePriceCents""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
 LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
@@ -1068,13 +1079,13 @@ LEFT JOIN LATERAL (
     WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid','CheckedIn')
 ) bs ON true
 LEFT JOIN LATERAL (
-    SELECT COUNT(*)::int AS available, MIN(et.""PriceCents"") AS min_price
+    SELECT COUNT(*)::int AS available, MIN(et.""PriceCents"") AS min_price, MIN(et.""PriceCents"" + COALESCE(et.""PlatformFeeCents"", 0)) AS min_total_price
     FROM tables t
     JOIN event_tables et ON t.""EventTableId"" = et.""Id""
     WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true AND t.""Status"" = 'Available'
 ) ts ON true
 LEFT JOIN LATERAL (
-    SELECT MIN(ett.""PriceCents"") AS min_price
+    SELECT MIN(ett.""PriceCents"") AS min_price, MIN(ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0)) AS min_total_price
     FROM event_ticket_types ett
     WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
 ) ettp ON true
@@ -1125,6 +1136,8 @@ SELECT
     COALESCE(ts.available, 0)::int AS ""AvailableTables"",
     ts.min_price::int AS ""MinTablePriceCents"",
     ettp.min_price::int AS ""MinTicketTypePriceCents"",
+    ts.min_total_price::int AS ""DisplayMinTablePriceCents"",
+    ettp.min_total_price::int AS ""DisplayMinTicketTypePriceCents"",
     e.""CreatedAt"" AS ""CreatedAt""
 FROM events e
 JOIN venues v ON e.""VenueId"" = v.""Id""
@@ -1142,13 +1155,13 @@ LEFT JOIN LATERAL (
     WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid','CheckedIn')
 ) bs ON true
 LEFT JOIN LATERAL (
-    SELECT COUNT(*)::int AS available, MIN(et.""PriceCents"") AS min_price
+    SELECT COUNT(*)::int AS available, MIN(et.""PriceCents"") AS min_price, MIN(et.""PriceCents"" + COALESCE(et.""PlatformFeeCents"", 0)) AS min_total_price
     FROM tables t
     JOIN event_tables et ON t.""EventTableId"" = et.""Id""
     WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true AND t.""Status"" = 'Available'
 ) ts ON true
 LEFT JOIN LATERAL (
-    SELECT MIN(ett.""PriceCents"") AS min_price
+    SELECT MIN(ett.""PriceCents"") AS min_price, MIN(ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0)) AS min_total_price
     FROM event_ticket_types ett
     WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
 ) ettp ON true
@@ -1189,6 +1202,7 @@ SELECT
     t.""CreatedAt"", t.""UpdatedAt"",
     et.""Capacity"", et.""Shape""::text, et.""Color"",
     et.""PriceCents"", et.""PlatformFeeCents"",
+    et.""PriceCents"" + COALESCE(et.""PlatformFeeCents"", 0) AS ""TotalPriceCents"",
     et.""Label"" AS ""EventTableLabel""
 FROM tables t
 JOIN event_tables et ON t.""EventTableId"" = et.""Id"";
@@ -1219,11 +1233,17 @@ SELECT
     tbl.""Label"" AS ""TableLabel"",
     b.""EventTicketTypeId"",
     ett.""Label"" AS ""EventTicketTypeLabel"",
-    p.""Id"" AS ""PaymentId"",
-    p.""PaymentIntentId"",
-    p.""Status""::text AS ""PaymentStatus"",
-    p.""AmountCents"" AS ""PaymentAmountCents"",
-    p.""PaidAt"", p.""RefundedAt"",
+    st.""Id"" AS ""StripeTransactionId"",
+    st.""PaymentIntentId"",
+    st.""TaxCalculationId"",
+    st.""TaxTransactionId"",
+    st.""Status""::text AS ""PaymentStatus"",
+    st.""AmountCents"" AS ""PaymentAmountCents"",
+    st.""TotalChargedCents"",
+    st.""TaxAmountCents"",
+    st.""StripeFeesCents"",
+    st.""TransferAmountCents"",
+    st.""PaidAt"", st.""RefundedAt"",
     COALESCE(tc.cnt, 0)::int AS ""TicketCount"",
     e.""OrganizerId""
 FROM bookings b
@@ -1233,7 +1253,7 @@ JOIN venues v ON e.""VenueId"" = v.""Id""
 LEFT JOIN addresses addr ON v.""AddressId"" = addr.""Id""
 LEFT JOIN tables tbl ON b.""TableId"" = tbl.""Id""
 LEFT JOIN event_ticket_types ett ON b.""EventTicketTypeId"" = ett.""Id""
-LEFT JOIN payments p ON p.""BookingId"" = b.""Id""
+LEFT JOIN stripe_transactions st ON st.""BookingId"" = b.""Id""
 LEFT JOIN LATERAL (
     SELECT COUNT(*)::int AS cnt FROM booking_tickets bt WHERE bt.""BookingId"" = b.""Id""
 ) tc ON true;
@@ -1315,6 +1335,7 @@ SELECT
     ett.""Id"", ett.""EventId"", ett.""Label"", ett.""PriceCents"",
     ett.""PlatformFeeCents"", ett.""MaxQuantity"", ett.""SortOrder"", ett.""IsActive"",
     ett.""Description"",
+    ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0) AS ""TotalPriceCents"",
     COALESCE(bs.sold, 0)::int AS ""SoldCount"",
     CASE
         WHEN ett.""MaxQuantity"" IS NULL THEN -1
@@ -1354,7 +1375,7 @@ BEGIN
     UPDATE magic_link_tokens
     SET ""IsUsed"" = true, ""UsedAt"" = now(), ""UpdatedAt"" = now()
     WHERE ""TokenHash"" = p_token_hash AND ""IsUsed"" = false AND ""ExpiresAt"" > now()
-    RETURNING magic_link_tokens.""Id"", magic_link_tokens.""Email"", magic_link_tokens.""ExpiresAt"";
+    RETURNING magic_link_tokens.""Id"", magic_link_tokens.""Email""::text, magic_link_tokens.""ExpiresAt"";
 END; $$;
 ");
 
@@ -1721,7 +1742,7 @@ BEGIN
         ""UpdatedAt"" = now()
     WHERE tables.""Id"" = p_table_id AND tables.""EventId"" = p_event_id
       AND tables.""Status"" = 'Available' AND tables.""IsActive"" = true
-    RETURNING tables.""Id"", tables.""Label"", tables.""LockExpiresAt"";
+    RETURNING tables.""Id"", tables.""Label""::text, tables.""LockExpiresAt"";
 END; $$;
 ");
 
@@ -1824,7 +1845,7 @@ DECLARE v_table_id uuid;
 BEGIN
     UPDATE bookings SET ""Status"" = 'Refunded', ""UpdatedAt"" = now()
     WHERE ""Id"" = p_booking_id RETURNING ""TableId"" INTO v_table_id;
-    UPDATE payments SET ""Status"" = 'Refunded', ""RefundedAt"" = now(), ""UpdatedAt"" = now()
+    UPDATE stripe_transactions SET ""Status"" = 'Refunded', ""RefundedAt"" = now(), ""UpdatedAt"" = now()
     WHERE ""BookingId"" = p_booking_id;
     IF v_table_id IS NOT NULL THEN
         UPDATE tables SET ""Status"" = 'Available', ""LockedByUserId"" = NULL,
@@ -1862,31 +1883,58 @@ BEGIN
 END; $$;
 ");
 
-            // ─── PAYMENT STORED PROCEDURES ────────────────────────────────────────────────
+            // ─── STRIPE TRANSACTION STORED PROCEDURES ──────────────────────────────────────
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE FUNCTION sp_create_payment(
-    p_booking_id uuid, p_intent_id text, p_amount_cents int, p_currency text DEFAULT 'usd'
+CREATE OR REPLACE FUNCTION sp_create_stripe_transaction(
+    p_booking_id uuid, p_intent_id text, p_amount_cents int,
+    p_transfer_amount_cents int DEFAULT NULL, p_tax_calculation_id text DEFAULT NULL,
+    p_currency text DEFAULT 'usd'
 ) RETURNS uuid LANGUAGE plpgsql AS $$
 DECLARE v_id uuid;
 BEGIN
-    INSERT INTO payments (""Id"", ""BookingId"", ""PaymentIntentId"", ""Status"",
-        ""AmountCents"", ""Currency"", ""CreatedAt"", ""UpdatedAt"")
+    INSERT INTO stripe_transactions (""Id"", ""BookingId"", ""PaymentIntentId"", ""Status"",
+        ""AmountCents"", ""TransferAmountCents"", ""TaxCalculationId"", ""Currency"", ""CreatedAt"", ""UpdatedAt"")
     VALUES (gen_random_uuid(), p_booking_id, p_intent_id, 'RequiresConfirmation',
-        p_amount_cents, p_currency, now(), now())
+        p_amount_cents, p_transfer_amount_cents, p_tax_calculation_id, p_currency, now(), now())
     RETURNING ""Id"" INTO v_id;
     RETURN v_id;
 END; $$;
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE FUNCTION sp_update_payment_status(p_intent_id text, p_status text)
+CREATE OR REPLACE FUNCTION sp_update_stripe_transaction_status(p_intent_id text, p_status text)
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-    UPDATE payments SET
+    UPDATE stripe_transactions SET
         ""Status"" = p_status,
         ""PaidAt"" = CASE WHEN p_status IN ('Succeeded','Refunded') AND ""PaidAt"" IS NULL THEN now() ELSE ""PaidAt"" END,
         ""RefundedAt"" = CASE WHEN p_status = 'Refunded' THEN now() ELSE ""RefundedAt"" END,
+        ""UpdatedAt"" = now()
+    WHERE ""PaymentIntentId"" = p_intent_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_enrich_stripe_transaction(
+    p_intent_id text, p_total_charged_cents int, p_tax_amount_cents int, p_stripe_fees_cents int
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE stripe_transactions SET
+        ""TotalChargedCents"" = p_total_charged_cents,
+        ""TaxAmountCents"" = p_tax_amount_cents,
+        ""StripeFeesCents"" = p_stripe_fees_cents,
+        ""UpdatedAt"" = now()
+    WHERE ""PaymentIntentId"" = p_intent_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_set_stripe_tax_transaction_id(p_intent_id text, p_tax_transaction_id text)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE stripe_transactions SET
+        ""TaxTransactionId"" = p_tax_transaction_id,
         ""UpdatedAt"" = now()
     WHERE ""PaymentIntentId"" = p_intent_id;
 END; $$;
@@ -2161,7 +2209,7 @@ END; $$;
             var auditTables = new[]
             {
                 "users", "addresses", "events", "venues", "event_tables", "tables",
-                "bookings", "booking_tickets", "payments", "images", "feedbacks",
+                "bookings", "booking_tickets", "stripe_transactions", "images", "feedbacks",
                 "magic_link_tokens", "device_sessions", "app_settings", "table_templates"
             };
             foreach (var table in auditTables)
@@ -2208,7 +2256,7 @@ FOR EACH ROW EXECUTE FUNCTION fn_audit_trigger();
                 name: "magic_link_tokens");
 
             migrationBuilder.DropTable(
-                name: "payments");
+                name: "stripe_transactions");
 
             migrationBuilder.DropTable(
                 name: "system_logs");

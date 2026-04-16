@@ -12,6 +12,9 @@ public class EventTicketTypeSummaryView
     public string? Description { get; set; }
     public bool IsActive { get; set; }
 
+    // Computed
+    public int TotalPriceCents { get; set; }
+
     // Aggregates
     public int SoldCount { get; set; }
     public int AvailableCount { get; set; }

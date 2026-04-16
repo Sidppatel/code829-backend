@@ -22,5 +22,6 @@ public class TableView
     public string? Color { get; set; }
     public int PriceCents { get; set; }
     public int? PlatformFeeCents { get; set; }
+    public int TotalPriceCents { get; set; }
     public string EventTableLabel { get; set; } = null!;
 }

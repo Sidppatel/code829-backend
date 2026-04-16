@@ -26,5 +26,7 @@ public class EventSummaryView
     public int AvailableTables { get; set; }
     public int? MinTablePriceCents { get; set; }
     public int? MinTicketTypePriceCents { get; set; }
+    public int? DisplayMinTablePriceCents { get; set; }
+    public int? DisplayMinTicketTypePriceCents { get; set; }
     public DateTime CreatedAt { get; set; }
 }

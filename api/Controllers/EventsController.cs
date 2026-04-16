@@ -126,6 +126,8 @@ public class EventsController(
             .Take(pageSize)
             .ToListAsync();
 
+        var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
+
         var dtos = items.Select(e => new EventSummaryDto(
             e.Id, e.Title, e.Slug, e.Status, e.Category,
             e.StartDate, e.EndDate,
@@ -140,7 +142,10 @@ public class EventsController(
             e.TotalSold,
             e.AvailableTables,
             e.MinTablePriceCents,
-            e.MinTicketTypePriceCents
+            e.MinTicketTypePriceCents,
+            e.PricePerPersonCents.HasValue ? e.PricePerPersonCents.Value + defaultOpenFee : null,
+            e.DisplayMinTablePriceCents,
+            e.DisplayMinTicketTypePriceCents
         )).ToList();
 
         var result = new PagedResponse<EventSummaryDto>(dtos, totalCount, page, pageSize);
@@ -265,8 +270,9 @@ public class EventsController(
         var imageUrl = ev.ImagePath is not null
             ? fileStorage.GetPublicUrl(ev.ImagePath)
             : await ResolveEventImageUrlAsync(ev.Id);
+        var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
 
-        return Ok(MapEventDto(ev, imageUrl));
+        return Ok(MapEventDto(ev, imageUrl, defaultOpenFee));
     }
 
     [HttpGet("by-slug/{slug}")]
@@ -280,8 +286,9 @@ public class EventsController(
         var imageUrl = ev.ImagePath is not null
             ? fileStorage.GetPublicUrl(ev.ImagePath)
             : await ResolveEventImageUrlAsync(ev.Id);
+        var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
 
-        return Ok(MapEventDto(ev, imageUrl));
+        return Ok(MapEventDto(ev, imageUrl, defaultOpenFee));
     }
 
     [HttpGet("{id:guid}/schema")]
@@ -401,8 +408,6 @@ public class EventsController(
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
-
         var rawTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .Where(tt => tt.EventId == id && tt.IsActive)
             .OrderBy(tt => tt.SortOrder)
@@ -410,20 +415,20 @@ public class EventsController(
 
         var types = rawTypes.Select(tt => new EventTicketTypeDto(
             tt.Id, tt.Label, tt.PriceCents, null,
-            tt.PriceCents + (tt.PlatformFeeCents ?? defaultFeeCents),
+            tt.TotalPriceCents,
             tt.MaxQuantity, tt.SortOrder, tt.IsActive,
             tt.SoldCount, tt.AvailableCount)).ToList();
 
         return Ok(new EventTicketTypesResponse(id, types));
     }
 
-    private EventDto MapEventDto(Db.Entities.Views.EventView ev, string? imageUrl) => new(
+    private EventDto MapEventDto(Db.Entities.Views.EventView ev, string? imageUrl, int defaultOpenFee) => new(
         ev.Id, ev.Title, ev.Slug, ev.Description,
         ev.Status, ev.Category,
         ev.StartDate, ev.EndDate,
         imageUrl,
         ev.IsFeatured,
-        ev.LayoutMode, 
+        ev.LayoutMode,
         ev.MaxCapacity ?? ev.TotalCapacity, // Use aggregated TotalCapacity as MaxCapacity if null
         ev.PricePerPersonCents,
         ev.GridRows, ev.GridCols, ev.PublishedAt,
@@ -443,7 +448,10 @@ public class EventsController(
         ev.TotalSold,
         ev.AvailableTables,
         ev.MinTablePriceCents,
-        ev.MinTicketTypePriceCents
+        ev.MinTicketTypePriceCents,
+        ev.PricePerPersonCents.HasValue ? ev.PricePerPersonCents.Value + defaultOpenFee : null,
+        ev.DisplayMinTablePriceCents,
+        ev.DisplayMinTicketTypePriceCents
     );
 
     private async Task<string?> ResolveEventImageUrlAsync(Guid eventId)

@@ -1,6 +1,7 @@
 using Contracts.DTOs;
 using System.Text.Json;
 using Api.Middleware;
+using Api.Services;
 using Contracts.DTOs.Layout;
 using Contracts.Enums;
 using Db;
@@ -16,7 +17,7 @@ namespace Api.Controllers;
 [Authorize]
 [RequireRole(UserRole.Admin)]
 [Route("")]
-public class AdminLayoutController(EventPlatformDbContext context, IConnectionMultiplexer redis) : ControllerBase
+public class AdminLayoutController(EventPlatformDbContext context, IConnectionMultiplexer redis, ISettingsService settings) : ControllerBase
 {
     // ═══════════════════════════════════════════════════════════
     //  Table Templates (global)
@@ -141,6 +142,8 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
         if (!Enum.TryParse<TableShape>(shapeStr, true, out var shape))
             return BadRequest(new ApiError(400, "Invalid shape", HttpContext.TraceIdentifier));
 
+        var defaultGridFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
+
         var et = new EventTable
         {
             Id = Guid.NewGuid(),
@@ -149,6 +152,7 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
             Shape = shape,
             Color = request.Color ?? template?.DefaultColor,
             PriceCents = request.PriceCents ?? template?.DefaultPriceCents ?? 0,
+            PlatformFeeCents = defaultGridFee,
             IsActive = true,
             EventId = eventId,
             TableTemplateId = template?.Id

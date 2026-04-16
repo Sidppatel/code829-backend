@@ -1765,6 +1765,12 @@ namespace db.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DisplayMinTablePriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DisplayMinTicketTypePriceCents")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -1929,6 +1935,9 @@ namespace db.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<int>("TotalPriceCents")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.ToTable((string)null);
@@ -1953,6 +1962,12 @@ namespace db.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<int?>("DisplayMinTablePriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DisplayMinTicketTypePriceCents")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");
@@ -2136,6 +2151,9 @@ namespace db.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("TotalPriceCents")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
