@@ -128,25 +128,41 @@ public class EventsController(
 
         var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
 
-        var dtos = items.Select(e => new EventSummaryDto(
-            e.Id, e.Title, e.Slug, e.Status, e.Category,
-            e.StartDate, e.EndDate,
-            e.ImagePath != null
-                ? fileStorage.GetPublicUrl(e.ImagePath)
-                : e.PrimaryImageKey != null ? fileStorage.GetPublicUrl($"{e.PrimaryImageKey}_card.webp") : null,
-            e.IsFeatured,
-            e.LayoutMode,
-            e.VenueName, e.VenueCity, e.VenueState,
-            e.PricePerPersonCents,
-            e.TotalCapacity,
-            e.TotalSold,
-            e.AvailableTables,
-            e.MinTablePriceCents,
-            e.MinTicketTypePriceCents,
-            e.PricePerPersonCents.HasValue ? e.PricePerPersonCents.Value + defaultOpenFee : null,
-            e.DisplayMinTablePriceCents,
-            e.DisplayMinTicketTypePriceCents
-        )).ToList();
+        var dtos = items.Select(e =>
+        {
+            var displayPricePerPerson = e.PricePerPersonCents.HasValue ? e.PricePerPersonCents.Value + defaultOpenFee : (int?)null;
+            var displayFrom = MinNonNull(e.DisplayMinTablePriceCents, displayPricePerPerson, e.DisplayMinTicketTypePriceCents);
+            var displayFromFormatted = displayFrom.HasValue ? $"${displayFrom.Value / 100.0:F2}" : null;
+            var isSoldOut = e.LayoutMode == "Grid"
+                ? e.AvailableTables <= 0
+                : (e.TotalCapacity > 0 && e.TotalSold >= e.TotalCapacity);
+            var availableCount = e.LayoutMode == "Grid"
+                ? e.AvailableTables
+                : Math.Max(0, e.TotalCapacity - e.TotalSold);
+
+            return new EventSummaryDto(
+                e.Id, e.Title, e.Slug, e.Status, e.Category,
+                e.StartDate, e.EndDate,
+                e.ImagePath != null
+                    ? fileStorage.GetPublicUrl(e.ImagePath)
+                    : e.PrimaryImageKey != null ? fileStorage.GetPublicUrl($"{e.PrimaryImageKey}_card.webp") : null,
+                e.IsFeatured,
+                e.LayoutMode,
+                e.VenueName, e.VenueCity, e.VenueState,
+                e.PricePerPersonCents,
+                e.TotalCapacity,
+                e.TotalSold,
+                e.AvailableTables,
+                e.MinTablePriceCents,
+                e.MinTicketTypePriceCents,
+                displayPricePerPerson,
+                e.DisplayMinTablePriceCents,
+                e.DisplayMinTicketTypePriceCents,
+                displayFrom,
+                displayFromFormatted,
+                isSoldOut,
+                availableCount);
+        }).ToList();
 
         var result = new PagedResponse<EventSummaryDto>(dtos, totalCount, page, pageSize);
         var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
@@ -423,37 +439,59 @@ public class EventsController(
         return Ok(new EventTicketTypesResponse(id, types));
     }
 
-    private EventDto MapEventDto(Db.Entities.Views.EventView ev, string? imageUrl, int defaultOpenFee) => new(
-        ev.Id, ev.Title, ev.Slug, ev.Description,
-        ev.Status, ev.Category,
-        ev.StartDate, ev.EndDate,
-        imageUrl,
-        ev.IsFeatured,
-        ev.LayoutMode,
-        ev.MaxCapacity ?? ev.TotalCapacity, // Use aggregated TotalCapacity as MaxCapacity if null
-        ev.PricePerPersonCents,
-        ev.GridRows, ev.GridCols, ev.PublishedAt,
-        ev.VenueId,
-        ev.VenueName,
-        new VenueDto(
-            ev.VenueId, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
-            ev.VenueZipCode, ev.VenueDescription,
-            ev.VenueImagePath is not null ? fileStorage.GetPublicUrl(ev.VenueImagePath) : null,
-            ev.VenuePhone, ev.VenueEmail, ev.VenueWebsite,
-            ev.VenueIsActive, ev.VenueCreatedAt
-        ),
-        ev.OrganizerId,
-        $"{ev.OrganizerFirstName} {ev.OrganizerLastName}",
-        ev.CreatedAt,
-        ev.TotalCapacity,
-        ev.TotalSold,
-        ev.AvailableTables,
-        ev.MinTablePriceCents,
-        ev.MinTicketTypePriceCents,
-        ev.PricePerPersonCents.HasValue ? ev.PricePerPersonCents.Value + defaultOpenFee : null,
-        ev.DisplayMinTablePriceCents,
-        ev.DisplayMinTicketTypePriceCents
-    );
+    private EventDto MapEventDto(Db.Entities.Views.EventView ev, string? imageUrl, int defaultOpenFee)
+    {
+        var displayPricePerPerson = ev.PricePerPersonCents.HasValue ? ev.PricePerPersonCents.Value + defaultOpenFee : (int?)null;
+        var displayFrom = MinNonNull(ev.DisplayMinTablePriceCents, displayPricePerPerson, ev.DisplayMinTicketTypePriceCents);
+        var displayFromFormatted = displayFrom.HasValue ? $"${displayFrom.Value / 100.0:F2}" : null;
+        var isSoldOut = ev.LayoutMode == "Grid"
+            ? ev.AvailableTables <= 0
+            : (ev.TotalCapacity > 0 && ev.TotalSold >= ev.TotalCapacity);
+        var availableCount = ev.LayoutMode == "Grid"
+            ? ev.AvailableTables
+            : Math.Max(0, ev.TotalCapacity - ev.TotalSold);
+
+        return new EventDto(
+            ev.Id, ev.Title, ev.Slug, ev.Description,
+            ev.Status, ev.Category,
+            ev.StartDate, ev.EndDate,
+            imageUrl,
+            ev.IsFeatured,
+            ev.LayoutMode,
+            ev.MaxCapacity ?? ev.TotalCapacity,
+            ev.PricePerPersonCents,
+            ev.GridRows, ev.GridCols, ev.PublishedAt,
+            ev.VenueId,
+            ev.VenueName,
+            new VenueDto(
+                ev.VenueId, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
+                ev.VenueZipCode, ev.VenueDescription,
+                ev.VenueImagePath is not null ? fileStorage.GetPublicUrl(ev.VenueImagePath) : null,
+                ev.VenuePhone, ev.VenueEmail, ev.VenueWebsite,
+                ev.VenueIsActive, ev.VenueCreatedAt
+            ),
+            ev.OrganizerId,
+            $"{ev.OrganizerFirstName} {ev.OrganizerLastName}",
+            ev.CreatedAt,
+            ev.TotalCapacity,
+            ev.TotalSold,
+            ev.AvailableTables,
+            ev.MinTablePriceCents,
+            ev.MinTicketTypePriceCents,
+            displayPricePerPerson,
+            ev.DisplayMinTablePriceCents,
+            ev.DisplayMinTicketTypePriceCents,
+            displayFrom,
+            displayFromFormatted,
+            isSoldOut,
+            availableCount);
+    }
+
+    private static int? MinNonNull(params int?[] values)
+    {
+        var nonNull = values.Where(v => v.HasValue).Select(v => v!.Value).ToArray();
+        return nonNull.Length == 0 ? null : nonNull.Min();
+    }
 
     private async Task<string?> ResolveEventImageUrlAsync(Guid eventId)
     {

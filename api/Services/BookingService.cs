@@ -7,7 +7,6 @@ using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using QRCoder;
 using Serilog;
-using StackExchange.Redis;
 
 namespace Api.Services;
 
@@ -19,8 +18,7 @@ public class BookingService(
     ITaxService taxService,
     IPricingService pricingService,
     IEmailService emailService,
-    ISettingsService settings,
-    IConnectionMultiplexer redis
+    ISettingsService settings
 ) : IBookingService
 {
     public async Task<BookingDto> CreateAsync(Guid userId, CreateBookingRequest request)
@@ -155,70 +153,59 @@ public class BookingService(
                 throw new InvalidOperationException("Event has no price configured");
         }
 
-        var redisDb = redis.GetDatabase();
-        var lockKey = $"capacity:{request.EventId}";
-        var lockToken = Guid.NewGuid().ToString();
-        var acquired = await redisDb.StringSetAsync(lockKey, lockToken, TimeSpan.FromSeconds(10), When.NotExists);
-        if (!acquired)
-            throw new InvalidOperationException("Another reservation is in progress. Please try again.");
+        var pricing = await pricingService.ComputeForBookingAsync(
+            new PricingQuoteRequest(ev.Id, SeatCount: seatsRequested, EventTicketTypeId: request.EventTicketTypeId));
+        var subtotal = pricing.SubtotalCents;
+        var fee = pricing.FeeCents;
+        var total = pricing.TotalCents;
+        var piAmount = pricing.PaymentIntentAmountCents;
+        var taxCalculationId = pricing.TaxCalculationId;
+        var estimatedTaxCents = pricing.TaxCents;
 
+        var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
+
+        var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
+            piAmount, subtotal, organizer?.StripeConnectedAccountId);
+
+        var bookingNumber = GenerateBookingNumber();
+
+        // sp_reserve_open_capacity serializes capacity + ticket-type quota checks via row-level
+        // locks on events/event_ticket_types rows. Replaces the previous Redis-lock + SELECT +
+        // INSERT pattern which could race under concurrent load.
+        Guid bookingId;
         try
         {
-            var totalReserved = await context.BookingViews.AsNoTracking()
-                .Where(b => b.EventId == request.EventId
-                    && (b.Status == "Pending" || b.Status == "Paid" || b.Status == "CheckedIn")
-                    && b.SeatsReserved.HasValue)
-                .SumAsync(b => b.SeatsReserved!.Value);
-
-            if (totalReserved + seatsRequested > ev.MaxCapacity.Value)
-                throw new InvalidOperationException(
-                    $"Not enough capacity. Available: {ev.MaxCapacity.Value - totalReserved}, requested: {seatsRequested}");
-
-            var pricing = await pricingService.ComputeForBookingAsync(
-                new PricingQuoteRequest(ev.Id, SeatCount: seatsRequested, EventTicketTypeId: request.EventTicketTypeId));
-            var subtotal = pricing.SubtotalCents;
-            var fee = pricing.FeeCents;
-            var total = pricing.TotalCents;
-            var piAmount = pricing.PaymentIntentAmountCents;
-            var taxCalculationId = pricing.TaxCalculationId;
-            var estimatedTaxCents = pricing.TaxCents;
-
-            var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
-
-            var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-                piAmount, subtotal, organizer?.StripeConnectedAccountId);
-
-            var bookingNumber = GenerateBookingNumber();
-            var bookingId = await bookingProc.CreateBookingAsync(
-                userId, request.EventId, null, seatsRequested, request.EventTicketTypeId, subtotal, fee, total, bookingNumber);
-
-            await stripeTransactionProc.CreateAsync(bookingId, intentId, piAmount, subtotal, taxCalculationId);
-
-            Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}, tax ${Tax}",
-                bookingNumber, seatsRequested, request.EventId, total / 100.0, estimatedTaxCents / 100.0);
-
-            var dto = await GetByIdAsync(bookingId) ?? throw new InvalidOperationException("Booking creation failed");
-
-            // Pre-populate estimated tax so the checkout page can display it immediately
-            if (estimatedTaxCents > 0 && dto.Transaction is not null)
-            {
-                dto = dto with
-                {
-                    Transaction = dto.Transaction with
-                    {
-                        TaxAmountCents = estimatedTaxCents,
-                        TotalChargedCents = piAmount
-                    }
-                };
-            }
-
-            return dto with { ClientSecret = clientSecret };
+            bookingId = await bookingProc.ReserveOpenCapacityAsync(
+                userId, request.EventId, seatsRequested, request.EventTicketTypeId,
+                subtotal, fee, total, bookingNumber);
         }
-        finally
+        catch (Exception ex) when (ex.Message.Contains("capacity") || ex.Message.Contains("availability"))
         {
-            var script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
-            await redisDb.ScriptEvaluateAsync(script, [(RedisKey)lockKey], [(RedisValue)lockToken]);
+            // Roll back the Stripe intent we just created so we don't orphan it
+            try { await paymentService.RefundPaymentAsync(intentId); } catch { }
+            throw new InvalidOperationException(ex.Message, ex);
         }
+
+        await stripeTransactionProc.CreateAsync(bookingId, intentId, piAmount, subtotal, taxCalculationId);
+
+        Log.Information("[Booking] Created capacity booking {BookingNumber} for {Seats} seats, event {EventId}, total ${Total}, tax ${Tax}",
+            bookingNumber, seatsRequested, request.EventId, total / 100.0, estimatedTaxCents / 100.0);
+
+        var dto = await GetByIdAsync(bookingId) ?? throw new InvalidOperationException("Booking creation failed");
+
+        if (estimatedTaxCents > 0 && dto.Transaction is not null)
+        {
+            dto = dto with
+            {
+                Transaction = dto.Transaction with
+                {
+                    TaxAmountCents = estimatedTaxCents,
+                    TotalChargedCents = piAmount
+                }
+            };
+        }
+
+        return dto with { ClientSecret = clientSecret };
     }
 
     public async Task<BookingDto> ConfirmPaymentAsync(Guid bookingId, Guid userId)

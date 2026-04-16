@@ -7,7 +7,6 @@ using Db.Repositories.StoredProcedures;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
-using StackExchange.Redis;
 
 namespace Api.Tests;
 
@@ -26,8 +25,6 @@ public class BookingServiceTests : IDisposable
     private readonly Mock<IPricingService> _pricingService;
     private readonly Mock<IEmailService> _emailService;
     private readonly Mock<ISettingsService> _settingsService;
-    private readonly Mock<IConnectionMultiplexer> _redis;
-    private readonly Mock<IDatabase> _redisDb;
     private readonly BookingService _service;
     private readonly Guid _userId;
     private readonly Guid _eventId;
@@ -44,16 +41,13 @@ public class BookingServiceTests : IDisposable
         _pricingService = new Mock<IPricingService>();
         _emailService = new Mock<IEmailService>();
         _settingsService = new Mock<ISettingsService>();
-        _redis = new Mock<IConnectionMultiplexer>();
-        _redisDb = new Mock<IDatabase>();
 
-        _redis.Setup(r => r.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(_redisDb.Object);
         _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync("10");
 
         _service = new BookingService(_context, _bookingProc.Object, _stripeTransactionProc.Object,
             _paymentService.Object, _taxService.Object, _pricingService.Object,
-            _emailService.Object, _settingsService.Object, _redis.Object);
+            _emailService.Object, _settingsService.Object);
 
         _userId = Guid.NewGuid();
         _eventId = Guid.NewGuid();

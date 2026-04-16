@@ -26,6 +26,24 @@ public class BookingProcedures(EventPlatformDbContext context) : IBookingProcedu
         return result;
     }
 
+    public async Task<Guid> ReserveOpenCapacityAsync(Guid userId, Guid eventId, int seats, Guid? eventTicketTypeId, int subtotalCents, int feeCents, int totalCents, string bookingNumber, CancellationToken ct = default)
+    {
+        var result = await context.Database
+            .SqlQueryRaw<Guid>(
+                "SELECT sp_reserve_open_capacity(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7) AS \"Value\"",
+                new NpgsqlParameter("p0", userId),
+                new NpgsqlParameter("p1", eventId),
+                new NpgsqlParameter("p2", seats),
+                new NpgsqlParameter("p3", NpgsqlDbType.Uuid) { Value = (object?)eventTicketTypeId ?? DBNull.Value },
+                new NpgsqlParameter("p4", subtotalCents),
+                new NpgsqlParameter("p5", feeCents),
+                new NpgsqlParameter("p6", totalCents),
+                new NpgsqlParameter("p7", bookingNumber))
+            .FirstAsync(ct);
+
+        return result;
+    }
+
     public async Task ConfirmBookingAsync(Guid bookingId, string qrToken, CancellationToken ct = default)
     {
         await context.Database
