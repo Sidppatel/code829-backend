@@ -324,11 +324,44 @@ public class DeveloperController(
                 u.FirstName,
                 u.LastName,
                 u.Email,
+                u.Phone,
+                u.IsActive,
+                u.LastLoginAt,
                 u.CreatedAt
             })
             .ToListAsync();
 
         return Ok(new { items = users, totalCount = totalCount, page, pageSize });
+    }
+
+    /// <summary>
+    /// Update a regular user's active status.
+    /// </summary>
+    [HttpPut("users/{id:guid}/status")]
+    public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] bool isActive)
+    {
+        var user = await context.Users.FindAsync(id); // ARCH-EXCEPTION: developer-only admin toggle; direct find ok for immediate cleanup.
+        if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+
+        user.IsActive = isActive;
+        await context.SaveChangesAsync();
+        Log.Information("[Developer] User {UserId} status updated to {Status}", id, isActive);
+        return Ok(new { message = "User status updated" });
+    }
+
+    /// <summary>
+    /// Permanently delete a regular user.
+    /// </summary>
+    [HttpDelete("users/{id:guid}")]
+    public async Task<IActionResult> DeleteUser(Guid id)
+    {
+        var user = await context.Users.FindAsync(id); // ARCH-EXCEPTION: developer-only admin deletion; direct find ok for immediate cleanup.
+        if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+
+        context.Users.Remove(user); // ARCH-EXCEPTION: developer-only admin deletion; direct remove ok for immediate cleanup.
+        await context.SaveChangesAsync();
+        Log.Information("[Developer] User {UserId} deleted", id);
+        return Ok(new { message = "User deleted successfully" });
     }
 
     /// <summary>
