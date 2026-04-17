@@ -25,7 +25,6 @@ BenchmarkDotNet.Artifacts/
 **/.env.*
 !**/.env.example
 appsettings.*.local.json
-appsettings.Production.json
 secrets.json
 
 # IDE
@@ -51,9 +50,9 @@ desktop.ini
 ehthumbs.db
 $RECYCLE.BIN/
 
-# Log files (not source directories named Logs)
+# Log files — runtime output only. Source directories named Logs/ stay tracked.
 /logs/
-**/logs/
+api/logs/
 *.log
 
 # NuGet
