@@ -3,4 +3,5 @@
   <Project Path="contracts/contracts.csproj" />
   <Project Path="db/db.csproj" />
   <Project Path="tests/Api.Tests/Api.Tests.csproj" />
+  <Project Path="tools/Analyzers/Analyzers.csproj" />
 </Solution>
