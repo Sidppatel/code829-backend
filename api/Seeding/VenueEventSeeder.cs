@@ -7,8 +7,11 @@ using Serilog;
 namespace Api.Seeding;
 
 /// <summary>
-/// Seeds 10 real Mobile/Gulf Coast AL venues and ~10 events using Grid or Open layout modes.
-/// Uses stored procedures for all writes to validate SPs on every dev startup.
+/// Seeds venues and events on a fresh DB. All events are owned by organizer@code829.local
+/// so any admin login that belongs to that account — or any Developer account — can edit
+/// them without running into ownership 403s. See DataSeeder for role semantics.
+///
+/// Writes go through stored procedures so SP behavior is exercised on every dev startup.
 /// </summary>
 public static class VenueEventSeeder
 {
@@ -24,14 +27,16 @@ public static class VenueEventSeeder
             return;
 
         var organizer = await context.AdminUsers.FirstAsync(u => u.Email == "organizer@code829.local");
-        var admin = await context.AdminUsers.FirstAsync(u => u.Email == "admin@code829.local");
 
         var venueIds = await SeedVenuesAsync(venueProc);
         Log.Information("[Seed] Created {Count} venues via SP", venueIds.Count);
 
-        await SeedEventsAsync(eventProc, ticketTypeProc, venueIds, organizer.Id, admin.Id);
+        await SeedGridEventsAsync(eventProc, venueIds, organizer.Id);
+        await SeedOpenEventsAsync(eventProc, ticketTypeProc, venueIds, organizer.Id);
+        await SeedDraftEventAsync(eventProc, ticketTypeProc, venueIds, organizer.Id);
+
         var eventCount = await context.Events.CountAsync();
-        Log.Information("[Seed] Created {Count} events via SP", eventCount);
+        Log.Information("[Seed] Created {Count} events via SP (owner: {Email})", eventCount, organizer.Email);
     }
 
     private static async Task<List<Guid>> SeedVenuesAsync(IVenueProcedures venueProc)
@@ -70,61 +75,72 @@ public static class VenueEventSeeder
         return venueIds;
     }
 
-    private static async Task SeedEventsAsync(IEventProcedures eventProc, IEventTicketTypeProcedures ticketTypeProc, List<Guid> venueIds, Guid organizerId, Guid adminId)
+    private static async Task SeedGridEventsAsync(IEventProcedures eventProc, List<Guid> venueIds, Guid ownerId)
     {
         var now = DateTime.UtcNow;
-
-        // Grid events
-        var gridEvents = new (string Title, string Desc, EventCategory Cat, EventStatus Status, int VenueIdx, Guid OrgId, int WeeksOut, bool Featured, int Rows, int Cols)[]
+        var gridEvents = new (string Title, string Desc, EventCategory Cat, int VenueIdx, int WeeksOut, bool Featured, int Rows, int Cols)[]
         {
-            ("Bellingrath Gardens Spring Gala", "An elegant evening under the stars in the Southern estate garden. Features a five-course gourmet dinner, live jazz by the reservoir, and an exclusive charity auction of rare azalea varieties.",
-                EventCategory.Social, EventStatus.Published, 6, adminId, 5, true, 6, 8),
-            ("Farm-to-Table Dinner: Coastal Harvest", "Experience the finest of Mobile Bay's bounty. This seasonal harvest dinner features local heirloom vegetables, freshly caught Gulf red snapper, and pairings from regional craft breweries.",
-                EventCategory.Dining, EventStatus.Published, 6, adminId, 3, false, 4, 6),
-            ("Mobile Tech Leadership Summit", "Join the brightest minds in the Gulf Coast tech scene for a full day of workshops, panels, and networking focused on the future of software engineering and digital transformation in the South.",
-                EventCategory.Business, EventStatus.Published, 1, adminId, 3, false, 4, 10),
-            ("Blind Mule Comedy Showcase", "Laughter, libations, and live entertainment. Our monthly comedy night brings together local favorites and national touring acts for an unforgettable night in downtown Mobile.",
-                EventCategory.Social, EventStatus.Published, 2, organizerId, 2, false, 4, 5),
-            ("Fairhope Lakeside Jazz Festival", "Smooth saxophones and cool breezes. Fairhope's annual lakeside jazz event celebrates the rich musical heritage of the Eastern Shore with multiple stages and local food vendors.",
-                EventCategory.Music, EventStatus.Published, 9, adminId, 4, true, 5, 8),
+            ("Bellingrath Gardens Spring Gala",
+                "An elegant evening under the stars in the Southern estate garden. Features a five-course gourmet dinner, live jazz by the reservoir, and an exclusive charity auction of rare azalea varieties.",
+                EventCategory.Social, 6, 5, true, 6, 8),
+            ("Farm-to-Table Dinner: Coastal Harvest",
+                "Experience the finest of Mobile Bay's bounty. This seasonal harvest dinner features local heirloom vegetables, freshly caught Gulf red snapper, and pairings from regional craft breweries.",
+                EventCategory.Dining, 6, 3, false, 4, 6),
+            ("Mobile Tech Leadership Summit",
+                "Join the brightest minds in the Gulf Coast tech scene for a full day of workshops, panels, and networking focused on the future of software engineering and digital transformation in the South.",
+                EventCategory.Business, 1, 3, false, 4, 10),
+            ("Blind Mule Comedy Showcase",
+                "Laughter, libations, and live entertainment. Our monthly comedy night brings together local favorites and national touring acts for an unforgettable night in downtown Mobile.",
+                EventCategory.Social, 2, 2, false, 4, 5),
+            ("Fairhope Lakeside Jazz Festival",
+                "Smooth saxophones and cool breezes. Fairhope's annual lakeside jazz event celebrates the rich musical heritage of the Eastern Shore with multiple stages and local food vendors.",
+                EventCategory.Music, 9, 4, true, 5, 8),
         };
 
-        foreach (var (title, desc, cat, status, venueIdx, orgId, weeksOut, featured, rows, cols) in gridEvents)
+        foreach (var (title, desc, cat, venueIdx, weeksOut, featured, rows, cols) in gridEvents)
         {
-            var startDate = now.AddDays(weeksOut * 7).Date.AddHours(18);
+            var startDate = DateTime.SpecifyKind(now.AddDays(weeksOut * 7).Date.AddHours(18), DateTimeKind.Utc);
             await eventProc.CreateEventAsync(
-                title, GenerateSlug(title), desc, status.ToString(), cat.ToString(),
-                DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
-                DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
+                title, GenerateSlug(title), desc, EventStatus.Published.ToString(), cat.ToString(),
+                startDate, startDate.AddHours(4),
                 null, featured, LayoutMode.Grid.ToString(), null, null, null, null,
-                rows, cols, venueIds[venueIdx], orgId, null);
+                rows, cols, venueIds[venueIdx], ownerId, null);
         }
+    }
 
-        // Open events
-        var openEvents = new (string Title, string Desc, EventCategory Cat, EventStatus Status, int VenueIdx, Guid OrgId, int WeeksOut, bool Featured, List<(string Label, int PriceCents, int? PlatformFeeCents, int? MaxQty, string? Desc)> Tiers)[]
+    private static async Task SeedOpenEventsAsync(
+        IEventProcedures eventProc, IEventTicketTypeProcedures ticketTypeProc,
+        List<Guid> venueIds, Guid ownerId)
+    {
+        var now = DateTime.UtcNow;
+        var openEvents = new (string Title, string Desc, EventCategory Cat, int VenueIdx, int WeeksOut, bool Featured, List<(string Label, int PriceCents, int? PlatformFeeCents, int? MaxQty, string? Desc)> Tiers)[]
         {
-            ("Sunset Rhythm & Blues Festival", "A high-energy outdoor music festival featuring legendary blues artists and rising Southern soul stars. Food trucks, local artisans, and sunset views over the water.",
-                EventCategory.Music, EventStatus.Published, 8, organizerId, 6, true,
+            ("Sunset Rhythm & Blues Festival",
+                "A high-energy outdoor music festival featuring legendary blues artists and rising Southern soul stars. Food trucks, local artisans, and sunset views over the water.",
+                EventCategory.Music, 8, 6, true,
                 [
                     ("VIP Lounge", 12500, 2000, 100, "Includes front-of-stage access, private bar, and 2 complimentary drink tokens."),
                     ("Premium Reserved", 7500, 1500, 250, "Fixed seating in the first 10 rows with dedicated entry."),
                     ("General Admission", 3500, 1000, 650, "Outdoor lawn seating. Bring your own blanket or low chair.")
                 ]),
-            ("Gulf Coast Coding Bootcamp", "Intensive two-week coding program designed to launch your career in tech. Learn full-stack development using modern frameworks and participate in a final capstone showcase.",
-                EventCategory.Tech, EventStatus.Published, 1, organizerId, 8, false,
+            ("Gulf Coast Coding Bootcamp",
+                "Intensive two-week coding program designed to launch your career in tech. Learn full-stack development using modern frameworks and participate in a final capstone showcase.",
+                EventCategory.Tech, 1, 8, false,
                 [
                     ("Early Bird Professional", 85000, 5000, 20, "Early discounted rate for professionals and career changers."),
                     ("Standard Registration", 120000, 7500, 30, "Standard two-week bootcamp tuition including all materials."),
                     ("Student Scholarship Rate", 45000, 2500, 5, "Highly discounted rate for currently enrolled university students.")
                 ]),
-            ("Mobile Arts & Crafts Fair", "Celebrating over 100 local artisans and creators. Walk through a vibrant marketplace of handmade pottery, jewelry, paintings, and textiles in the heart of Fairhope.",
-                EventCategory.Social, EventStatus.Published, 9, organizerId, 2, false,
+            ("Mobile Arts & Crafts Fair",
+                "Celebrating over 100 local artisans and creators. Walk through a vibrant marketplace of handmade pottery, jewelry, paintings, and textiles in the heart of Fairhope.",
+                EventCategory.Social, 9, 2, false,
                 [
                     ("Weekend Pass", 1500, 500, 200, "Full access to both days of the fair plus a commemorative tote bag."),
                     ("Single Day Entry", 1000, 300, 500, "Standard admission for one day.")
                 ]),
-            ("Mardi Gras Coronation Ball", "The most prestigious event of the Carnival season. Witness the crowning of the 2026 King and Queen followed by an evening of orchestral music and ballroom dancing.",
-                EventCategory.Social, EventStatus.Published, 0, organizerId, 4, true,
+            ("Mardi Gras Coronation Ball",
+                "The most prestigious event of the Carnival season. Witness the crowning of the 2026 King and Queen followed by an evening of orchestral music and ballroom dancing.",
+                EventCategory.Social, 0, 4, true,
                 [
                     ("Royal Tier (Front)", 25000, 5000, 50, "Front row seating and invitation to the private after-party."),
                     ("Inner Circle", 15000, 3000, 150, "Premium seating within the coronation circle."),
@@ -132,16 +148,15 @@ public static class VenueEventSeeder
                 ]),
         };
 
-        foreach (var (title, desc, cat, status, venueIdx, orgId, weeksOut, featured, tiers) in openEvents)
+        foreach (var (title, desc, cat, venueIdx, weeksOut, featured, tiers) in openEvents)
         {
-            var startDate = now.AddDays(weeksOut * 7).Date.AddHours(18);
+            var startDate = DateTime.SpecifyKind(now.AddDays(weeksOut * 7).Date.AddHours(18), DateTimeKind.Utc);
             var totalCapacity = tiers.Sum(t => t.MaxQty ?? 0);
             var eventId = await eventProc.CreateEventAsync(
-                title, GenerateSlug(title), desc, status.ToString(), cat.ToString(),
-                DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
-                DateTime.SpecifyKind(startDate.AddHours(4), DateTimeKind.Utc),
+                title, GenerateSlug(title), desc, EventStatus.Published.ToString(), cat.ToString(),
+                startDate, startDate.AddHours(4),
                 null, featured, LayoutMode.Open.ToString(), totalCapacity, null, null, null,
-                null, null, venueIds[venueIdx], orgId, null);
+                null, null, venueIds[venueIdx], ownerId, null);
 
             var sortOrder = 0;
             foreach (var (label, price, platformFee, maxQty, tDesc) in tiers)
@@ -149,18 +164,23 @@ public static class VenueEventSeeder
                 await ticketTypeProc.CreateAsync(eventId, label, price, platformFee, maxQty, sortOrder++, tDesc);
             }
         }
+    }
 
-        // Draft events
-        var draftOpenStart = DateTime.SpecifyKind(now.AddDays(56).Date.AddHours(9), DateTimeKind.Utc);
-        var draftEventId = await eventProc.CreateEventAsync(
+    private static async Task SeedDraftEventAsync(
+        IEventProcedures eventProc, IEventTicketTypeProcedures ticketTypeProc,
+        List<Guid> venueIds, Guid ownerId)
+    {
+        var start = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(56).Date.AddHours(9), DateTimeKind.Utc);
+        var draftId = await eventProc.CreateEventAsync(
             "Summer Coding Bootcamp for Kids", GenerateSlug("Summer Coding Bootcamp for Kids"),
             "Two-week intensive coding program for ages 10-16. Learn Python, web development, and game design.",
             EventStatus.Draft.ToString(), EventCategory.Tech.ToString(),
-            draftOpenStart, draftOpenStart.AddHours(7),
+            start, start.AddHours(7),
             null, false, LayoutMode.Open.ToString(), 30, null, null, null,
-            null, null, venueIds[9], organizerId, null);
+            null, null, venueIds[9], ownerId, null);
 
-        await ticketTypeProc.CreateAsync(draftEventId, "Standard Enrollment", 29900, 2000, 30, 0, "Includes all course materials and daily lunch.");
+        await ticketTypeProc.CreateAsync(draftId, "Standard Enrollment", 29900, 2000, 30, 0,
+            "Includes all course materials and daily lunch.");
     }
 
     private static string GenerateSlug(string title)

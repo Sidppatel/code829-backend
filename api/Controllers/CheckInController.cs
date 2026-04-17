@@ -55,6 +55,21 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
                 ));
             }
 
+            // A ticket must be claimed by its actual attendee before it's usable. This prevents
+            // a buyer (or anyone holding the QR) from walking in with an unclaimed seat — the
+            // attendee's identity has to be on record first.
+            if (ticket.Status != Contracts.Enums.TicketStatus.Claimed)
+            {
+                var reason = ticket.Status == Contracts.Enums.TicketStatus.Invited
+                    ? "Ticket invite not yet accepted — recipient must claim it first"
+                    : "Ticket has not been claimed yet — assign it to an attendee first";
+                return BadRequest(new ScanResponse(
+                    false, reason,
+                    ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                    ticket.Status.ToString(), null
+                ));
+            }
+
             ticket.Status = Contracts.Enums.TicketStatus.CheckedIn;
             ticket.UpdatedAt = DateTime.UtcNow;
 

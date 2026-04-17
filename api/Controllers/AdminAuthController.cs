@@ -15,7 +15,8 @@ namespace Api.Controllers;
 [Route("admin/auth")]
 public class AdminAuthController(
     IAdminAuthService adminAuthService,
-    IInvitationService invitationService
+    IInvitationService invitationService,
+    IWebHostEnvironment environment
 ) : ControllerBase
 {
     private const string SessionCookieName = "session";
@@ -199,10 +200,13 @@ public class AdminAuthController(
 
     private void SetSessionCookie(string sessionToken)
     {
+        // Secure=true over plain http://localhost causes the browser to drop the cookie, which
+        // looked like "refresh always logs me out". Mirror AuthController: Secure in Production,
+        // off in Development so localhost works.
         Response.Cookies.Append(SessionCookieName, sessionToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = !environment.IsDevelopment(),
             SameSite = SameSiteMode.Lax,
             MaxAge = TimeSpan.FromDays(SessionMaxAgeDays),
             Path = "/"

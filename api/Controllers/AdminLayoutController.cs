@@ -703,9 +703,13 @@ public class AdminLayoutController(EventPlatformDbContext context, IConnectionMu
     private Guid GetCurrentUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
+    // Mirrors AdminEventsController.IsOwnerOrDeveloper — Admin role gets the same platform-wide
+    // access here as it does on the events controller. The two checks must stay in sync or the
+    // admin UI ends up half-working (event pages load, layout pages 403).
     private bool IsOwnerOrDeveloper(Guid organizerId) =>
         organizerId == GetCurrentUserId()
-        || User.IsInRole(UserRole.Developer.ToString());
+        || User.IsInRole(UserRole.Developer.ToString())
+        || User.IsInRole(UserRole.Admin.ToString());
 
     // ═══════════════════════════════════════════════════════════
     //  Helpers

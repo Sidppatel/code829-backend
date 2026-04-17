@@ -149,6 +149,45 @@ public class TicketsController(
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  Claim a ticket for the booking owner (no email roundtrip)
+    //  — buyer's "this one's for me" button.
+    // ═══════════════════════════════════════════════════════════
+
+    [HttpPost("bookings/{bookingId:guid}/tickets/{ticketId:guid}/claim-self")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> ClaimSelf(Guid bookingId, Guid ticketId)
+    {
+        var userId = GetUserId();
+        var ticket = await context.BookingTickets
+            .Include(t => t.Booking)
+            .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
+
+        if (ticket is null)
+            return NotFound(new ApiError(404, "Ticket not found", HttpContext.TraceIdentifier));
+        if (ticket.Booking.UserId != userId)
+            return StatusCode(403, new ApiError(403, "Only the booking owner can self-claim", HttpContext.TraceIdentifier));
+        if (ticket.Status == TicketStatus.CheckedIn)
+            return BadRequest(new ApiError(400, "Cannot modify a checked-in ticket", HttpContext.TraceIdentifier));
+        if (ticket.Status == TicketStatus.Claimed && ticket.GuestUserId != userId)
+            return BadRequest(new ApiError(400, "Ticket is already claimed by someone else — revoke first", HttpContext.TraceIdentifier));
+
+        ticket.GuestUserId = userId;
+        ticket.Status = TicketStatus.Claimed;
+        ticket.ClaimedAt = DateTime.UtcNow;
+        ticket.InviteTokenHash = null;
+        ticket.InviteExpiresAt = null;
+        ticket.InvitedEmail = null;
+        ticket.InviteSentAt = null;
+        ticket.UpdatedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+
+        Log.Information("[Tickets] {TicketCode} self-claimed by owner {UserId}", ticket.TicketCode, userId);
+        return Ok(new { message = "Ticket claimed", ticketId = ticket.Id });
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  Revoke a ticket invite
     // ═══════════════════════════════════════════════════════════
 

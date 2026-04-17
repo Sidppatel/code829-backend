@@ -9,8 +9,18 @@ using Serilog;
 namespace Api.Seeding;
 
 /// <summary>
-/// Seeds initial users, app settings, and table templates on first run.
-/// Only seeds if the users table is empty to avoid duplicates.
+/// Seeds initial admin users, regular users, app settings, and table templates on first run.
+/// Each seeder short-circuits if its target table is non-empty, so this is a fresh-DB-only path.
+///
+/// Admin role semantics:
+///   developer@code829.local  (Developer) — platform owner; IsOwnerOrDeveloper lets this
+///                                          account edit ANY event regardless of OrganizerId
+///   organizer@code829.local  (Admin)     — the event organizer; OWNS all seeded events
+///   admin@code829.local      (Admin)     — platform staff; owns no events by design
+///   staff@code829.local      (Staff)     — limited role; read-mostly
+///
+/// Single-owner model intentionally: splitting events across two Admin accounts made
+/// testing brittle — logging in as the wrong one surfaced 403s that looked like bugs.
 /// </summary>
 public static class DataSeeder
 {
