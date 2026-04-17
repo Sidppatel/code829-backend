@@ -12,6 +12,8 @@ public record PricingQuoteDto(
     int FeeCents,
     int TaxCents,
     int TotalCents,
+    int DisplaySubtotalCents,
+    int SeatsIncluded,
     string Currency,
     string FormattedTotal,
     DateTime ExpiresAt

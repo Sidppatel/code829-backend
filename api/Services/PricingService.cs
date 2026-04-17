@@ -22,6 +22,7 @@ public record PricingComputation(
     int TaxCents,
     int TotalCents,
     int PaymentIntentAmountCents,
+    int SeatsIncluded,
     string? TaxCalculationId,
     string Currency
 );
@@ -44,6 +45,8 @@ public class PricingService(
             comp.FeeCents,
             comp.TaxCents,
             comp.PaymentIntentAmountCents,
+            comp.SubtotalCents + comp.FeeCents,
+            comp.SeatsIncluded,
             comp.Currency,
             FormatUsd(comp.PaymentIntentAmountCents),
             DateTime.UtcNow.AddMinutes(5));
@@ -81,8 +84,9 @@ public class PricingService(
         var subtotal = tables.Sum(t => t.PriceCents);
         var fee = tables.Sum(t => t.PlatformFeeCents ?? defaultFeeCents);
         var total = subtotal + fee;
+        var seatsIncluded = tables.Sum(t => t.Capacity);
 
-        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, total, ct);
+        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, total, seatsIncluded, ct);
     }
 
     private async Task<PricingComputation> ComputeOpenPricingAsync(EventView ev, int seats, Guid? ticketTypeId, CancellationToken ct)
@@ -118,22 +122,22 @@ public class PricingService(
         var fee = feePerTicket * seats;
         var total = subtotal + fee;
 
-        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, total, ct);
+        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, total, seats, ct);
     }
 
-    private async Task<PricingComputation> ApplyTaxIfEnabledAsync(EventView ev, int subtotal, int fee, int total, CancellationToken ct)
+    private async Task<PricingComputation> ApplyTaxIfEnabledAsync(EventView ev, int subtotal, int fee, int total, int seatsIncluded, CancellationToken ct)
     {
         var stripeTaxSetting = await settings.GetOrDefaultAsync("stripe_tax_enabled", "false");
         var stripeTaxEnabled = "true".Equals(stripeTaxSetting, StringComparison.OrdinalIgnoreCase);
         if (!stripeTaxEnabled)
-            return new PricingComputation(subtotal, fee, 0, total, total, null, "usd");
+            return new PricingComputation(subtotal, fee, 0, total, total, seatsIncluded, null, "usd");
 
         try
         {
             var taxResult = await taxService.CalculateAsync(total, "usd",
                 ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode, ct: ct);
             return new PricingComputation(subtotal, fee, taxResult.TaxAmountExclusive, total,
-                taxResult.AmountTotal, taxResult.CalculationId, "usd");
+                taxResult.AmountTotal, seatsIncluded, taxResult.CalculationId, "usd");
         }
         catch (Exception ex)
         {
