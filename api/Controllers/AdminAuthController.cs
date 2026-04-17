@@ -43,9 +43,8 @@ public class AdminAuthController(
     [HttpPost("signup")]
     public async Task<IActionResult> Signup([FromBody] AcceptInvitationRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.Password)
-            || string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
-            return BadRequest(new ApiError(400, "All fields are required", HttpContext.TraceIdentifier));
+        if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(new ApiError(400, "Token and password are required", HttpContext.TraceIdentifier));
 
         var (pwValid, pwError) = Helpers.PasswordValidator.Validate(request.Password);
         if (!pwValid)

@@ -20,7 +20,7 @@ public class InvitationService(
     IJwtService jwtService
 ) : IInvitationService
 {
-    private const int InvitationExpiryDays = 7;
+    private const double InvitationExpiryMinutes = 15;
 
     public async Task<InvitationDto> CreateAsync(string email, AdminRole role, Guid invitedByAdminUserId)
     {
@@ -40,7 +40,7 @@ public class InvitationService(
         var rawToken = Convert.ToBase64String(tokenBytes);
         var tokenHash = HashToken(rawToken);
 
-        var expiresAt = DateTime.UtcNow.AddDays(InvitationExpiryDays);
+        var expiresAt = DateTime.UtcNow.AddMinutes(InvitationExpiryMinutes);
         var invitationId = await invitationProc.CreateAsync(
             normalizedEmail, tokenHash, role.ToString(), invitedByAdminUserId, expiresAt);
 
@@ -57,10 +57,12 @@ public class InvitationService(
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var inviterName = $"{inviter.FirstName} {inviter.LastName}".Trim();
 
+        Log.Information("[Invitation] Sending invitation to {Email}. Signup URL: {Url}", normalizedEmail, signupUrl);
+
         await emailService.SendAsync(
             normalizedEmail,
             $"You're invited to join {appName}",
-            EmailTemplates.Invitation(appName, inviterName, role.ToString(), signupUrl, InvitationExpiryDays)
+            EmailTemplates.Invitation(appName, inviterName, role.ToString(), signupUrl, (int)InvitationExpiryMinutes)
         );
 
         Log.Information("[Invitation] {Inviter} invited {Email} as {Role}", inviterName, normalizedEmail, role);
@@ -83,7 +85,7 @@ public class InvitationService(
     }
 
     public async Task<(AdminUserDto User, string SessionToken, string Jwt)> AcceptAsync(
-        string rawToken, string password, string firstName, string lastName,
+        string rawToken, string password, string? firstName, string? lastName,
         string? deviceName, string? ip)
     {
         var tokenHash = HashToken(rawToken);
@@ -97,7 +99,7 @@ public class InvitationService(
         var emailHash = encryptionService.HashEmail(invitation.Email);
 
         var adminId = await adminUserProc.CreateAsync(
-            invitation.Email, emailHash, firstName.Trim(), lastName.Trim(),
+            invitation.Email, emailHash, (firstName ?? "Pending").Trim(), (lastName ?? "Setup").Trim(),
             passwordHash, invitation.Role.ToString());
 
         await invitationProc.AcceptAsync(invitation.Id);
