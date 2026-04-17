@@ -170,6 +170,7 @@ try
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventTicketTypeProcedures, Db.Repositories.StoredProcedures.EventTicketTypeProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminUserProcedures, Db.Repositories.StoredProcedures.AdminUserProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IInvitationProcedures, Db.Repositories.StoredProcedures.InvitationProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILayoutProcedures, Db.Repositories.StoredProcedures.LayoutProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
