@@ -19,12 +19,17 @@ public class AdminAuthController(
     IWebHostEnvironment environment
 ) : ControllerBase
 {
-    private const string SessionCookieName = "session";
+    // Admin-side sessions are split across three cookie names (session_admin, session_staff,
+    // session_developer) so the same browser can hold independent logins for each portal
+    // without cookies clobbering each other. See Api.Helpers.PortalHelper.
     // Admin sessions re-auth every 14 days. Admins have destructive power (rotate
     // Stripe keys, delete users, change fees) so the trust window is kept tighter
     // than the regular-user cookie. Users can still use "revoke my sessions" at
     // any time, and the DeviceSession row lets a Developer revoke remotely.
     private const int SessionMaxAgeDays = 14;
+
+    private string? CurrentPortalCookie() =>
+        Helpers.PortalHelper.CookieFor(Helpers.PortalHelper.ReadPortal(Request));
 
     [HttpGet("invitation/{token}")]
     public async Task<IActionResult> GetInvitationInfo(string token)
@@ -82,6 +87,21 @@ public class AdminAuthController(
             var (user, sessionToken, jwt) = await adminAuthService.LoginAsync(
                 request.Email, request.Password, deviceName, ip);
 
+            // Role-vs-portal gate: a Staff account cannot obtain a session_developer cookie
+            // even if they know developer creds, and vice versa. Match the X-Portal header
+            // against the admin's actual role before issuing a cookie. AdminUserDto.Role is a
+            // string name; parse back to the enum for numeric comparison.
+            var portal = Helpers.PortalHelper.ReadPortal(Request);
+            var minRole = Helpers.PortalHelper.MinRoleForPortal(portal);
+            if (minRole.HasValue
+                && Enum.TryParse<AdminRole>(user.Role, out var actualRole)
+                && (int)actualRole < (int)minRole.Value)
+            {
+                return StatusCode(403, new ApiError(403,
+                    "Your account does not have access to this portal.",
+                    HttpContext.TraceIdentifier));
+            }
+
             SetSessionCookie(sessionToken);
 
             return Ok(new AdminAuthResponse(user, jwt));
@@ -97,14 +117,20 @@ public class AdminAuthController(
     [RequireRole(UserRole.Staff)]
     public async Task<IActionResult> Logout()
     {
-        var sessionToken = Request.Cookies[SessionCookieName];
+        // Revoke only the portal-specific session — leaves the other admin-side portals'
+        // sessions alone if the user happens to be logged into them in the same browser.
+        var cookieName = CurrentPortalCookie();
+        if (cookieName is null)
+            return Ok(new { message = "Logged out" });
+
+        var sessionToken = Request.Cookies[cookieName];
         if (!string.IsNullOrEmpty(sessionToken))
         {
             var sessionHash = HashToken(sessionToken);
             await adminAuthService.LogoutAsync(sessionHash);
         }
 
-        Response.Cookies.Delete(SessionCookieName);
+        Response.Cookies.Delete(cookieName);
         return Ok(new { message = "Logged out" });
     }
 
@@ -163,7 +189,8 @@ public class AdminAuthController(
     public async Task<IActionResult> GetSessions()
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var sessionToken = Request.Cookies[SessionCookieName];
+        var cookieName = CurrentPortalCookie();
+        var sessionToken = cookieName is not null ? Request.Cookies[cookieName] : null;
         var currentHash = sessionToken is not null ? HashToken(sessionToken) : null;
         var sessions = await adminAuthService.GetSessionsAsync(userId, currentHash);
         return Ok(sessions);
@@ -192,7 +219,8 @@ public class AdminAuthController(
     public async Task<IActionResult> RevokeAllSessions()
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var sessionToken = Request.Cookies[SessionCookieName];
+        var cookieName = CurrentPortalCookie();
+        var sessionToken = cookieName is not null ? Request.Cookies[cookieName] : null;
         var currentHash = sessionToken is not null ? HashToken(sessionToken) : null;
         await adminAuthService.RevokeAllSessionsAsync(userId, currentHash);
         return Ok(new { message = "All other sessions revoked" });
@@ -200,10 +228,14 @@ public class AdminAuthController(
 
     private void SetSessionCookie(string sessionToken)
     {
+        // Cookie name is chosen from the X-Portal header so admin / staff / developer portals
+        // each get their own cookie and don't clobber one another. If the header is missing
+        // (direct API hit, e.g. swagger) fall back to session_admin so something is set.
+        var cookieName = CurrentPortalCookie() ?? Helpers.PortalHelper.AdminCookie;
         // Secure=true over plain http://localhost causes the browser to drop the cookie, which
         // looked like "refresh always logs me out". Mirror AuthController: Secure in Production,
         // off in Development so localhost works.
-        Response.Cookies.Append(SessionCookieName, sessionToken, new CookieOptions
+        Response.Cookies.Append(cookieName, sessionToken, new CookieOptions
         {
             HttpOnly = true,
             Secure = !environment.IsDevelopment(),

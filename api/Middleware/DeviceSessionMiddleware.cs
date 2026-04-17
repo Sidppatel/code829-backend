@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Api.Helpers;
 using Api.Services;
 using Db;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,6 @@ namespace Api.Middleware;
 
 public class DeviceSessionMiddleware(RequestDelegate next)
 {
-    private const string CookieName = "session";
     private static readonly TimeSpan JwtCacheTtl = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan ActivityDebounce = TimeSpan.FromMinutes(5);
 
@@ -20,7 +20,17 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         IJwtService jwtService,
         IConnectionMultiplexer redis)
     {
-        var sessionToken = httpContext.Request.Cookies[CookieName];
+        // Per-portal cookie lookup: each frontend declares which portal it is via X-Portal,
+        // so we know exactly which cookie to resolve. Missing/unknown header = no session.
+        var portal = PortalHelper.ReadPortal(httpContext.Request);
+        var cookieName = PortalHelper.CookieFor(portal);
+        if (cookieName is null)
+        {
+            await next(httpContext);
+            return;
+        }
+
+        var sessionToken = httpContext.Request.Cookies[cookieName];
         if (string.IsNullOrEmpty(sessionToken))
         {
             await next(httpContext);
@@ -51,7 +61,24 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         if (session is null)
         {
             // Invalid session — clear the cookie
-            httpContext.Response.Cookies.Delete(CookieName);
+            httpContext.Response.Cookies.Delete(cookieName);
+            await next(httpContext);
+            return;
+        }
+
+        // Portal-vs-session-type guard: a session_user cookie must resolve to a user session,
+        // and session_admin / session_staff / session_developer to an admin session. This catches
+        // stale cookies after DB reseeds and blocks any cross-portal resolution attempts.
+        var isAdminPortal = PortalHelper.IsAdminPortal(portal);
+        if (isAdminPortal && !session.AdminUserId.HasValue)
+        {
+            httpContext.Response.Cookies.Delete(cookieName);
+            await next(httpContext);
+            return;
+        }
+        if (!isAdminPortal && !session.UserId.HasValue)
+        {
+            httpContext.Response.Cookies.Delete(cookieName);
             await next(httpContext);
             return;
         }
@@ -64,7 +91,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == session.UserId);
             if (user is null || !user.IsActive)
             {
-                httpContext.Response.Cookies.Delete(CookieName);
+                httpContext.Response.Cookies.Delete(cookieName);
                 await next(httpContext);
                 return;
             }
@@ -75,7 +102,17 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             var admin = await dbContext.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == session.AdminUserId);
             if (admin is null || !admin.IsActive)
             {
-                httpContext.Response.Cookies.Delete(CookieName);
+                httpContext.Response.Cookies.Delete(cookieName);
+                await next(httpContext);
+                return;
+            }
+
+            // Role-vs-portal guard: staff portal requires ≥Staff, admin ≥Admin, developer =Developer.
+            // An admin who downgrades roles between sessions won't keep a stale higher-privilege cookie.
+            var minRole = PortalHelper.MinRoleForPortal(portal);
+            if (minRole.HasValue && (int)admin.Role < (int)minRole.Value)
+            {
+                httpContext.Response.Cookies.Delete(cookieName);
                 await next(httpContext);
                 return;
             }
@@ -84,7 +121,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
 
         if (jwt is null)
         {
-            httpContext.Response.Cookies.Delete(CookieName);
+            httpContext.Response.Cookies.Delete(cookieName);
             await next(httpContext);
             return;
         }

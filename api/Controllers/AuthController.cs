@@ -22,7 +22,9 @@ public class AuthController(
     IImageService imageService
 ) : ControllerBase
 {
-    private const string SessionCookieName = "session";
+    // Public user sessions live under their own cookie name — see Api.Helpers.PortalHelper.
+    // Matches the X-Portal: user header sent by the public frontend app.
+    private const string SessionCookieName = Api.Helpers.PortalHelper.UserCookie;
     private const int SessionMaxAgeDays = 90;
     private const int MagicLinkLimit = 2;
     private static readonly TimeSpan MagicLinkWindow = TimeSpan.FromMinutes(2);
