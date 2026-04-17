@@ -18,6 +18,7 @@ public class WebhooksController(
     IStripeTransactionProcedures stripeTransactionProc,
     IBookingProcedures bookingProc,
     ITaxService taxService,
+    IPaymentService paymentService,
     IConnectionMultiplexer redis
 ) : ControllerBase
 {
@@ -38,7 +39,10 @@ public class WebhooksController(
             }
 
             var signature = Request.Headers["Stripe-Signature"].ToString();
-            stripeEvent = EventUtility.ConstructEvent(json, signature, webhookSecret);
+            // Stripe CLI forwards events using the newest API version while the SDK is pinned to
+            // an older one. Signature + payload are still validated; we only read core fields
+            // (PaymentIntent.Id, AmountReceived, Metadata) that are stable across versions.
+            stripeEvent = EventUtility.ConstructEvent(json, signature, webhookSecret, throwOnApiVersionMismatch: false);
         }
         catch (StripeException ex)
         {
@@ -172,6 +176,10 @@ public class WebhooksController(
         {
             var taxTxnId = await taxService.CreateTransactionAsync(taxCalculationId, paymentIntentId);
             await stripeTransactionProc.SetTaxTransactionIdAsync(paymentIntentId, taxTxnId);
+            // Mirror the tax transaction id back onto the PaymentIntent metadata so refund
+            // paths can reverse the transaction without another DB lookup (Stripe pattern).
+            await paymentService.UpdateMetadataAsync(paymentIntentId,
+                new Dictionary<string, string> { ["tax_transaction"] = taxTxnId });
             Log.Information("[Webhook] Recorded tax transaction {TaxTxnId} for intent {IntentId}",
                 taxTxnId, paymentIntentId);
         }

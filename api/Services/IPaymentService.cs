@@ -8,9 +8,11 @@ public interface IPaymentService
         int amountCents,
         int transferAmountCents,
         string? connectedAccountId,
-        string currency = "usd");
+        string currency = "usd",
+        IDictionary<string, string>? metadata = null);
 
     Task<string> ConfirmPaymentAsync(string paymentIntentId);
     Task<PaymentIntentDetails> GetPaymentIntentAsync(string paymentIntentId);
     Task<string> RefundPaymentAsync(string paymentIntentId);
+    Task UpdateMetadataAsync(string paymentIntentId, IDictionary<string, string> metadata);
 }

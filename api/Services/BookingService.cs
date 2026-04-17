@@ -78,11 +78,15 @@ public class BookingService(
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
 
+        // Generate booking number up-front so we can attach it to the PaymentIntent metadata.
+        var bookingNumber = GenerateBookingNumber();
+        var piMetadata = BuildPaymentIntentMetadata(
+            bookingNumber, ev.Id, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
+
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            piAmount, subtotal, organizer?.StripeConnectedAccountId);
+            piAmount, subtotal, organizer?.StripeConnectedAccountId, "usd", piMetadata);
 
         // Create booking with the first table as primary (for backward compat)
-        var bookingNumber = GenerateBookingNumber();
         var bookingId = await bookingProc.CreateBookingAsync(
             userId, ev.Id, tables[0].Id, totalSeats, null, subtotal, fee, total, bookingNumber);
 
@@ -170,10 +174,12 @@ public class BookingService(
 
         var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
 
-        var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            piAmount, subtotal, organizer?.StripeConnectedAccountId);
-
         var bookingNumber = GenerateBookingNumber();
+        var piMetadata = BuildPaymentIntentMetadata(
+            bookingNumber, ev.Id, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, seats: seatsRequested);
+
+        var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
+            piAmount, subtotal, organizer?.StripeConnectedAccountId, "usd", piMetadata);
 
         // sp_reserve_open_capacity serializes capacity + ticket-type quota checks via row-level
         // locks on events/event_ticket_types rows. Replaces the previous Redis-lock + SELECT +
@@ -261,13 +267,22 @@ public class BookingService(
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var checkinLink = $"{frontendUrl}/booking/{bookingId}/checkin";
-        await emailService.SendAsync(
-            booking.UserEmail,
-            $"Booking Confirmed — {booking.EventTitle} | {appName}",
-            EmailTemplates.BookingConfirmed(
-                appName, booking.UserFirstName, booking.BookingNumber,
-                booking.EventTitle, $"${booking.TotalCents / 100.0:F2}", checkinLink)
-        );
+        // Email is a notification, not a booking invariant — a failure here (bad Resend domain,
+        // network, etc.) should not un-confirm a paid booking. Log and continue.
+        try
+        {
+            await emailService.SendAsync(
+                booking.UserEmail,
+                $"Booking Confirmed — {booking.EventTitle} | {appName}",
+                EmailTemplates.BookingConfirmed(
+                    appName, booking.UserFirstName, booking.BookingNumber,
+                    booking.EventTitle, $"${booking.TotalCents / 100.0:F2}", checkinLink)
+            );
+        }
+        catch (Exception emailEx)
+        {
+            Log.Warning(emailEx, "[Booking] Confirmation email failed for {BookingNumber} — booking still confirmed", booking.BookingNumber);
+        }
 
         Log.Information(
             "[Audit] booking_confirmed booking={BookingNumber} user={UserId} amount={Amount} qr={QrToken}",
@@ -378,6 +393,43 @@ public class BookingService(
         var timestamp = DateTime.UtcNow.ToString("yyMMdd");
         var random = RandomNumberGenerator.GetInt32(100000, 999999);
         return $"BK-{timestamp}-{random}";
+    }
+
+    // Builds PaymentIntent metadata so the payment, booking, and tax breakdown are reconcilable
+    // from the Stripe dashboard alone. Key "tax_calculation" is Stripe's standard for linking a
+    // Tax Calculation to a PaymentIntent (see https://docs.stripe.com/tax/custom).
+    // Payout split: admin_payout_cents goes to the organizer via transfer_data.amount;
+    // developer_gross_cents = platform_fee + tax; developer owes the tax to the jurisdiction,
+    // so developer's net revenue = platform_fee - stripe_fee (stripe_fee isn't known at create time).
+    private static Dictionary<string, string> BuildPaymentIntentMetadata(
+        string bookingNumber,
+        Guid eventId,
+        int subtotalCents,
+        int platformFeeCents,
+        int taxCents,
+        int totalCents,
+        string? taxCalculationId,
+        int? tableCount = null,
+        int? seats = null)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["booking_number"] = bookingNumber,
+            ["event_id"] = eventId.ToString(),
+            ["subtotal_cents"] = subtotalCents.ToString(),
+            ["platform_fee_cents"] = platformFeeCents.ToString(),
+            ["tax_cents"] = taxCents.ToString(),
+            ["total_cents"] = totalCents.ToString(),
+            ["admin_payout_cents"] = subtotalCents.ToString(),
+            ["developer_gross_cents"] = (platformFeeCents + taxCents).ToString()
+        };
+        if (!string.IsNullOrEmpty(taxCalculationId))
+            metadata["tax_calculation"] = taxCalculationId;
+        if (tableCount is int tc)
+            metadata["table_count"] = tc.ToString();
+        if (seats is int s)
+            metadata["seats"] = s.ToString();
+        return metadata;
     }
 
     private static string GenerateQrToken()

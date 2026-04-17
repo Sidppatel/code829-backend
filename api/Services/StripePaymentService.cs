@@ -15,7 +15,8 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
         int amountCents,
         int transferAmountCents,
         string? connectedAccountId,
-        string currency = "usd")
+        string currency = "usd",
+        IDictionary<string, string>? metadata = null)
     {
         var client = await GetClientAsync();
 
@@ -25,6 +26,12 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
             Currency = currency,
             AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true }
         };
+
+        if (metadata is { Count: > 0 })
+        {
+            // Stripe caps metadata keys at 50 and values at 500 chars; short keys/values below are well within limits.
+            options.Metadata = new Dictionary<string, string>(metadata);
+        }
 
         if (!string.IsNullOrEmpty(connectedAccountId))
         {
@@ -88,6 +95,25 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
         {
             Log.Error(ex, "[Stripe] Failed to fetch PaymentIntent {IntentId}", paymentIntentId);
             throw MapStripeException(ex);
+        }
+    }
+
+    public async Task UpdateMetadataAsync(string paymentIntentId, IDictionary<string, string> metadata)
+    {
+        if (metadata.Count == 0) return;
+        var client = await GetClientAsync();
+
+        try
+        {
+            var service = new PaymentIntentService(client);
+            await service.UpdateAsync(paymentIntentId, new PaymentIntentUpdateOptions
+            {
+                Metadata = new Dictionary<string, string>(metadata)
+            });
+        }
+        catch (StripeException ex)
+        {
+            Log.Warning(ex, "[Stripe] Failed to update metadata on PaymentIntent {IntentId}", paymentIntentId);
         }
     }
 

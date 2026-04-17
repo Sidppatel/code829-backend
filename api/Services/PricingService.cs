@@ -35,13 +35,17 @@ public class PricingService(
     public async Task<PricingQuoteDto> CalculateQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default)
     {
         var comp = await ComputeForBookingAsync(request, ct);
+        // The quote's Total must be what the customer actually gets charged — subtotal + fee + tax.
+        // PaymentIntentAmountCents is the tax-inclusive amount Stripe authorizes. TotalCents inside
+        // PricingComputation is pre-tax and stays that way for the booking record; only the DTO
+        // surfaces the grand total.
         return new PricingQuoteDto(
             comp.SubtotalCents,
             comp.FeeCents,
             comp.TaxCents,
-            comp.TotalCents,
+            comp.PaymentIntentAmountCents,
             comp.Currency,
-            FormatUsd(comp.TotalCents),
+            FormatUsd(comp.PaymentIntentAmountCents),
             DateTime.UtcNow.AddMinutes(5));
     }
 
