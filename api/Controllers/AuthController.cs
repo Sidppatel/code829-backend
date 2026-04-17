@@ -18,8 +18,8 @@ namespace Api.Controllers;
 public class AuthController(
     IAuthService authService,
     IWebHostEnvironment environment,
-    Db.EventPlatformDbContext context,
-    IImageService imageService
+    IImageService imageService,
+    Db.Repositories.StoredProcedures.IUserProcedures userProc
 ) : ControllerBase
 {
     // Public user sessions live under their own cookie name — see Api.Helpers.PortalHelper.
@@ -190,49 +190,20 @@ public class AuthController(
         var userId = GetUserId();
         if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
-        var user = await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == userId);
-        if (user is null)
+        var exists = await userProc.GetByIdAsync(userId.Value) is not null;
+        if (!exists)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
-        if (!string.IsNullOrWhiteSpace(request.FirstName))
-            user.FirstName = request.FirstName;
-        if (!string.IsNullOrWhiteSpace(request.LastName))
-            user.LastName = request.LastName;
-
-        if (request.Address is not null || request.City is not null || request.State is not null || request.ZipCode is not null)
-        {
-            if (user.Address is null)
-            {
-                var address = new Db.Entities.Address
-                {
-                    Id = Guid.NewGuid(),
-                    Line1 = request.Address ?? "",
-                    City = request.City ?? "",
-                    State = request.State ?? "",
-                    ZipCode = request.ZipCode ?? ""
-                };
-                context.Set<Db.Entities.Address>().Add(address);
-                user.AddressId = address.Id;
-                user.Address = address;
-            }
-            else
-            {
-                if (request.Address is not null) user.Address.Line1 = request.Address;
-                if (request.City is not null) user.Address.City = request.City;
-                if (request.State is not null) user.Address.State = request.State;
-                if (request.ZipCode is not null) user.Address.ZipCode = request.ZipCode;
-            }
-        }
-
-        user.Phone = request.Phone;
-
-        if (request.OptInLocationEmail.HasValue)
-            user.OptInLocationEmail = request.OptInLocationEmail.Value;
-
-        user.HasCompletedOnboarding = true;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        await context.SaveChangesAsync();
+        await userProc.UpdateUserProfileAsync(
+            userId.Value,
+            string.IsNullOrWhiteSpace(request.FirstName) ? null : request.FirstName,
+            string.IsNullOrWhiteSpace(request.LastName) ? null : request.LastName,
+            request.Phone,
+            request.Address,
+            request.City,
+            request.State,
+            request.ZipCode,
+            request.OptInLocationEmail);
 
         return Ok(new { message = "Profile updated successfully" });
     }
@@ -248,7 +219,7 @@ public class AuthController(
         var userId = GetUserId();
         if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
-        var user = await context.Users.FindAsync(userId);
+        var user = await userProc.GetByIdAsync(userId.Value);
         if (user is null)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
@@ -258,9 +229,7 @@ public class AuthController(
 
         var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId.Value, userId.Value);
 
-        user.AvatarPath = result.StorageKey;
-        user.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await userProc.UpdateUserAvatarAsync(userId.Value, result.StorageKey);
 
         return Ok(result);
     }
@@ -273,7 +242,7 @@ public class AuthController(
         var userId = GetUserId();
         if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
-        var user = await context.Users.FindAsync(userId);
+        var user = await userProc.GetByIdAsync(userId.Value);
         if (user is null)
             return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
@@ -281,9 +250,7 @@ public class AuthController(
         foreach (var img in images)
             await imageService.DeleteAsync(img.Id);
 
-        user.AvatarPath = null;
-        user.UpdatedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await userProc.ClearUserAvatarAsync(userId.Value);
 
         return NoContent();
     }

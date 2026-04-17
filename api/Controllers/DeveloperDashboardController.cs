@@ -13,7 +13,9 @@ namespace Api.Controllers;
 [Route("developer")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
-public class DeveloperDashboardController(EventPlatformDbContext context) : ControllerBase
+public class DeveloperDashboardController(
+    EventPlatformDbContext context,
+    Db.Repositories.StoredProcedures.IUserProcedures userProc) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard()
@@ -28,7 +30,7 @@ public class DeveloperDashboardController(EventPlatformDbContext context) : Cont
             .Select(b => b.TotalCents)
             .ToListAsync();
         var totalRevenue = revenueList.Sum(x => (long)x);
-        var totalUsers = await context.Users.CountAsync();
+        var totalUsers = (await userProc.GetCountsAsync()).Total;
         var totalVenues = await context.VenueViews.AsNoTracking().CountAsync();
 
         var topEventsRaw = await context.BookingViews.AsNoTracking()

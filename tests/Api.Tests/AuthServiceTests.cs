@@ -22,7 +22,7 @@ public class AuthServiceTests : IDisposable
     private readonly Mock<IWebHostEnvironment> _environment;
     private readonly Mock<IAuthProcedures> _authProc;
     private readonly Mock<IConnectionMultiplexer> _redis;
-    private readonly IUserRepository _userRepository;
+    private readonly Mock<IUserRepository> _userRepoMock;
     private readonly AuthService _service;
 
     public AuthServiceTests()
@@ -36,7 +36,7 @@ public class AuthServiceTests : IDisposable
         _authProc = new Mock<IAuthProcedures>();
         _redis = new Mock<IConnectionMultiplexer>();
 
-        _userRepository = new UserRepository(_context);
+        _userRepoMock = new Mock<IUserRepository>();
 
         _settingsService.Setup(s => s.GetOrDefaultAsync("magic_link_expiry_minutes", "15"))
             .ReturnsAsync("15");
@@ -56,7 +56,7 @@ public class AuthServiceTests : IDisposable
         jwtService.Setup(j => j.GenerateUserJwtAsync(It.IsAny<Db.Entities.User>()))
             .ReturnsAsync("test-jwt-token");
         _service = new AuthService(
-            _context, _userRepository, _authProc.Object, _settingsService.Object,
+            _context, _userRepoMock.Object, _authProc.Object, _settingsService.Object,
             _emailService.Object, _encryptionService.Object, _environment.Object,
             fileStorage.Object, _redis.Object, jwtService.Object);
     }
@@ -120,15 +120,15 @@ public class AuthServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Guid.NewGuid());
 
-        _context.Users.Add(new User
-        {
-            Id = userId,
-            Email = "newuser@example.com",
-            EmailHash = "testhash",
-            FirstName = "newuser",
-            LastName = ""
-        });
-        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        _userRepoMock.Setup(r => r.GetByIdAsync(userId))
+            .ReturnsAsync(new User
+            {
+                Id = userId,
+                Email = "newuser@example.com",
+                EmailHash = "testhash",
+                FirstName = "newuser",
+                LastName = ""
+            });
 
         var result = await _service.VerifyMagicLinkAsync(rawToken, "Chrome on Windows", "127.0.0.1");
 

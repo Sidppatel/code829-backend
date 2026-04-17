@@ -298,7 +298,7 @@ public class DeveloperController(
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        var query = context.Users.AsQueryable();
+        var query = context.UserProfileViews.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search))
         {

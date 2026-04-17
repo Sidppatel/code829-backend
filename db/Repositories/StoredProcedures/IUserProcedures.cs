@@ -1,7 +1,18 @@
+using Db.Entities;
+
 namespace Db.Repositories.StoredProcedures;
+
+public record UserCounts(int Total, int Active, int NewThisMonth);
 
 public interface IUserProcedures
 {
-    Task UpdateUserProfileAsync(Guid userId, string firstName, string lastName, string? phone, string? address, string? city, string? state, string? zip, bool optIn, CancellationToken ct = default);
+    Task<User?> GetByIdAsync(Guid userId, CancellationToken ct = default);
+    Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
+    Task<User?> GetByEmailHashAsync(string emailHash, CancellationToken ct = default);
+    Task<List<User>> ListAsync(CancellationToken ct = default);
+    Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default);
+    Task<UserCounts> GetCountsAsync(CancellationToken ct = default);
+    Task UpdateUserProfileAsync(Guid userId, string? firstName, string? lastName, string? phone, string? address, string? city, string? state, string? zip, bool? optIn, CancellationToken ct = default);
     Task UpdateUserAvatarAsync(Guid userId, string avatarPath, CancellationToken ct = default);
+    Task ClearUserAvatarAsync(Guid userId, CancellationToken ct = default);
 }

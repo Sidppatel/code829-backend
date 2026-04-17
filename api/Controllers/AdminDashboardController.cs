@@ -12,7 +12,9 @@ namespace Api.Controllers;
 [Route("admin")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
-public class AdminDashboardController(EventPlatformDbContext context) : ControllerBase
+public class AdminDashboardController(
+    EventPlatformDbContext context,
+    Db.Repositories.StoredProcedures.IUserProcedures userProc) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard()
@@ -27,7 +29,7 @@ public class AdminDashboardController(EventPlatformDbContext context) : Controll
             .Select(b => b.TotalCents)
             .ToListAsync();
         var totalRevenue = revenueList.Sum(x => (long)x);
-        var totalUsers = await context.Users.CountAsync();
+        var totalUsers = (await userProc.GetCountsAsync()).Total;
         var totalVenues = await context.VenueViews.AsNoTracking().CountAsync();
 
         var topEventsRaw = await context.BookingViews.AsNoTracking()

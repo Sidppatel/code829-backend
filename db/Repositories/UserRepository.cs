@@ -1,36 +1,11 @@
 using Db.Entities;
-using Microsoft.EntityFrameworkCore;
+using Db.Repositories.StoredProcedures;
 
 namespace Db.Repositories;
 
-public class UserRepository(EventPlatformDbContext context) : IUserRepository
+public class UserRepository(IUserProcedures userProcedures) : IUserRepository
 {
-    public async Task<User?> GetByIdAsync(Guid id)
-        => await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Id == id);
-
-    public async Task<User?> GetByEmailAsync(string email)
-        => await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.Email == email);
-
-    public async Task<User?> GetByEmailHashAsync(string emailHash)
-        => await context.Users.Include(u => u.Address).FirstOrDefaultAsync(u => u.EmailHash == emailHash);
-
-    public async Task<List<User>> GetAllAsync()
-        => await context.Users.Include(u => u.Address).OrderBy(u => u.CreatedAt).ToListAsync();
-
-    public async Task<User> CreateAsync(User user)
-    {
-        context.Users.Add(user);
-        await context.SaveChangesAsync();
-        return user;
-    }
-
-    public async Task UpdateAsync(User user)
-    {
-        user.UpdatedAt = DateTime.UtcNow;
-        context.Users.Update(user);
-        await context.SaveChangesAsync();
-    }
-
-    public async Task<bool> ExistsAsync(string email)
-        => await context.Users.AnyAsync(u => u.Email == email);
+    public Task<User?> GetByIdAsync(Guid id) => userProcedures.GetByIdAsync(id);
+    public Task<User?> GetByEmailAsync(string email) => userProcedures.GetByEmailAsync(email);
+    public Task<User?> GetByEmailHashAsync(string emailHash) => userProcedures.GetByEmailHashAsync(emailHash);
 }
