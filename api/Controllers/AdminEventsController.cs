@@ -30,6 +30,12 @@ public class AdminEventsController(
     ISettingsService settingsService
 ) : ControllerBase
 {
+    // Exposed so derived controllers (e.g. DeveloperEventsController) can reuse these
+    // dependencies without re-capturing them in their own primary-constructor state,
+    // which would trigger CS9107.
+    protected EventPlatformDbContext Context => context;
+    protected ISettingsService Settings => settingsService;
+
     [HttpGet]
     public virtual async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,

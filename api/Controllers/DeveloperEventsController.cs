@@ -28,22 +28,22 @@ public class DeveloperEventsController(
     [HttpGet("{id:guid}/fees")]
     public async Task<IActionResult> GetEventFees(Guid id)
     {
-        var ev = await context.EventViews.AsNoTracking()
+        var ev = await Context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound();
 
         var defaultFeeKey = ev.LayoutMode == "Grid" ? "default_platform_fee_grid_cents" : "default_platform_fee_open_cents";
         var defaultFeeDefault = ev.LayoutMode == "Grid" ? "2500" : "1000";
-        var defaultFee = int.Parse(await settings.GetOrDefaultAsync(defaultFeeKey, defaultFeeDefault) ?? defaultFeeDefault);
+        var defaultFee = int.Parse(await Settings.GetOrDefaultAsync(defaultFeeKey, defaultFeeDefault) ?? defaultFeeDefault);
 
-        var tableTypes = await context.EventTablesSummaryViews.AsNoTracking()
+        var tableTypes = await Context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id && et.IsActive)
             .OrderBy(et => et.Label)
             .Select(et => new TableTypeFee(et.Id, et.Label, et.PriceCents, et.PlatformFeeCents,
                 et.BookedTables > 0 || et.LockedTables > 0))
             .ToListAsync();
 
-        var ticketTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
+        var ticketTypes = await Context.EventTicketTypeSummaryViews.AsNoTracking()
             .Where(tt => tt.EventId == id && tt.IsActive)
             .OrderBy(tt => tt.SortOrder)
             .Select(tt => new TicketTypeFee(tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
@@ -60,10 +60,10 @@ public class DeveloperEventsController(
     [HttpPut("{id:guid}/ticket-type-fees")]
     public async Task<IActionResult> UpdateTicketTypeFees(Guid id, [FromBody] UpdateTicketTypeFeesRequest request)
     {
-        var ev = await context.Events.FindAsync(id);
+        var ev = await Context.Events.FindAsync(id);
         if (ev is null) return NotFound();
 
-        var ticketTypes = await context.EventTicketTypes
+        var ticketTypes = await Context.EventTicketTypes
             .Where(tt => tt.EventId == id && tt.IsActive)
             .ToListAsync();
 
@@ -74,7 +74,7 @@ public class DeveloperEventsController(
 
             if (feeCents != tt.PlatformFeeCents)
             {
-                var hasSales = await context.BookingViews.AsNoTracking()
+                var hasSales = await Context.BookingViews.AsNoTracking()
                     .AnyAsync(b => b.EventTicketTypeId == typeId
                         && b.Status != "Cancelled" && b.Status != "Expired" && b.Status != "Refunded");
                 if (hasSales)
@@ -87,17 +87,17 @@ public class DeveloperEventsController(
             tt.UpdatedAt = DateTime.UtcNow;
         }
 
-        await context.SaveChangesAsync();
+        await Context.SaveChangesAsync();
         return Ok(new { message = "Ticket type fees updated" });
     }
 
     [HttpPut("{id:guid}/table-fees")]
     public async Task<IActionResult> UpdateTableTypeFees(Guid id, [FromBody] UpdateTableTypeFeesRequest request)
     {
-        var ev = await context.Events.FindAsync(id);
+        var ev = await Context.Events.FindAsync(id);
         if (ev is null) return NotFound();
 
-        var tableTypes = await context.EventTables
+        var tableTypes = await Context.EventTables
             .Include(et => et.Tables)
             .Where(et => et.EventId == id && et.IsActive)
             .ToListAsync();
@@ -111,7 +111,7 @@ public class DeveloperEventsController(
             {
                 // Check if any tables under this type are sold or locked
                 var ttTableIds = tt.Tables.Select(t => t.Id).ToList();
-                var hasSales = await context.Bookings.AnyAsync(b =>
+                var hasSales = await Context.Bookings.AnyAsync(b =>
                     b.EventId == id && b.TableId.HasValue && ttTableIds.Contains(b.TableId.Value)
                     && b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Expired && b.Status != BookingStatus.Refunded);
                 var hasLocks = tt.Tables.Any(t => t.Status == TableStatus.Locked && t.LockExpiresAt > DateTime.UtcNow);
@@ -126,7 +126,7 @@ public class DeveloperEventsController(
             tt.UpdatedAt = DateTime.UtcNow;
         }
 
-        await context.SaveChangesAsync();
+        await Context.SaveChangesAsync();
         return Ok(new { message = "Table type fees updated" });
     }
 }
