@@ -14,17 +14,11 @@ public record EventSummaryDto(
     string VenueName,
     string VenueCity,
     string VenueState,
-    int? PricePerPersonCents,
     int TotalCapacity,
     int TotalSold,
     int NoOfAvailableTables,
-    int? MinPricePerTableCents,
-    int? MinTicketTypePriceCents = null,
-    int? DisplayPricePerPersonCents = null,
-    int? DisplayMinPricePerTableCents = null,
-    int? DisplayMinTicketTypePriceCents = null,
-    int? DisplayFromAmountCents = null,
-    string? DisplayFromFormatted = null,
-    bool IsSoldOut = false,
-    int AvailableCount = 0
+    int? DisplayFromAmountCents,
+    string? DisplayFromFormatted,
+    bool IsSoldOut,
+    int AvailableCount
 );

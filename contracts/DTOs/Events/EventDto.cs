@@ -15,7 +15,6 @@ public record EventDto(
     bool IsFeatured,
     string LayoutMode,
     int? MaxCapacity,
-    int? PricePerPersonCents,
     int? GridRows,
     int? GridCols,
     DateTime? PublishedAt,
@@ -28,15 +27,12 @@ public record EventDto(
     int TotalCapacity,
     int TotalSold,
     int NoOfAvailableTables,
-    int? MinPricePerTableCents,
-    int? MinTicketTypePriceCents = null,
-    int? DisplayPricePerPersonCents = null,
-    int? DisplayMinPricePerTableCents = null,
-    int? DisplayMinTicketTypePriceCents = null,
-    int? DisplayFromAmountCents = null,
-    string? DisplayFromFormatted = null,
-    bool IsSoldOut = false,
-    int AvailableCount = 0,
+    int? DisplayFromAmountCents,
+    string? DisplayFromFormatted,
+    bool IsSoldOut,
+    int AvailableCount,
     List<EventTicketTypeDto>? TicketTypes = null,
-    List<EventTableTypeSummaryDto>? TableTypes = null
+    List<EventTableTypeSummaryDto>? TableTypes = null,
+    // Raw (pre-fee) price for admin surfaces. Not populated on public responses.
+    int? PricePerPersonCents = null
 );

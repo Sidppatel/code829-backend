@@ -490,28 +490,47 @@ public class AdminEventsController(
 
     // ─── Helpers ──────────────────────────────────────────────────
 
-    private EventDto MapToDto(EventView e) => new(
-        e.Id, e.Title, e.Slug, e.Description,
-        e.Status, e.Category,
-        e.StartDate, e.EndDate,
-        e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
-        e.IsFeatured,
-        e.LayoutMode, e.MaxCapacity, e.PricePerPersonCents,
-        e.GridRows, e.GridCols, e.PublishedAt,
-        e.VenueId,
-        e.VenueName,
-        null,
-        e.OrganizerId,
-        $"{e.OrganizerFirstName} {e.OrganizerLastName}",
-        e.CreatedAt,
-        e.MaxCapacity ?? 0,
-        e.TotalSold,
-        e.AvailableTables,
-        e.MinTablePriceCents,
-        e.MinTicketTypePriceCents,
-        DisplayMinPricePerTableCents: e.DisplayMinTablePriceCents,
-        DisplayMinTicketTypePriceCents: e.DisplayMinTicketTypePriceCents
-    );
+    private EventDto MapToDto(EventView e)
+    {
+        var displayFrom = MinNonNull(e.DisplayMinTablePriceCents, e.DisplayMinTicketTypePriceCents);
+        var displayFromFormatted = displayFrom.HasValue ? $"${displayFrom.Value / 100.0:F2}" : null;
+        var isSoldOut = e.LayoutMode == "Grid"
+            ? e.AvailableTables <= 0
+            : (e.TotalCapacity > 0 && e.TotalSold >= e.TotalCapacity);
+        var availableCount = e.LayoutMode == "Grid"
+            ? e.AvailableTables
+            : Math.Max(0, e.TotalCapacity - e.TotalSold);
+
+        return new EventDto(
+            e.Id, e.Title, e.Slug, e.Description,
+            e.Status, e.Category,
+            e.StartDate, e.EndDate,
+            e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,
+            e.IsFeatured,
+            e.LayoutMode, e.MaxCapacity,
+            e.GridRows, e.GridCols, e.PublishedAt,
+            e.VenueId,
+            e.VenueName,
+            null,
+            e.OrganizerId,
+            $"{e.OrganizerFirstName} {e.OrganizerLastName}",
+            e.CreatedAt,
+            e.MaxCapacity ?? 0,
+            e.TotalSold,
+            e.AvailableTables,
+            displayFrom,
+            displayFromFormatted,
+            isSoldOut,
+            availableCount,
+            PricePerPersonCents: e.PricePerPersonCents
+        );
+    }
+
+    private static int? MinNonNull(params int?[] values)
+    {
+        var nonNull = values.Where(v => v.HasValue).Select(v => v!.Value).ToArray();
+        return nonNull.Length == 0 ? null : nonNull.Min();
+    }
 
     private static bool IsValidTransition(EventStatus current, EventStatus target) => (current, target) switch
     {
