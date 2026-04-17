@@ -13,6 +13,7 @@ public record EventTableDto(
     int SortOrder,
     string Status,
     DateTime? HoldExpiresAt,
+    bool IsAvailable,
     bool IsLockedByYou = false,
     Guid? EventTableId = null,
     string? EventTableLabel = null

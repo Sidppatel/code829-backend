@@ -405,8 +405,11 @@ public class EventsController(
 
             return new EventTableDto(t.Id, t.Label, t.Capacity,
                 t.Shape, t.Color, t.PriceCents, t.TotalPriceCents,
-                t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt, isLockedByYou,
-                t.EventTableId, t.EventTableLabel);
+                t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt,
+                IsAvailable: status == "Available" || isLockedByYou,
+                IsLockedByYou: isLockedByYou,
+                EventTableId: t.EventTableId,
+                EventTableLabel: t.EventTableLabel);
         }).ToList();
 
         return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, eventTableTypes, dtos));
@@ -428,7 +431,8 @@ public class EventsController(
             tt.Id, tt.Label, tt.PriceCents, null,
             tt.TotalPriceCents,
             tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-            tt.SoldCount, tt.AvailableCount)).ToList();
+            tt.SoldCount, tt.AvailableCount,
+            IsSoldOut: tt.AvailableCount <= 0)).ToList();
 
         return Ok(new EventTicketTypesResponse(id, types));
     }

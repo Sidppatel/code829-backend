@@ -93,7 +93,9 @@ public class AdminEventsController(
                     tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                     tt.TotalPriceCents,
                     tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-                    tt.SoldCount, tt.AvailableCount, tt.Description)).ToList()
+                    tt.SoldCount, tt.AvailableCount,
+                    IsSoldOut: tt.AvailableCount <= 0,
+                    Description: tt.Description)).ToList()
             };
         }
         else if (ev.LayoutMode == "Grid")
@@ -399,7 +401,9 @@ public class AdminEventsController(
             tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
             tt.TotalPriceCents,
             tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-            tt.SoldCount, tt.AvailableCount, tt.Description)).ToList();
+            tt.SoldCount, tt.AvailableCount,
+            IsSoldOut: tt.AvailableCount <= 0,
+            Description: tt.Description)).ToList();
 
         return Ok(new EventTicketTypesResponse(id, types));
     }
@@ -430,7 +434,9 @@ public class AdminEventsController(
             created.Id, created.Label, created.PriceCents, created.PlatformFeeCents,
             created.TotalPriceCents,
             created.MaxQuantity, created.SortOrder, created.IsActive,
-            created.SoldCount, created.AvailableCount, created.Description));
+            created.SoldCount, created.AvailableCount,
+            IsSoldOut: created.AvailableCount <= 0,
+            Description: created.Description));
     }
 
     [HttpPut("{id:guid}/ticket-types/{typeId:guid}")]
@@ -465,7 +471,9 @@ public class AdminEventsController(
             updated.Id, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
             updated.TotalPriceCents,
             updated.MaxQuantity, updated.SortOrder, updated.IsActive,
-            updated.SoldCount, updated.AvailableCount, updated.Description));
+            updated.SoldCount, updated.AvailableCount,
+            IsSoldOut: updated.AvailableCount <= 0,
+            Description: updated.Description));
     }
 
     [HttpDelete("{id:guid}/ticket-types/{typeId:guid}")]

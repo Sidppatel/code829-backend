@@ -11,6 +11,7 @@ public record EventTicketTypeDto(
     bool IsActive,
     int SoldCount,
     int AvailableCount,
+    bool IsSoldOut,
     string? Description = null
 );
 
