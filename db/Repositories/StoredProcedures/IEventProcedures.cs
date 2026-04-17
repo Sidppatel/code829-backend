@@ -1,5 +1,7 @@
 namespace Db.Repositories.StoredProcedures;
 
+public record EventStats(int TotalSold, int MaxCapacity, int FillRatePct, long GrossRevenueCents);
+
 public interface IEventProcedures
 {
     Task<Guid> CreateEventAsync(
@@ -22,4 +24,6 @@ public interface IEventProcedures
     Task<int> PublishScheduledEventsAsync();
 
     Task DeleteEventAsync(Guid id, CancellationToken ct = default);
+
+    Task<EventStats?> GetEventStatsAsync(Guid id, CancellationToken ct = default);
 }

@@ -316,6 +316,20 @@ public class AdminEventsController(
         return Ok(MapToDto(updated));
     }
 
+    [HttpGet("{id:guid}/stats")]
+    public async Task<IActionResult> GetStats(Guid id)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
+
+        var stats = await eventProc.GetEventStatsAsync(id);
+        if (stats is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+
+        return Ok(new EventStatsDto(
+            stats.TotalSold, stats.MaxCapacity, stats.FillRatePct, stats.GrossRevenueCents));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

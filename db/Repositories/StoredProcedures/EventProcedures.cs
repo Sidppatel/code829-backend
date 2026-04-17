@@ -63,4 +63,20 @@ public class EventProcedures(EventPlatformDbContext context) : IEventProcedures
         await context.Database.ExecuteSqlRawAsync(
             "SELECT sp_delete_event({0})", [id], ct);
     }
+
+    public async Task<EventStats?> GetEventStatsAsync(Guid id, CancellationToken ct = default)
+    {
+        var row = await context.Database
+            .SqlQueryRaw<EventStatsRow>("SELECT * FROM sp_event_stats({0})", id)
+            .FirstOrDefaultAsync(ct);
+        return row is null ? null : new EventStats(row.TotalSold, row.MaxCapacity, row.FillRatePct, row.GrossRevenueCents);
+    }
+
+    private sealed class EventStatsRow
+    {
+        public int TotalSold { get; set; }
+        public int MaxCapacity { get; set; }
+        public int FillRatePct { get; set; }
+        public long GrossRevenueCents { get; set; }
+    }
 }
