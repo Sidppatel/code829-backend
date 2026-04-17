@@ -1,14 +1,32 @@
 # .NET Build
 **/bin/
 **/obj/
+**/artifacts/
 *.user
 *.suo
 *.sln.docstates
+*.rsuser
+*.userosscache
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
 
-# Environment
+# .NET Test & Coverage
+TestResults/
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+BenchmarkDotNet.Artifacts/
+
+# Environment & local-only config
 **/.env
 **/.env.*
 !**/.env.example
+appsettings.*.local.json
+appsettings.Production.json
+secrets.json
 
 # IDE
 .vs/
@@ -16,6 +34,10 @@
 *.swp
 *.swo
 .idea/
+*.DotSettings.user
+*.ReSharper.user
+_ReSharper*/
+[Rr]ider*/
 
 # Docker volumes
 docker-data/
@@ -25,14 +47,20 @@ redis-data/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
 
 # Log files (not source directories named Logs)
 /logs/
+**/logs/
 *.log
 
 # NuGet
 *.nupkg
+*.snupkg
 **/packages/
+.nuget/
 
 # Uploads (dev local storage)
 uploads/
