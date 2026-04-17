@@ -109,4 +109,23 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 - Keep controllers thin — business logic belongs in services
 - Ownership checks required on all admin mutation endpoints (compare `OrganizerId` to current user)
 
+## Data Access Rule (architectural)
+
+**The API must never read or write tables directly via EF Core LINQ.** All data access goes through:
+- Stored Procedures (`sp_*`) called via `SqlQueryRaw<T>()` / `ExecuteSqlRawAsync()` — wrapped in `db/Repositories/StoredProcedures/`
+- SQL Functions (`SELECT * FROM sp_foo(...)`)
+- Views (keyless entities mapped in `OnModelCreating`, e.g., `context.EventViews`, `context.UserProfileViews` — these ARE views and are fine)
+
+Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`, `context.Events.Add(...)`, `context.Bookings.AnyAsync(...)`, `context.Tables.Where(...).ToListAsync()`, `context.AdminUsers.CountAsync()`.
+
+**Exceptions:** `api/Seeding/**` and `tests/**` may use EF directly. Mark with `[AllowDirectDbAccess]` attribute (once the Roslyn analyzer lands) or `// ARCH-EXCEPTION: <reason>` comment on the line.
+
+**When adding new data access:**
+- For reads that need entity materialization: create an `sp_*` function returning `SETOF <tablename>` and call via `context.Entities.FromSqlRaw("SELECT * FROM sp_foo({0})", arg).Include(...).FirstOrDefaultAsync()`.
+- For projections/aggregations: prefer a view (`v_*`) registered in `OnModelCreating` and queried through its DbSet.
+- For writes: create `sp_create_*` / `sp_update_*` / `sp_delete_*` returning whatever the caller needs (uuid of new row, void, etc.).
+- For existence checks: prefer `SELECT EXISTS(...)` via `sp_*_exists_*` returning `bool`.
+
+**PR checklist:** reviewer confirms no new `context.<NonViewTable>.<EFMethod>` outside `Seeding/` or `Tests/`.
+
 
