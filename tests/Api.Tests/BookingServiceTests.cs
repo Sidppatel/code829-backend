@@ -118,7 +118,7 @@ public class BookingServiceTests : IDisposable
             AmountCents = 5000,
             RefundedAt = DateTime.UtcNow
         });
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // CancelAsync reads from BookingViews which doesn't exist in in-memory DB.
         // This test verifies the service throws KeyNotFoundException when booking not found in view.

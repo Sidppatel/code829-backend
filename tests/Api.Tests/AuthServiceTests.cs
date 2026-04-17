@@ -128,7 +128,7 @@ public class AuthServiceTests : IDisposable
             FirstName = "newuser",
             LastName = ""
         });
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _service.VerifyMagicLinkAsync(rawToken, "Chrome on Windows", "127.0.0.1");
 

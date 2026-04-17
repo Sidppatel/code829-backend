@@ -12,7 +12,7 @@ using Db;
 using Db.Repositories;
 using Microsoft.AspNetCore.ResponseCompression;
 using FluentValidation;
-using FluentValidation.AspNetCore;
+using Api.Filters;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -250,7 +250,12 @@ try
     // Controllers + OpenAPI + Validation
     // CSRF note: Antiforgery tokens are designed for server-rendered forms, not SPA + JWT APIs.
     // This API is protected by JWT auth + SameSite cookies + CORS origin checks instead.
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options =>
+        {
+            // Replaces AddFluentValidationAutoValidation() from the deprecated
+            // FluentValidation.AspNetCore package. See api/Filters/FluentValidationFilter.cs.
+            options.Filters.Add<FluentValidationFilter>();
+        })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
@@ -286,7 +291,6 @@ try
         };
     });
     builder.Services.AddOpenApi();
-    builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
     builder.Services.AddScoped<IValidator<CreateBookingRequest>, CreateBookingRequestValidator>();
     builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
