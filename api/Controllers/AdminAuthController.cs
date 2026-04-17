@@ -112,6 +112,47 @@ public class AdminAuthController(
         }
     }
 
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
+
+        try
+        {
+            await adminAuthService.RequestPasswordResetAsync(request.Email, Request.Headers.Origin);
+            return Ok(new { message = "If the account exists, a reset link has been sent." });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Security requirement: show error when not authorized (email not found in admin table)
+            return Unauthorized(new ApiError(401, "Not authorized", HttpContext.TraceIdentifier));
+        }
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new ApiError(400, "Token and new password are required", HttpContext.TraceIdentifier));
+
+        var (pwValid, pwError) = Helpers.PasswordValidator.Validate(request.NewPassword);
+        if (!pwValid)
+            return BadRequest(new ApiError(400, pwError!, HttpContext.TraceIdentifier));
+
+        try
+        {
+            await adminAuthService.ResetPasswordAsync(request.Token, request.NewPassword);
+            return Ok(new { message = "Password reset successful" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
     [HttpPost("logout")]
     [Authorize]
     [RequireRole(UserRole.Staff)]

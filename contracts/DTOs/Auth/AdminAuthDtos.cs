@@ -20,3 +20,7 @@ public record UpdateAdminUserRequest(
 public record ChangeAdminPasswordRequest(string CurrentPassword, string NewPassword);
 
 public record ResetAdminPasswordRequest(string NewPassword);
+
+public record ForgotPasswordRequest(string Email);
+
+public record ResetPasswordRequest(string Token, string NewPassword);

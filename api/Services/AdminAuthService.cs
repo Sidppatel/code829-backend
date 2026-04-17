@@ -16,7 +16,9 @@ public class AdminAuthService(
     IAuthProcedures authProc,
     IFileStorageService fileStorage,
     IConnectionMultiplexer redis,
-    IJwtService jwtService
+    IJwtService jwtService,
+    IEmailService emailService,
+    ISettingsService settingsService
 ) : IAdminAuthService
 {
     private const int MaxFailedAttempts = 5;
@@ -134,6 +136,72 @@ public class AdminAuthService(
         await adminProc.UpdatePasswordAsync(adminUserId, newHash);
 
         Log.Information("[AdminAuth] Password changed for {Email}", admin.Email);
+    }
+
+    public async Task RequestPasswordResetAsync(string email, string? origin)
+    {
+        var normalizedEmail = email.ToLowerInvariant().Trim();
+        var admin = await adminProc.GetByEmailAsync(normalizedEmail);
+
+        // Security requirement: show unauthorizied if user doesn't exist as admin
+        if (admin is null || !admin.IsActive)
+        {
+            Log.Warning("[AdminAuth] Password reset requested for non-existent or inactive admin: {Email}", normalizedEmail);
+            throw new UnauthorizedAccessException("Unauthorized");
+        }
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var rawToken = Convert.ToBase64String(tokenBytes);
+        var tokenHash = HashToken(rawToken);
+
+        var expiryMinutes = int.Parse(
+            await settingsService.GetOrDefaultAsync("password_reset_expiry_minutes", "60") ?? "60");
+
+        var resetToken = new AdminPasswordResetToken
+        {
+            AdminUserId = admin.Id,
+            TokenHash = tokenHash,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes),
+            Email = normalizedEmail
+        };
+
+        context.AdminPasswordResetTokens.Add(resetToken); // ARCH-EXCEPTION: Dedicated tokens table for admins, no SP wrapper yet
+        await context.SaveChangesAsync();
+
+        var frontendUrl = origin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+        var resetUrl = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+
+        await emailService.SendAsync(
+            normalizedEmail,
+            $"{appName} Password Reset",
+            EmailTemplates.PasswordReset(appName, resetUrl, expiryMinutes)
+        );
+
+        Log.Information("[AdminAuth] Password reset link sent to {Email}", normalizedEmail);
+    }
+
+    public async Task ResetPasswordAsync(string token, string newPassword)
+    {
+        var tokenHash = HashToken(token);
+        var resetToken = await context.AdminPasswordResetTokens // ARCH-EXCEPTION: Verified reset token lookup
+            .Include(t => t.AdminUser) // ARCH-EXCEPTION: Verified reset token lookup
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow); // ARCH-EXCEPTION: Verified reset token lookup
+
+        if (resetToken is null)
+            throw new UnauthorizedAccessException("Invalid or expired reset token");
+
+        var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await adminProc.UpdatePasswordAsync(resetToken.AdminUserId, newHash);
+
+        resetToken.IsUsed = true;
+        resetToken.UsedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        // Revoke all sessions for this user to force re-login with new password
+        await RevokeAllSessionsAsync(resetToken.AdminUserId, null);
+
+        Log.Information("[AdminAuth] Password reset successful for {Email}", resetToken.AdminUser.Email);
     }
 
     private async Task<(string RawToken, string Hash)> CreateDeviceSessionAsync(Guid adminUserId, string? deviceName, string? ip)

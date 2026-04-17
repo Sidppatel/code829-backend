@@ -15,6 +15,7 @@ public class EventPlatformDbContext(
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
+    public DbSet<AdminPasswordResetToken> AdminPasswordResetTokens => Set<AdminPasswordResetToken>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
 
     // Template/parent entities
@@ -169,6 +170,23 @@ public class EventPlatformDbContext(
             entity.HasIndex(e => e.ExpiresAt);
             entity.Property(e => e.TokenHash).HasMaxLength(128);
             entity.Property(e => e.Email).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<AdminPasswordResetToken>(entity =>
+        {
+            entity.ToTable("admin_password_reset_tokens", t =>
+            {
+                t.HasCheckConstraint("CK_admin_password_reset_tokens_Usage",
+                    "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
+            });
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.AdminUserId);
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<DeviceSession>(entity =>

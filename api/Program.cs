@@ -27,33 +27,33 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    var builder = WebApplication.CreateBuilder(args);
-
-    // Load .env file — only in Development to prevent stale env files overriding production secrets
-    if (builder.Environment.IsDevelopment())
+var bootstrapEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+if (bootstrapEnv == "Development")
+{
+    var envCandidates = new[]
     {
-        var envCandidates = new[]
+        Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
+        Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+    };
+    var envPath = envCandidates.FirstOrDefault(File.Exists);
+    if (envPath is not null)
+    {
+        Console.WriteLine($"[Bootstrap] Loading environment from {envPath}");
+        foreach (var line in File.ReadAllLines(envPath))
         {
-            Path.Combine(builder.Environment.ContentRootPath, "..", ".env"),
-            Path.Combine(Directory.GetCurrentDirectory(), ".env"),
-            Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
-        };
-        var envPath = envCandidates.FirstOrDefault(File.Exists);
-        if (envPath is not null)
-        {
-            foreach (var line in File.ReadAllLines(envPath))
-            {
-                var trimmed = line.Trim();
-                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#'))
-                    continue;
-                var eqIndex = trimmed.IndexOf('=');
-                if (eqIndex <= 0) continue;
-                var key = trimmed[..eqIndex];
-                var value = trimmed[(eqIndex + 1)..];
-                Environment.SetEnvironmentVariable(key, value);
-            }
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
+            var eqIndex = trimmed.IndexOf('=');
+            if (eqIndex <= 0) continue;
+            var key = trimmed[..eqIndex];
+            var value = trimmed[(eqIndex + 1)..];
+            Environment.SetEnvironmentVariable(key, value);
         }
     }
+}
+
+var builder = WebApplication.CreateBuilder(args);
+
 
     // Serilog — structured logging to console + files with timestamps
     builder.Host.UseSerilog((ctx, lc) =>

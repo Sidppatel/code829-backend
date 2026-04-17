@@ -11,4 +11,6 @@ public interface IAdminAuthService
     Task RevokeSessionAsync(Guid sessionId, Guid adminUserId);
     Task RevokeAllSessionsAsync(Guid adminUserId, string? exceptSessionHash);
     Task ChangePasswordAsync(Guid adminUserId, string currentPassword, string newPassword);
+    Task RequestPasswordResetAsync(string email, string? origin);
+    Task ResetPasswordAsync(string token, string newPassword);
 }
