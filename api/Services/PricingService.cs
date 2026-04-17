@@ -72,7 +72,7 @@ public class PricingService(
         if (tables.Count != tableIds.Count)
             throw new KeyNotFoundException("One or more tables not found for this event");
 
-        var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
+        var defaultFeeCents = await settings.GetIntAsync("default_platform_fee_grid_cents", 2500);
 
         var subtotal = tables.Sum(t => t.PriceCents);
         var fee = tables.Sum(t => t.PlatformFeeCents ?? defaultFeeCents);
@@ -100,14 +100,14 @@ public class PricingService(
             var selected = ticketTypes.FirstOrDefault(tt => tt.Id == ticketTypeId)
                 ?? throw new KeyNotFoundException("Ticket type not found or inactive");
             pricePerPerson = selected.PriceCents;
-            var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
+            var defaultOpenFee = await settings.GetIntAsync("default_platform_fee_open_cents", 1000);
             feePerTicket = selected.PlatformFeeCents ?? defaultOpenFee;
         }
         else
         {
             pricePerPerson = ev.PricePerPersonCents
                 ?? throw new InvalidOperationException("Event has no price configured");
-            feePerTicket = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
+            feePerTicket = await settings.GetIntAsync("default_platform_fee_open_cents", 1000);
         }
 
         var subtotal = pricePerPerson * seats;
@@ -119,7 +119,8 @@ public class PricingService(
 
     private async Task<PricingComputation> ApplyTaxIfEnabledAsync(EventView ev, int subtotal, int fee, int total, CancellationToken ct)
     {
-        var stripeTaxEnabled = (await settings.GetOrDefaultAsync("stripe_tax_enabled", "false")) == "true";
+        var stripeTaxSetting = await settings.GetOrDefaultAsync("stripe_tax_enabled", "false");
+        var stripeTaxEnabled = "true".Equals(stripeTaxSetting, StringComparison.OrdinalIgnoreCase);
         if (!stripeTaxEnabled)
             return new PricingComputation(subtotal, fee, 0, total, total, null, "usd");
 
