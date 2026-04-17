@@ -1,3 +1,6 @@
+using Db;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -8,10 +11,11 @@ namespace db.Migrations
     /// Installs the pgcrypto extension. sp_confirm_booking calls gen_random_bytes(32) to seed
     /// the ticket QrToken; that function lives in pgcrypto. Earlier migrations assumed the
     /// extension was pre-loaded on the host, which isn't true for a vanilla postgres:16 image.
-    /// The previous migration (20260417060000) was retroactively edited to include this, but
-    /// databases that applied the older version already won't re-run it — hence this explicit
-    /// companion migration.
+    /// Dropping and recreating the database loses the extension, so this migration reinstalls
+    /// it deterministically on every fresh DB.
     /// </summary>
+    [DbContext(typeof(EventPlatformDbContext))]
+    [Migration("20260417070000_EnablePgcrypto")]
     public partial class EnablePgcrypto : Migration
     {
         /// <inheritdoc />

@@ -1,3 +1,6 @@
+using Db;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -12,6 +15,8 @@ namespace db.Migrations
     /// IX_booking_tickets_BookingId_SeatNumber. The guard uses plpgsql's FOUND to short-circuit
     /// when the booking was already confirmed.
     /// </summary>
+    [DbContext(typeof(EventPlatformDbContext))]
+    [Migration("20260417060000_MakeConfirmBookingIdempotent")]
     public partial class MakeConfirmBookingIdempotent : Migration
     {
         /// <inheritdoc />

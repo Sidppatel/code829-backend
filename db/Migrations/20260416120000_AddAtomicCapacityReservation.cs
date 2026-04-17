@@ -1,3 +1,6 @@
+using Db;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -9,6 +12,8 @@ namespace db.Migrations
     /// Replaces the Redis-lock + SELECT + INSERT pattern which had a race window between
     /// the capacity check and the row insert.
     /// </summary>
+    [DbContext(typeof(EventPlatformDbContext))]
+    [Migration("20260416120000_AddAtomicCapacityReservation")]
     public partial class AddAtomicCapacityReservation : Migration
     {
         /// <inheritdoc />
