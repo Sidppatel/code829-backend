@@ -368,13 +368,19 @@ try
     app.UseResponseCompression();
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
-    // CORS must run before rate limiting so that 429 responses still include CORS headers
+    // CORS must run before rate limiting so that 429 responses still include CORS headers.
+    // Methods/headers are allow-listed rather than AllowAny* — we only ever serve the verbs
+    // below, and narrowing the preflight response limits damage if a future cookie-auth
+    // path is added without revisiting CORS. Retry-After is exposed so clients can read it
+    // from 429 responses.
     app.UseCors(policy =>
     {
         policy.WithOrigins(corsOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+              .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+              .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With", "Idempotency-Key")
+              .WithExposedHeaders("Retry-After", "X-Correlation-Id")
+              .AllowCredentials()
+              .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
     });
 
     app.UseMiddleware<CorrelationIdMiddleware>();

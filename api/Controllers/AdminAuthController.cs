@@ -19,7 +19,11 @@ public class AdminAuthController(
 ) : ControllerBase
 {
     private const string SessionCookieName = "session";
-    private const int SessionMaxAgeDays = 90;
+    // Admin sessions re-auth every 14 days. Admins have destructive power (rotate
+    // Stripe keys, delete users, change fees) so the trust window is kept tighter
+    // than the regular-user cookie. Users can still use "revoke my sessions" at
+    // any time, and the DeviceSession row lets a Developer revoke remotely.
+    private const int SessionMaxAgeDays = 14;
 
     [HttpGet("invitation/{token}")]
     public async Task<IActionResult> GetInvitationInfo(string token)

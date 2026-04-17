@@ -209,7 +209,7 @@ Redis is used for:
 | `DATABASE_URL` | PostgreSQL connection string (use Supabase transaction pooler, port 6543) |
 | `DATABASE_SSL_MODE` | `Require` for Supabase |
 | `REDIS_URL` | Redis connection URL (`redis://` or `rediss://` for TLS) |
-| `SETTINGS_ENCRYPTION_KEY` | AES-256 key for encrypting DB settings. Generate: `openssl rand -base64 32`. **Never rotate after first deploy.** |
+| `JWT_SECRET` | 64-char hex string for JWT signing. Generate: `openssl rand -hex 32` |
 | `RESEND_API_KEY` | Resend email API key (starts with `re_`) |
 | `EMAIL_FROM_ADDRESS` | Sender email (must match verified Resend domain) |
 

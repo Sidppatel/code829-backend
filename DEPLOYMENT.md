@@ -167,7 +167,7 @@ Your API uses Redis (see `docker-compose.yml`). Upstash provides a **free server
 ```
 DATABASE_URL         = postgresql://postgres.[ref]:[password]@...supabase.com:6543/postgres?pgbouncer=true
 REDIS_URL            = rediss://default:[password]@[host].upstash.io:6380
-SETTINGS_ENCRYPTION_KEY = <run: openssl rand -hex 32>
+JWT_SECRET           = <run: openssl rand -hex 32>
 ASPNETCORE_ENVIRONMENT = Production
 PORT                 = 8000
 ```
@@ -280,7 +280,7 @@ That's it. UptimeRobot will now ping your API every 5 minutes 24/7 — keeping R
 |---|---|---|
 | `DATABASE_URL` | `postgresql://...supabase.com:6543/postgres?pgbouncer=true` | Transaction pooler, port 6543 |
 | `REDIS_URL` | `rediss://default:pass@host.upstash.io:6380` | Upstash TLS URL |
-| `SETTINGS_ENCRYPTION_KEY` | 64-char hex string | Generate: `openssl rand -hex 32` |
+| `JWT_SECRET` | 64-char hex string | Generate: `openssl rand -hex 32` |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | |
 | `PORT` | `8000` | Already set in Dockerfile |
 

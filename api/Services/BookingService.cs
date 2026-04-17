@@ -86,12 +86,18 @@ public class BookingService(
         var bookingId = await bookingProc.CreateBookingAsync(
             userId, ev.Id, tables[0].Id, totalSeats, null, subtotal, fee, total, bookingNumber);
 
-        // Insert additional tables into junction table
+        // Insert additional tables into the booking_tables junction table. Using
+        // ExecuteSqlInterpolated (FormattableString) instead of ExecuteSqlRawAsync
+        // so EF Core parameterizes the Guids at compile time — any future edit that
+        // accidentally interpolates user input still goes through parameter binding.
+        // The junction has no EF entity mapping; sp_create_booking inserts the
+        // primary table row and this loop adds the rest. ON CONFLICT DO NOTHING
+        // keeps the call idempotent if the SP ever adds overlapping rows.
         foreach (var table in tables.Skip(1))
         {
-            await context.Database.ExecuteSqlRawAsync(
-                "INSERT INTO booking_tables (\"BookingId\", \"TableId\") VALUES (@p0, @p1) ON CONFLICT DO NOTHING",
-                bookingId, table.Id);
+            var tableId = table.Id;
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO booking_tables (\"BookingId\", \"TableId\") VALUES ({bookingId}, {tableId}) ON CONFLICT DO NOTHING");
         }
 
         await stripeTransactionProc.CreateAsync(bookingId, intentId, piAmount, subtotal, taxCalculationId);
