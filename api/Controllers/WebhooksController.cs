@@ -5,6 +5,7 @@ using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using StackExchange.Redis;
 using Stripe;
 
 namespace Api.Controllers;
@@ -16,9 +17,11 @@ public class WebhooksController(
     ISecretsProvider secrets,
     IStripeTransactionProcedures stripeTransactionProc,
     IBookingProcedures bookingProc,
-    ITaxService taxService
+    ITaxService taxService,
+    IConnectionMultiplexer redis
 ) : ControllerBase
 {
+    private static readonly TimeSpan DedupeTtl = TimeSpan.FromDays(7);
     [HttpPost("stripe")]
     public async Task<IActionResult> HandleStripeWebhook()
     {
@@ -43,6 +46,18 @@ public class WebhooksController(
             return BadRequest("Invalid signature");
         }
 
+        // Dedupe at the controller level — Stripe retries failed webhooks and a single event
+        // can arrive multiple times. Idempotent handlers guard downstream work, but processing
+        // the same event twice still burns DB + Stripe API calls.
+        var dedupeKey = $"stripe-webhook:{stripeEvent.Id}";
+        var db = redis.GetDatabase();
+        var firstSeen = await db.StringSetAsync(dedupeKey, "1", DedupeTtl, When.NotExists);
+        if (!firstSeen)
+        {
+            Log.Information("[Webhook] Duplicate event {EventId} ({EventType}) — skipping", stripeEvent.Id, stripeEvent.Type);
+            return Ok();
+        }
+
         try
         {
             switch (stripeEvent.Type)
@@ -64,6 +79,8 @@ public class WebhooksController(
         catch (Exception ex)
         {
             Log.Error(ex, "[Webhook] Error processing {EventType} {EventId}", stripeEvent.Type, stripeEvent.Id);
+            // Clear the dedupe key so Stripe's retry has a chance
+            await db.KeyDeleteAsync(dedupeKey);
         }
 
         return Ok();
