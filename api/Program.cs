@@ -124,6 +124,12 @@ try
     // Secrets from environment variables
     builder.Services.AddSingleton<ISecretsProvider, SecretsProvider>();
 
+    // Security headers / CSP — defaults are baked into SecurityHeadersOptions so that
+    // missing/empty appsettings cannot silently strip Stripe domains from the policy.
+    // Override in appsettings.*.json under "Security:Csp".
+    builder.Services.Configure<SecurityHeadersOptions>(
+        builder.Configuration.GetSection("Security:Csp"));
+
     // Fail-fast: Stripe is mandatory in every environment. No mock payment path exists.
     // Read directly from Environment to honor .env files loaded above after CreateBuilder.
     var stripeSecret = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
@@ -325,6 +331,16 @@ try
             : "http://localhost:5173";
         var originsStr = await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins) ?? defaultOrigins;
         corsOrigins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    // Security header sanity check — if an operator accidentally disabled CSP in Production,
+    // surface it in the logs instead of silently serving requests with weakened policy.
+    if (app.Environment.IsProduction())
+    {
+        var securityOpts = app.Services
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<SecurityHeadersOptions>>().Value;
+        if (!securityOpts.EnableHstsAndCsp)
+            Log.Warning("[Security] HSTS+CSP disabled in Production — set Security:Csp:EnableHstsAndCsp=true");
     }
 
     // Middleware pipeline

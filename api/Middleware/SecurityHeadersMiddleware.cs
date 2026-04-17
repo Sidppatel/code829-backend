@@ -1,11 +1,31 @@
+using Microsoft.Extensions.Options;
+
 namespace Api.Middleware;
+
+/// <summary>
+/// CSP and HSTS configuration. Defaults include Stripe domains required for
+/// Stripe.js / Elements to load. Override via appsettings "Security:Csp".
+/// </summary>
+public class SecurityHeadersOptions
+{
+    public bool EnableHstsAndCsp { get; set; } = true;
+    public string[] DefaultSrc { get; set; } = ["'self'"];
+    public string[] ScriptSrc { get; set; } = ["'self'", "https://js.stripe.com"];
+    public string[] StyleSrc { get; set; } = ["'self'", "https://fonts.googleapis.com"];
+    public string[] FontSrc { get; set; } = ["'self'", "https://fonts.gstatic.com"];
+    public string[] ImgSrc { get; set; } = ["'self'", "data:", "blob:", "https:"];
+    public string[] ConnectSrc { get; set; } = ["'self'", "https://api.stripe.com", "https://r.stripe.com"];
+    public string[] FrameSrc { get; set; } = ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"];
+}
 
 /// <summary>
 /// Adds production security headers to all responses:
 /// HSTS, X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy.
 /// </summary>
-public class SecurityHeadersMiddleware(RequestDelegate next)
+public class SecurityHeadersMiddleware(RequestDelegate next, IOptions<SecurityHeadersOptions> options)
 {
+    private readonly SecurityHeadersOptions _opts = options.Value;
+
     public async Task InvokeAsync(HttpContext context)
     {
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -16,13 +36,25 @@ public class SecurityHeadersMiddleware(RequestDelegate next)
         context.Response.Headers.Remove("X-Powered-By");
         context.Response.Headers.Remove("Server");
 
-        if (!context.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
+        var env = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
+        if (_opts.EnableHstsAndCsp && !env.IsDevelopment())
         {
             context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload";
-            context.Response.Headers["Content-Security-Policy"] =
-                "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'";
+            context.Response.Headers["Content-Security-Policy"] = BuildCsp();
         }
 
         await next(context);
     }
+
+    private string BuildCsp() =>
+        string.Join("; ", new[]
+        {
+            $"default-src {string.Join(' ', _opts.DefaultSrc)}",
+            $"script-src {string.Join(' ', _opts.ScriptSrc)}",
+            $"style-src {string.Join(' ', _opts.StyleSrc)}",
+            $"font-src {string.Join(' ', _opts.FontSrc)}",
+            $"img-src {string.Join(' ', _opts.ImgSrc)}",
+            $"connect-src {string.Join(' ', _opts.ConnectSrc)}",
+            $"frame-src {string.Join(' ', _opts.FrameSrc)}",
+        });
 }

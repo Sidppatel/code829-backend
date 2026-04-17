@@ -52,7 +52,7 @@ public class RateLimitingMiddlewareTests
     public async Task Request_AboveLimit_Returns429()
     {
         _redisDb.Setup(d => d.StringIncrementAsync(It.IsAny<RedisKey>(), It.IsAny<long>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(101); // above default limit of 100
+            .ReturnsAsync(201); // above default limit of 200
         _redisDb.Setup(d => d.KeyTimeToLiveAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(TimeSpan.FromSeconds(60));
 
