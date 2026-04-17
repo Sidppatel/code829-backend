@@ -130,6 +130,15 @@ try
     builder.Services.Configure<SecurityHeadersOptions>(
         builder.Configuration.GetSection("Security:Csp"));
 
+    // Forwarded headers — rewrite Connection.RemoteIpAddress from X-Forwarded-For so
+    // rate limiting and audit logs see the real client IP when deployed behind a LB/CDN.
+    // Trusted proxy CIDRs come from the TRUSTED_PROXIES env var.
+    builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+        ForwardedHeadersConfig.Configure(
+            options,
+            builder.Environment.IsDevelopment(),
+            Environment.GetEnvironmentVariable("TRUSTED_PROXIES")));
+
     // Fail-fast: Stripe is mandatory in every environment. No mock payment path exists.
     // Read directly from Environment to honor .env files loaded above after CreateBuilder.
     var stripeSecret = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
@@ -344,6 +353,9 @@ try
     }
 
     // Middleware pipeline
+    // Must run before any middleware that reads RemoteIpAddress (rate limiting, audit logs).
+    app.UseForwardedHeaders();
+
     app.UseResponseCompression();
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
