@@ -41,13 +41,14 @@ public class BookingServiceTests : IDisposable
         _pricingService = new Mock<IPricingService>();
         _emailService = new Mock<IEmailService>();
         _settingsService = new Mock<ISettingsService>();
+        var adminProcMock = new Mock<IAdminUserProcedures>();
 
         _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync("10");
 
         _service = new BookingService(_context, _bookingProc.Object, _stripeTransactionProc.Object,
             _paymentService.Object, _taxService.Object, _pricingService.Object,
-            _emailService.Object, _settingsService.Object);
+            _emailService.Object, _settingsService.Object, adminProcMock.Object);
 
         _userId = Guid.NewGuid();
         _eventId = Guid.NewGuid();

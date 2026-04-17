@@ -26,8 +26,7 @@ public class AdminAuthService(
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
-        var admin = await context.AdminUsers
-            .FirstOrDefaultAsync(a => a.Email == normalizedEmail);
+        var admin = await adminProc.GetByEmailAsync(normalizedEmail);
 
         if (admin is null || !admin.IsActive)
             throw new UnauthorizedAccessException("Invalid email or password");
@@ -41,23 +40,15 @@ public class AdminAuthService(
 
         if (!BCrypt.Net.BCrypt.Verify(password, admin.PasswordHash))
         {
-            admin.FailedLoginAttempts++;
-            if (admin.FailedLoginAttempts >= MaxFailedAttempts)
-            {
-                admin.LockedUntil = DateTime.UtcNow.Add(LockoutDuration);
-                Log.Warning("[AdminAuth] Account locked for {Email} after {Attempts} failed attempts", admin.Email, admin.FailedLoginAttempts);
-            }
-            await context.SaveChangesAsync();
+            await adminProc.IncrementFailedLoginAsync(admin.Id, MaxFailedAttempts, (int)LockoutDuration.TotalMinutes);
+            if (admin.FailedLoginAttempts + 1 >= MaxFailedAttempts)
+                Log.Warning("[AdminAuth] Account locked for {Email} after {Attempts} failed attempts", admin.Email, admin.FailedLoginAttempts + 1);
             throw new UnauthorizedAccessException("Invalid email or password");
         }
 
         // Reset lockout on successful login
         if (admin.FailedLoginAttempts > 0)
-        {
-            admin.FailedLoginAttempts = 0;
-            admin.LockedUntil = null;
-            await context.SaveChangesAsync();
-        }
+            await adminProc.ResetLockoutAsync(admin.Id);
 
         await adminProc.UpdateLastLoginAsync(admin.Id);
 
@@ -71,8 +62,7 @@ public class AdminAuthService(
 
     public async Task<AdminUserDto?> GetCurrentAdminAsync(Guid adminUserId)
     {
-        var admin = await context.AdminUsers.AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == adminUserId);
+        var admin = await adminProc.GetByIdAsync(adminUserId);
         return admin is null ? null : MapAdminUserDto(admin);
     }
 
@@ -85,7 +75,7 @@ public class AdminAuthService(
 
     public async Task<List<DeviceSessionDto>> GetSessionsAsync(Guid adminUserId, string? currentSessionHash)
     {
-        var sessions = await context.DeviceSessions
+        var sessions = await context.DeviceSessionViews
             .AsNoTracking()
             .Where(s => s.AdminUserId == adminUserId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
             .OrderByDescending(s => s.LastActivityAt)
@@ -104,7 +94,8 @@ public class AdminAuthService(
 
     public async Task RevokeSessionAsync(Guid sessionId, Guid adminUserId)
     {
-        var session = await context.DeviceSessions
+        var session = await context.DeviceSessionViews
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == sessionId && s.AdminUserId == adminUserId && s.RevokedAt == null);
 
         if (session is null)
@@ -117,7 +108,8 @@ public class AdminAuthService(
 
     public async Task RevokeAllSessionsAsync(Guid adminUserId, string? exceptSessionHash)
     {
-        var hashes = await context.DeviceSessions
+        var hashes = await context.DeviceSessionViews
+            .AsNoTracking()
             .Where(s => s.AdminUserId == adminUserId && s.RevokedAt == null && (exceptSessionHash == null || s.SessionHash != exceptSessionHash))
             .Select(s => s.SessionHash)
             .ToListAsync();
@@ -132,8 +124,7 @@ public class AdminAuthService(
 
     public async Task ChangePasswordAsync(Guid adminUserId, string currentPassword, string newPassword)
     {
-        var admin = await context.AdminUsers.AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == adminUserId)
+        var admin = await adminProc.GetByIdAsync(adminUserId)
             ?? throw new KeyNotFoundException("Admin user not found");
 
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, admin.PasswordHash))

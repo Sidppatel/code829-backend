@@ -18,7 +18,8 @@ public class BookingService(
     ITaxService taxService,
     IPricingService pricingService,
     IEmailService emailService,
-    ISettingsService settings
+    ISettingsService settings,
+    IAdminUserProcedures adminProc
 ) : IBookingService
 {
     public async Task<BookingDto> CreateAsync(Guid userId, CreateBookingRequest request)
@@ -76,7 +77,7 @@ public class BookingService(
         var estimatedTaxCents = pricing.TaxCents;
         var totalSeats = tables.Sum(t => t.Capacity);
 
-        var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
+        var organizer = await adminProc.GetByIdAsync(ev.OrganizerId);
 
         // Generate booking number up-front so we can attach it to the PaymentIntent metadata.
         var bookingNumber = GenerateBookingNumber();
@@ -172,7 +173,7 @@ public class BookingService(
         var taxCalculationId = pricing.TaxCalculationId;
         var estimatedTaxCents = pricing.TaxCents;
 
-        var organizer = await context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == ev.OrganizerId);
+        var organizer = await adminProc.GetByIdAsync(ev.OrganizerId);
 
         var bookingNumber = GenerateBookingNumber();
         var piMetadata = BuildPaymentIntentMetadata(

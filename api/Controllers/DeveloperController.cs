@@ -341,7 +341,7 @@ public class DeveloperController(
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        var query = context.AdminUsers.AsQueryable();
+        var query = context.AdminUserViews.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -387,7 +387,7 @@ public class DeveloperController(
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        if (await context.AdminUsers.AnyAsync(a => a.Email == normalizedEmail))
+        if (await adminUserProc.ExistsByEmailAsync(normalizedEmail))
             return Conflict(new ApiError(409, "An admin user with this email already exists", HttpContext.TraceIdentifier));
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -406,7 +406,7 @@ public class DeveloperController(
     [HttpPut("admin-users/{id:guid}")]
     public async Task<IActionResult> UpdateAdminUser(Guid id, [FromBody] UpdateAdminUserRequest request)
     {
-        var admin = await context.AdminUsers.FindAsync(id);
+        var admin = await adminUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
         if (request.Role is not null && !Enum.TryParse<AdminRole>(request.Role, true, out _))
@@ -428,7 +428,7 @@ public class DeveloperController(
     [HttpPut("admin-users/{id:guid}/reset-password")]
     public async Task<IActionResult> ResetAdminPassword(Guid id, [FromBody] ResetAdminPasswordRequest request)
     {
-        var admin = await context.AdminUsers.FindAsync(id);
+        var admin = await adminUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
         var (pwValid2, pwError2) = Api.Helpers.PasswordValidator.Validate(request.NewPassword);
@@ -447,7 +447,7 @@ public class DeveloperController(
     [HttpDelete("admin-users/{id:guid}")]
     public async Task<IActionResult> DeactivateAdminUser(Guid id)
     {
-        var admin = await context.AdminUsers.FindAsync(id);
+        var admin = await adminUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
         if (admin.Role == AdminRole.Developer)

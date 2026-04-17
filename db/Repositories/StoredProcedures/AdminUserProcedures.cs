@@ -1,3 +1,4 @@
+using Db.Entities;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -6,6 +7,29 @@ namespace Db.Repositories.StoredProcedures;
 
 public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserProcedures
 {
+    public async Task<AdminUser?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await context.AdminUsers
+            .FromSqlRaw("SELECT * FROM sp_get_admin_by_id({0})", id)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<AdminUser?> GetByEmailAsync(string email, CancellationToken ct = default)
+    {
+        return await context.AdminUsers
+            .FromSqlRaw("SELECT * FROM sp_get_admin_by_email({0})", email)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<bool>("SELECT sp_admin_exists_by_email({0}) AS \"Value\"", email)
+            .FirstAsync(ct);
+    }
+
     public async Task<Guid> CreateAsync(string email, string emailHash, string firstName, string lastName,
         string passwordHash, string role, CancellationToken ct = default)
     {
@@ -48,6 +72,22 @@ public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserPro
         await context.Database
             .ExecuteSqlRawAsync(
                 "SELECT sp_update_admin_last_login(@p0)",
+                [id], ct);
+    }
+
+    public async Task IncrementFailedLoginAsync(Guid id, int maxAttempts, int lockoutMinutes, CancellationToken ct = default)
+    {
+        await context.Database
+            .ExecuteSqlRawAsync(
+                "SELECT sp_increment_admin_failed_login(@p0, @p1, @p2)",
+                [id, maxAttempts, lockoutMinutes], ct);
+    }
+
+    public async Task ResetLockoutAsync(Guid id, CancellationToken ct = default)
+    {
+        await context.Database
+            .ExecuteSqlRawAsync(
+                "SELECT sp_reset_admin_lockout(@p0)",
                 [id], ct);
     }
 

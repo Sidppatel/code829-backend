@@ -116,7 +116,7 @@ public class AuthService(
 
     public async Task<List<DeviceSessionDto>> GetSessionsAsync(Guid userId, string? currentSessionHash)
     {
-        var sessions = await context.DeviceSessions
+        var sessions = await context.DeviceSessionViews
             .AsNoTracking()
             .Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
             .OrderByDescending(s => s.LastActivityAt)
@@ -135,7 +135,8 @@ public class AuthService(
 
     public async Task RevokeSessionAsync(Guid sessionId, Guid userId)
     {
-        var session = await context.DeviceSessions
+        var session = await context.DeviceSessionViews
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId && s.RevokedAt == null);
 
         if (session is null)
@@ -149,7 +150,8 @@ public class AuthService(
     public async Task RevokeAllSessionsAsync(Guid userId, string? exceptSessionHash)
     {
         // Get all active session hashes for Redis cleanup
-        var hashes = await context.DeviceSessions
+        var hashes = await context.DeviceSessionViews
+            .AsNoTracking()
             .Where(s => s.UserId == userId && s.RevokedAt == null && (exceptSessionHash == null || s.SessionHash != exceptSessionHash))
             .Select(s => s.SessionHash)
             .ToListAsync();

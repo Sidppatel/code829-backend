@@ -37,7 +37,7 @@ public class AdminStaffController(
         page = Math.Max(1, page);
 
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
-        var query = context.AdminUsers.AsQueryable();
+        var query = context.AdminUserViews.AsNoTracking();
 
         if (!isDeveloper)
             query = query.Where(a => a.Role == AdminRole.Staff);
@@ -88,7 +88,7 @@ public class AdminStaffController(
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        if (await context.AdminUsers.AnyAsync(a => a.Email == normalizedEmail))
+        if (await adminUserProc.ExistsByEmailAsync(normalizedEmail))
             return Conflict(new ApiError(409, "An admin user with this email already exists", HttpContext.TraceIdentifier));
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -108,7 +108,7 @@ public class AdminStaffController(
     public async Task<IActionResult> UpdateStaff(Guid id, [FromBody] UpdateAdminUserRequest request)
     {
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
-        var admin = await context.AdminUsers.FindAsync(id);
+        var admin = await adminUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Staff user not found", HttpContext.TraceIdentifier));
 
         if (!isDeveloper && admin.Role != AdminRole.Staff)

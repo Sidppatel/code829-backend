@@ -52,6 +52,9 @@ public class EventPlatformDbContext(
     public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
     public DbSet<EventTicketTypeSummaryView> EventTicketTypeSummaryViews => Set<EventTicketTypeSummaryView>();
+    public DbSet<AdminUserView> AdminUserViews => Set<AdminUserView>();
+    public DbSet<DeviceSessionView> DeviceSessionViews => Set<DeviceSessionView>();
+    public DbSet<InvitationView> InvitationViews => Set<InvitationView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -606,6 +609,27 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_event_ticket_types_summary");
             entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<AdminUserView>(entity =>
+        {
+            entity.ToView("v_admin_users");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Role).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<DeviceSessionView>(entity =>
+        {
+            entity.ToView("v_device_sessions");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<InvitationView>(entity =>
+        {
+            entity.ToView("v_invitations");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Role).HasConversion<string>();
+            entity.Property(e => e.Status).HasConversion<string>();
         });
     }
 }
