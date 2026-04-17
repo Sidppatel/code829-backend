@@ -250,7 +250,7 @@ public class TicketsController(
             return BadRequest(new ApiError(400, "This invite link has expired", HttpContext.TraceIdentifier));
 
         var tableLabel = ticket.Booking.TableId.HasValue
-            ? await context.Tables.Where(t => t.Id == ticket.Booking.TableId).Select(t => t.Label).FirstOrDefaultAsync()
+            ? await context.TableViews.AsNoTracking().Where(t => t.Id == ticket.Booking.TableId).Select(t => t.Label).FirstOrDefaultAsync()
             : null;
 
         return Ok(new TicketClaimInfoDto(

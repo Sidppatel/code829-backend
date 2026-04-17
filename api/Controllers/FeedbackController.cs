@@ -96,10 +96,8 @@ public class FeedbackController(
     [RequireRole(UserRole.Admin)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var feedback = await context.Feedbacks.FindAsync(id);
-        if (feedback is null) return NotFound();
-        context.Feedbacks.Remove(feedback);
-        await context.SaveChangesAsync();
+        var deleted = await feedbackProc.DeleteFeedbackAsync(id);
+        if (!deleted) return NotFound();
         return NoContent();
     }
 }

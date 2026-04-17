@@ -121,7 +121,7 @@ public class AdminBookingsController(
         if (booking is null) return NotFound(new ApiError(404, "Booking not found", HttpContext.TraceIdentifier));
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var ev = await context.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == booking.EventId);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == booking.EventId);
         if (ev is not null && ev.OrganizerId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
             return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
 

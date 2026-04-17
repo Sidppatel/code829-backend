@@ -83,8 +83,8 @@ public class AdminVenuesController(
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
 
-        var venue = await context.Venues.FindAsync(id);
-        if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.Id == id);
+        if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "venues", file.FileName);
         await venueProc.UpdateVenueAsync(id, null, null, path, null, null, null, null, null, null, null, null);

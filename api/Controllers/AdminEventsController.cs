@@ -141,7 +141,7 @@ public class AdminEventsController(
 
         var baseSlug = slug;
         var counter = 1;
-        while (await context.Events.AnyAsync(e => e.Slug == slug))
+        while (await context.EventViews.AsNoTracking().AnyAsync(e => e.Slug == slug))
             slug = $"{baseSlug}-{counter++}";
 
         var eventId = await eventProc.CreateEventAsync(
@@ -272,7 +272,7 @@ public class AdminEventsController(
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
 
-        var ev = await context.Events.FindAsync(id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
@@ -319,19 +319,18 @@ public class AdminEventsController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var ev = await context.Events.FindAsync(id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
-        if (ev.Status != EventStatus.Draft)
+        if (ev.Status != EventStatus.Draft.ToString())
             return BadRequest(new ApiError(400, "Only draft events can be deleted", HttpContext.TraceIdentifier));
 
         var hasBookings = await context.BookingViews.AsNoTracking().AnyAsync(b => b.EventId == id);
         if (hasBookings)
             return BadRequest(new ApiError(400, "Cannot delete an event with bookings", HttpContext.TraceIdentifier));
 
-        context.Events.Remove(ev);
-        await context.SaveChangesAsync();
+        await eventProc.DeleteEventAsync(id);
         return NoContent();
     }
 
@@ -346,7 +345,7 @@ public class AdminEventsController(
         var slug = GenerateSlug(original.Title + " copy");
         var baseSlug = slug;
         var counter = 1;
-        while (await context.Events.AnyAsync(e => e.Slug == slug))
+        while (await context.EventViews.AsNoTracking().AnyAsync(e => e.Slug == slug))
             slug = $"{baseSlug}-{counter++}";
 
         var copyId = await eventProc.CreateEventAsync(

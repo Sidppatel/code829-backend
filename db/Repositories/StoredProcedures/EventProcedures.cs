@@ -57,4 +57,10 @@ public class EventProcedures(EventPlatformDbContext context) : IEventProcedures
 
         return result;
     }
+
+    public async Task DeleteEventAsync(Guid id, CancellationToken ct = default)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            "SELECT sp_delete_event({0})", [id], ct);
+    }
 }

@@ -23,4 +23,11 @@ public class FeedbackProcedures(EventPlatformDbContext context) : IFeedbackProce
 
         return result;
     }
+
+    public async Task<bool> DeleteFeedbackAsync(Guid id, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<bool>("SELECT sp_delete_feedback({0}) AS \"Value\"", id)
+            .FirstAsync(ct);
+    }
 }
