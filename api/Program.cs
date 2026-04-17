@@ -65,15 +65,16 @@ try
           .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
           .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning);
 
-        // Console: all info, warnings, and errors with timestamps
+        // Console: include CorrelationId so a payment issue in logs can be traced back to the
+        // request. UserId comes from CorrelationIdMiddleware too.
         lc.WriteTo.Console(
-            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}");
 
         // Main API log file
         lc.WriteTo.File("logs/api-.log",
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 30,
-            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}");
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}");
 
         // Error-only log file for quick triage
         lc.WriteTo.Logger(lc2 => lc2
@@ -81,7 +82,7 @@ try
             .WriteTo.File("logs/errors-.log",
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 30,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
 
         // Separate file for seeding operations
         lc.WriteTo.Logger(lc2 => lc2

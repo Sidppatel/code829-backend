@@ -293,7 +293,9 @@ public class BookingService(
         if (booking.PaymentIntentId is not null)
             await paymentService.RefundPaymentAsync(booking.PaymentIntentId);
 
-        // Reverse the tax transaction if one was recorded
+        // Reverse the tax transaction if one was recorded. This is accounting-critical —
+        // a missing reversal means we'll over-report sales tax remitted. Log as Error (not
+        // Warning) with a TAX_REVERSAL_FAILED marker so alerts can pattern-match it.
         if (!string.IsNullOrEmpty(booking.TaxTransactionId) && booking.PaymentIntentId is not null)
         {
             try
@@ -302,7 +304,9 @@ public class BookingService(
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "[Booking] Failed to reverse tax transaction {TaxTxnId} — non-critical", booking.TaxTransactionId);
+                Log.Error(ex,
+                    "[Booking] TAX_REVERSAL_FAILED booking={BookingNumber} txTxn={TaxTxnId} intent={IntentId} — refund completed but tax not reversed; manual reconciliation required",
+                    booking.BookingNumber, booking.TaxTransactionId, booking.PaymentIntentId);
             }
         }
 
