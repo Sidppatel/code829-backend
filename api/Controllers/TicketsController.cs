@@ -57,7 +57,8 @@ public class TicketsController(
             booking.TableLabel,
             t.GuestFirstName is not null ? $"{t.GuestFirstName} {t.GuestLastName}" : null,
             t.GuestEmail,
-            t.InvitedEmail, t.InviteSentAt, t.ClaimedAt
+            t.InvitedEmail, t.InviteSentAt, t.ClaimedAt,
+            t.GuestUserId
         ));
 
         return Ok(dtos);
@@ -169,9 +170,11 @@ public class TicketsController(
             return StatusCode(403, new ApiError(403, "Only the booking owner can self-claim", HttpContext.TraceIdentifier));
         if (ticket.Status == TicketStatus.CheckedIn)
             return BadRequest(new ApiError(400, "Cannot modify a checked-in ticket", HttpContext.TraceIdentifier));
-        if (ticket.Status == TicketStatus.Claimed && ticket.GuestUserId != userId)
-            return BadRequest(new ApiError(400, "Ticket is already claimed by someone else — revoke first", HttpContext.TraceIdentifier));
+        if (ticket.Status == TicketStatus.Claimed && ticket.GuestUserId == userId)
+            return Ok(new { message = "Already claimed by you", ticketId = ticket.Id });
 
+        // Override any prior invite or guest-claim. Matches InviteGuest's "clear previous guest"
+        // pattern so the buyer can always take a ticket back without a separate revoke step.
         ticket.GuestUserId = userId;
         ticket.Status = TicketStatus.Claimed;
         ticket.ClaimedAt = DateTime.UtcNow;

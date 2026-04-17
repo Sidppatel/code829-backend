@@ -16,7 +16,8 @@ public record BookingTicketDto(
     string? GuestEmail,
     string? InvitedEmail,
     DateTime? InviteSentAt,
-    DateTime? ClaimedAt
+    DateTime? ClaimedAt,
+    Guid? GuestUserId
 );
 
 /// <summary>
