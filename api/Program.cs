@@ -125,7 +125,8 @@ try
     builder.Services.AddSingleton<ISecretsProvider, SecretsProvider>();
 
     // Fail-fast: Stripe is mandatory in every environment. No mock payment path exists.
-    var stripeSecret = builder.Configuration["STRIPE_SECRET_KEY"];
+    // Read directly from Environment to honor .env files loaded above after CreateBuilder.
+    var stripeSecret = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
     if (string.IsNullOrEmpty(stripeSecret))
         throw new InvalidOperationException(
             "STRIPE_SECRET_KEY is required. Set test keys in .env for development or live keys in production — see .env.example.");
