@@ -17,6 +17,13 @@ namespace db.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // sp_confirm_booking has always called encode(gen_random_bytes(32), 'hex') for
+            // booking_tickets.QrToken. gen_random_bytes lives in pgcrypto; prior migrations
+            // assumed the extension was pre-loaded. Fresh Postgres instances (e.g., the
+            // official postgres:16 image without contrib pre-enabled) fail with 42883 when
+            // confirming a booking. Install it here once — idempotent via IF NOT EXISTS.
+            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
+
             migrationBuilder.Sql(@"
 CREATE OR REPLACE FUNCTION sp_confirm_booking(p_booking_id uuid, p_qr_token text)
 RETURNS void LANGUAGE plpgsql AS $$
