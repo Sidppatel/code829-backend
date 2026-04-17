@@ -51,6 +51,18 @@ dotnet ef migrations add <Name> --project db --startup-project api
 - `[AllowAnonymous]` only where explicitly needed (public endpoints, beacon)
 - JWT secret loaded from `JWT_SECRET` environment variable via `ISecretsProvider`
 
+### CSRF posture
+- All authenticated requests use `Authorization: Bearer <jwt>` headers — **no auth cookies**.
+  Beacon endpoints pass the JWT in the request body (unavoidable: `navigator.sendBeacon` can't set headers) and each beacon delegates to a service that re-validates ownership.
+- Because the API doesn't accept session cookies, classic CSRF (cookie auto-attach) is not applicable and anti-forgery tokens are not required.
+- If a cookie-based auth path is ever added (e.g., admin SSR), add anti-forgery then.
+
+### Payment integrity
+- Stripe is mandatory in every environment (no mock service). Missing `STRIPE_SECRET_KEY` fails startup; live keys are required in `Production` and blocked outside it.
+- `BookingService.ConfirmPaymentAsync` and `WebhooksController.HandlePaymentIntentSucceeded` both fetch the PaymentIntent and reject if `AmountReceived != StripeTransaction.AmountCents` — logged as `PAYMENT_AMOUNT_MISMATCH`.
+- Pricing is computed exclusively by `PricingService`; `BookingService` and `POST /bookings/quote` both call it, so quote math and booking math are guaranteed identical.
+- Open-capacity bookings use `sp_reserve_open_capacity` which takes a row-level lock on the event and validates capacity + ticket-type quota atomically.
+
 ### Key Patterns
 - `ApiError(statusCode, message, traceId)` for consistent error responses
 - **Secrets** (JWT, Stripe, Resend, S3/CDN keys) are in environment variables, accessed via `ISecretsProvider` (singleton)
