@@ -192,6 +192,15 @@ try
     }
     else
     {
+        // Fail-fast: an empty access/secret/bucket would construct an AmazonS3Client that
+        // only fails at upload time, crashing user-facing requests instead of the process.
+        var s3Access = Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
+        var s3Secret = Environment.GetEnvironmentVariable("S3_SECRET_KEY");
+        var s3Bucket = Environment.GetEnvironmentVariable("S3_BUCKET");
+        if (string.IsNullOrEmpty(s3Access) || string.IsNullOrEmpty(s3Secret) || string.IsNullOrEmpty(s3Bucket))
+            throw new InvalidOperationException(
+                "S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET are required outside Development. See .env.example.");
+
         builder.Services.AddScoped<IFileStorageService, S3FileStorageService>();
     }
 
