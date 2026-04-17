@@ -28,6 +28,7 @@ public class DeveloperLogsController(EventPlatformDbContext context) : Controlle
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
+        // ARCH-EXCEPTION: admin_logs is append-only audit log; dynamic filter + paginate for developer view.
         var query = context.AdminLogs.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(action))

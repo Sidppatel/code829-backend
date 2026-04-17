@@ -31,18 +31,19 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
     private static readonly LocalizableString Description =
         "The Event Platform API must never read or write tables directly via EF LINQ. Route access through Db.Repositories.StoredProcedures.* or keyless view DbSets.";
 
-    // Severity is Warning (not Error) because pre-existing repositories and legacy
-    // controller code have sites that haven't been migrated yet. The intent is to
-    // catch NEW regressions and surface the existing debt; escalate to Error once
-    // the backlog is cleared. Build output still lists every offending site.
+    // Severity is Error: the backlog has been cleared. Existing intentional exceptions use
+    // `// ARCH-EXCEPTION: <reason>` line comments with justification. New direct-DbSet access
+    // fails the build.
+#pragma warning disable RS2008 // Single-rule analyzer; release-tracking infra is overkill here.
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticId,
         title: Title,
         messageFormat: MessageFormat,
         category: "Architecture",
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: Description);
+#pragma warning restore RS2008
 
     // Raw-SQL escape hatches. These are how SP-backed access threads through the DbSet
     // property without actually reading tables directly, and are expressly allowed.

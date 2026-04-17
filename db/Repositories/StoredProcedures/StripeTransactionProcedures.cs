@@ -44,4 +44,12 @@ public class StripeTransactionProcedures(EventPlatformDbContext context) : IStri
                 "SELECT sp_set_stripe_tax_transaction_id(@p0, @p1)",
                 [intentId, taxTransactionId], ct);
     }
+
+    public async Task<Db.Entities.StripeTransaction?> GetByPaymentIntentAsync(string intentId, CancellationToken ct = default)
+    {
+        return await context.StripeTransactions
+            .FromSqlRaw("SELECT * FROM sp_get_stripe_transaction_by_intent({0})", intentId)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(ct);
+    }
 }

@@ -120,7 +120,7 @@ Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`,
 
 **Exceptions:** `api/Seeding/**`, `tests/**`, and `db/Repositories/*.cs` (legacy low-level adapters, excluding the `StoredProcedures/` subfolder) are path-whitelisted. For a specific site, annotate with `[AllowDirectDbAccess("reason")]` on the method/class, or put `// ARCH-EXCEPTION: <reason>` on the invocation line.
 
-**Roslyn analyzer `EP0001`** in `tools/Analyzers/` enforces this at build time. It currently runs at **Warning** severity because pre-existing call sites haven't all been migrated — new violations surface as warnings, and the build still passes. Run `dotnet build 2>&1 | grep -c "warning EP0001"` to see the debt count. Escalate the severity to `Error` in `DirectDbSetAccessAnalyzer.cs` once the backlog is cleared.
+**Roslyn analyzer `EP0001`** in `tools/Analyzers/` enforces this at build time at **Error** severity — new direct-DbSet access fails `dotnet build`. Intentional exceptions use inline `// ARCH-EXCEPTION: <reason>` comments (dozens of these exist in legacy controllers where the read+mutate pattern would require deep SP redesign; grep for them).
 
 **The analyzer allows**: `FromSqlRaw`, `FromSqlInterpolated`, and `FromSql` on any DbSet (that's the SP-call escape hatch). View DbSets (property name ends in `Views`) are always allowed.
 

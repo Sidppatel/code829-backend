@@ -1,3 +1,5 @@
+using Db.Entities;
+
 namespace Db.Repositories.StoredProcedures;
 
 public interface IStripeTransactionProcedures
@@ -12,4 +14,6 @@ public interface IStripeTransactionProcedures
         int stripeFeesCents, CancellationToken ct = default);
 
     Task SetTaxTransactionIdAsync(string intentId, string taxTransactionId, CancellationToken ct = default);
+
+    Task<StripeTransaction?> GetByPaymentIntentAsync(string intentId, CancellationToken ct = default);
 }

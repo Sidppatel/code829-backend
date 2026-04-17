@@ -62,11 +62,16 @@ public class EventsController(
             }
             else
             {
+                // ARCH-EXCEPTION: FTS requires the events.SearchVector tsvector column which is
+                // not projected onto v_events. PlainToTsQuery + Matches is only valid against the
+                // raw tsvector. The projection is read-only (.Select(e => e.Id)) — no writes.
                 var ftsIds = await context.Events
                     .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery(trimmedSearch)))
                     .Select(e => e.Id)
                     .ToListAsync();
 
+                // ARCH-EXCEPTION: pg_trgm similarity operates on the underlying events.Title;
+                // projecting through v_events would still require the raw table for the operator.
                 var trigramIds = await context.Events
                     .Where(e => e.Status == EventStatus.Published)
                     .Where(e => EF.Functions.TrigramsSimilarity(e.Title, trimmedSearch) > 0.1)
@@ -487,6 +492,8 @@ public class EventsController(
 
     private async Task<string?> ResolveEventImageUrlAsync(Guid eventId)
     {
+        // ARCH-EXCEPTION: trivial single-field projection for the primary image storage key.
+        // Not worth a dedicated SP; read-only and scoped to one entity.
         var primary = await context.Images
             .Where(img => img.EntityType == "event" && img.EntityId == eventId && img.IsPrimary)
             .Select(img => img.StorageKey)

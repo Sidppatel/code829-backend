@@ -24,6 +24,7 @@ public class AdminEventsController(
     EventPlatformDbContext context,
     IEventProcedures eventProc,
     ITableProcedures tableProc,
+    ILayoutProcedures layoutProc,
     IEventTicketTypeProcedures ticketTypeProc,
     IFileStorageService fileStorage,
     IAdminLogService adminLog,
@@ -220,7 +221,8 @@ public class AdminEventsController(
         // Sync Ticket Types (Pricing Tiers) for Open events
         if (request.TicketTypes != null && (request.LayoutMode == "Open" || (request.LayoutMode == null && ev.LayoutMode == "Open")))
         {
-            var existingTiers = await context.EventTicketTypes
+            var existingTiers = await context.EventTicketTypeSummaryViews
+                .AsNoTracking()
                 .Where(tt => tt.EventId == id && tt.IsActive)
                 .ToListAsync();
 
@@ -369,25 +371,28 @@ public class AdminEventsController(
             null, null,
             original.GridRows, original.GridCols, original.VenueId, organizerId, null);
 
-        // Copy event tables and their table instances
-        var eventTables = await context.EventTables
-            .Include(et => et.Tables)
-            .Where(et => et.EventId == id)
-            .ToListAsync();
+        // Copy event tables and their table instances via layout procedures.
+        var eventTables = await layoutProc.ListEventTablesForEventAsync(id);
+        var allTables = await layoutProc.ListTablesForEventAsync(id);
+        var tablesByEventTable = allTables.GroupBy(t => t.EventTableId).ToDictionary(g => g.Key, g => g.ToList());
         foreach (var et in eventTables)
         {
             var newEtId = await tableProc.CreateEventTableAsync(
                 copyId, et.Label, et.Capacity, et.Shape.ToString(), et.Color,
                 et.PriceCents, et.PlatformFeeCents, et.TableTemplateId);
 
-            foreach (var t in et.Tables)
+            if (tablesByEventTable.TryGetValue(et.Id, out var tables))
             {
-                await tableProc.CreateTableAsync(newEtId, copyId, t.Label, t.GridRow, t.GridCol, t.SortOrder);
+                foreach (var t in tables)
+                {
+                    await tableProc.CreateTableAsync(newEtId, copyId, t.Label, t.GridRow, t.GridCol, t.SortOrder);
+                }
             }
         }
 
         // Copy ticket types (Open events)
-        var ticketTypes = await context.EventTicketTypes
+        var ticketTypes = await context.EventTicketTypeSummaryViews
+            .AsNoTracking()
             .Where(tt => tt.EventId == id && tt.IsActive)
             .ToListAsync();
         foreach (var tt in ticketTypes)

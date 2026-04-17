@@ -3,6 +3,7 @@ using System.Text;
 using Api.Helpers;
 using Api.Services;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using StackExchange.Redis;
@@ -18,7 +19,9 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         HttpContext httpContext,
         EventPlatformDbContext dbContext,
         IJwtService jwtService,
-        IConnectionMultiplexer redis)
+        IConnectionMultiplexer redis,
+        IUserProcedures userProc,
+        IAdminUserProcedures adminProc)
     {
         // Per-portal cookie lookup: each frontend declares which portal it is via X-Portal,
         // so we know exactly which cookie to resolve. Missing/unknown header = no session.
@@ -51,7 +54,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         }
 
         // Cache miss — validate session in DB
-        var session = await dbContext.DeviceSessions
+        var session = await dbContext.DeviceSessionViews
             .AsNoTracking()
             .FirstOrDefaultAsync(s =>
                 s.SessionHash == sessionHash &&
@@ -88,7 +91,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
 
         if (session.UserId.HasValue)
         {
-            var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == session.UserId);
+            var user = await userProc.GetByIdAsync(session.UserId.Value);
             if (user is null || !user.IsActive)
             {
                 httpContext.Response.Cookies.Delete(cookieName);
@@ -99,7 +102,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         }
         else if (session.AdminUserId.HasValue)
         {
-            var admin = await dbContext.AdminUsers.AsNoTracking().FirstOrDefaultAsync(a => a.Id == session.AdminUserId);
+            var admin = await adminProc.GetByIdAsync(session.AdminUserId.Value);
             if (admin is null || !admin.IsActive)
             {
                 httpContext.Response.Cookies.Delete(cookieName);

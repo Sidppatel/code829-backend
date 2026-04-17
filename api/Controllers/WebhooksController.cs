@@ -13,7 +13,6 @@ namespace Api.Controllers;
 [ApiController]
 [Route("webhooks")]
 public class WebhooksController(
-    EventPlatformDbContext context,
     ISecretsProvider secrets,
     IStripeTransactionProcedures stripeTransactionProc,
     IBookingProcedures bookingProc,
@@ -95,8 +94,7 @@ public class WebhooksController(
         var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
         if (paymentIntent is null) return;
 
-        var txn = await context.StripeTransactions
-            .FirstOrDefaultAsync(t => t.PaymentIntentId == paymentIntent.Id);
+        var txn = await stripeTransactionProc.GetByPaymentIntentAsync(paymentIntent.Id);
 
         if (txn is null)
         {
@@ -194,8 +192,7 @@ public class WebhooksController(
         var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
         if (paymentIntent is null) return;
 
-        var txn = await context.StripeTransactions
-            .FirstOrDefaultAsync(t => t.PaymentIntentId == paymentIntent.Id);
+        var txn = await stripeTransactionProc.GetByPaymentIntentAsync(paymentIntent.Id);
 
         if (txn is null) return;
 
@@ -214,8 +211,7 @@ public class WebhooksController(
         var refund = stripeEvent.Data.Object as Refund;
         if (refund?.PaymentIntentId is null) return;
 
-        var txn = await context.StripeTransactions
-            .FirstOrDefaultAsync(t => t.PaymentIntentId == refund.PaymentIntentId);
+        var txn = await stripeTransactionProc.GetByPaymentIntentAsync(refund.PaymentIntentId);
 
         if (txn is null) return;
 

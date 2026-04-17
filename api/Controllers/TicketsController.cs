@@ -74,6 +74,7 @@ public class TicketsController(
     public async Task<IActionResult> GetTicketQr(Guid bookingId, Guid ticketId)
     {
         var userId = GetUserId();
+        // ARCH-EXCEPTION: ticket + owning booking for ownership check on QR fetch.
         var ticket = await context.BookingTickets
             .Include(t => t.Booking)
             .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
@@ -101,6 +102,8 @@ public class TicketsController(
     public async Task<IActionResult> InviteGuest(Guid bookingId, Guid ticketId, [FromBody] InviteTicketRequest request)
     {
         var userId = GetUserId();
+        // ARCH-EXCEPTION: ticket + booking + owner user + event joined for invite email contents.
+        // Mutation flows through the tracked entity (invite token/email set + SaveChanges).
         var ticket = await context.BookingTickets
             .Include(t => t.Booking).ThenInclude(b => b.User)
             .Include(t => t.Booking).ThenInclude(b => b.Event)
@@ -160,6 +163,7 @@ public class TicketsController(
     public async Task<IActionResult> ClaimSelf(Guid bookingId, Guid ticketId)
     {
         var userId = GetUserId();
+        // ARCH-EXCEPTION: ticket + booking for ownership guard on self-claim.
         var ticket = await context.BookingTickets
             .Include(t => t.Booking)
             .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
@@ -200,6 +204,7 @@ public class TicketsController(
     public async Task<IActionResult> RevokeInvite(Guid bookingId, Guid ticketId)
     {
         var userId = GetUserId();
+        // ARCH-EXCEPTION: ticket + booking for ownership guard on invite revoke.
         var ticket = await context.BookingTickets
             .Include(t => t.Booking)
             .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
@@ -238,6 +243,8 @@ public class TicketsController(
             return BadRequest(new ApiError(400, "Token is required", HttpContext.TraceIdentifier));
 
         var tokenHash = HashToken(token);
+        // ARCH-EXCEPTION: claim-info needs ticket + booking + inviter + event + venue for the
+        // invite preview page. No composite view exists for this specific read shape.
         var ticket = await context.BookingTickets
             .Include(t => t.Booking).ThenInclude(b => b.User)
             .Include(t => t.Booking).ThenInclude(b => b.Event).ThenInclude(e => e.Venue)
@@ -281,6 +288,8 @@ public class TicketsController(
         var userId = GetUserId();
         var tokenHash = HashToken(request.Token);
 
+        // ARCH-EXCEPTION: claim-by-token needs ticket + booking; mutation sets guest info
+        // directly on the tracked ticket entity.
         var ticket = await context.BookingTickets
             .Include(t => t.Booking)
             .FirstOrDefaultAsync(t => t.InviteTokenHash == tokenHash);
@@ -360,6 +369,7 @@ public class TicketsController(
     public async Task<IActionResult> GetMyTicketQr(Guid ticketId)
     {
         var userId = GetUserId();
+        // ARCH-EXCEPTION: ticket + booking for guest QR access (guest-vs-owner check).
         var ticket = await context.BookingTickets
             .Include(t => t.Booking)
             .FirstOrDefaultAsync(t => t.Id == ticketId);

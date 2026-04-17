@@ -28,6 +28,8 @@ public class AdminLogsController(EventPlatformDbContext context) : ControllerBas
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
+        // ARCH-EXCEPTION: admin_logs is an append-only audit log read by the admin UI with
+        // dynamic filters (action/entityType/date-range). No business logic — direct read is fine.
         var query = context.AdminLogs.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(action))

@@ -41,6 +41,7 @@ public class DeveloperController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
+        // ARCH-EXCEPTION: email_logs is append-only diagnostic data; dynamic filter + paginate.
         var query = context.EmailLogs.AsQueryable();
         if (!string.IsNullOrWhiteSpace(recipient))
             query = query.Where(e => e.Recipient.Contains(recipient));
@@ -66,6 +67,7 @@ public class DeveloperController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
+        // ARCH-EXCEPTION: developer_logs is append-only error log; dynamic severity/path filter.
         var query = context.DeveloperLogs.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(severity) && Enum.TryParse<LogSeverity>(severity, true, out var sev))
@@ -102,6 +104,7 @@ public class DeveloperController(
     {
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
+        // ARCH-EXCEPTION: system_logs is append-only audit log with before/after JSON; cursor-paginated.
         var query = context.SystemLogs.AsQueryable();
 
         if (after.HasValue)

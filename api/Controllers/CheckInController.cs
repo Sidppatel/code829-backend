@@ -23,7 +23,9 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         if (string.IsNullOrWhiteSpace(request.QrToken))
             return BadRequest(new ScanResponse(false, "QR token is required", null, null, null, null, null));
 
-        // First try per-seat ticket QR tokens
+        // ARCH-EXCEPTION: ticket scan requires ticket + booking + user + event in one query for
+        // the response DTO. No dedicated view/SP wraps this join; the scan is read-heavy and
+        // mutates via an existing SP (MarkTicketCheckedIn) later in the flow.
         var ticket = await context.BookingTickets
             .Include(t => t.Booking).ThenInclude(b => b.User)
             .Include(t => t.Booking).ThenInclude(b => b.Event)
@@ -73,7 +75,8 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
             ticket.Status = Contracts.Enums.TicketStatus.CheckedIn;
             ticket.UpdatedAt = DateTime.UtcNow;
 
-            // Mark parent booking as CheckedIn if all tickets are checked in
+            // ARCH-EXCEPTION: scoped read (all tickets for this booking) to decide booking-level
+            // CheckedIn rollup. Mutations happen on the already-tracked ticket entity above.
             var allTickets = await context.BookingTickets
                 .Where(t => t.BookingId == ticket.BookingId)
                 .ToListAsync();
@@ -95,7 +98,8 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
             ));
         }
 
-        // Fallback: legacy booking-level QR token
+        // ARCH-EXCEPTION: legacy booking-level QR fallback. Needs booking + user + event joined
+        // for the scan response; mutates the tracked booking status directly for check-in.
         var booking = await context.Bookings
             .Include(b => b.User)
             .Include(b => b.Event)
@@ -156,7 +160,8 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         var totalSold = checkedIn + remaining;
         var pending = bookings.Where(b => b.Status == "Pending").Sum(b => b.SeatsReserved ?? 1);
 
-        // LastCheckIn not available from view — use entity for this specific field
+        // ARCH-EXCEPTION: LastCheckIn (booking.UpdatedAt) isn't projected on v_bookings. Single
+        // scalar projection from the table for a stats display field; no business logic.
         var lastCheckIn = await context.Bookings
             .Where(b => b.EventId == eventId && b.Status == BookingStatus.CheckedIn)
             .OrderByDescending(b => b.UpdatedAt)
