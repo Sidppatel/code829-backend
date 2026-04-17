@@ -22,6 +22,8 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
     // Booking-critical paths where we insist on idempotency even if the client forgot a header.
     private static readonly string[] EnforcedPathPrefixes = ["/bookings"];
     private static readonly string[] EnforcedPathSuffixes = ["/confirm", "/confirm-by-intent"];
+    // Pure read-style POSTs under /bookings that never mutate state — skip enforcement.
+    private static readonly string[] ExemptPaths = ["/bookings/quote"];
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -95,6 +97,7 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
     private static bool IsEnforcedPath(string path)
     {
         var p = path.ToLowerInvariant();
+        if (ExemptPaths.Any(exempt => p == exempt)) return false;
         if (EnforcedPathSuffixes.Any(suffix => p.EndsWith(suffix))) return true;
         return EnforcedPathPrefixes.Any(prefix =>
             p == prefix || p.StartsWith(prefix + "/") || p.StartsWith(prefix + "?"));
