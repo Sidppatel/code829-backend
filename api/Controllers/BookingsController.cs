@@ -125,6 +125,18 @@ public class BookingsController(
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
 
+            // Explicit ownership re-check at the controller boundary. bookingService.CancelAsync
+            // also checks, but we fail fast here so any future refactor that reshapes the service
+            // can't accidentally let a beacon cancel someone else's booking.
+            var booking = await context.BookingViews.AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == request.BookingId);
+            if (booking is null) return Ok(); // nothing to cancel; beacon stays 200
+            if (booking.UserId != userId)
+            {
+                Log.Warning("[Bookings] AUDIT beacon_cancel_ownership_mismatch booking={BookingId} user={UserId}", request.BookingId, userId);
+                return Ok();
+            }
+
             await bookingService.CancelAsync(request.BookingId, userId);
             return Ok();
         }

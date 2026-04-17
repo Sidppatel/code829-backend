@@ -57,6 +57,17 @@ dotnet ef migrations add <Name> --project db --startup-project api
 - Because the API doesn't accept session cookies, classic CSRF (cookie auto-attach) is not applicable and anti-forgery tokens are not required.
 - If a cookie-based auth path is ever added (e.g., admin SSR), add anti-forgery then.
 
+### [AllowAnonymous] endpoint audit
+Every endpoint without `[RequireRole]` has been reviewed and is intentionally public:
+- `GET /events`, `GET /events/{id}`, `GET /events/{id}/tables`, `GET /events/{id}/ticket-types`, `GET /events/facets`, `GET /events/schema-list` — public catalog; no PII, aggregate/display pricing only.
+- `POST /bookings/cancel-beacon`, `POST /tables/release-beacon` — JWT in body, explicit ownership re-check at controller boundary, rate-limited (20/min), log `AUDIT beacon_*_ownership_mismatch` if misused.
+- `GET /bookings/stripe-config` — publishable key only; env-gated (503 if unconfigured; live keys blocked outside production).
+- `GET /developer/logo` — public branding asset.
+- `POST /feedback` — public form, rate-limited via default bucket.
+- `GET /tickets/claim` — claim token is the authenticator; tokens expire.
+- `POST /webhooks/stripe` — Stripe HMAC signature validates authenticity.
+- `/auth/*` — magic link / dev-login / admin-login; each rate-limited 5/min.
+
 ### Payment integrity
 - Stripe is mandatory in every environment (no mock service). Missing `STRIPE_SECRET_KEY` fails startup; live keys are required in `Production` and blocked outside it.
 - `BookingService.ConfirmPaymentAsync` and `WebhooksController.HandlePaymentIntentSucceeded` both fetch the PaymentIntent and reject if `AmountReceived != StripeTransaction.AmountCents` — logged as `PAYMENT_AMOUNT_MISMATCH`.

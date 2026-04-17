@@ -181,6 +181,9 @@ public class BookingService(
         }
         catch (Exception ex) when (ex.Message.Contains("capacity") || ex.Message.Contains("availability"))
         {
+            Log.Warning(
+                "[Audit] capacity_race_rejected event={EventId} user={UserId} requested={Seats} reason={Reason}",
+                request.EventId, userId, seatsRequested, ex.Message);
             // Roll back the Stripe intent we just created so we don't orphan it
             try { await paymentService.RefundPaymentAsync(intentId); } catch { }
             throw new InvalidOperationException(ex.Message, ex);
@@ -239,8 +242,8 @@ public class BookingService(
         if (intent.AmountReceived != expectedAmount)
         {
             Log.Error(
-                "[Booking] PAYMENT_AMOUNT_MISMATCH booking={BookingNumber} intent={IntentId} expected={Expected} received={Received}",
-                booking.BookingNumber, booking.PaymentIntentId, expectedAmount, intent.AmountReceived);
+                "[Audit] payment_amount_mismatch booking={BookingNumber} intent={IntentId} expected={Expected} received={Received} user={UserId}",
+                booking.BookingNumber, booking.PaymentIntentId, expectedAmount, intent.AmountReceived, userId);
             throw new InvalidOperationException("Payment amount does not match booking total");
         }
 
@@ -260,7 +263,9 @@ public class BookingService(
                 booking.EventTitle, $"${booking.TotalCents / 100.0:F2}", checkinLink)
         );
 
-        Log.Information("[Booking] Confirmed {BookingNumber}, QR: {QrToken}", booking.BookingNumber, qrToken);
+        Log.Information(
+            "[Audit] booking_confirmed booking={BookingNumber} user={UserId} amount={Amount} qr={QrToken}",
+            booking.BookingNumber, userId, intent.AmountReceived, qrToken);
         return (await GetByIdAsync(bookingId))!;
     }
 

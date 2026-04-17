@@ -12,7 +12,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("tables")]
-public class TableBookingController(ITableBookingService tableBookingService) : ControllerBase
+public class TableBookingController(ITableBookingService tableBookingService, Db.EventPlatformDbContext context) : ControllerBase
 {
     [HttpPost("lock")]
     [Authorize]
@@ -75,6 +75,17 @@ public class TableBookingController(ITableBookingService tableBookingService) : 
             var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
+
+            // Explicit ownership re-check at the controller boundary. ReleaseTableLockAsync
+            // also checks but we verify up-front so a misbehaving client can't probe lock state.
+            var table = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .FirstOrDefaultAsync(context.TableViews, t => t.Id == request.TableId);
+            if (table is null) return Ok();
+            if (table.LockedByUserId.HasValue && table.LockedByUserId != userId)
+            {
+                Log.Warning("[TableBooking] AUDIT beacon_release_ownership_mismatch table={TableId} user={UserId}", request.TableId, userId);
+                return Ok();
+            }
 
             await tableBookingService.ReleaseTableLockAsync(userId, request.EventId, request.TableId);
             return Ok();
