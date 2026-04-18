@@ -1,6 +1,6 @@
 # 🚀 Production Deployment Guide
 
-> **Stack**: React (Vite) → Cloudflare Pages | ASP.NET Core (.NET 10) → Render | PostgreSQL → Supabase | Redis → Upstash | Keepalive → UptimeRobot
+> **Stack**: React (Vite) → Cloudflare Workers | ASP.NET Core (.NET 10) → Render | PostgreSQL → Supabase | Redis → Upstash | Keepalive → UptimeRobot
 
 ---
 
@@ -10,7 +10,7 @@
 2. [Supabase — Database Setup](#2-supabase--database-setup)
 3. [Upstash — Redis Setup](#3-upstash--redis-setup)
 4. [Render — API Hosting](#4-render--api-hosting)
-5. [Cloudflare Pages — Frontend](#5-cloudflare-pages--frontend)
+5. [Cloudflare Workers — Frontend](#5-cloudflare-workers--frontend)
 6. [UptimeRobot — Prevent Cold Starts](#6-uptimerobot--prevent-cold-starts)
 7. [Environment Variables Reference](#7-environment-variables-reference)
 8. [Post-Deploy Checklist](#8-post-deploy-checklist)
@@ -148,7 +148,21 @@ Your API uses Redis (see `docker-compose.yml`). Upstash provides a **free server
 
 ## 4. Render — API Hosting
 
-### 4.1 Create a Web Service
+Two setup paths. The Blueprint path is preferred — it's IaC and reproducible.
+
+### 4.1 (Preferred) Blueprint via `render.yaml`
+
+`code829-backend/render.yaml` declares the service, Docker build, health check, and required env vars. To provision:
+
+1. In Render → **New → Blueprint** → connect the `code829-backend` repo.
+2. Render discovers `render.yaml` and creates the service.
+3. Fill in the env vars marked `sync: false` (all secrets — see the file for the list).
+
+Subsequent deploys happen automatically on pushes to `master`.
+
+### 4.2 (Alternative) Manual Web Service
+
+Use this only if you don't want to use the Blueprint.
 
 1. Go to [render.com](https://render.com) → **New → Web Service**
 2. Connect your GitHub account and select `Sidppatel/code829-backend`
@@ -156,91 +170,67 @@ Your API uses Redis (see `docker-compose.yml`). Upstash provides a **free server
 
 | Setting | Value |
 |---|---|
-| **Name** | `code829-api` |
+| **Name** | `code829-backend` |
 | **Region** | Same as Supabase (e.g. Oregon / US East) |
 | **Branch** | `master` |
 | **Runtime** | **Docker** (auto-detected from `Dockerfile`) |
 | **Instance Type** | Free |
+| **Health Check Path** | `/health/live` |
 
-4. Click **Advanced** → set the following **Environment Variables**:
+4. Click **Advanced** → set the environment variables listed in [Section 7](#7-environment-variables-reference).
 
-```
-DATABASE_URL         = postgresql://postgres.[ref]:[password]@...supabase.com:6543/postgres?pgbouncer=true
-REDIS_URL            = rediss://default:[password]@[host].upstash.io:6380
-JWT_SECRET           = <run: openssl rand -hex 32>
-ASPNETCORE_ENVIRONMENT = Production
-PORT                 = 8000
-```
-
-> ⚠️ Use the **Transaction Pooler** connection string (port **6543**) here — NOT the session mode URL.
-
-### 4.2 Health Check Configuration
-
-Render auto-detects the health check from your `Dockerfile`. To confirm:
-
-- Go to your service → **Settings → Health & Alerts**
-- Set **Health Check Path** to: `/health/live`
+> ⚠️ Use the Supabase **Transaction Pooler** connection string (port **6543**) in `DATABASE_URL` — NOT the session mode URL.
 
 ### 4.3 Deploy
 
-Click **Create Web Service** — Render will:
+Render will:
 1. Pull your repo
-2. Build the Docker image using your `Dockerfile`
-3. Run the container on port `8000`
+2. Build the Docker image using `Dockerfile`
+3. Run the container on port `10000` (set via `PORT` env var in `render.yaml` and Dockerfile)
 4. Start health checks against `/health/live`
 
 First deploy takes ~3–5 minutes. Once live, copy your service URL:
 ```
-https://code829-api.onrender.com
+https://code829-backend.onrender.com
 ```
 
 ---
 
-## 5. Cloudflare Pages — Frontend
+## 5. Cloudflare Workers — Frontend
 
-### 5.1 Connect Your Repo
+The frontend is **four separate Workers** (one per SPA), each bound to its own subdomain. Deploys are driven by [`code829-frontend/.github/workflows/deploy.yml`](../code829-frontend/.github/workflows/deploy.yml) — pushing to `master` auto-deploys only the apps whose files changed.
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → **Pages → Create a project**
-2. Connect GitHub → select `Sidppatel/code829-frontend`
-3. Configure build settings:
+| App | Domain | Worker name | Config |
+|---|---|---|---|
+| Public | `code829.com` | `code829-public` | `apps/public/wrangler.toml` |
+| Admin | `admin.code829.com` | `code829-admin` | `apps/admin/wrangler.toml` |
+| Developer | `developer.code829.com` | `code829-developer` | `apps/developer/wrangler.toml` |
+| Staff | `staff.code829.com` | `code829-staff` | `apps/staff/wrangler.toml` |
 
-| Setting | Value |
-|---|---|
-| **Framework preset** | Vite |
-| **Build command** | `npm run build` |
-| **Build output directory** | `dist` |
-| **Node.js version** | `20` |
+SPA routing is handled by Workers' `not_found_handling = "single-page-application"` — no `_redirects` file needed.
 
-### 5.2 Set Environment Variables
+Each Worker's `/api/*` path proxies to the Render backend (shared proxy in `tools/cf-worker/apiProxy.ts`). The `public` Worker additionally serves a dynamic `/sitemap.xml`.
 
-In **Settings → Environment Variables → Production**, add:
+### 5.1 Prerequisites (one time)
 
-```
-VITE_API_URL       = https://code829-api.onrender.com
-VITE_APP_NAME      = Code829
-VITE_DEFAULT_THEME = system
-```
+1. Add your four domains to Cloudflare DNS (orange cloud on each).
+2. Create a Cloudflare API token with **Workers Scripts: Edit** + **Account: Read** + **Zone: Read** scopes.
+3. Set the following **GitHub Actions secrets** on `code829-frontend`:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `VITE_API_URL` → `https://code829-backend.onrender.com` (the Render URL from Section 4)
+
+### 5.2 First deploy
+
+Push to `master` (or trigger the workflow manually via the Actions tab — the `workflow_dispatch` input lets you deploy a specific subset).
+
+Workers bind their custom domains automatically from each `wrangler.toml`'s `[[routes]]` block, so no dashboard clicks are required after the initial DNS setup.
 
 > ⚠️ All `VITE_` prefixed vars are baked into the bundle at build time — they are **not secret**. Never put API keys or secrets in `VITE_` variables.
 
-### 5.3 Deploy
+### 5.3 Local dev
 
-Click **Save and Deploy**. Cloudflare will install deps and run `npm run build`. Your site goes live at:
-```
-https://code829-frontend.pages.dev
-```
-
-You can add a custom domain later under **Pages → Custom Domains**.
-
-### 5.4 Handle SPA Routing
-
-React Router requires a `_redirects` file so direct URL visits don't 404. Create this file at `public/_redirects`:
-
-```
-/*    /index.html    200
-```
-
-This tells Cloudflare Pages to serve `index.html` for all routes and let React Router handle navigation.
+Each app runs on its own port (5173/5174/5175/5176) via `pnpm dev:<app>`. Vite proxies `/api/*` to `http://localhost:8000` (the local backend) for same-origin cookies.
 
 ---
 
@@ -260,8 +250,8 @@ Render's free tier spins down your API after **15 minutes of inactivity**, causi
 | Field | Value |
 |---|---|
 | **Monitor Type** | HTTP(s) |
-| **Friendly Name** | `code829-api keepalive` |
-| **URL** | `https://code829-api.onrender.com/health/live` |
+| **Friendly Name** | `code829-backend keepalive` |
+| **URL** | `https://code829-backend.onrender.com/health/live` |
 | **Monitoring Interval** | **5 minutes** |
 
 3. Click **Create Monitor**
@@ -276,21 +266,44 @@ That's it. UptimeRobot will now ping your API every 5 minutes 24/7 — keeping R
 
 ### Backend (Render)
 
+Required (fail-fast — service won't start without these):
+
 | Variable | Example | Notes |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://...supabase.com:6543/postgres?pgbouncer=true` | Transaction pooler, port 6543 |
-| `REDIS_URL` | `rediss://default:pass@host.upstash.io:6380` | Upstash TLS URL |
 | `JWT_SECRET` | 64-char hex string | Generate: `openssl rand -hex 32` |
-| `ASPNETCORE_ENVIRONMENT` | `Production` | |
-| `PORT` | `8000` | Already set in Dockerfile |
+| `STRIPE_SECRET_KEY` | `sk_live_…` / `sk_test_…` | Live keys required in Production, blocked outside it |
 
-### Frontend (Cloudflare Pages)
+Runtime defaults (set automatically via `render.yaml` / Dockerfile):
+
+| Variable | Value | Notes |
+|---|---|---|
+| `ASPNETCORE_ENVIRONMENT` | `Production` | |
+| `PORT` | `10000` | Render binds this automatically |
+| `FRONTEND_URL` | `https://code829.com` | Used in magic-link emails |
+| `CORS_ORIGINS` | `https://code829.com,https://admin.code829.com,...` | All four subdomains |
+| `TRUSTED_PROXIES` | Cloudflare IPv4 CIDRs | For `X-Forwarded-For` trust |
+
+Optional (set as needed):
+
+| Variable | Notes |
+|---|---|
+| `REDIS_URL` | Upstash `rediss://…:6380`. Omit to skip cache (not recommended for prod) |
+| `STRIPE_PUBLISHABLE_KEY` | Client-side key |
+| `STRIPE_WEBHOOK_SECRET` | Needed for `/webhooks/stripe` signature verification |
+| `RESEND_API_KEY` | Email sending |
+| `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_ENDPOINT_URL`, `CDN_BASE_URL` | File storage (falls back to local disk if unset) |
+| `DATABASE_SSL_MODE` | Override the default `VerifyFull` (non-dev) / `Disable` (dev) |
+
+### Frontend (Cloudflare Workers — set in GitHub Actions secrets)
 
 | Variable | Example | Notes |
 |---|---|---|
-| `VITE_API_URL` | `https://code829-api.onrender.com` | No trailing slash |
+| `VITE_API_URL` | `https://code829-backend.onrender.com` | No trailing slash. Injected into the Worker at deploy via `wrangler deploy --var` |
 | `VITE_APP_NAME` | `Code829` | |
 | `VITE_DEFAULT_THEME` | `system` | |
+| `CLOUDFLARE_API_TOKEN` | (secret) | Needs `Workers Scripts: Edit`, `Account: Read`, `Zone: Read` |
+| `CLOUDFLARE_ACCOUNT_ID` | (secret) | From Cloudflare dashboard sidebar |
 
 ---
 
@@ -301,9 +314,10 @@ That's it. UptimeRobot will now ping your API every 5 minutes 24/7 — keeping R
 - [ ] RLS disabled on all tables
 - [ ] pg_cron cleanup jobs scheduled
 - [ ] Render API is live at `/health/live` → returns `200`
-- [ ] Cloudflare Pages build succeeded and site loads
-- [ ] `VITE_API_URL` points to Render API URL (no 404s on API calls)
-- [ ] `public/_redirects` file added for SPA routing
+- [ ] All four Cloudflare Workers deployed (`code829-{public,admin,developer,staff}`)
+- [ ] All four custom domains respond (`code829.com`, `admin.code829.com`, `developer.code829.com`, `staff.code829.com`)
+- [ ] `VITE_API_URL` secret in GitHub points to Render API URL (no 404s on API calls)
+- [ ] `/api/events` via each subdomain proxies through to the backend successfully
 - [ ] UptimeRobot monitor is active and showing **Up** status
 - [ ] Test a full flow: Register → Browse Events → Book → Payment
 
@@ -315,12 +329,12 @@ That's it. UptimeRobot will now ping your API every 5 minutes 24/7 — keeping R
 User Browser
      │
      ▼
-Cloudflare Pages (code829-frontend)
-  React + Vite | Global CDN | Free
-     │
-     │ HTTPS API calls to VITE_API_URL
+Cloudflare Workers (4 × code829-frontend)
+  public / admin / developer / staff  |  Static Assets + /api proxy
+     │                                     │
+     │ same-origin /api/* forwarded by Worker
      ▼
-Render Web Service (code829-backend/api)
+Render Web Service (code829-backend)
   ASP.NET Core .NET 10 | Docker | Free
      │                    ▲
      │                    │ ping /health/live every 5 min

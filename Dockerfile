@@ -9,13 +9,11 @@ RUN dotnet publish api/api.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:1201dde897ab436b7c6b386f6dbd4f9a3ca0245f9c5a8aac8f8bcdccb4c7d484 AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
 
-# Run as a non-root user. The uid/gid are fixed so bind-mounted volumes get
-# predictable ownership across hosts; alpine's `adduser -D` creates the matching
-# group automatically.
-RUN addgroup -g 10001 app && adduser -u 10001 -G app -S -H -D app \
-    && chown -R app:app /app
+# .NET 10 Alpine images ship with a non-root `app` user (UID/GID 10001) pre-created,
+# so creating it ourselves now errors with "group 'app' in use". Just reuse it and
+# chown published files to it during COPY.
+COPY --from=build --chown=app:app /app/publish .
 USER app
 
 # Render provides PORT at runtime (typically 10000); fallback to 8000 for local Docker
