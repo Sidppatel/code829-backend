@@ -8,11 +8,14 @@ RUN dotnet restore backend.slnx
 RUN dotnet publish api/api.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:1201dde897ab436b7c6b386f6dbd4f9a3ca0245f9c5a8aac8f8bcdccb4c7d484 AS runtime
+RUN apk add --no-cache krb5-libs
 WORKDIR /app
 
-# .NET 10 Alpine images ship with a non-root `app` user (UID/GID 10001) pre-created,
-# so creating it ourselves now errors with "group 'app' in use". Just reuse it and
-# chown published files to it during COPY.
+# Ensure the app user has permission to write to /app and its subdirectories
+# for local file storage (uploads) and logging.
+RUN mkdir -p uploads logs && chown -R app:app /app
+
+# .NET 10 Alpine images ship with a non-root `app` user (UID/GID 10001) pre-created.
 COPY --from=build --chown=app:app /app/publish .
 USER app
 
