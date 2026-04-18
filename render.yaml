@@ -23,8 +23,11 @@ services:
     healthCheckPath: /health/live
     envVars:
       # ─── Runtime (non-secret) ───────────────────────────────────
+      # Set in the Render dashboard, NOT here. Use `Staging` until you have live
+      # Stripe keys (sk_live_*) — Program.cs refuses to start in Production without
+      # them. Flip to `Production` once live keys are wired up.
       - key: ASPNETCORE_ENVIRONMENT
-        value: Production
+        sync: false
       - key: PORT
         value: "10000"
 
