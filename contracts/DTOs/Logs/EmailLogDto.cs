@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Logs;
 
 public record EmailLogDto(
-    Guid Id,
+    Guid EmailLogId,
     string Recipient,
     string Subject,
     string Body,

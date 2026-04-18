@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Purchases;
 
 public record PurchaseTicketDto(
-    Guid Id,
+    Guid PurchaseTicketId,
     string TicketCode,
     int SeatNumber,
     string Status,
@@ -24,7 +24,7 @@ public record PurchaseTicketDto(
 /// Stripped-down ticket view for guests — no payment info, no purchase owner details.
 /// </summary>
 public record GuestTicketDto(
-    Guid Id,
+    Guid PurchaseTicketId,
     string TicketCode,
     int SeatNumber,
     string Status,
@@ -41,7 +41,7 @@ public record InviteTicketRequest(string Email, string? GuestName);
 public record ClaimTicketRequest(string Token);
 
 public record TicketClaimInfoDto(
-    Guid TicketId,
+    Guid PurchaseTicketId,
     string TicketCode,
     int SeatNumber,
     string EventTitle,

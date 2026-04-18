@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Purchases;
 
 public record PurchaseDto(
-    Guid Id,
+    Guid PurchaseId,
     string PurchaseNumber,
     string Status,
     Guid UserId,
@@ -30,7 +30,7 @@ public record PurchaseDto(
 );
 
 public record StripeTransactionDto(
-    Guid Id,
+    Guid StripeTransactionId,
     string PaymentIntentId,
     string Status,
     int AmountCents,

@@ -3,7 +3,7 @@ using Contracts.DTOs.Venues;
 namespace Contracts.DTOs.Events;
 
 public record EventDto(
-    Guid Id,
+    Guid EventId,
     string Title,
     string Slug,
     string? Description,

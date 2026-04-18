@@ -20,7 +20,7 @@ public record UpdateEventRequest(
 );
 
 public record NestedTicketTypeUpdate(
-    [property: JsonPropertyName("id")] Guid? Id,
+    [property: JsonPropertyName("eventTicketTypeId")] Guid? EventTicketTypeId,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("priceCents")] int PriceCents,
     [property: JsonPropertyName("capacity")] int? Capacity,

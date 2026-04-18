@@ -17,7 +17,7 @@ public record StripeKeyStatus(
 );
 
 public record StripeAccountInfo(
-    string Id,
+    string StripeAccountId,
     string? BusinessName,
     string? Country,
     bool ChargesEnabled,

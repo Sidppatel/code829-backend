@@ -30,7 +30,7 @@ public class DeveloperInvitationsController(
         {
             var adminUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var invitation = await invitationService.CreateAsync(request.Email, role, adminUserId);
-            return Created($"/developer/invitations/{invitation.Id}", invitation);
+            return Created($"/developer/invitations/{invitation.InvitationId}", invitation);
         }
         catch (InvalidOperationException ex)
         {

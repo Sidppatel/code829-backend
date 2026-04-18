@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Images;
 
 public record ImageDto(
-    Guid Id,
+    Guid ImageId,
     string EntityType,
     Guid EntityId,
     string Url,
@@ -17,7 +17,7 @@ public record ImageDto(
 );
 
 public record ImageUploadResponse(
-    Guid Id,
+    Guid ImageId,
     string StorageKey,
     string Url,
     string ThumbnailUrl,

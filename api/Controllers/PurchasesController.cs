@@ -30,7 +30,7 @@ public class PurchasesController(
         try
         {
             var purchase = await purchaseService.CreateAsync(userId, request);
-            return CreatedAtAction(nameof(GetById), new { id = purchase.Id }, purchase);
+            return CreatedAtAction(nameof(GetById), new { id = purchase.PurchaseId }, purchase);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }

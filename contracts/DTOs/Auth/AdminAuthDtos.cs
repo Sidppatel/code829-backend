@@ -3,7 +3,7 @@ namespace Contracts.DTOs.Auth;
 public record AdminLoginRequest(string Email, string Password);
 
 public record AdminUserDto(
-    Guid Id, string Email, string FirstName, string LastName,
+    Guid AdminUserId, string Email, string FirstName, string LastName,
     string Role, bool IsActive, DateTime CreatedAt, DateTime? LastLoginAt,
     string? Phone, string? AvatarUrl);
 

@@ -225,7 +225,7 @@ public class AuthController(
 
         var oldImages = await imageService.GetByEntityAsync("user", userId.Value);
         foreach (var old in oldImages)
-            await imageService.DeleteAsync(old.Id);
+            await imageService.DeleteAsync(old.ImageId);
 
         var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId.Value, userId.Value, uploaderType: "user");
 
@@ -248,7 +248,7 @@ public class AuthController(
 
         var images = await imageService.GetByEntityAsync("user", userId.Value);
         foreach (var img in images)
-            await imageService.DeleteAsync(img.Id);
+            await imageService.DeleteAsync(img.ImageId);
 
         await userProc.ClearUserAvatarAsync(userId.Value);
 

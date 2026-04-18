@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Logs;
 
 public record DeveloperLogDto(
-    Guid Id,
+    Guid DeveloperLogId,
     DateTime Timestamp,
     string Severity,
     string Message,

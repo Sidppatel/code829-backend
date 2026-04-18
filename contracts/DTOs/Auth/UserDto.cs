@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Auth;
 
 public record UserDto(
-    Guid Id,
+    Guid UserId,
     string Email,
     string FirstName,
     string LastName,

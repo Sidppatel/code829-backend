@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Logs;
 
 public record AdminLogDto(
-    Guid Id,
+    Guid AdminLogId,
     DateTime Timestamp,
     string Action,
     Guid? AdminUserId,

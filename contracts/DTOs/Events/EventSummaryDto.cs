@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Events;
 
 public record EventSummaryDto(
-    Guid Id,
+    Guid EventId,
     string Title,
     string Slug,
     string Status,

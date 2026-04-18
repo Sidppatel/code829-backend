@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Auth;
 
 public record DeviceSessionDto(
-    Guid Id,
+    Guid DeviceSessionId,
     string? DeviceName,
     string? IpAddress,
     DateTime LastActivityAt,

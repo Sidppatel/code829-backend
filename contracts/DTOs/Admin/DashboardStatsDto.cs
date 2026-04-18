@@ -50,7 +50,7 @@ public record NextEventDashboardDto(
 );
 
 public record RecentPurchaseDto(
-    Guid Id,
+    Guid PurchaseId,
     string PurchaseNumber,
     string UserName,
     string UserEmail,

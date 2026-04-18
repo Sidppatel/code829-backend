@@ -3,7 +3,7 @@ namespace Contracts.DTOs.Layout;
 // ─── Table Templates (global) ────────────────────────────────
 
 public record TableTemplateResponse(
-    Guid Id,
+    Guid TableTemplateId,
     string Name,
     int DefaultCapacity,
     string DefaultShape,
@@ -24,7 +24,7 @@ public record CreateTableTemplateRequest(
 // ─── Event Tables (per-event table types) ────────────────────
 
 public record EventTableResponse(
-    Guid Id,
+    Guid EventTableId,
     string Label,
     int Capacity,
     string Shape,
@@ -65,7 +65,7 @@ public record EventLayoutResponse(
 );
 
 public record LayoutTableResponse(
-    Guid Id,
+    Guid TableId,
     string Label,
     int GridRow,
     int GridCol,

@@ -223,7 +223,7 @@ public class DeveloperController(
                     root.TryGetProperty("details_submitted", out var ds) && ds.GetBoolean());
                 verified = true;
 
-                Log.Information("[StripeStatus] Verified account {AccountId} ({Country})", account.Id, account.Country);
+                Log.Information("[StripeStatus] Verified account {AccountId} ({Country})", account.StripeAccountId, account.Country);
             }
             catch (StripeException ex)
             {
@@ -510,7 +510,7 @@ public class DeveloperController(
         // Delete old logo if any
         var existing = await imageService.GetByEntityAsync("platform", platformEntityId);
         foreach (var old in existing)
-            await imageService.DeleteAsync(old.Id);
+            await imageService.DeleteAsync(old.ImageId);
 
         var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "platform", platformEntityId, userId, uploaderType: "admin");
         return Ok(result);

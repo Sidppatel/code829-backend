@@ -226,7 +226,7 @@ public class AdminEventsController(
                 .Where(tt => tt.EventId == id && tt.IsActive)
                 .ToListAsync();
 
-            var requestIds = request.TicketTypes.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToList();
+            var requestIds = request.TicketTypes.Where(t => t.EventTicketTypeId.HasValue).Select(t => t.EventTicketTypeId!.Value).ToList();
             
             // Delete tiers not in request
             var toDelete = existingTiers.Where(et => !requestIds.Contains(et.EventTicketTypeId)).ToList();
@@ -241,9 +241,9 @@ public class AdminEventsController(
             var sortOrder = 0;
             foreach (var tt in request.TicketTypes)
             {
-                if (tt.Id.HasValue && existingTiers.FirstOrDefault(et => et.EventTicketTypeId == tt.Id.Value) is { } existing)
+                if (tt.EventTicketTypeId.HasValue && existingTiers.FirstOrDefault(et => et.EventTicketTypeId == tt.EventTicketTypeId.Value) is { } existing)
                 {
-                    await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, existing.PlatformFeeCents, tt.Capacity, sortOrder++, true, tt.Description);
+                    await ticketTypeProc.UpdateAsync(tt.EventTicketTypeId.Value, tt.Name, tt.PriceCents, existing.PlatformFeeCents, tt.Capacity, sortOrder++, true, tt.Description);
                 }
                 else
                 {

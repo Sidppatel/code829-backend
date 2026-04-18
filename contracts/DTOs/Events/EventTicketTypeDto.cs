@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Events;
 
 public record EventTicketTypeDto(
-    Guid Id,
+    Guid EventTicketTypeId,
     string Label,
     int PriceCents,
     int? PlatformFeeCents,

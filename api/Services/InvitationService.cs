@@ -116,7 +116,7 @@ public class InvitationService(
             ?? throw new InvalidOperationException("Admin user creation failed");
 
         var dto = new AdminUserDto(
-            Id: admin.Id,
+            AdminUserId: admin.Id,
             Email: admin.Email,
             FirstName: admin.FirstName,
             LastName: admin.LastName,

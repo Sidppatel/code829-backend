@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Events;
 
 public record EventTableDto(
-    Guid Id,
+    Guid TableId,
     string Label,
     int Capacity,
     string Shape,
@@ -20,7 +20,7 @@ public record EventTableDto(
 );
 
 public record EventTableTypeInfo(
-    Guid Id,
+    Guid EventTableId,
     string Label,
     int Capacity,
     string Shape,

@@ -124,7 +124,7 @@ public class AuthService(
             .ToListAsync();
 
         return sessions.Select(s => new DeviceSessionDto(
-            Id: s.DeviceSessionId,
+            DeviceSessionId: s.DeviceSessionId,
             DeviceName: s.DeviceName,
             IpAddress: s.IpAddress,
             LastActivityAt: s.LastActivityAt,
@@ -178,7 +178,7 @@ public class AuthService(
     }
 
     private UserDto MapUserDto(User user) => new(
-        Id: user.Id,
+        UserId: user.Id,
         Email: user.Email,
         FirstName: user.FirstName,
         LastName: user.LastName,

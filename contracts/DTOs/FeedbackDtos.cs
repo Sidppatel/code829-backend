@@ -9,7 +9,7 @@ public record SubmitFeedbackRequest(
 );
 
 public record FeedbackDto(
-    Guid Id,
+    Guid FeedbackId,
     string Name,
     string? Email,
     string Type,

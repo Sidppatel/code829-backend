@@ -85,7 +85,7 @@ public class AdminAuthService(
             .ToListAsync();
 
         return sessions.Select(s => new DeviceSessionDto(
-            Id: s.DeviceSessionId,
+            DeviceSessionId: s.DeviceSessionId,
             DeviceName: s.DeviceName,
             IpAddress: s.IpAddress,
             LastActivityAt: s.LastActivityAt,
@@ -218,7 +218,7 @@ public class AdminAuthService(
     }
 
     private AdminUserDto MapAdminUserDto(AdminUser admin) => new(
-        Id: admin.Id,
+        AdminUserId: admin.Id,
         Email: admin.Email,
         FirstName: admin.FirstName,
         LastName: admin.LastName,

@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Venues;
 
 public record VenueDto(
-    Guid Id,
+    Guid VenueId,
     string Name,
     string Address,
     string City,

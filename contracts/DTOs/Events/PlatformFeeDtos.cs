@@ -12,7 +12,7 @@ public record EventFeeResponse(
 );
 
 public record TableTypeFee(
-    Guid Id,
+    Guid EventTableId,
     string Label,
     int PriceCents,
     int? PlatformFeeCents,
@@ -20,7 +20,7 @@ public record TableTypeFee(
 );
 
 public record TicketTypeFee(
-    Guid Id,
+    Guid EventTicketTypeId,
     string Label,
     int PriceCents,
     int? PlatformFeeCents,

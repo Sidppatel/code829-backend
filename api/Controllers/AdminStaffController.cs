@@ -146,7 +146,7 @@ public class AdminStaffController(
         {
             var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
             var invitation = await invitationService.CreateAsync(request.Email, role, adminUserId);
-            return Created($"/admin/staff/invitations/{invitation.Id}", invitation);
+            return Created($"/admin/staff/invitations/{invitation.InvitationId}", invitation);
         }
         catch (InvalidOperationException ex)
         {
