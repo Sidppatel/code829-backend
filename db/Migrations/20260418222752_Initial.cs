@@ -1069,9 +1069,10 @@ CREATE INDEX ""IX_purchase_tables_TableId"" ON purchase_tables (""TableId"");
             // ─── VIEWS ────────────────────────────────────────────────────────────────────
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_events AS
+DROP VIEW IF EXISTS v_events;
+CREATE VIEW v_events AS
 SELECT
-    e.""Id"" AS ""Id"",
+    e.""Id"" AS ""EventId"",
     e.""Title"" AS ""Title"",
     e.""Slug"" AS ""Slug"",
     e.""Description"" AS ""Description"",
@@ -1154,9 +1155,10 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_summary AS
+DROP VIEW IF EXISTS v_event_summary;
+CREATE VIEW v_event_summary AS
 SELECT
-    e.""Id"" AS ""Id"",
+    e.""Id"" AS ""EventId"",
     e.""Title"" AS ""Title"",
     e.""Slug"" AS ""Slug"",
     e.""Status""::text AS ""Status"",
@@ -1230,9 +1232,10 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_user_profile AS
+DROP VIEW IF EXISTS v_user_profile;
+CREATE VIEW v_user_profile AS
 SELECT
-    u.""Id"", u.""Email"", u.""FirstName"", u.""LastName"",
+    u.""Id"" AS ""UserId"", u.""Email"", u.""FirstName"", u.""LastName"",
     u.""IsActive"", u.""LastLoginAt"",
     u.""Phone"", u.""OptInLocationEmail"", u.""HasCompletedOnboarding"",
     u.""AvatarPath"", u.""CreatedAt"",
@@ -1243,9 +1246,10 @@ LEFT JOIN addresses a ON u.""AddressId"" = a.""Id"";
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_tables AS
+DROP VIEW IF EXISTS v_tables;
+CREATE VIEW v_tables AS
 SELECT
-    t.""Id"", t.""EventId"", t.""EventTableId"",
+    t.""Id"" AS ""TableId"", t.""EventId"", t.""EventTableId"",
     t.""Label"", t.""GridRow"", t.""GridCol"",
     t.""IsActive"", t.""SortOrder"",
     t.""Status""::text,
@@ -1260,9 +1264,10 @@ JOIN event_tables et ON t.""EventTableId"" = et.""Id"";
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_purchases AS
+DROP VIEW IF EXISTS v_purchases;
+CREATE VIEW v_purchases AS
 SELECT
-    b.""Id"", b.""PurchaseNumber"", b.""Status""::text,
+    b.""Id"" AS ""PurchaseId"", b.""PurchaseNumber"", b.""Status""::text,
     b.""SubtotalCents"", b.""FeeCents"", b.""TotalCents"",
     b.""QrToken"", b.""SeatsReserved"", b.""CreatedAt"",
     b.""UserId"",
@@ -1311,9 +1316,10 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_purchase_tickets AS
+DROP VIEW IF EXISTS v_purchase_tickets;
+CREATE VIEW v_purchase_tickets AS
 SELECT
-    bt.""Id"", bt.""TicketCode"", bt.""QrToken"", bt.""SeatNumber"",
+    bt.""Id"" AS ""PurchaseTicketId"", bt.""TicketCode"", bt.""QrToken"", bt.""SeatNumber"",
     bt.""Status""::text,
     bt.""CreatedAt"",
     bt.""InvitedEmail"", bt.""InviteSentAt"", bt.""InviteExpiresAt"", bt.""ClaimedAt"",
@@ -1341,9 +1347,10 @@ JOIN users bu ON b.""UserId"" = bu.""Id"";
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_venues AS
+DROP VIEW IF EXISTS v_venues;
+CREATE VIEW v_venues AS
 SELECT
-    v.""Id"", v.""Name"", v.""Description"", v.""ImagePath"",
+    v.""Id"" AS ""VenueId"", v.""Name"", v.""Description"", v.""ImagePath"",
     v.""Phone"", v.""Email"", v.""Website"",
     v.""IsActive"", v.""CreatedAt"",
     COALESCE(a.""Line1"", '') AS ""AddressLine1"",
@@ -1360,9 +1367,10 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_tables_summary AS
+DROP VIEW IF EXISTS v_event_tables_summary;
+CREATE VIEW v_event_tables_summary AS
 SELECT
-    et.""Id"", et.""EventId"", et.""Label"", et.""Capacity"",
+    et.""Id"" AS ""EventTableId"", et.""EventId"", et.""Label"", et.""Capacity"",
     et.""Shape""::text, et.""Color"", et.""PriceCents"", et.""PlatformFeeCents"",
     et.""IsActive"",
     COALESCE(ts.total, 0)::int AS ""TotalTables"",
@@ -1381,9 +1389,10 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_event_ticket_types_summary AS
+DROP VIEW IF EXISTS v_event_ticket_types_summary;
+CREATE VIEW v_event_ticket_types_summary AS
 SELECT
-    ett.""Id"", ett.""EventId"", ett.""Label"", ett.""PriceCents"",
+    ett.""Id"" AS ""EventTicketTypeId"", ett.""EventId"", ett.""Label"", ett.""PriceCents"",
     ett.""PlatformFeeCents"", ett.""MaxQuantity"", ett.""SortOrder"", ett.""IsActive"",
     ett.""Description"",
     ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0) AS ""TotalPriceCents"",
@@ -1402,18 +1411,20 @@ LEFT JOIN LATERAL (
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_admin_users AS
+DROP VIEW IF EXISTS v_admin_users;
+CREATE VIEW v_admin_users AS
 SELECT
-    ""Id"", ""Email"", ""EmailHash"", ""FirstName"", ""LastName"",
+    ""Id"" AS ""AdminUserId"", ""Email"", ""EmailHash"", ""FirstName"", ""LastName"",
     ""Role"", ""IsActive"", ""LastLoginAt"", ""AvatarPath"", ""Phone"",
     ""StripeConnectedAccountId"", ""CreatedAt"", ""UpdatedAt""
 FROM admin_users;
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_device_sessions AS
+DROP VIEW IF EXISTS v_device_sessions;
+CREATE VIEW v_device_sessions AS
 SELECT
-    ""Id"", ""UserId"", ""AdminUserId"", ""SessionHash"",
+    ""Id"" AS ""DeviceSessionId"", ""UserId"", ""AdminUserId"", ""SessionHash"",
     ""DeviceFingerprint"", ""DeviceName"", ""IpAddress"",
     ""LastActivityAt"", ""ExpiresAt"", ""RevokedAt"",
     ""CreatedAt"", ""UpdatedAt""
@@ -1421,9 +1432,10 @@ FROM device_sessions;
 ");
 
             migrationBuilder.Sql(@"
-CREATE OR REPLACE VIEW v_invitations AS
+DROP VIEW IF EXISTS v_invitations;
+CREATE VIEW v_invitations AS
 SELECT
-    i.""Id"", i.""Email"", i.""TokenHash"", i.""Role"",
+    i.""Id"" AS ""InvitationId"", i.""Email"", i.""TokenHash"", i.""Role"",
     i.""InvitedByAdminUserId"", i.""Status"",
     i.""ExpiresAt"", i.""AcceptedAt"",
     i.""CreatedAt"", i.""UpdatedAt"",
