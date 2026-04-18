@@ -12,5 +12,5 @@ public class Image : BaseEntity
     public bool IsPrimary { get; set; }
     public int SortOrder { get; set; }
     public Guid? UploadedById { get; set; }
-    public User? UploadedBy { get; set; }
+    public string? UploaderType { get; set; }   // "user" or "admin"
 }

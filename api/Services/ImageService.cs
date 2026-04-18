@@ -12,7 +12,7 @@ public class ImageService(
 ) : IImageService
 {
     public async Task<ImageUploadResponse> UploadAsync(
-        Stream fileStream, string fileName, string entityType, Guid entityId, Guid? uploadedById)
+        Stream fileStream, string fileName, string entityType, Guid entityId, Guid? uploadedById, string? uploaderType = null)
     {
         var variants = await imageProcessing.ProcessAsync(fileStream, entityType);
         var detailVariant = variants.First(v => v.Suffix == "");
@@ -41,7 +41,8 @@ public class ImageService(
             Height = detailVariant.Height,
             IsPrimary = isPrimary,
             SortOrder = existing.Count,
-            UploadedById = uploadedById
+            UploadedById = uploadedById,
+            UploaderType = uploaderType
         };
 
         await imageRepo.AddAsync(image);

@@ -483,8 +483,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.EntityType).HasMaxLength(20);
             entity.Property(e => e.StorageKey).HasMaxLength(500);
             entity.Property(e => e.OriginalName).HasMaxLength(255);
-            entity.HasOne(e => e.UploadedBy).WithMany().HasForeignKey(e => e.UploadedById)
-                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.Property(e => e.UploaderType).HasMaxLength(10);
         });
 
         // ─── Logging ─────────────────────────────────────────────

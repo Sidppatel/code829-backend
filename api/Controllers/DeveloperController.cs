@@ -512,7 +512,7 @@ public class DeveloperController(
         foreach (var old in existing)
             await imageService.DeleteAsync(old.Id);
 
-        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "platform", platformEntityId, userId);
+        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "platform", platformEntityId, userId, uploaderType: "admin");
         return Ok(result);
     }
 

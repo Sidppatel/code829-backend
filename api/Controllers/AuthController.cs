@@ -227,7 +227,7 @@ public class AuthController(
         foreach (var old in oldImages)
             await imageService.DeleteAsync(old.Id);
 
-        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId.Value, userId.Value);
+        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId.Value, userId.Value, uploaderType: "user");
 
         await userProc.UpdateUserAvatarAsync(userId.Value, result.StorageKey);
 
