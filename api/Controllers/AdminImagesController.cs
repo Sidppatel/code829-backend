@@ -41,7 +41,7 @@ public class AdminImagesController(
         if (!await CanManageEntityAsync(entityType, entityId, userId))
             return NotFound(new ApiError(404, $"{entityType} not found or access denied", HttpContext.TraceIdentifier));
 
-        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, entityType, entityId, userId);
+        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, entityType, entityId, null);
         await adminLog.LogAsync("UploadImage", entityType, entityId, $"Uploaded image for {entityType} {entityId}");
 
         return Ok(result);

@@ -4,7 +4,7 @@ namespace Api.Services;
 
 public interface IImageService
 {
-    Task<ImageUploadResponse> UploadAsync(Stream fileStream, string fileName, string entityType, Guid entityId, Guid uploadedById);
+    Task<ImageUploadResponse> UploadAsync(Stream fileStream, string fileName, string entityType, Guid entityId, Guid? uploadedById);
     Task<List<ImageDto>> GetByEntityAsync(string entityType, Guid entityId);
     Task<bool> DeleteAsync(Guid imageId);
     Task SetPrimaryAsync(Guid imageId);

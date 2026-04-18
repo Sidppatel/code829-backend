@@ -12,7 +12,7 @@ public class ImageService(
 ) : IImageService
 {
     public async Task<ImageUploadResponse> UploadAsync(
-        Stream fileStream, string fileName, string entityType, Guid entityId, Guid uploadedById)
+        Stream fileStream, string fileName, string entityType, Guid entityId, Guid? uploadedById)
     {
         var variants = await imageProcessing.ProcessAsync(fileStream, entityType);
         var detailVariant = variants.First(v => v.Suffix == "");
