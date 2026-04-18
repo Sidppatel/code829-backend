@@ -135,6 +135,17 @@ public static class DataSeeder
                 await settings.SetAsync("cors_origins", corsOrigins, "Comma-separated allowed CORS origins");
                 Log.Information("[Seed] Updated cors_origins to {Origins}", corsOrigins);
             }
+
+            var fromEmail = Environment.GetEnvironmentVariable("EMAIL_FROM_ADDRESS");
+            if (!string.IsNullOrEmpty(fromEmail))
+            {
+                var currentFrom = await settings.GetOrDefaultAsync("email_from_address");
+                if (currentFrom != fromEmail)
+                {
+                    await settings.SetAsync("email_from_address", fromEmail, "Sender email address");
+                    Log.Information("[Seed] Updated email_from_address to {Email}", fromEmail);
+                }
+            }
         }
 
         Log.Information("[Seed] App settings initialized");
