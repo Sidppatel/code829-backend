@@ -45,7 +45,7 @@ public class AdminLogsController(EventPlatformDbContext context) : ControllerBas
         var items = await query.OrderByDescending(l => l.Timestamp)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(l => new AdminLogDto(
-                l.Id, l.Timestamp, l.Action, l.ActorId, l.ActorEmail, l.ActorRole,
+                l.Id, l.Timestamp, l.Action, l.AdminUserId, l.ActorEmail, l.ActorRole,
                 l.EntityType, l.EntityId, l.Description, l.MetadataJson, l.IpAddress))
             .ToListAsync();
 

@@ -4,7 +4,7 @@ public record AdminLogDto(
     Guid Id,
     DateTime Timestamp,
     string Action,
-    Guid? ActorId,
+    Guid? AdminUserId,
     string? ActorEmail,
     string? ActorRole,
     string? EntityType,

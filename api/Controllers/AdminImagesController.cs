@@ -108,7 +108,7 @@ public class AdminImagesController(
         return entityType switch
         {
             "venue" => await context.VenueViews.AsNoTracking().AnyAsync(v => v.Id == entityId),
-            "event" => await context.EventViews.AsNoTracking().AnyAsync(e => e.Id == entityId && e.OrganizerId == userId),
+            "event" => await context.EventViews.AsNoTracking().AnyAsync(e => e.Id == entityId && e.AdminUserId == userId),
             _ => false
         };
     }

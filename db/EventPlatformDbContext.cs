@@ -327,7 +327,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.Organizer).WithMany().HasForeignKey(e => e.OrganizerId)
+            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 #pragma warning disable CS8603
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, Description = e.Description! })
@@ -579,12 +579,14 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_events");
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.AdminUserId).HasColumnName("OrganizerId");
         });
 
         modelBuilder.Entity<EventSummaryView>(entity =>
         {
             entity.ToView("v_event_summary");
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.AdminUserId).HasColumnName("OrganizerId");
         });
 
         modelBuilder.Entity<TableView>(entity =>
@@ -597,6 +599,7 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_purchases");
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.AdminUserId).HasColumnName("OrganizerId");
         });
 
         modelBuilder.Entity<PurchaseTicketView>(entity =>

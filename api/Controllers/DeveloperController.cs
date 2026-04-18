@@ -85,7 +85,7 @@ public class DeveloperController(
             .Select(l => new DeveloperLogDto(
                 l.Id, l.Timestamp, l.Severity.ToString(), l.Message, l.ExceptionType,
                 l.StackTrace, l.RequestPath, l.RequestMethod, l.StatusCode,
-                l.UserId, l.IpAddress, l.CorrelationId, l.MetadataJson))
+                l.AdminUserId, l.IpAddress, l.CorrelationId, l.MetadataJson))
             .ToListAsync();
 
         return Ok(new PagedResponse<DeveloperLogDto>(items, totalCount, page, pageSize));
@@ -119,7 +119,7 @@ public class DeveloperController(
             .Select(l => new SystemLogDto(
                 l.Id, l.Timestamp, l.Category.ToString(), l.Action, l.Source,
                 l.EntityType, l.EntityId, l.BeforeJson, l.AfterJson,
-                l.ActorId, l.CorrelationId, l.DurationMs, l.MetadataJson))
+                l.AdminUserId, l.CorrelationId, l.DurationMs, l.MetadataJson))
             .ToListAsync();
 
         var hasMore = items.Count > pageSize;

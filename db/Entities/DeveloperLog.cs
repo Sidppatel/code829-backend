@@ -13,7 +13,7 @@ public class DeveloperLog
     public string? RequestPath { get; set; }
     public string? RequestMethod { get; set; }
     public int? StatusCode { get; set; }
-    public Guid? UserId { get; set; }
+    public Guid? AdminUserId { get; set; }
     public string? IpAddress { get; set; }
     public string? CorrelationId { get; set; }
     public string? MetadataJson { get; set; }

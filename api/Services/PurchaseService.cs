@@ -77,7 +77,7 @@ public class PurchaseService(
         var estimatedTaxCents = pricing.TaxCents;
         var totalSeats = tables.Sum(t => t.Capacity);
 
-        var organizer = await adminProc.GetByIdAsync(ev.OrganizerId);
+        var organizer = await adminProc.GetByIdAsync(ev.AdminUserId);
 
         // Generate purchase number up-front so we can attach it to the PaymentIntent metadata.
         var purchaseNumber = GeneratePurchaseNumber();
@@ -173,7 +173,7 @@ public class PurchaseService(
         var taxCalculationId = pricing.TaxCalculationId;
         var estimatedTaxCents = pricing.TaxCents;
 
-        var organizer = await adminProc.GetByIdAsync(ev.OrganizerId);
+        var organizer = await adminProc.GetByIdAsync(ev.AdminUserId);
 
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(

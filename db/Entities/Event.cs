@@ -30,6 +30,6 @@ public class Event : BaseEntity
     public Guid VenueId { get; set; }
     public Venue Venue { get; set; } = null!;
 
-    public Guid OrganizerId { get; set; }
-    public AdminUser Organizer { get; set; } = null!;
+    public Guid AdminUserId { get; set; }
+    public AdminUser AdminUser { get; set; } = null!;
 }

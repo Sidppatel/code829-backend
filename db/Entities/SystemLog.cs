@@ -13,7 +13,7 @@ public class SystemLog
     public Guid? EntityId { get; set; }
     public string? BeforeJson { get; set; }
     public string? AfterJson { get; set; }
-    public Guid? ActorId { get; set; }
+    public Guid? AdminUserId { get; set; }
     public string? CorrelationId { get; set; }
     public long? DurationMs { get; set; }
     public string? MetadataJson { get; set; }

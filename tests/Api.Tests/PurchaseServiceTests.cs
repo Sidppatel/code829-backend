@@ -89,7 +89,7 @@ public class PurchaseServiceTests : IDisposable
             StartDate = DateTime.UtcNow.AddDays(1),
             EndDate = DateTime.UtcNow.AddDays(2),
             VenueId = venue.Id,
-            OrganizerId = _userId
+            AdminUserId = _userId
         };
         _context.Events.Add(ev);
         _context.SaveChanges();
