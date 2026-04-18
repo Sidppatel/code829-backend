@@ -334,7 +334,10 @@ var builder = WebApplication.CreateBuilder(args);
     }
 
     // Seed data — only in development to prevent test data in production
-    if (app.Environment.IsDevelopment())
+    // Allow override via SEED_DATA environment variable for initialization in other environments
+    var shouldSeed = app.Environment.IsDevelopment() || 
+                    Environment.GetEnvironmentVariable("SEED_DATA")?.ToLower() == "true";
+    if (shouldSeed)
     {
         await DataSeeder.SeedAsync(app.Services);
         await VenueEventSeeder.SeedAsync(app.Services);
@@ -385,7 +388,7 @@ var builder = WebApplication.CreateBuilder(args);
     {
         policy.WithOrigins(corsOrigins)
               .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-              .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With", "Idempotency-Key")
+              .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With", "Idempotency-Key", "x-portal")
               .WithExposedHeaders("Retry-After", "X-Correlation-Id")
               .AllowCredentials()
               .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
