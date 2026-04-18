@@ -82,10 +82,10 @@ public class AdminEventsController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.EventId == id);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        
+
         var dto = MapToDto(ev);
 
         if (ev.LayoutMode == "Open")
@@ -97,7 +97,7 @@ public class AdminEventsController(
 
             dto = dto with {
                 TicketTypes = ticketTypeViews.Select(tt => new EventTicketTypeDto(
-                    tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+                    tt.EventTicketTypeId, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                     tt.TotalPriceCents,
                     tt.MaxQuantity, tt.SortOrder, tt.IsActive,
                     tt.SoldCount, tt.AvailableCount,
@@ -114,7 +114,7 @@ public class AdminEventsController(
 
             dto = dto with {
                 TableTypes = tableTypeViews.Select(t => new EventTableTypeSummaryDto(
-                    t.Id, t.Label, t.Capacity, t.Shape, t.Color,
+                    t.EventTableId, t.Label, t.Capacity, t.Shape, t.Color,
                     t.PriceCents, t.PlatformFeeCents,
                     t.PriceCents + (t.PlatformFeeCents ?? 0),
                     t.TotalTables, t.AvailableTables, t.BookedTables)).ToList()
@@ -128,7 +128,7 @@ public class AdminEventsController(
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
         var venue = await context.VenueViews.AsNoTracking()
-            .FirstOrDefaultAsync(v => v.Id == request.VenueId);
+            .FirstOrDefaultAsync(v => v.VenueId == request.VenueId);
         if (venue is null) return BadRequest(new ApiError(400, "Venue not found", HttpContext.TraceIdentifier));
 
         if (!Enum.TryParse<EventCategory>(request.Category, true, out _))
@@ -167,7 +167,7 @@ public class AdminEventsController(
         }
 
 
-        var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == eventId);
+        var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == eventId);
         return CreatedAtAction(nameof(GetById), new { id = eventId }, MapToDto(created));
     }
 
@@ -182,7 +182,7 @@ public class AdminEventsController(
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
@@ -229,10 +229,10 @@ public class AdminEventsController(
             var requestIds = request.TicketTypes.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToList();
             
             // Delete tiers not in request
-            var toDelete = existingTiers.Where(et => !requestIds.Contains(et.Id)).ToList();
+            var toDelete = existingTiers.Where(et => !requestIds.Contains(et.EventTicketTypeId)).ToList();
             foreach (var td in toDelete)
             {
-                await ticketTypeProc.DeleteAsync(td.Id);
+                await ticketTypeProc.DeleteAsync(td.EventTicketTypeId);
             }
 
             // Upsert remaining — preserve existing platform fees, assign default to new tiers
@@ -241,7 +241,7 @@ public class AdminEventsController(
             var sortOrder = 0;
             foreach (var tt in request.TicketTypes)
             {
-                if (tt.Id.HasValue && existingTiers.FirstOrDefault(et => et.Id == tt.Id.Value) is { } existing)
+                if (tt.Id.HasValue && existingTiers.FirstOrDefault(et => et.EventTicketTypeId == tt.Id.Value) is { } existing)
                 {
                     await ticketTypeProc.UpdateAsync(tt.Id.Value, tt.Name, tt.PriceCents, existing.PlatformFeeCents, tt.Capacity, sortOrder++, true, tt.Description);
                 }
@@ -252,14 +252,14 @@ public class AdminEventsController(
             }
         }
 
-        var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == id);
+        var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == id);
         return Ok(MapToDto(updated));
     }
 
     [HttpGet("{id:guid}/layout-locked")]
     public async Task<IActionResult> IsLayoutModeLocked(Guid id)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var hasPurchases = await context.PurchaseViews.AsNoTracking()
@@ -274,7 +274,7 @@ public class AdminEventsController(
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
 
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
@@ -288,7 +288,7 @@ public class AdminEventsController(
     [HttpPut("{id:guid}/status")]
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeEventStatusRequest request)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
@@ -314,14 +314,14 @@ public class AdminEventsController(
         await adminLog.LogAsync($"event.{newStatus.ToString().ToLower()}", "Event", id,
             $"Event '{ev.Title}' status changed to {newStatus}");
 
-        var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == id);
+        var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == id);
         return Ok(MapToDto(updated));
     }
 
     [HttpGet("{id:guid}/stats")]
     public async Task<IActionResult> GetStats(Guid id)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
@@ -335,7 +335,7 @@ public class AdminEventsController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
@@ -353,7 +353,7 @@ public class AdminEventsController(
     [HttpPost("{id:guid}/duplicate")]
     public async Task<IActionResult> Duplicate(Guid id, [FromBody] DuplicateEventRequest request)
     {
-        var original = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var original = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (original is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(original.AdminUserId)) return Forbid();
 
@@ -404,7 +404,7 @@ public class AdminEventsController(
         await adminLog.LogAsync("event.duplicated", "Event", copyId,
             $"Event duplicated from '{original.Title}'");
 
-        var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.Id == copyId);
+        var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == copyId);
         return Created("", MapToDto(created));
     }
 
@@ -413,7 +413,7 @@ public class AdminEventsController(
     [HttpGet("{id:guid}/ticket-types")]
     public async Task<IActionResult> GetTicketTypes(Guid id)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var rawTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
@@ -422,7 +422,7 @@ public class AdminEventsController(
             .ToListAsync();
 
         var types = rawTypes.Select(tt => new EventTicketTypeDto(
-            tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+            tt.EventTicketTypeId, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
             tt.TotalPriceCents,
             tt.MaxQuantity, tt.SortOrder, tt.IsActive,
             tt.SoldCount, tt.AvailableCount,
@@ -435,7 +435,7 @@ public class AdminEventsController(
     [HttpPost("{id:guid}/ticket-types")]
     public async Task<IActionResult> CreateTicketType(Guid id, [FromBody] CreateEventTicketTypeRequest request)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
         if (ev.LayoutMode != "Open")
@@ -452,10 +452,10 @@ public class AdminEventsController(
             $"Ticket type '{request.Label}' created for event '{ev.Title}'");
 
         var created = await context.EventTicketTypeSummaryViews.AsNoTracking()
-            .FirstAsync(tt => tt.Id == typeId);
+            .FirstAsync(tt => tt.EventTicketTypeId == typeId);
 
         return Created("", new EventTicketTypeDto(
-            created.Id, created.Label, created.PriceCents, created.PlatformFeeCents,
+            created.EventTicketTypeId, created.Label, created.PriceCents, created.PlatformFeeCents,
             created.TotalPriceCents,
             created.MaxQuantity, created.SortOrder, created.IsActive,
             created.SoldCount, created.AvailableCount,
@@ -466,12 +466,12 @@ public class AdminEventsController(
     [HttpPut("{id:guid}/ticket-types/{typeId:guid}")]
     public async Task<IActionResult> UpdateTicketType(Guid id, Guid typeId, [FromBody] UpdateEventTicketTypeRequest request)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
         var existing = await context.EventTicketTypeSummaryViews.AsNoTracking()
-            .FirstOrDefaultAsync(tt => tt.Id == typeId && tt.EventId == id);
+            .FirstOrDefaultAsync(tt => tt.EventTicketTypeId == typeId && tt.EventId == id);
         if (existing is null) return NotFound(new ApiError(404, "Ticket type not found", HttpContext.TraceIdentifier));
 
         var isPriceChange = (request.PriceCents.HasValue && request.PriceCents != existing.PriceCents)
@@ -489,10 +489,10 @@ public class AdminEventsController(
             request.PlatformFeeCents, request.MaxQuantity, request.SortOrder, request.IsActive, request.Description);
 
         var updated = await context.EventTicketTypeSummaryViews.AsNoTracking()
-            .FirstAsync(tt => tt.Id == typeId);
+            .FirstAsync(tt => tt.EventTicketTypeId == typeId);
 
         return Ok(new EventTicketTypeDto(
-            updated.Id, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
+            updated.EventTicketTypeId, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
             updated.TotalPriceCents,
             updated.MaxQuantity, updated.SortOrder, updated.IsActive,
             updated.SoldCount, updated.AvailableCount,
@@ -503,12 +503,12 @@ public class AdminEventsController(
     [HttpDelete("{id:guid}/ticket-types/{typeId:guid}")]
     public async Task<IActionResult> DeleteTicketType(Guid id, Guid typeId)
     {
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
         if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
 
         var existing = await context.EventTicketTypeSummaryViews.AsNoTracking()
-            .FirstOrDefaultAsync(tt => tt.Id == typeId && tt.EventId == id);
+            .FirstOrDefaultAsync(tt => tt.EventTicketTypeId == typeId && tt.EventId == id);
         if (existing is null) return NotFound(new ApiError(404, "Ticket type not found", HttpContext.TraceIdentifier));
 
         var hasActivePurchases = await context.PurchaseViews.AsNoTracking()
@@ -534,7 +534,7 @@ public class AdminEventsController(
             : Math.Max(0, e.TotalCapacity - e.TotalSold);
 
         return new EventDto(
-            e.Id, e.Title, e.Slug, e.Description,
+            e.EventId, e.Title, e.Slug, e.Description,
             e.Status, e.Category,
             e.StartDate, e.EndDate,
             e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null,

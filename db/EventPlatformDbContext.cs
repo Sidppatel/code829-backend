@@ -577,74 +577,74 @@ public class EventPlatformDbContext(
         modelBuilder.Entity<EventView>(entity =>
         {
             entity.ToView("v_events");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.EventId);
         });
 
         modelBuilder.Entity<EventSummaryView>(entity =>
         {
             entity.ToView("v_event_summary");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.EventId);
         });
 
         modelBuilder.Entity<TableView>(entity =>
         {
             entity.ToView("v_tables");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.TableId);
         });
 
         modelBuilder.Entity<PurchaseView>(entity =>
         {
             entity.ToView("v_purchases");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.PurchaseId);
         });
 
         modelBuilder.Entity<PurchaseTicketView>(entity =>
         {
             entity.ToView("v_purchase_tickets");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.PurchaseTicketId);
         });
 
         modelBuilder.Entity<VenueView>(entity =>
         {
             entity.ToView("v_venues");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.VenueId);
         });
 
         modelBuilder.Entity<UserProfileView>(entity =>
         {
             entity.ToView("v_user_profile");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.UserId);
         });
 
         modelBuilder.Entity<EventTablesSummaryView>(entity =>
         {
             entity.ToView("v_event_tables_summary");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.EventTableId);
         });
 
         modelBuilder.Entity<EventTicketTypeSummaryView>(entity =>
         {
             entity.ToView("v_event_ticket_types_summary");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.EventTicketTypeId);
         });
 
         modelBuilder.Entity<AdminUserView>(entity =>
         {
             entity.ToView("v_admin_users");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.AdminUserId);
             entity.Property(e => e.Role).HasConversion<string>();
         });
 
         modelBuilder.Entity<DeviceSessionView>(entity =>
         {
             entity.ToView("v_device_sessions");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.DeviceSessionId);
         });
 
         modelBuilder.Entity<InvitationView>(entity =>
         {
             entity.ToView("v_invitations");
-            entity.HasKey(e => e.Id);
+            entity.HasKey(e => e.InvitationId);
             entity.Property(e => e.Role).HasConversion<string>();
             entity.Property(e => e.Status).HasConversion<string>();
         });

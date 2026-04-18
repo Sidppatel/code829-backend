@@ -124,7 +124,7 @@ public class AuthService(
             .ToListAsync();
 
         return sessions.Select(s => new DeviceSessionDto(
-            Id: s.Id,
+            Id: s.DeviceSessionId,
             DeviceName: s.DeviceName,
             IpAddress: s.IpAddress,
             LastActivityAt: s.LastActivityAt,
@@ -137,7 +137,7 @@ public class AuthService(
     {
         var session = await context.DeviceSessionViews
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId && s.RevokedAt == null);
+            .FirstOrDefaultAsync(s => s.DeviceSessionId == sessionId && s.UserId == userId && s.RevokedAt == null);
 
         if (session is null)
             throw new KeyNotFoundException("Session not found");

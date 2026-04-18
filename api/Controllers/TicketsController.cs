@@ -38,7 +38,7 @@ public class TicketsController(
 
         // Verify purchase ownership via view
         var purchase = await context.PurchaseViews.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == purchaseId);
+            .FirstOrDefaultAsync(b => b.PurchaseId == purchaseId);
         if (purchase is null)
             return NotFound(new ApiError(404, "Purchase not found", HttpContext.TraceIdentifier));
         if (purchase.UserId != userId)
@@ -50,8 +50,8 @@ public class TicketsController(
             .ToListAsync();
 
         var dtos = tickets.Select(t => new PurchaseTicketDto(
-            t.Id, t.TicketCode, t.SeatNumber, t.Status,
-            purchase.Id, purchase.PurchaseNumber,
+            t.PurchaseTicketId, t.TicketCode, t.SeatNumber, t.Status,
+            purchase.PurchaseId, purchase.PurchaseNumber,
             purchase.EventId, purchase.EventTitle, purchase.EventStartDate,
             purchase.VenueName,
             purchase.TableLabel,
@@ -257,7 +257,7 @@ public class TicketsController(
             return BadRequest(new ApiError(400, "This invite link has expired", HttpContext.TraceIdentifier));
 
         var tableLabel = ticket.Purchase.TableId.HasValue
-            ? await context.TableViews.AsNoTracking().Where(t => t.Id == ticket.Purchase.TableId).Select(t => t.Label).FirstOrDefaultAsync()
+            ? await context.TableViews.AsNoTracking().Where(t => t.TableId == ticket.Purchase.TableId).Select(t => t.Label).FirstOrDefaultAsync()
             : null;
 
         return Ok(new TicketClaimInfoDto(
@@ -340,11 +340,11 @@ public class TicketsController(
         // Get table labels from purchase views for table purchases
         var purchaseIds = tickets.Select(t => t.PurchaseId).Distinct().ToList();
         var purchaseTableLabels = await context.PurchaseViews.AsNoTracking()
-            .Where(b => purchaseIds.Contains(b.Id) && b.TableId.HasValue)
-            .ToDictionaryAsync(b => b.Id, b => b.TableLabel);
+            .Where(b => purchaseIds.Contains(b.PurchaseId) && b.TableId.HasValue)
+            .ToDictionaryAsync(b => b.PurchaseId, b => b.TableLabel);
 
         var dtos = tickets.Select(t => new GuestTicketDto(
-            t.Id,
+            t.PurchaseTicketId,
             t.TicketCode,
             t.SeatNumber,
             t.Status,

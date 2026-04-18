@@ -148,7 +148,7 @@ public class InvitationService(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(i => new InvitationDto(
-                i.Id,
+                i.InvitationId,
                 i.Email,
                 i.Role.ToString(),
                 i.ExpiresAt < DateTime.UtcNow && i.Status == InvitationStatus.Pending

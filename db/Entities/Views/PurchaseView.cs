@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class PurchaseView
 {
-    public Guid Id { get; set; }
+    public Guid PurchaseId { get; set; }
     public string PurchaseNumber { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public int SubtotalCents { get; set; }

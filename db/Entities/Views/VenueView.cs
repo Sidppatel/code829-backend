@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class VenueView
 {
-    public Guid Id { get; set; }
+    public Guid VenueId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? ImagePath { get; set; }

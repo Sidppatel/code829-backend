@@ -122,7 +122,7 @@ public class DeveloperDashboardController(
             return Ok(new { hasUpcoming = false });
 
         var purchases = await context.PurchaseViews.AsNoTracking()
-            .Where(b => b.EventId == ev.Id)
+            .Where(b => b.EventId == ev.EventId)
             .ToListAsync();
 
         var paid = purchases.Count(b => b.Status == "Paid");
@@ -135,7 +135,7 @@ public class DeveloperDashboardController(
             .Sum(b => (long)b.TotalCents);
 
         var tables = await context.TableViews.AsNoTracking()
-            .Where(t => t.EventId == ev.Id && t.IsActive)
+            .Where(t => t.EventId == ev.EventId && t.IsActive)
             .ToListAsync();
         var totalCapacity = ev.MaxCapacity ?? tables.Sum(t => t.Capacity);
         var soldCount = paid + checkedInCount;
@@ -149,7 +149,7 @@ public class DeveloperDashboardController(
         var recentPurchases = purchases
             .OrderByDescending(b => b.CreatedAt)
             .Take(8)
-            .Select(b => new RecentPurchaseDto(b.Id, b.PurchaseNumber,
+            .Select(b => new RecentPurchaseDto(b.PurchaseId, b.PurchaseNumber,
                 $"{b.UserFirstName} {b.UserLastName}", b.UserEmail,
                 b.Status, b.TotalCents, b.CreatedAt))
             .ToList();
@@ -160,7 +160,7 @@ public class DeveloperDashboardController(
         {
             hasUpcoming = true,
             data = new NextEventDashboardDto(
-                ev.Id, ev.Title, ev.Slug, ev.Status, ev.Category,
+                ev.EventId, ev.Title, ev.Slug, ev.Status, ev.Category,
                 ev.StartDate, ev.EndDate, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
                 ev.ImagePath, ev.LayoutMode, daysUntil,
                 purchases.Count, paid, checkedInCount, pending, cancelled, refunded,

@@ -18,7 +18,7 @@ public class TableBookingService(
             await settings.GetOrDefaultAsync("hold_expiry_minutes", "10") ?? "10");
 
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == eventId)
+            .FirstOrDefaultAsync(e => e.EventId == eventId)
             ?? throw new KeyNotFoundException("Event not found");
 
         if (ev.Status != "Published")
@@ -27,7 +27,7 @@ public class TableBookingService(
         var result = await tableProc.LockTableAsync(userId, eventId, tableId, holdMinutes);
 
         var table = await context.TableViews.AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == tableId && t.EventId == eventId)
+            .FirstOrDefaultAsync(t => t.TableId == tableId && t.EventId == eventId)
             ?? throw new InvalidOperationException("Table lock succeeded but table not found in view");
 
         var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
@@ -64,7 +64,7 @@ public class TableBookingService(
     {
         var now = DateTime.UtcNow;
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == eventId);
+            .FirstOrDefaultAsync(e => e.EventId == eventId);
         var defaultFeeCents = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_grid_cents", "2500") ?? "2500");
         var eventFeeFallback = defaultFeeCents;
 
@@ -79,7 +79,7 @@ public class TableBookingService(
         {
             var fee = t.PlatformFeeCents ?? eventFeeFallback;
             return new TableLockDto(
-                t.Id,
+                t.TableId,
                 t.Label,
                 eventId,
                 userId,

@@ -59,7 +59,7 @@ public class AdminStaffController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.Id, a.FirstName, a.LastName, a.Email,
+                a.AdminUserId, a.FirstName, a.LastName, a.Email,
                 Role = a.Role.ToString(),
                 a.IsActive, a.CreatedAt, a.LastLoginAt, a.Phone
             })

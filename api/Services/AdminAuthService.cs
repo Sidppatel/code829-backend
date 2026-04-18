@@ -85,7 +85,7 @@ public class AdminAuthService(
             .ToListAsync();
 
         return sessions.Select(s => new DeviceSessionDto(
-            Id: s.Id,
+            Id: s.DeviceSessionId,
             DeviceName: s.DeviceName,
             IpAddress: s.IpAddress,
             LastActivityAt: s.LastActivityAt,
@@ -98,7 +98,7 @@ public class AdminAuthService(
     {
         var session = await context.DeviceSessionViews
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == sessionId && s.AdminUserId == adminUserId && s.RevokedAt == null);
+            .FirstOrDefaultAsync(s => s.DeviceSessionId == sessionId && s.AdminUserId == adminUserId && s.RevokedAt == null);
 
         if (session is null)
             throw new KeyNotFoundException("Session not found");

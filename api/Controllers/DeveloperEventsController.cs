@@ -30,7 +30,7 @@ public class DeveloperEventsController(
     public async Task<IActionResult> GetEventFees(Guid id)
     {
         var ev = await Context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound();
 
         var defaultFeeKey = ev.LayoutMode == "Grid" ? "default_platform_fee_grid_cents" : "default_platform_fee_open_cents";
@@ -40,19 +40,19 @@ public class DeveloperEventsController(
         var tableTypes = await Context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id && et.IsActive)
             .OrderBy(et => et.Label)
-            .Select(et => new TableTypeFee(et.Id, et.Label, et.PriceCents, et.PlatformFeeCents,
+            .Select(et => new TableTypeFee(et.EventTableId, et.Label, et.PriceCents, et.PlatformFeeCents,
                 et.BookedTables > 0 || et.LockedTables > 0))
             .ToListAsync();
 
         var ticketTypes = await Context.EventTicketTypeSummaryViews.AsNoTracking()
             .Where(tt => tt.EventId == id && tt.IsActive)
             .OrderBy(tt => tt.SortOrder)
-            .Select(tt => new TicketTypeFee(tt.Id, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
+            .Select(tt => new TicketTypeFee(tt.EventTicketTypeId, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                 tt.SoldCount > 0))
             .ToListAsync();
 
         return Ok(new EventFeeResponse(
-            ev.Id, ev.Title, ev.LayoutMode,
+            ev.EventId, ev.Title, ev.LayoutMode,
             ev.PricePerPersonCents, ev.MaxCapacity,
             defaultFee, tableTypes, ticketTypes
         ));
@@ -64,7 +64,7 @@ public class DeveloperEventsController(
         [FromBody] UpdateTicketTypeFeesRequest request,
         [FromServices] IEventTicketTypeProcedures ticketTypeProc)
     {
-        var evExists = await Context.EventViews.AsNoTracking().AnyAsync(e => e.Id == id);
+        var evExists = await Context.EventViews.AsNoTracking().AnyAsync(e => e.EventId == id);
         if (!evExists) return NotFound();
 
         var ticketTypes = await Context.EventTicketTypeSummaryViews
@@ -74,7 +74,7 @@ public class DeveloperEventsController(
 
         foreach (var (typeId, feeCents) in request.TicketTypeFees)
         {
-            var tt = ticketTypes.FirstOrDefault(t => t.Id == typeId);
+            var tt = ticketTypes.FirstOrDefault(t => t.EventTicketTypeId == typeId);
             if (tt is null) continue;
 
             if (feeCents != tt.PlatformFeeCents)
@@ -89,7 +89,7 @@ public class DeveloperEventsController(
             }
 
             await ticketTypeProc.UpdateAsync(
-                tt.Id, label: null, priceCents: null, platformFeeCents: feeCents,
+                tt.EventTicketTypeId, label: null, priceCents: null, platformFeeCents: feeCents,
                 maxQuantity: null, sortOrder: null, isActive: null, description: null);
         }
 
@@ -102,7 +102,7 @@ public class DeveloperEventsController(
         [FromBody] UpdateTableTypeFeesRequest request,
         [FromServices] ILayoutProcedures layoutProc)
     {
-        var evExists = await Context.EventViews.AsNoTracking().AnyAsync(e => e.Id == id);
+        var evExists = await Context.EventViews.AsNoTracking().AnyAsync(e => e.EventId == id);
         if (!evExists) return NotFound();
 
         var tableTypes = await layoutProc.ListEventTablesForEventAsync(id);

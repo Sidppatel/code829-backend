@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class EventTicketTypeSummaryView
 {
-    public Guid Id { get; set; }
+    public Guid EventTicketTypeId { get; set; }
     public Guid EventId { get; set; }
     public string Label { get; set; } = string.Empty;
     public int PriceCents { get; set; }

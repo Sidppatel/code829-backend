@@ -55,7 +55,7 @@ public class PricingService(
     public async Task<PricingComputation> ComputeForPurchaseAsync(PricingQuoteRequest request, CancellationToken ct = default)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == request.EventId, ct)
+            .FirstOrDefaultAsync(e => e.EventId == request.EventId, ct)
             ?? throw new KeyNotFoundException("Event not found");
 
         if (request.TableIds is { Count: > 0 })
@@ -73,7 +73,7 @@ public class PricingService(
             throw new InvalidOperationException("Table pricing only applies to Grid events");
 
         var tables = await context.TableViews.AsNoTracking()
-            .Where(t => tableIds.Contains(t.Id) && t.EventId == ev.Id)
+            .Where(t => tableIds.Contains(t.TableId) && t.EventId == ev.EventId)
             .ToListAsync(ct);
 
         if (tables.Count != tableIds.Count)
@@ -95,7 +95,7 @@ public class PricingService(
             throw new InvalidOperationException("Open pricing only applies to Open events");
 
         var ticketTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
-            .Where(tt => tt.EventId == ev.Id && tt.IsActive)
+            .Where(tt => tt.EventId == ev.EventId && tt.IsActive)
             .ToListAsync(ct);
 
         int pricePerPerson;
@@ -105,7 +105,7 @@ public class PricingService(
         {
             if (ticketTypeId is null)
                 throw new InvalidOperationException("This event requires a ticket type selection");
-            var selected = ticketTypes.FirstOrDefault(tt => tt.Id == ticketTypeId)
+            var selected = ticketTypes.FirstOrDefault(tt => tt.EventTicketTypeId == ticketTypeId)
                 ?? throw new KeyNotFoundException("Ticket type not found or inactive");
             pricePerPerson = selected.PriceCents;
             var defaultOpenFee = await settings.GetIntAsync("default_platform_fee_open_cents", 1000);
@@ -141,7 +141,7 @@ public class PricingService(
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[Pricing] Tax calculation failed for event {EventId}", ev.Id);
+            Log.Error(ex, "[Pricing] Tax calculation failed for event {EventId}", ev.EventId);
             throw new InvalidOperationException("Unable to calculate tax", ex);
         }
     }

@@ -4,7 +4,7 @@ namespace Db.Entities.Views;
 
 public class InvitationView
 {
-    public Guid Id { get; set; }
+    public Guid InvitationId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string TokenHash { get; set; } = string.Empty;
     public AdminRole Role { get; set; }

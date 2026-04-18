@@ -70,7 +70,7 @@ public class AdminPurchasesController(
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
         var dtos = items.Select(b => new PurchaseDto(
-            b.Id, b.PurchaseNumber, b.Status,
+            b.PurchaseId, b.PurchaseNumber, b.Status,
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
@@ -117,11 +117,11 @@ public class AdminPurchasesController(
     [HttpPost("{id:guid}/refund")]
     public async Task<IActionResult> Refund(Guid id)
     {
-        var purchase = await context.PurchaseViews.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        var purchase = await context.PurchaseViews.AsNoTracking().FirstOrDefaultAsync(b => b.PurchaseId == id);
         if (purchase is null) return NotFound(new ApiError(404, "Purchase not found", HttpContext.TraceIdentifier));
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == purchase.EventId);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == purchase.EventId);
         if (ev is not null && ev.AdminUserId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
             return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
 

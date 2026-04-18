@@ -147,7 +147,7 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
     public async Task<IActionResult> GetStats(Guid eventId)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == eventId);
+            .FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var purchases = await context.PurchaseViews.AsNoTracking()

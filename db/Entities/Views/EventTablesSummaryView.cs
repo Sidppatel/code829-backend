@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class EventTablesSummaryView
 {
-    public Guid Id { get; set; }
+    public Guid EventTableId { get; set; }
     public Guid EventId { get; set; }
     public string Label { get; set; } = string.Empty;
     public int Capacity { get; set; }

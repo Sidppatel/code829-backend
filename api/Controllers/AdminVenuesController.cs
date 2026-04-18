@@ -44,7 +44,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var venue = await context.VenueViews.AsNoTracking()
-            .FirstOrDefaultAsync(v => v.Id == id);
+            .FirstOrDefaultAsync(v => v.VenueId == id);
         if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
         return Ok(MapToDto(venue));
     }
@@ -57,7 +57,7 @@ public class AdminVenuesController(
             request.Phone, request.Email, request.Website,
             request.Address, null, request.City, request.State, request.ZipCode);
 
-        var created = await context.VenueViews.AsNoTracking().FirstAsync(v => v.Id == venueId);
+        var created = await context.VenueViews.AsNoTracking().FirstAsync(v => v.VenueId == venueId);
         return CreatedAtAction(nameof(GetById), new { id = venueId }, MapToDto(created));
     }
 
@@ -65,7 +65,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVenueRequest request)
     {
         var venue = await context.VenueViews.AsNoTracking()
-            .FirstOrDefaultAsync(v => v.Id == id);
+            .FirstOrDefaultAsync(v => v.VenueId == id);
         if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         await venueProc.UpdateVenueAsync(
@@ -73,7 +73,7 @@ public class AdminVenuesController(
             request.Phone, request.Email, request.Website, request.IsActive,
             request.Address, request.City, request.State, request.ZipCode);
 
-        var updated = await context.VenueViews.AsNoTracking().FirstAsync(v => v.Id == id);
+        var updated = await context.VenueViews.AsNoTracking().FirstAsync(v => v.VenueId == id);
         return Ok(MapToDto(updated));
     }
 
@@ -83,7 +83,7 @@ public class AdminVenuesController(
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
 
-        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.Id == id);
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.VenueId == id);
         if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "venues", file.FileName);
@@ -96,7 +96,7 @@ public class AdminVenuesController(
     public async Task<IActionResult> Delete(Guid id)
     {
         var venue = await context.VenueViews.AsNoTracking()
-            .FirstOrDefaultAsync(v => v.Id == id);
+            .FirstOrDefaultAsync(v => v.VenueId == id);
         if (venue is null) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
 
         await venueProc.UpdateVenueAsync(id, null, null, null, null, null, null, false, null, null, null, null);
@@ -104,7 +104,7 @@ public class AdminVenuesController(
     }
 
     private VenueDto MapToDto(VenueView v) => new(
-        v.Id, v.Name, v.AddressLine1, v.City, v.State, v.ZipCode,
+        v.VenueId, v.Name, v.AddressLine1, v.City, v.State, v.ZipCode,
         v.Description,
         v.ImagePath is not null ? fileStorage.GetPublicUrl(v.ImagePath) : null,
         v.Phone, v.Email, v.Website, v.IsActive, v.CreatedAt

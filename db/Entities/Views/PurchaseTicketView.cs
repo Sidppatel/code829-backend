@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class PurchaseTicketView
 {
-    public Guid Id { get; set; }
+    public Guid PurchaseTicketId { get; set; }
     public string TicketCode { get; set; } = string.Empty;
     public string QrToken { get; set; } = string.Empty;
     public int SeatNumber { get; set; }

@@ -79,7 +79,7 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
             // Explicit ownership re-check at the controller boundary. ReleaseTableLockAsync
             // also checks but we verify up-front so a misbehaving client can't probe lock state.
             var table = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .FirstOrDefaultAsync(context.TableViews, t => t.Id == request.TableId);
+                .FirstOrDefaultAsync(context.TableViews, t => t.TableId == request.TableId);
             if (table is null) return Ok();
             if (table.LockedByUserId.HasValue && table.LockedByUserId != userId)
             {

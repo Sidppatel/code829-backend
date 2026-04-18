@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class DeviceSessionView
 {
-    public Guid Id { get; set; }
+    public Guid DeviceSessionId { get; set; }
     public Guid? UserId { get; set; }
     public Guid? AdminUserId { get; set; }
     public string SessionHash { get; set; } = string.Empty;

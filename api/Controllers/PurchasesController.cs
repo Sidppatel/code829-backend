@@ -81,9 +81,9 @@ public class PurchasesController(
                 return StatusCode(403, new ApiError(403, "Not your purchase", HttpContext.TraceIdentifier));
 
             if (purchase.Status != "Pending")
-                return Ok(await purchaseService.GetByIdAsync(purchase.Id));
+                return Ok(await purchaseService.GetByIdAsync(purchase.PurchaseId));
 
-            var result = await purchaseService.ConfirmPaymentAsync(purchase.Id, userId);
+            var result = await purchaseService.ConfirmPaymentAsync(purchase.PurchaseId, userId);
             return Ok(result);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
@@ -129,7 +129,7 @@ public class PurchasesController(
             // also checks, but we fail fast here so any future refactor that reshapes the service
             // can't accidentally let a beacon cancel someone else's purchase.
             var purchase = await context.PurchaseViews.AsNoTracking()
-                .FirstOrDefaultAsync(b => b.Id == request.PurchaseId);
+                .FirstOrDefaultAsync(b => b.PurchaseId == request.PurchaseId);
             if (purchase is null) return Ok(); // nothing to cancel; beacon stays 200
             if (purchase.UserId != userId)
             {
@@ -151,11 +151,11 @@ public class PurchasesController(
     [RequireRole(UserRole.Admin)]
     public async Task<IActionResult> Refund(Guid id)
     {
-        var purchase = await context.PurchaseViews.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        var purchase = await context.PurchaseViews.AsNoTracking().FirstOrDefaultAsync(b => b.PurchaseId == id);
         if (purchase is null) return NotFound(new ApiError(404, "Purchase not found", HttpContext.TraceIdentifier));
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == purchase.EventId);
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == purchase.EventId);
         if (ev is not null && ev.AdminUserId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
             return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
 
@@ -214,7 +214,7 @@ public class PurchasesController(
             .ToListAsync();
 
         var dtos = items.Select(b => new PurchaseDto(
-            b.Id, b.PurchaseNumber, b.Status,
+            b.PurchaseId, b.PurchaseNumber, b.Status,
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,

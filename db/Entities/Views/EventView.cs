@@ -2,7 +2,7 @@ namespace Db.Entities.Views;
 
 public class EventView
 {
-    public Guid Id { get; set; }
+    public Guid EventId { get; set; }
     public string Title { get; set; } = null!;
     public string Slug { get; set; } = null!;
     public string? Description { get; set; }

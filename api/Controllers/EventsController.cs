@@ -88,7 +88,7 @@ public class EventsController(
                 }
                 else
                 {
-                    query = query.Where(e => matchIds.Contains(e.Id));
+                    query = query.Where(e => matchIds.Contains(e.EventId));
                 }
             }
         }
@@ -146,7 +146,7 @@ public class EventsController(
                 : Math.Max(0, e.TotalCapacity - e.TotalSold);
 
             return new EventSummaryDto(
-                e.Id, e.Title, e.Slug, e.Status, e.Category,
+                e.EventId, e.Title, e.Slug, e.Status, e.Category,
                 e.StartDate, e.EndDate,
                 e.ImagePath != null
                     ? fileStorage.GetPublicUrl(e.ImagePath)
@@ -242,7 +242,7 @@ public class EventsController(
     public async Task<IActionResult> GetSeoMeta(Guid id)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.EventId == id);
 
         if (ev is null) return NotFound();
 
@@ -278,13 +278,13 @@ public class EventsController(
     public async Task<IActionResult> GetById(Guid id)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id && e.Status == "Published");
+            .FirstOrDefaultAsync(e => e.EventId == id && e.Status == "Published");
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var imageUrl = ev.ImagePath is not null
             ? fileStorage.GetPublicUrl(ev.ImagePath)
-            : await ResolveEventImageUrlAsync(ev.Id);
+            : await ResolveEventImageUrlAsync(ev.EventId);
         var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
 
         return Ok(MapEventDto(ev, imageUrl, defaultOpenFee));
@@ -300,7 +300,7 @@ public class EventsController(
 
         var imageUrl = ev.ImagePath is not null
             ? fileStorage.GetPublicUrl(ev.ImagePath)
-            : await ResolveEventImageUrlAsync(ev.Id);
+            : await ResolveEventImageUrlAsync(ev.EventId);
         var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
 
         return Ok(MapEventDto(ev, imageUrl, defaultOpenFee));
@@ -310,7 +310,7 @@ public class EventsController(
     public async Task<IActionResult> GetSchemaOrg(Guid id)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id && e.Status == "Published");
+            .FirstOrDefaultAsync(e => e.EventId == id && e.Status == "Published");
 
         if (ev is null) return NotFound();
 
@@ -368,7 +368,7 @@ public class EventsController(
     public async Task<IActionResult> GetTables(Guid id)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         Guid? userId = null;
@@ -383,7 +383,7 @@ public class EventsController(
         var eventTableTypes = await context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id)
             .Select(et => new EventTableTypeInfo(
-                et.Id, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents,
+                et.EventTableId, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents,
                 et.PriceCents + (et.PlatformFeeCents ?? 0)))
             .ToListAsync();
 
@@ -408,7 +408,7 @@ public class EventsController(
                     break;
             }
 
-            return new EventTableDto(t.Id, t.Label, t.Capacity,
+            return new EventTableDto(t.TableId, t.Label, t.Capacity,
                 t.Shape, t.Color, t.PriceCents, t.TotalPriceCents,
                 t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt,
                 IsAvailable: status == "Available" || isLockedByYou,
@@ -424,7 +424,7 @@ public class EventsController(
     public async Task<IActionResult> GetTicketTypes(Guid id)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+            .FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var rawTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
@@ -433,7 +433,7 @@ public class EventsController(
             .ToListAsync();
 
         var types = rawTypes.Select(tt => new EventTicketTypeDto(
-            tt.Id, tt.Label, tt.PriceCents, null,
+            tt.EventTicketTypeId, tt.Label, tt.PriceCents, null,
             tt.TotalPriceCents,
             tt.MaxQuantity, tt.SortOrder, tt.IsActive,
             tt.SoldCount, tt.AvailableCount,
@@ -455,7 +455,7 @@ public class EventsController(
             : Math.Max(0, ev.TotalCapacity - ev.TotalSold);
 
         return new EventDto(
-            ev.Id, ev.Title, ev.Slug, ev.Description,
+            ev.EventId, ev.Title, ev.Slug, ev.Description,
             ev.Status, ev.Category,
             ev.StartDate, ev.EndDate,
             imageUrl,

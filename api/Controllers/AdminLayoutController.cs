@@ -399,11 +399,11 @@ public class AdminLayoutController(
                 : t.Status == "Locked" ? "Held"
                 : "Available";
 
-            purchaseInfo.TryGetValue(t.Id, out var info);
+            purchaseInfo.TryGetValue(t.TableId, out var info);
 
             return new
             {
-                t.Id,
+                t.TableId,
                 t.Label,
                 t.GridRow,
                 t.GridCol,
@@ -553,21 +553,21 @@ public class AdminLayoutController(
     }
 
     private static LayoutTableResponse MapTableViewToResponse(Db.Entities.Views.TableView t) => new(
-        t.Id, t.Label, t.GridRow, t.GridCol, t.IsActive,
+        t.TableId, t.Label, t.GridRow, t.GridCol, t.IsActive,
         t.SortOrder, t.EventTableId, t.EventTableLabel,
         t.Capacity, t.Shape, t.Color, t.PriceCents,
         t.Status);
 
     private static LayoutTableResponse MapTableViewWithStatus(Db.Entities.Views.TableView t, HashSet<Guid> lockedIds)
     {
-        var status = lockedIds.Contains(t.Id)
+        var status = lockedIds.Contains(t.TableId)
             ? (t.Status == "Booked" ? "Booked"
                 : t.Status == "Locked" ? "Locked"
                 : "Booked")
             : "Available";
 
         return new LayoutTableResponse(
-            t.Id, t.Label, t.GridRow, t.GridCol, t.IsActive,
+            t.TableId, t.Label, t.GridRow, t.GridCol, t.IsActive,
             t.SortOrder, t.EventTableId, t.EventTableLabel,
             t.Capacity, t.Shape, t.Color, t.PriceCents,
             status);

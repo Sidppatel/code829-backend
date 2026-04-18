@@ -4,7 +4,7 @@ namespace Db.Entities.Views;
 
 public class AdminUserView
 {
-    public Guid Id { get; set; }
+    public Guid AdminUserId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string EmailHash { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;

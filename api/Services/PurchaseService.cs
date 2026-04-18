@@ -25,7 +25,7 @@ public class PurchaseService(
     public async Task<PurchaseDto> CreateAsync(Guid userId, CreatePurchaseRequest request)
     {
         var ev = await context.EventViews.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == request.EventId)
+            .FirstOrDefaultAsync(e => e.EventId == request.EventId)
             ?? throw new KeyNotFoundException("Event not found");
 
         if (ev.Status != "Published")
@@ -51,7 +51,7 @@ public class PurchaseService(
             throw new InvalidOperationException("Table purchases are only available for Grid events");
 
         var tables = await context.TableViews.AsNoTracking()
-            .Where(t => tableIds.Contains(t.Id) && t.EventId == ev.Id)
+            .Where(t => tableIds.Contains(t.TableId) && t.EventId == ev.EventId)
             .ToListAsync();
 
         if (tables.Count != tableIds.Count)
@@ -68,7 +68,7 @@ public class PurchaseService(
         }
 
         var pricing = await pricingService.ComputeForPurchaseAsync(
-            new PricingQuoteRequest(ev.Id, TableIds: tableIds));
+            new PricingQuoteRequest(ev.EventId, TableIds: tableIds));
         var subtotal = pricing.SubtotalCents;
         var fee = pricing.FeeCents;
         var total = pricing.TotalCents;
@@ -82,14 +82,14 @@ public class PurchaseService(
         // Generate purchase number up-front so we can attach it to the PaymentIntent metadata.
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
-            purchaseNumber, ev.Id, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
+            purchaseNumber, ev.EventId, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
             piAmount, subtotal, organizer?.StripeConnectedAccountId, "usd", piMetadata);
 
         // Create purchase with the first table as primary (for backward compat)
         var purchaseId = await purchaseProc.CreatePurchaseAsync(
-            userId, ev.Id, tables[0].Id, totalSeats, null, subtotal, fee, total, purchaseNumber);
+            userId, ev.EventId, tables[0].TableId, totalSeats, null, subtotal, fee, total, purchaseNumber);
 
         // Insert additional tables into the purchase_tables junction table. Using
         // ExecuteSqlInterpolated (FormattableString) instead of ExecuteSqlRawAsync
@@ -100,7 +100,7 @@ public class PurchaseService(
         // keeps the call idempotent if the SP ever adds overlapping rows.
         foreach (var table in tables.Skip(1))
         {
-            var tableId = table.Id;
+            var tableId = table.TableId;
             await context.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO purchase_tables (\"PurchaseId\", \"TableId\") VALUES ({purchaseId}, {tableId}) ON CONFLICT DO NOTHING");
         }
@@ -109,7 +109,7 @@ public class PurchaseService(
 
         var tableLabels = string.Join(", ", tables.Select(t => t.Label));
         Log.Information("[Purchase] Created multi-table purchase {PurchaseNumber} for tables [{Tables}], event {EventId}, total ${Total}, tax ${Tax}",
-            purchaseNumber, tableLabels, ev.Id, total / 100.0, estimatedTaxCents / 100.0);
+            purchaseNumber, tableLabels, ev.EventId, total / 100.0, estimatedTaxCents / 100.0);
 
         var dto = await GetByIdAsync(purchaseId) ?? throw new InvalidOperationException("Purchase creation failed");
 
@@ -150,7 +150,7 @@ public class PurchaseService(
             if (!request.EventTicketTypeId.HasValue)
                 throw new InvalidOperationException("This event requires a ticket type selection");
 
-            selectedType = ticketTypes.FirstOrDefault(tt => tt.Id == request.EventTicketTypeId.Value)
+            selectedType = ticketTypes.FirstOrDefault(tt => tt.EventTicketTypeId == request.EventTicketTypeId.Value)
                 ?? throw new KeyNotFoundException("Ticket type not found or inactive");
 
             if (selectedType.MaxQuantity.HasValue &&
@@ -165,7 +165,7 @@ public class PurchaseService(
         }
 
         var pricing = await pricingService.ComputeForPurchaseAsync(
-            new PricingQuoteRequest(ev.Id, SeatCount: seatsRequested, EventTicketTypeId: request.EventTicketTypeId));
+            new PricingQuoteRequest(ev.EventId, SeatCount: seatsRequested, EventTicketTypeId: request.EventTicketTypeId));
         var subtotal = pricing.SubtotalCents;
         var fee = pricing.FeeCents;
         var total = pricing.TotalCents;
@@ -177,7 +177,7 @@ public class PurchaseService(
 
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
-            purchaseNumber, ev.Id, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, seats: seatsRequested);
+            purchaseNumber, ev.EventId, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, seats: seatsRequested);
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
             piAmount, subtotal, organizer?.StripeConnectedAccountId, "usd", piMetadata);
@@ -227,7 +227,7 @@ public class PurchaseService(
     public async Task<PurchaseDto> ConfirmPaymentAsync(Guid purchaseId, Guid userId)
     {
         var purchase = await context.PurchaseViews.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == purchaseId)
+            .FirstOrDefaultAsync(b => b.PurchaseId == purchaseId)
             ?? throw new KeyNotFoundException("Purchase not found");
 
         if (purchase.UserId != userId)
@@ -239,7 +239,7 @@ public class PurchaseService(
         if (purchase.TableId.HasValue)
         {
             var table = await context.TableViews.AsNoTracking()
-                .FirstOrDefaultAsync(t => t.Id == purchase.TableId.Value);
+                .FirstOrDefaultAsync(t => t.TableId == purchase.TableId.Value);
             if (table is null || table.Status != "Locked" || table.LockedByUserId != userId)
                 throw new InvalidOperationException("Table lock has expired. Please select a new table.");
         }
@@ -294,7 +294,7 @@ public class PurchaseService(
     public async Task<PurchaseDto> CancelAsync(Guid purchaseId, Guid userId)
     {
         var purchase = await context.PurchaseViews.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == purchaseId)
+            .FirstOrDefaultAsync(b => b.PurchaseId == purchaseId)
             ?? throw new KeyNotFoundException("Purchase not found");
 
         if (purchase.UserId != userId)
@@ -311,7 +311,7 @@ public class PurchaseService(
     public async Task<PurchaseDto> RefundAsync(Guid purchaseId)
     {
         var purchase = await context.PurchaseViews.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == purchaseId)
+            .FirstOrDefaultAsync(b => b.PurchaseId == purchaseId)
             ?? throw new KeyNotFoundException("Purchase not found");
 
         if (purchase.Status != "Paid")
@@ -345,7 +345,7 @@ public class PurchaseService(
     public async Task<PurchaseDto?> GetByIdAsync(Guid purchaseId)
     {
         var b = await context.PurchaseViews.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == purchaseId);
+            .FirstOrDefaultAsync(x => x.PurchaseId == purchaseId);
 
         if (b is null) return null;
 
@@ -354,7 +354,7 @@ public class PurchaseService(
             : null;
 
         return new PurchaseDto(
-            b.Id, b.PurchaseNumber, b.Status,
+            b.PurchaseId, b.PurchaseNumber, b.Status,
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, venueAddress,
@@ -374,7 +374,7 @@ public class PurchaseService(
     public async Task<byte[]> GetQrImageAsync(Guid purchaseId, Guid userId)
     {
         var purchase = await context.PurchaseViews.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == purchaseId)
+            .FirstOrDefaultAsync(b => b.PurchaseId == purchaseId)
             ?? throw new KeyNotFoundException("Purchase not found");
 
         if (purchase.UserId != userId)
