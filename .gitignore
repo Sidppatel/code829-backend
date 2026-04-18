@@ -65,3 +65,9 @@ api/logs/
 uploads/
 .gitnexus
 scratch/
+
+# Graphify analysis output (generated)
+graphify-out/
+
+# graphify local interpreter pointer
+.graphify_python
