@@ -54,16 +54,16 @@ public class RedisCacheService(IConnectionMultiplexer redis) : ICacheService
         await RemoveAsync($"user:{userId}:profile");
     }
 
-    public async Task InvalidateBookingsAsync(Guid? eventId = null)
+    public async Task InvalidatePurchasesAsync(Guid? eventId = null)
     {
         if (eventId.HasValue)
         {
-            await RemoveByPrefixAsync($"bookings:list:{eventId}:");
-            await RemoveAsync($"bookings:stats:{eventId}");
+            await RemoveByPrefixAsync($"purchases:list:{eventId}:");
+            await RemoveAsync($"purchases:stats:{eventId}");
         }
         else
         {
-            await RemoveByPrefixAsync("bookings:");
+            await RemoveByPrefixAsync("purchases:");
         }
     }
 }

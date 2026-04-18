@@ -23,12 +23,12 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         if (string.IsNullOrWhiteSpace(request.QrToken))
             return BadRequest(new ScanResponse(false, "QR token is required", null, null, null, null, null));
 
-        // ARCH-EXCEPTION: ticket scan requires ticket + booking + user + event in one query for
+        // ARCH-EXCEPTION: ticket scan requires ticket + purchase + user + event in one query for
         // the response DTO. No dedicated view/SP wraps this join; the scan is read-heavy and
         // mutates via an existing SP (MarkTicketCheckedIn) later in the flow.
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking).ThenInclude(b => b.User)
-            .Include(t => t.Booking).ThenInclude(b => b.Event)
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase).ThenInclude(b => b.User)
+            .Include(t => t.Purchase).ThenInclude(b => b.Event)
             .Include(t => t.GuestUser)
             .FirstOrDefaultAsync(t => t.QrToken == request.QrToken);
 
@@ -36,24 +36,24 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
         {
             var guestName = ticket.GuestUser is not null
                 ? $"{ticket.GuestUser.FirstName} {ticket.GuestUser.LastName}"
-                : $"{ticket.Booking.User.FirstName} {ticket.Booking.User.LastName}";
+                : $"{ticket.Purchase.User.FirstName} {ticket.Purchase.User.LastName}";
 
             if (ticket.Status == Contracts.Enums.TicketStatus.CheckedIn)
             {
                 Log.Warning("[CheckIn] Double scan for ticket {TicketCode}", ticket.TicketCode);
                 return Conflict(new ScanResponse(
                     false, $"Ticket already checked in (Seat #{ticket.SeatNumber})",
-                    ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                    ticket.Purchase.PurchaseNumber, guestName, ticket.Purchase.Event.Title,
                     "CheckedIn", ticket.UpdatedAt
                 ));
             }
 
-            if (ticket.Booking.Status != BookingStatus.Paid && ticket.Booking.Status != BookingStatus.CheckedIn)
+            if (ticket.Purchase.Status != PurchaseStatus.Paid && ticket.Purchase.Status != PurchaseStatus.CheckedIn)
             {
                 return BadRequest(new ScanResponse(
-                    false, $"Booking is {ticket.Booking.Status} — cannot check in",
-                    ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
-                    ticket.Booking.Status.ToString(), null
+                    false, $"Purchase is {ticket.Purchase.Status} — cannot check in",
+                    ticket.Purchase.PurchaseNumber, guestName, ticket.Purchase.Event.Title,
+                    ticket.Purchase.Status.ToString(), null
                 ));
             }
 
@@ -67,7 +67,7 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
                     : "Ticket has not been claimed yet — assign it to an attendee first";
                 return BadRequest(new ScanResponse(
                     false, reason,
-                    ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                    ticket.Purchase.PurchaseNumber, guestName, ticket.Purchase.Event.Title,
                     ticket.Status.ToString(), null
                 ));
             }
@@ -75,71 +75,71 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
             ticket.Status = Contracts.Enums.TicketStatus.CheckedIn;
             ticket.UpdatedAt = DateTime.UtcNow;
 
-            // ARCH-EXCEPTION: scoped read (all tickets for this booking) to decide booking-level
+            // ARCH-EXCEPTION: scoped read (all tickets for this purchase) to decide purchase-level
             // CheckedIn rollup. Mutations happen on the already-tracked ticket entity above.
-            var allTickets = await context.BookingTickets
-                .Where(t => t.BookingId == ticket.BookingId)
+            var allTickets = await context.PurchaseTickets
+                .Where(t => t.PurchaseId == ticket.PurchaseId)
                 .ToListAsync();
             if (allTickets.All(t => t.Status == Contracts.Enums.TicketStatus.CheckedIn))
             {
-                ticket.Booking.Status = BookingStatus.CheckedIn;
-                ticket.Booking.UpdatedAt = DateTime.UtcNow;
+                ticket.Purchase.Status = PurchaseStatus.CheckedIn;
+                ticket.Purchase.UpdatedAt = DateTime.UtcNow;
             }
 
             await context.SaveChangesAsync();
 
             Log.Information("[CheckIn] Ticket {TicketCode} (Seat #{Seat}) checked in for {Event}",
-                ticket.TicketCode, ticket.SeatNumber, ticket.Booking.Event.Title);
+                ticket.TicketCode, ticket.SeatNumber, ticket.Purchase.Event.Title);
 
             return Ok(new ScanResponse(
                 true, $"Check-in successful — Seat #{ticket.SeatNumber}",
-                ticket.Booking.BookingNumber, guestName, ticket.Booking.Event.Title,
+                ticket.Purchase.PurchaseNumber, guestName, ticket.Purchase.Event.Title,
                 "CheckedIn", DateTime.UtcNow
             ));
         }
 
-        // ARCH-EXCEPTION: legacy booking-level QR fallback. Needs booking + user + event joined
-        // for the scan response; mutates the tracked booking status directly for check-in.
-        var booking = await context.Bookings
+        // ARCH-EXCEPTION: legacy purchase-level QR fallback. Needs purchase + user + event joined
+        // for the scan response; mutates the tracked purchase status directly for check-in.
+        var purchase = await context.Purchases
             .Include(b => b.User)
             .Include(b => b.Event)
             .FirstOrDefaultAsync(b => b.QrToken == request.QrToken);
 
-        if (booking is null)
+        if (purchase is null)
         {
             Log.Warning("[CheckIn] Invalid QR token scanned: {Token}", request.QrToken[..Math.Min(10, request.QrToken.Length)]);
-            return NotFound(new ScanResponse(false, "Invalid QR code — booking not found", null, null, null, null, null));
+            return NotFound(new ScanResponse(false, "Invalid QR code — purchase not found", null, null, null, null, null));
         }
 
-        if (booking.Status == BookingStatus.CheckedIn)
+        if (purchase.Status == PurchaseStatus.CheckedIn)
         {
-            Log.Warning("[CheckIn] Double scan attempt for {BookingNumber}", booking.BookingNumber);
+            Log.Warning("[CheckIn] Double scan attempt for {PurchaseNumber}", purchase.PurchaseNumber);
             return Conflict(new ScanResponse(
                 false, "Already checked in",
-                booking.BookingNumber, $"{booking.User.FirstName} {booking.User.LastName}", booking.Event.Title,
-                booking.Status.ToString(), booking.UpdatedAt
+                purchase.PurchaseNumber, $"{purchase.User.FirstName} {purchase.User.LastName}", purchase.Event.Title,
+                purchase.Status.ToString(), purchase.UpdatedAt
             ));
         }
 
-        if (booking.Status != BookingStatus.Paid)
+        if (purchase.Status != PurchaseStatus.Paid)
         {
             return BadRequest(new ScanResponse(
-                false, $"Booking is {booking.Status} — cannot check in",
-                booking.BookingNumber, $"{booking.User.FirstName} {booking.User.LastName}", booking.Event.Title,
-                booking.Status.ToString(), null
+                false, $"Purchase is {purchase.Status} — cannot check in",
+                purchase.PurchaseNumber, $"{purchase.User.FirstName} {purchase.User.LastName}", purchase.Event.Title,
+                purchase.Status.ToString(), null
             ));
         }
 
-        booking.Status = BookingStatus.CheckedIn;
-        booking.UpdatedAt = DateTime.UtcNow;
+        purchase.Status = PurchaseStatus.CheckedIn;
+        purchase.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
-        Log.Information("[CheckIn] {BookingNumber} checked in for {Event}", booking.BookingNumber, booking.Event.Title);
+        Log.Information("[CheckIn] {PurchaseNumber} checked in for {Event}", purchase.PurchaseNumber, purchase.Event.Title);
 
         return Ok(new ScanResponse(
             true, "Check-in successful",
-            booking.BookingNumber, $"{booking.User.FirstName} {booking.User.LastName}", booking.Event.Title,
-            booking.Status.ToString(), DateTime.UtcNow
+            purchase.PurchaseNumber, $"{purchase.User.FirstName} {purchase.User.LastName}", purchase.Event.Title,
+            purchase.Status.ToString(), DateTime.UtcNow
         ));
     }
 
@@ -150,20 +150,20 @@ public class CheckInController(EventPlatformDbContext context) : ControllerBase
             .FirstOrDefaultAsync(e => e.Id == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var bookings = await context.BookingViews.AsNoTracking()
+        var purchases = await context.PurchaseViews.AsNoTracking()
             .Where(b => b.EventId == eventId)
             .ToListAsync();
 
-        var paidOrCheckedIn = bookings.Where(b => b.Status is "Paid" or "CheckedIn").ToList();
+        var paidOrCheckedIn = purchases.Where(b => b.Status is "Paid" or "CheckedIn").ToList();
         var checkedIn = paidOrCheckedIn.Where(b => b.Status == "CheckedIn").Sum(b => b.SeatsReserved ?? 1);
         var remaining = paidOrCheckedIn.Where(b => b.Status == "Paid").Sum(b => b.SeatsReserved ?? 1);
         var totalSold = checkedIn + remaining;
-        var pending = bookings.Where(b => b.Status == "Pending").Sum(b => b.SeatsReserved ?? 1);
+        var pending = purchases.Where(b => b.Status == "Pending").Sum(b => b.SeatsReserved ?? 1);
 
-        // ARCH-EXCEPTION: LastCheckIn (booking.UpdatedAt) isn't projected on v_bookings. Single
+        // ARCH-EXCEPTION: LastCheckIn (purchase.UpdatedAt) isn't projected on v_purchases. Single
         // scalar projection from the table for a stats display field; no business logic.
-        var lastCheckIn = await context.Bookings
-            .Where(b => b.EventId == eventId && b.Status == BookingStatus.CheckedIn)
+        var lastCheckIn = await context.Purchases
+            .Where(b => b.EventId == eventId && b.Status == PurchaseStatus.CheckedIn)
             .OrderByDescending(b => b.UpdatedAt)
             .Select(b => (DateTime?)b.UpdatedAt)
             .FirstOrDefaultAsync();

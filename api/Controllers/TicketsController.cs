@@ -4,7 +4,7 @@ using System.Text;
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
-using Contracts.DTOs.Bookings;
+using Contracts.DTOs.Purchases;
 using Contracts.Enums;
 using Db;
 using Db.Entities;
@@ -26,35 +26,35 @@ public class TicketsController(
 ) : ControllerBase
 {
     // ═══════════════════════════════════════════════════════════
-    //  Booking owner: list all tickets for a booking
+    //  Purchase owner: list all tickets for a purchase
     // ═══════════════════════════════════════════════════════════
 
-    [HttpGet("bookings/{bookingId:guid}/tickets")]
+    [HttpGet("purchases/{purchaseId:guid}/tickets")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> GetTicketsForBooking(Guid bookingId)
+    public async Task<IActionResult> GetTicketsForPurchase(Guid purchaseId)
     {
         var userId = GetUserId();
 
-        // Verify booking ownership via view
-        var booking = await context.BookingViews.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == bookingId);
-        if (booking is null)
-            return NotFound(new ApiError(404, "Booking not found", HttpContext.TraceIdentifier));
-        if (booking.UserId != userId)
-            return StatusCode(403, new ApiError(403, "Not your booking", HttpContext.TraceIdentifier));
+        // Verify purchase ownership via view
+        var purchase = await context.PurchaseViews.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == purchaseId);
+        if (purchase is null)
+            return NotFound(new ApiError(404, "Purchase not found", HttpContext.TraceIdentifier));
+        if (purchase.UserId != userId)
+            return StatusCode(403, new ApiError(403, "Not your purchase", HttpContext.TraceIdentifier));
 
-        var tickets = await context.BookingTicketViews.AsNoTracking()
-            .Where(t => t.BookingId == bookingId)
+        var tickets = await context.PurchaseTicketViews.AsNoTracking()
+            .Where(t => t.PurchaseId == purchaseId)
             .OrderBy(t => t.SeatNumber)
             .ToListAsync();
 
-        var dtos = tickets.Select(t => new BookingTicketDto(
+        var dtos = tickets.Select(t => new PurchaseTicketDto(
             t.Id, t.TicketCode, t.SeatNumber, t.Status,
-            booking.Id, booking.BookingNumber,
-            booking.EventId, booking.EventTitle, booking.EventStartDate,
-            booking.VenueName,
-            booking.TableLabel,
+            purchase.Id, purchase.PurchaseNumber,
+            purchase.EventId, purchase.EventTitle, purchase.EventStartDate,
+            purchase.VenueName,
+            purchase.TableLabel,
             t.GuestFirstName is not null ? $"{t.GuestFirstName} {t.GuestLastName}" : null,
             t.GuestEmail,
             t.InvitedEmail, t.InviteSentAt, t.ClaimedAt,
@@ -68,22 +68,22 @@ public class TicketsController(
     //  QR code image for a specific ticket
     // ═══════════════════════════════════════════════════════════
 
-    [HttpGet("bookings/{bookingId:guid}/tickets/{ticketId:guid}/qr")]
+    [HttpGet("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/qr")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> GetTicketQr(Guid bookingId, Guid ticketId)
+    public async Task<IActionResult> GetTicketQr(Guid purchaseId, Guid ticketId)
     {
         var userId = GetUserId();
-        // ARCH-EXCEPTION: ticket + owning booking for ownership check on QR fetch.
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking)
-            .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
+        // ARCH-EXCEPTION: ticket + owning purchase for ownership check on QR fetch.
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase)
+            .FirstOrDefaultAsync(t => t.Id == ticketId && t.PurchaseId == purchaseId);
 
         if (ticket is null)
             return NotFound(new ApiError(404, "Ticket not found", HttpContext.TraceIdentifier));
 
-        // Allow booking owner OR the assigned guest
-        if (ticket.Booking.UserId != userId && ticket.GuestUserId != userId)
+        // Allow purchase owner OR the assigned guest
+        if (ticket.Purchase.UserId != userId && ticket.GuestUserId != userId)
             return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier));
 
         using var qrGenerator = new QRCodeGenerator();
@@ -96,23 +96,23 @@ public class TicketsController(
     //  Send invite email for a ticket
     // ═══════════════════════════════════════════════════════════
 
-    [HttpPost("bookings/{bookingId:guid}/tickets/{ticketId:guid}/invite")]
+    [HttpPost("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/invite")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> InviteGuest(Guid bookingId, Guid ticketId, [FromBody] InviteTicketRequest request)
+    public async Task<IActionResult> InviteGuest(Guid purchaseId, Guid ticketId, [FromBody] InviteTicketRequest request)
     {
         var userId = GetUserId();
-        // ARCH-EXCEPTION: ticket + booking + owner user + event joined for invite email contents.
+        // ARCH-EXCEPTION: ticket + purchase + owner user + event joined for invite email contents.
         // Mutation flows through the tracked entity (invite token/email set + SaveChanges).
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking).ThenInclude(b => b.User)
-            .Include(t => t.Booking).ThenInclude(b => b.Event)
-            .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase).ThenInclude(b => b.User)
+            .Include(t => t.Purchase).ThenInclude(b => b.Event)
+            .FirstOrDefaultAsync(t => t.Id == ticketId && t.PurchaseId == purchaseId);
 
         if (ticket is null)
             return NotFound(new ApiError(404, "Ticket not found", HttpContext.TraceIdentifier));
-        if (ticket.Booking.UserId != userId)
-            return StatusCode(403, new ApiError(403, "Only the booking owner can invite guests", HttpContext.TraceIdentifier));
+        if (ticket.Purchase.UserId != userId)
+            return StatusCode(403, new ApiError(403, "Only the purchase owner can invite guests", HttpContext.TraceIdentifier));
         if (ticket.Status == TicketStatus.CheckedIn)
             return BadRequest(new ApiError(400, "Cannot modify a checked-in ticket", HttpContext.TraceIdentifier));
 
@@ -135,9 +135,9 @@ public class TicketsController(
         // Send invite email
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
-        var inviterName = $"{ticket.Booking.User.FirstName} {ticket.Booking.User.LastName}";
-        var eventTitle = ticket.Booking.Event.Title;
-        var eventDate = ticket.Booking.Event.StartDate.ToString("dddd, MMMM d, yyyy 'at' h:mm tt");
+        var inviterName = $"{ticket.Purchase.User.FirstName} {ticket.Purchase.User.LastName}";
+        var eventTitle = ticket.Purchase.Event.Title;
+        var eventDate = ticket.Purchase.Event.StartDate.ToString("dddd, MMMM d, yyyy 'at' h:mm tt");
         var claimUrl = $"{frontendUrl}/tickets/claim?token={Uri.EscapeDataString(rawToken)}";
 
         await emailService.SendAsync(
@@ -153,25 +153,25 @@ public class TicketsController(
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Claim a ticket for the booking owner (no email roundtrip)
+    //  Claim a ticket for the purchase owner (no email roundtrip)
     //  — buyer's "this one's for me" button.
     // ═══════════════════════════════════════════════════════════
 
-    [HttpPost("bookings/{bookingId:guid}/tickets/{ticketId:guid}/claim-self")]
+    [HttpPost("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/claim-self")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> ClaimSelf(Guid bookingId, Guid ticketId)
+    public async Task<IActionResult> ClaimSelf(Guid purchaseId, Guid ticketId)
     {
         var userId = GetUserId();
-        // ARCH-EXCEPTION: ticket + booking for ownership guard on self-claim.
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking)
-            .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
+        // ARCH-EXCEPTION: ticket + purchase for ownership guard on self-claim.
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase)
+            .FirstOrDefaultAsync(t => t.Id == ticketId && t.PurchaseId == purchaseId);
 
         if (ticket is null)
             return NotFound(new ApiError(404, "Ticket not found", HttpContext.TraceIdentifier));
-        if (ticket.Booking.UserId != userId)
-            return StatusCode(403, new ApiError(403, "Only the booking owner can self-claim", HttpContext.TraceIdentifier));
+        if (ticket.Purchase.UserId != userId)
+            return StatusCode(403, new ApiError(403, "Only the purchase owner can self-claim", HttpContext.TraceIdentifier));
         if (ticket.Status == TicketStatus.CheckedIn)
             return BadRequest(new ApiError(400, "Cannot modify a checked-in ticket", HttpContext.TraceIdentifier));
         if (ticket.Status == TicketStatus.Claimed && ticket.GuestUserId == userId)
@@ -198,21 +198,21 @@ public class TicketsController(
     //  Revoke a ticket invite
     // ═══════════════════════════════════════════════════════════
 
-    [HttpPost("bookings/{bookingId:guid}/tickets/{ticketId:guid}/revoke")]
+    [HttpPost("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/revoke")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> RevokeInvite(Guid bookingId, Guid ticketId)
+    public async Task<IActionResult> RevokeInvite(Guid purchaseId, Guid ticketId)
     {
         var userId = GetUserId();
-        // ARCH-EXCEPTION: ticket + booking for ownership guard on invite revoke.
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking)
-            .FirstOrDefaultAsync(t => t.Id == ticketId && t.BookingId == bookingId);
+        // ARCH-EXCEPTION: ticket + purchase for ownership guard on invite revoke.
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase)
+            .FirstOrDefaultAsync(t => t.Id == ticketId && t.PurchaseId == purchaseId);
 
         if (ticket is null)
             return NotFound(new ApiError(404, "Ticket not found", HttpContext.TraceIdentifier));
-        if (ticket.Booking.UserId != userId)
-            return StatusCode(403, new ApiError(403, "Only the booking owner can revoke invites", HttpContext.TraceIdentifier));
+        if (ticket.Purchase.UserId != userId)
+            return StatusCode(403, new ApiError(403, "Only the purchase owner can revoke invites", HttpContext.TraceIdentifier));
         if (ticket.Status == TicketStatus.CheckedIn)
             return BadRequest(new ApiError(400, "Cannot revoke a checked-in ticket", HttpContext.TraceIdentifier));
 
@@ -243,11 +243,11 @@ public class TicketsController(
             return BadRequest(new ApiError(400, "Token is required", HttpContext.TraceIdentifier));
 
         var tokenHash = HashToken(token);
-        // ARCH-EXCEPTION: claim-info needs ticket + booking + inviter + event + venue for the
+        // ARCH-EXCEPTION: claim-info needs ticket + purchase + inviter + event + venue for the
         // invite preview page. No composite view exists for this specific read shape.
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking).ThenInclude(b => b.User)
-            .Include(t => t.Booking).ThenInclude(b => b.Event).ThenInclude(e => e.Venue)
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase).ThenInclude(b => b.User)
+            .Include(t => t.Purchase).ThenInclude(b => b.Event).ThenInclude(e => e.Venue)
             .FirstOrDefaultAsync(t => t.InviteTokenHash == tokenHash);
 
         if (ticket is null)
@@ -256,19 +256,19 @@ public class TicketsController(
         if (ticket.InviteExpiresAt.HasValue && ticket.InviteExpiresAt < DateTime.UtcNow)
             return BadRequest(new ApiError(400, "This invite link has expired", HttpContext.TraceIdentifier));
 
-        var tableLabel = ticket.Booking.TableId.HasValue
-            ? await context.TableViews.AsNoTracking().Where(t => t.Id == ticket.Booking.TableId).Select(t => t.Label).FirstOrDefaultAsync()
+        var tableLabel = ticket.Purchase.TableId.HasValue
+            ? await context.TableViews.AsNoTracking().Where(t => t.Id == ticket.Purchase.TableId).Select(t => t.Label).FirstOrDefaultAsync()
             : null;
 
         return Ok(new TicketClaimInfoDto(
             ticket.Id,
             ticket.TicketCode,
             ticket.SeatNumber,
-            ticket.Booking.Event.Title,
-            ticket.Booking.Event.StartDate,
-            ticket.Booking.Event.Venue?.Name ?? "",
+            ticket.Purchase.Event.Title,
+            ticket.Purchase.Event.StartDate,
+            ticket.Purchase.Event.Venue?.Name ?? "",
             tableLabel,
-            $"{ticket.Booking.User.FirstName} {ticket.Booking.User.LastName}",
+            $"{ticket.Purchase.User.FirstName} {ticket.Purchase.User.LastName}",
             ticket.Status == TicketStatus.Claimed || ticket.Status == TicketStatus.CheckedIn
         ));
     }
@@ -288,10 +288,10 @@ public class TicketsController(
         var userId = GetUserId();
         var tokenHash = HashToken(request.Token);
 
-        // ARCH-EXCEPTION: claim-by-token needs ticket + booking; mutation sets guest info
+        // ARCH-EXCEPTION: claim-by-token needs ticket + purchase; mutation sets guest info
         // directly on the tracked ticket entity.
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking)
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase)
             .FirstOrDefaultAsync(t => t.InviteTokenHash == tokenHash);
 
         if (ticket is null)
@@ -332,15 +332,15 @@ public class TicketsController(
     {
         var userId = GetUserId();
 
-        var tickets = await context.BookingTicketViews.AsNoTracking()
+        var tickets = await context.PurchaseTicketViews.AsNoTracking()
             .Where(t => t.GuestUserId == userId)
             .OrderByDescending(t => t.EventStartDate)
             .ToListAsync();
 
-        // Get table labels from booking views for table bookings
-        var bookingIds = tickets.Select(t => t.BookingId).Distinct().ToList();
-        var bookingTableLabels = await context.BookingViews.AsNoTracking()
-            .Where(b => bookingIds.Contains(b.Id) && b.TableId.HasValue)
+        // Get table labels from purchase views for table purchases
+        var purchaseIds = tickets.Select(t => t.PurchaseId).Distinct().ToList();
+        var purchaseTableLabels = await context.PurchaseViews.AsNoTracking()
+            .Where(b => purchaseIds.Contains(b.Id) && b.TableId.HasValue)
             .ToDictionaryAsync(b => b.Id, b => b.TableLabel);
 
         var dtos = tickets.Select(t => new GuestTicketDto(
@@ -351,8 +351,8 @@ public class TicketsController(
             t.EventTitle,
             t.EventStartDate,
             t.VenueName,
-            bookingTableLabels.TryGetValue(t.BookingId, out var label) ? label : null,
-            t.BookingNumber,
+            purchaseTableLabels.TryGetValue(t.PurchaseId, out var label) ? label : null,
+            t.PurchaseNumber,
             t.ClaimedAt
         ));
 
@@ -369,16 +369,16 @@ public class TicketsController(
     public async Task<IActionResult> GetMyTicketQr(Guid ticketId)
     {
         var userId = GetUserId();
-        // ARCH-EXCEPTION: ticket + booking for guest QR access (guest-vs-owner check).
-        var ticket = await context.BookingTickets
-            .Include(t => t.Booking)
+        // ARCH-EXCEPTION: ticket + purchase for guest QR access (guest-vs-owner check).
+        var ticket = await context.PurchaseTickets
+            .Include(t => t.Purchase)
             .FirstOrDefaultAsync(t => t.Id == ticketId);
 
         if (ticket is null)
             return NotFound(new ApiError(404, "Ticket not found", HttpContext.TraceIdentifier));
 
-        // Allow booking owner OR assigned guest
-        if (ticket.Booking.UserId != userId && ticket.GuestUserId != userId)
+        // Allow purchase owner OR assigned guest
+        if (ticket.Purchase.UserId != userId && ticket.GuestUserId != userId)
             return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier));
 
         using var qrGenerator = new QRCodeGenerator();

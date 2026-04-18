@@ -3,7 +3,7 @@ namespace Contracts.DTOs.Admin;
 public record MonthlyReportDto(
     int Year,
     int Month,
-    int TotalBookings,
+    int TotalPurchases,
     long TotalChargedCents,
     long TotalAdminPayoutsCents,
     long TotalPlatformFeesCents,
@@ -16,7 +16,7 @@ public record MonthlyReportDto(
 public record EventMonthlyBreakdown(
     Guid EventId,
     string EventTitle,
-    int BookingCount,
+    int PurchaseCount,
     long ChargedCents,
     long AdminPayoutCents,
     long PlatformFeeCents,

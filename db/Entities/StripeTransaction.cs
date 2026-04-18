@@ -4,8 +4,8 @@ namespace Db.Entities;
 
 public class StripeTransaction : BaseEntity
 {
-    public Guid BookingId { get; set; }
-    public Booking Booking { get; set; } = null!;
+    public Guid PurchaseId { get; set; }
+    public Purchase Purchase { get; set; } = null!;
 
     public required string PaymentIntentId { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.RequiresConfirmation;

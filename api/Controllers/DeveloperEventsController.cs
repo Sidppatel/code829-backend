@@ -79,7 +79,7 @@ public class DeveloperEventsController(
 
             if (feeCents != tt.PlatformFeeCents)
             {
-                var hasSales = await Context.BookingViews.AsNoTracking()
+                var hasSales = await Context.PurchaseViews.AsNoTracking()
                     .AnyAsync(b => b.EventTicketTypeId == typeId
                         && b.Status != "Cancelled" && b.Status != "Expired" && b.Status != "Refunded");
                 if (hasSales)
@@ -115,9 +115,9 @@ public class DeveloperEventsController(
 
             if (feeCents != tt.PlatformFeeCents)
             {
-                // Sales + active-lock check via SP helpers (bookings on any child table OR any
+                // Sales + active-lock check via SP helpers (purchases on any child table OR any
                 // table currently Held/Booked under this event-table).
-                var hasSales = await layoutProc.EventTableHasActiveBookingsAsync(id, tt.Id);
+                var hasSales = await layoutProc.EventTableHasActivePurchasesAsync(id, tt.Id);
                 var hasLocks = await layoutProc.EventTableHasLockedTablesAsync(tt.Id);
                 if (hasSales || hasLocks)
                     return BadRequest(new ApiError(400,

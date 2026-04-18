@@ -173,19 +173,19 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
             .ToListAsync(ct);
     }
 
-    // ─── Booking / lock checks ─────────────────────────────────────
+    // ─── Purchase / lock checks ─────────────────────────────────────
 
-    public async Task<bool> EventHasActiveBookingsAsync(Guid eventId, CancellationToken ct = default)
+    public async Task<bool> EventHasActivePurchasesAsync(Guid eventId, CancellationToken ct = default)
     {
         return await context.Database
-            .SqlQueryRaw<bool>("SELECT sp_event_has_active_bookings({0}) AS \"Value\"", eventId)
+            .SqlQueryRaw<bool>("SELECT sp_event_has_active_purchases({0}) AS \"Value\"", eventId)
             .FirstAsync(ct);
     }
 
-    public async Task<bool> EventTableHasActiveBookingsAsync(Guid eventId, Guid eventTableId, CancellationToken ct = default)
+    public async Task<bool> EventTableHasActivePurchasesAsync(Guid eventId, Guid eventTableId, CancellationToken ct = default)
     {
         return await context.Database
-            .SqlQueryRaw<bool>("SELECT sp_event_table_has_active_bookings({0}, {1}) AS \"Value\"", eventId, eventTableId)
+            .SqlQueryRaw<bool>("SELECT sp_event_table_has_active_purchases({0}, {1}) AS \"Value\"", eventId, eventTableId)
             .FirstAsync(ct);
     }
 

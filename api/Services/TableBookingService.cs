@@ -22,7 +22,7 @@ public class TableBookingService(
             ?? throw new KeyNotFoundException("Event not found");
 
         if (ev.Status != "Published")
-            throw new InvalidOperationException("Event is not available for booking");
+            throw new InvalidOperationException("Event is not available for purchase");
 
         var result = await tableProc.LockTableAsync(userId, eventId, tableId, holdMinutes);
 

@@ -4,7 +4,7 @@ namespace Db.Repositories.StoredProcedures;
 
 public interface IStripeTransactionProcedures
 {
-    Task<Guid> CreateAsync(Guid bookingId, string intentId, int amountCents,
+    Task<Guid> CreateAsync(Guid purchaseId, string intentId, int amountCents,
         int? transferAmountCents = null, string? taxCalculationId = null,
         string currency = "usd", CancellationToken ct = default);
 

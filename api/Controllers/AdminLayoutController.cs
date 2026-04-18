@@ -153,9 +153,9 @@ public class AdminLayoutController(
         if (et is null || et.EventId != eventId)
             return NotFound(new ApiError(404, "Event table not found", HttpContext.TraceIdentifier));
 
-        var hasActiveBookings = await layoutProc.EventTableHasActiveBookingsAsync(eventId, id);
+        var hasActivePurchases = await layoutProc.EventTableHasActivePurchasesAsync(eventId, id);
         var hasLockedTables = await layoutProc.EventTableHasLockedTablesAsync(id);
-        var hasSalesOrLocks = hasActiveBookings || hasLockedTables;
+        var hasSalesOrLocks = hasActivePurchases || hasLockedTables;
 
         if (hasSalesOrLocks)
         {
@@ -189,8 +189,8 @@ public class AdminLayoutController(
         if (et is null || et.EventId != eventId)
             return NotFound(new ApiError(404, "Event table not found", HttpContext.TraceIdentifier));
 
-        if (await layoutProc.EventTableHasActiveBookingsAsync(eventId, id))
-            return BadRequest(new ApiError(400, "Cannot delete — tables have active bookings", HttpContext.TraceIdentifier));
+        if (await layoutProc.EventTableHasActivePurchasesAsync(eventId, id))
+            return BadRequest(new ApiError(400, "Cannot delete — tables have active purchases", HttpContext.TraceIdentifier));
 
         await layoutProc.DeleteEventTableAsync(id);
         return NoContent();
@@ -278,8 +278,8 @@ public class AdminLayoutController(
     [HttpPost("admin/events/{eventId:guid}/layout/flush")]
     public async Task<IActionResult> FlushDraft(Guid eventId)
     {
-        if (await layoutProc.EventHasActiveBookingsAsync(eventId))
-            return Conflict(new ApiError(409, "Layout is locked — tables have active bookings", HttpContext.TraceIdentifier));
+        if (await layoutProc.EventHasActivePurchasesAsync(eventId))
+            return Conflict(new ApiError(409, "Layout is locked — tables have active purchases", HttpContext.TraceIdentifier));
 
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(DraftKey(eventId));
@@ -339,7 +339,7 @@ public class AdminLayoutController(
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
         if (locked.Contains(tableId))
-            return BadRequest(new ApiError(400, "This table has active bookings and cannot be modified", HttpContext.TraceIdentifier));
+            return BadRequest(new ApiError(400, "This table has active purchases and cannot be modified", HttpContext.TraceIdentifier));
 
         if (request.EventTableId.HasValue)
         {
@@ -375,7 +375,7 @@ public class AdminLayoutController(
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
         if (locked.Contains(tableId))
-            return BadRequest(new ApiError(400, "This table has active bookings and cannot be deleted", HttpContext.TraceIdentifier));
+            return BadRequest(new ApiError(400, "This table has active purchases and cannot be deleted", HttpContext.TraceIdentifier));
 
         await layoutProc.DeleteTableAsync(tableId);
         return NoContent();
@@ -391,7 +391,7 @@ public class AdminLayoutController(
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var tables = await context_TableViews_ForEvent(eventId, activeOnly: true);
-        var bookingInfo = await GetBookingInfoForEvent(eventId);
+        var purchaseInfo = await GetPurchaseInfoForEvent(eventId);
 
         var result = tables.Select(t =>
         {
@@ -399,7 +399,7 @@ public class AdminLayoutController(
                 : t.Status == "Locked" ? "Held"
                 : "Available";
 
-            bookingInfo.TryGetValue(t.Id, out var info);
+            purchaseInfo.TryGetValue(t.Id, out var info);
 
             return new
             {
@@ -417,7 +417,7 @@ public class AdminLayoutController(
                 t.PriceCents,
                 Status = status,
                 SeatsBooked = info?.SeatsBooked ?? 0,
-                BookingCount = info?.BookingCount ?? 0
+                PurchaseCount = info?.PurchaseCount ?? 0
             };
         }).ToList();
 
@@ -442,8 +442,8 @@ public class AdminLayoutController(
         var totalCapacity = tables.Sum(t => t.Capacity);
         var totalPotentialRevenueCents = tables.Sum(t => (long)t.PriceCents);
 
-        var bookingInfo = await GetBookingInfoForEvent(eventId);
-        var totalBookedRevenueCents = bookingInfo.Values.Sum(x => x.SubtotalCents);
+        var purchaseInfo = await GetPurchaseInfoForEvent(eventId);
+        var totalBookedRevenueCents = purchaseInfo.Values.Sum(x => x.SubtotalCents);
 
         return Ok(new LayoutStatsResponse(
             totalTables, totalCapacity, totalPotentialRevenueCents, totalBookedRevenueCents));
@@ -457,7 +457,7 @@ public class AdminLayoutController(
         if (!IsOwnerOrDeveloper(ev.OrganizerId)) return Forbid();
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
-        var layoutLocked = await layoutProc.EventHasActiveBookingsAsync(eventId);
+        var layoutLocked = await layoutProc.EventHasActivePurchasesAsync(eventId);
         return Ok(new { layoutLocked, lockedTableIds = locked });
     }
 
@@ -511,23 +511,23 @@ public class AdminLayoutController(
         return await query.OrderBy(t => t.SortOrder).ToListAsync();
     }
 
-    private record TableBookingInfo(int BookingCount, int SeatsBooked, long SubtotalCents);
+    private record TablePurchaseInfo(int PurchaseCount, int SeatsBooked, long SubtotalCents);
 
-    private async Task<Dictionary<Guid, TableBookingInfo>> GetBookingInfoForEvent(Guid eventId)
+    private async Task<Dictionary<Guid, TablePurchaseInfo>> GetPurchaseInfoForEvent(Guid eventId)
     {
-        var grouped = await context.BookingViews.AsNoTracking()
+        var grouped = await context.PurchaseViews.AsNoTracking()
             .Where(b => b.EventId == eventId && b.TableId.HasValue
                 && (b.Status == "Paid" || b.Status == "CheckedIn"))
             .GroupBy(b => b.TableId!.Value)
             .Select(g => new
             {
                 TableId = g.Key,
-                BookingCount = g.Count(),
+                PurchaseCount = g.Count(),
                 SeatsBooked = g.Sum(b => b.SeatsReserved ?? 0),
                 SubtotalCents = g.Sum(b => (long)b.SubtotalCents)
             })
             .ToListAsync();
-        return grouped.ToDictionary(x => x.TableId, x => new TableBookingInfo(x.BookingCount, x.SeatsBooked, x.SubtotalCents));
+        return grouped.ToDictionary(x => x.TableId, x => new TablePurchaseInfo(x.PurchaseCount, x.SeatsBooked, x.SubtotalCents));
     }
 
     private async Task<List<EventTableResponse>> MapEventTables(IEnumerable<EventTable> eventTables, Guid eventId)

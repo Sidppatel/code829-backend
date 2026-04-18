@@ -19,8 +19,8 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
     private const int SeatHoldLimit = 20;
     private static readonly TimeSpan SeatHoldWindow = TimeSpan.FromMinutes(1);
 
-    private const int BookingLimit = 10;
-    private static readonly TimeSpan BookingWindow = TimeSpan.FromMinutes(1);
+    private const int PurchaseLimit = 10;
+    private static readonly TimeSpan PurchaseWindow = TimeSpan.FromMinutes(1);
 
     private const int BeaconLimit = 20;
     private static readonly TimeSpan BeaconWindow = TimeSpan.FromMinutes(1);
@@ -29,10 +29,10 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
     // verify endpoint gets the stricter auth limit here too
     private static readonly string[] AuthPaths = ["/auth/dev-login", "/auth/magic-link/verify", "/admin/auth/login"];
     private static readonly string[] SeatHoldPaths = ["/seats/hold", "/seats/hold-table", "/tables/lock"];
-    // Booking-critical mutations — payment integrity endpoints get their own bucket.
-    private static readonly string[] BookingPaths = ["/bookings", "/bookings/quote"];
+    // Purchase-critical mutations — payment integrity endpoints get their own bucket.
+    private static readonly string[] PurchasePaths = ["/purchases", "/purchases/quote"];
     private static readonly string[] ConfirmPathSuffixes = ["/confirm", "/confirm-by-intent"];
-    private static readonly string[] BeaconPaths = ["/bookings/cancel-beacon", "/tables/release-beacon"];
+    private static readonly string[] BeaconPaths = ["/purchases/cancel-beacon", "/tables/release-beacon"];
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -91,8 +91,8 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
         if (BeaconPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             return (BeaconLimit, BeaconWindow);
 
-        if (IsBookingPath(path))
-            return (BookingLimit, BookingWindow);
+        if (IsPurchasePath(path))
+            return (PurchaseLimit, PurchaseWindow);
 
         if (SeatHoldPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             return (SeatHoldLimit, SeatHoldWindow);
@@ -108,8 +108,8 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
         if (BeaconPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             return "beacon";
 
-        if (IsBookingPath(path))
-            return "booking";
+        if (IsPurchasePath(path))
+            return "purchase";
 
         if (SeatHoldPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             return "seat-hold";
@@ -117,7 +117,7 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
         return "general";
     }
 
-    private static bool IsBookingPath(string path) =>
-        BookingPaths.Any(p => path == p || path.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase))
+    private static bool IsPurchasePath(string path) =>
+        PurchasePaths.Any(p => path == p || path.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase))
         || ConfirmPathSuffixes.Any(suffix => path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
 }

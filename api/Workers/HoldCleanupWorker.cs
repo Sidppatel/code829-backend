@@ -16,7 +16,7 @@ public class HoldCleanupWorker(IServiceScopeFactory scopeFactory) : BackgroundSe
 
                 var tablesCleaned = await tableBookingService.CleanupExpiredLocksAsync();
                 if (tablesCleaned > 0)
-                    Log.Information("[HoldCleanup] Cleaned {Count} expired table locks/bookings", tablesCleaned);
+                    Log.Information("[HoldCleanup] Cleaned {Count} expired table locks/purchases", tablesCleaned);
             }
             catch (Exception ex)
             {

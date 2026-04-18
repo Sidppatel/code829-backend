@@ -9,5 +9,5 @@ public interface ICacheService
     Task InvalidateEventAsync(Guid eventId);
     Task InvalidateTablesAsync(Guid eventId);
     Task InvalidateUserAsync(Guid userId);
-    Task InvalidateBookingsAsync(Guid? eventId = null);
+    Task InvalidatePurchasesAsync(Guid? eventId = null);
 }

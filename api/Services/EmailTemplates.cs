@@ -63,15 +63,15 @@ public static class EmailTemplates
             <p style="margin:0;color:#71717a;font-size:13px;line-height:1.5;">This link expires in {expiryMinutes} minutes. If you didn't request this, you can safely ignore this email.</p>
             """);
 
-    public static string BookingConfirmed(
-        string brandName, string firstName, string bookingNumber,
+    public static string PurchaseConfirmed(
+        string brandName, string firstName, string purchaseNumber,
         string eventTitle, string totalFormatted, string checkinLink) =>
         Wrap(brandName,
             $"""
-            <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">Booking Confirmed!</h2>
-            <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">Hi {firstName}, your booking is all set.</p>
+            <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">Purchase Confirmed!</h2>
+            <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">Hi {firstName}, your purchase is all set.</p>
             {InfoTable(
-                InfoRow("Booking #", bookingNumber) +
+                InfoRow("Purchase #", purchaseNumber) +
                 InfoRow("Event", eventTitle) +
                 InfoRow("Total", totalFormatted)
             )}

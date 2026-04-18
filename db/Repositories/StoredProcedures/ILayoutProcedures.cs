@@ -29,9 +29,9 @@ public interface ILayoutProcedures
     Task<Table?> GetTableByIdAsync(Guid id, CancellationToken ct = default);
     Task<List<Table>> ListTablesForEventAsync(Guid eventId, CancellationToken ct = default);
 
-    // Booking / lock checks
-    Task<bool> EventHasActiveBookingsAsync(Guid eventId, CancellationToken ct = default);
-    Task<bool> EventTableHasActiveBookingsAsync(Guid eventId, Guid eventTableId, CancellationToken ct = default);
+    // Purchase / lock checks
+    Task<bool> EventHasActivePurchasesAsync(Guid eventId, CancellationToken ct = default);
+    Task<bool> EventTableHasActivePurchasesAsync(Guid eventId, Guid eventTableId, CancellationToken ct = default);
     Task<bool> EventTableHasLockedTablesAsync(Guid eventTableId, CancellationToken ct = default);
     Task<HashSet<Guid>> GetLockedTableIdsAsync(Guid eventId, CancellationToken ct = default);
 

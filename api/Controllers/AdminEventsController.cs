@@ -202,10 +202,10 @@ public class AdminEventsController(
         {
             if (lm.ToString() != ev.LayoutMode)
             {
-                var hasBookings = await context.BookingViews.AsNoTracking()
+                var hasPurchases = await context.PurchaseViews.AsNoTracking()
                     .AnyAsync(b => b.EventId == id && b.Status != "Cancelled" && b.Status != "Refunded");
-                if (hasBookings)
-                    return BadRequest(new ApiError(400, "Cannot change layout mode — active bookings exist for this event", HttpContext.TraceIdentifier));
+                if (hasPurchases)
+                    return BadRequest(new ApiError(400, "Cannot change layout mode — active purchases exist for this event", HttpContext.TraceIdentifier));
             }
         }
 
@@ -262,10 +262,10 @@ public class AdminEventsController(
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
-        var hasBookings = await context.BookingViews.AsNoTracking()
+        var hasPurchases = await context.PurchaseViews.AsNoTracking()
             .AnyAsync(b => b.EventId == id && b.Status != "Cancelled" && b.Status != "Refunded");
 
-        return Ok(new { locked = hasBookings });
+        return Ok(new { locked = hasPurchases });
     }
 
     [HttpPost("{id:guid}/image")]
@@ -342,9 +342,9 @@ public class AdminEventsController(
         if (ev.Status != EventStatus.Draft.ToString())
             return BadRequest(new ApiError(400, "Only draft events can be deleted", HttpContext.TraceIdentifier));
 
-        var hasBookings = await context.BookingViews.AsNoTracking().AnyAsync(b => b.EventId == id);
-        if (hasBookings)
-            return BadRequest(new ApiError(400, "Cannot delete an event with bookings", HttpContext.TraceIdentifier));
+        var hasPurchases = await context.PurchaseViews.AsNoTracking().AnyAsync(b => b.EventId == id);
+        if (hasPurchases)
+            return BadRequest(new ApiError(400, "Cannot delete an event with purchases", HttpContext.TraceIdentifier));
 
         await eventProc.DeleteEventAsync(id);
         return NoContent();
@@ -478,10 +478,10 @@ public class AdminEventsController(
             || (request.PlatformFeeCents.HasValue && request.PlatformFeeCents != existing.PlatformFeeCents);
         if (isPriceChange)
         {
-            var hasActiveBookings = await context.BookingViews.AsNoTracking()
+            var hasActivePurchases = await context.PurchaseViews.AsNoTracking()
                 .AnyAsync(b => b.EventTicketTypeId == typeId
                     && b.Status != "Cancelled" && b.Status != "Expired" && b.Status != "Refunded");
-            if (hasActiveBookings)
+            if (hasActivePurchases)
                 return BadRequest(new ApiError(400, "Cannot change pricing — tickets have been sold or locked for this ticket type", HttpContext.TraceIdentifier));
         }
 
@@ -511,10 +511,10 @@ public class AdminEventsController(
             .FirstOrDefaultAsync(tt => tt.Id == typeId && tt.EventId == id);
         if (existing is null) return NotFound(new ApiError(404, "Ticket type not found", HttpContext.TraceIdentifier));
 
-        var hasActiveBookings = await context.BookingViews.AsNoTracking()
+        var hasActivePurchases = await context.PurchaseViews.AsNoTracking()
             .AnyAsync(b => b.EventTicketTypeId == typeId && (b.Status == "Pending" || b.Status == "Paid" || b.Status == "CheckedIn"));
-        if (hasActiveBookings)
-            return BadRequest(new ApiError(400, "Cannot delete — active bookings exist for this ticket type", HttpContext.TraceIdentifier));
+        if (hasActivePurchases)
+            return BadRequest(new ApiError(400, "Cannot delete — active purchases exist for this ticket type", HttpContext.TraceIdentifier));
 
         await ticketTypeProc.DeleteAsync(typeId);
         return NoContent();

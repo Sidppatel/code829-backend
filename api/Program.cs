@@ -5,7 +5,7 @@ using Api.Services;
 using Api.Validators;
 using Api.Workers;
 using Contracts.DTOs.Auth;
-using Contracts.DTOs.Bookings;
+using Contracts.DTOs.Purchases;
 using Contracts.DTOs.Events;
 using System.IO.Compression;
 using Db;
@@ -160,7 +160,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventProcedures, Db.Repositories.StoredProcedures.EventProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IVenueProcedures, Db.Repositories.StoredProcedures.VenueProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITableProcedures, Db.Repositories.StoredProcedures.TableProcedures>();
-    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBookingProcedures, Db.Repositories.StoredProcedures.BookingProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IPurchaseProcedures, Db.Repositories.StoredProcedures.PurchaseProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITicketProcedures, Db.Repositories.StoredProcedures.TicketProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeTransactionProcedures, Db.Repositories.StoredProcedures.StripeTransactionProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IImageProcedures, Db.Repositories.StoredProcedures.ImageProcedures>();
@@ -179,7 +179,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IAdminAuthService, AdminAuthService>();
     builder.Services.AddScoped<IInvitationService, InvitationService>();
     builder.Services.AddScoped<ITableBookingService, TableBookingService>();
-    builder.Services.AddScoped<IBookingService, BookingService>();
+    builder.Services.AddScoped<IPurchaseService, PurchaseService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
     builder.Services.AddScoped<IImageRepository, ImageRepository>();
     builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
@@ -294,7 +294,7 @@ var builder = WebApplication.CreateBuilder(args);
     });
     builder.Services.AddOpenApi();
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
-    builder.Services.AddScoped<IValidator<CreateBookingRequest>, CreateBookingRequestValidator>();
+    builder.Services.AddScoped<IValidator<CreatePurchaseRequest>, CreatePurchaseRequestValidator>();
     builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
     // CORS — configured from settings, defaults to localhost:5173
@@ -342,7 +342,7 @@ var builder = WebApplication.CreateBuilder(args);
         await DataSeeder.SeedAsync(app.Services);
         await VenueEventSeeder.SeedAsync(app.Services);
         await LayoutSeeder.SeedAsync(app.Services);
-        await BookingSeeder.SeedAsync(app.Services);
+        await PurchaseSeeder.SeedAsync(app.Services);
     }
 
     // Configure JWT signing key from DB settings

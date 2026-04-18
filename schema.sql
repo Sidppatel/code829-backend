@@ -377,9 +377,9 @@ CREATE TABLE tables (
 );
 
 
-CREATE TABLE bookings (
+CREATE TABLE purchases (
     "Id" uuid NOT NULL DEFAULT (gen_random_uuid()),
-    "BookingNumber" character varying(20) NOT NULL,
+    "PurchaseNumber" character varying(20) NOT NULL,
     "Status" character varying(20) NOT NULL,
     "UserId" uuid NOT NULL,
     "EventId" uuid NOT NULL,
@@ -392,26 +392,26 @@ CREATE TABLE bookings (
     "EventTicketTypeId" uuid,
     "CreatedAt" timestamp with time zone NOT NULL DEFAULT (now()),
     "UpdatedAt" timestamp with time zone NOT NULL DEFAULT (now()),
-    CONSTRAINT "PK_bookings" PRIMARY KEY ("Id"),
-    CONSTRAINT "CK_bookings_FeeCents" CHECK ("FeeCents" >= 0),
-    CONSTRAINT "CK_bookings_SeatsReserved" CHECK ("SeatsReserved" IS NULL OR "SeatsReserved" > 0),
-    CONSTRAINT "CK_bookings_Status" CHECK ("Status" IN ('Pending','Paid','CheckedIn','Cancelled','Refunded','Expired')),
-    CONSTRAINT "CK_bookings_SubtotalCents" CHECK ("SubtotalCents" >= 0),
-    CONSTRAINT "CK_bookings_TotalCents" CHECK ("TotalCents" >= 0),
-    CONSTRAINT "CK_bookings_TotalFormula" CHECK ("TotalCents" = "SubtotalCents" + "FeeCents"),
-    CONSTRAINT "FK_bookings_event_ticket_types_EventTicketTypeId" FOREIGN KEY ("EventTicketTypeId") REFERENCES event_ticket_types ("Id") ON DELETE SET NULL,
-    CONSTRAINT "FK_bookings_events_EventId" FOREIGN KEY ("EventId") REFERENCES events ("Id") ON DELETE RESTRICT,
-    CONSTRAINT "FK_bookings_tables_TableId" FOREIGN KEY ("TableId") REFERENCES tables ("Id") ON DELETE SET NULL,
-    CONSTRAINT "FK_bookings_users_UserId" FOREIGN KEY ("UserId") REFERENCES users ("Id") ON DELETE RESTRICT
+    CONSTRAINT "PK_purchases" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_purchases_FeeCents" CHECK ("FeeCents" >= 0),
+    CONSTRAINT "CK_purchases_SeatsReserved" CHECK ("SeatsReserved" IS NULL OR "SeatsReserved" > 0),
+    CONSTRAINT "CK_purchases_Status" CHECK ("Status" IN ('Pending','Paid','CheckedIn','Cancelled','Refunded','Expired')),
+    CONSTRAINT "CK_purchases_SubtotalCents" CHECK ("SubtotalCents" >= 0),
+    CONSTRAINT "CK_purchases_TotalCents" CHECK ("TotalCents" >= 0),
+    CONSTRAINT "CK_purchases_TotalFormula" CHECK ("TotalCents" = "SubtotalCents" + "FeeCents"),
+    CONSTRAINT "FK_purchases_event_ticket_types_EventTicketTypeId" FOREIGN KEY ("EventTicketTypeId") REFERENCES event_ticket_types ("Id") ON DELETE SET NULL,
+    CONSTRAINT "FK_purchases_events_EventId" FOREIGN KEY ("EventId") REFERENCES events ("Id") ON DELETE RESTRICT,
+    CONSTRAINT "FK_purchases_tables_TableId" FOREIGN KEY ("TableId") REFERENCES tables ("Id") ON DELETE SET NULL,
+    CONSTRAINT "FK_purchases_users_UserId" FOREIGN KEY ("UserId") REFERENCES users ("Id") ON DELETE RESTRICT
 );
 
 
-CREATE TABLE booking_tickets (
+CREATE TABLE purchase_tickets (
     "Id" uuid NOT NULL DEFAULT (gen_random_uuid()),
     "TicketCode" character varying(20) NOT NULL,
     "QrToken" character varying(128) NOT NULL,
     "SeatNumber" integer NOT NULL,
-    "BookingId" uuid NOT NULL,
+    "PurchaseId" uuid NOT NULL,
     "GuestUserId" uuid,
     "InviteTokenHash" character varying(128),
     "InviteExpiresAt" timestamp with time zone,
@@ -421,17 +421,17 @@ CREATE TABLE booking_tickets (
     "Status" character varying(20) NOT NULL,
     "CreatedAt" timestamp with time zone NOT NULL DEFAULT (now()),
     "UpdatedAt" timestamp with time zone NOT NULL DEFAULT (now()),
-    CONSTRAINT "PK_booking_tickets" PRIMARY KEY ("Id"),
-    CONSTRAINT "CK_booking_tickets_SeatNumber" CHECK ("SeatNumber" > 0),
-    CONSTRAINT "CK_booking_tickets_Status" CHECK ("Status" IN ('Unassigned','Invited','Claimed','CheckedIn')),
-    CONSTRAINT "FK_booking_tickets_bookings_BookingId" FOREIGN KEY ("BookingId") REFERENCES bookings ("Id") ON DELETE CASCADE,
-    CONSTRAINT "FK_booking_tickets_users_GuestUserId" FOREIGN KEY ("GuestUserId") REFERENCES users ("Id") ON DELETE SET NULL
+    CONSTRAINT "PK_purchase_tickets" PRIMARY KEY ("Id"),
+    CONSTRAINT "CK_purchase_tickets_SeatNumber" CHECK ("SeatNumber" > 0),
+    CONSTRAINT "CK_purchase_tickets_Status" CHECK ("Status" IN ('Unassigned','Invited','Claimed','CheckedIn')),
+    CONSTRAINT "FK_purchase_tickets_purchases_PurchaseId" FOREIGN KEY ("PurchaseId") REFERENCES purchases ("Id") ON DELETE CASCADE,
+    CONSTRAINT "FK_purchase_tickets_users_GuestUserId" FOREIGN KEY ("GuestUserId") REFERENCES users ("Id") ON DELETE SET NULL
 );
 
 
 CREATE TABLE stripe_transactions (
     "Id" uuid NOT NULL DEFAULT (gen_random_uuid()),
-    "BookingId" uuid NOT NULL,
+    "PurchaseId" uuid NOT NULL,
     "PaymentIntentId" character varying(128) NOT NULL,
     "Status" character varying(30) NOT NULL,
     "Currency" character varying(3) NOT NULL,
@@ -459,7 +459,7 @@ CREATE TABLE stripe_transactions (
     CONSTRAINT "CK_stripe_transactions_TaxAmount" CHECK ("TaxAmountCents" IS NULL OR "TaxAmountCents" >= 0),
     CONSTRAINT "CK_stripe_transactions_TotalCharged" CHECK ("TotalChargedCents" IS NULL OR "TotalChargedCents" >= 0),
     CONSTRAINT "CK_stripe_transactions_TransferAmount" CHECK ("TransferAmountCents" IS NULL OR "TransferAmountCents" >= 0),
-    CONSTRAINT "FK_stripe_transactions_bookings_BookingId" FOREIGN KEY ("BookingId") REFERENCES bookings ("Id") ON DELETE RESTRICT
+    CONSTRAINT "FK_stripe_transactions_purchases_PurchaseId" FOREIGN KEY ("PurchaseId") REFERENCES purchases ("Id") ON DELETE RESTRICT
 );
 
 
@@ -487,40 +487,40 @@ CREATE UNIQUE INDEX "IX_admin_users_EmailHash" ON admin_users ("EmailHash");
 CREATE UNIQUE INDEX "IX_app_settings_Key" ON app_settings ("Key");
 
 
-CREATE UNIQUE INDEX "IX_booking_tickets_BookingId_SeatNumber" ON booking_tickets ("BookingId", "SeatNumber");
+CREATE UNIQUE INDEX "IX_purchase_tickets_PurchaseId_SeatNumber" ON purchase_tickets ("PurchaseId", "SeatNumber");
 
 
-CREATE INDEX "IX_booking_tickets_GuestUserId" ON booking_tickets ("GuestUserId");
+CREATE INDEX "IX_purchase_tickets_GuestUserId" ON purchase_tickets ("GuestUserId");
 
 
-CREATE UNIQUE INDEX "IX_booking_tickets_InviteTokenHash" ON booking_tickets ("InviteTokenHash") WHERE "InviteTokenHash" IS NOT NULL;
+CREATE UNIQUE INDEX "IX_purchase_tickets_InviteTokenHash" ON purchase_tickets ("InviteTokenHash") WHERE "InviteTokenHash" IS NOT NULL;
 
 
-CREATE UNIQUE INDEX "IX_booking_tickets_QrToken" ON booking_tickets ("QrToken");
+CREATE UNIQUE INDEX "IX_purchase_tickets_QrToken" ON purchase_tickets ("QrToken");
 
 
-CREATE UNIQUE INDEX "IX_bookings_BookingNumber" ON bookings ("BookingNumber");
+CREATE UNIQUE INDEX "IX_purchases_PurchaseNumber" ON purchases ("PurchaseNumber");
 
 
-CREATE INDEX "IX_bookings_EventId_Status" ON bookings ("EventId", "Status");
+CREATE INDEX "IX_purchases_EventId_Status" ON purchases ("EventId", "Status");
 
 
-CREATE INDEX "IX_bookings_EventTicketTypeId" ON bookings ("EventTicketTypeId");
+CREATE INDEX "IX_purchases_EventTicketTypeId" ON purchases ("EventTicketTypeId");
 
 
-CREATE UNIQUE INDEX "IX_bookings_QrToken" ON bookings ("QrToken") WHERE "QrToken" IS NOT NULL;
+CREATE UNIQUE INDEX "IX_purchases_QrToken" ON purchases ("QrToken") WHERE "QrToken" IS NOT NULL;
 
 
-CREATE INDEX "IX_bookings_Status" ON bookings ("Status");
+CREATE INDEX "IX_purchases_Status" ON purchases ("Status");
 
 
-CREATE INDEX "IX_bookings_TableId" ON bookings ("TableId");
+CREATE INDEX "IX_purchases_TableId" ON purchases ("TableId");
 
 
-CREATE INDEX "IX_bookings_UserId" ON bookings ("UserId");
+CREATE INDEX "IX_purchases_UserId" ON purchases ("UserId");
 
 
-CREATE INDEX "IX_bookings_UserId_CreatedAt" ON bookings ("UserId", "CreatedAt");
+CREATE INDEX "IX_purchases_UserId_CreatedAt" ON purchases ("UserId", "CreatedAt");
 
 
 CREATE INDEX "IX_developer_logs_Severity" ON developer_logs ("Severity");
@@ -613,7 +613,7 @@ CREATE INDEX "IX_magic_link_tokens_ExpiresAt" ON magic_link_tokens ("ExpiresAt")
 CREATE UNIQUE INDEX "IX_magic_link_tokens_TokenHash" ON magic_link_tokens ("TokenHash");
 
 
-CREATE UNIQUE INDEX "IX_stripe_transactions_BookingId" ON stripe_transactions ("BookingId");
+CREATE UNIQUE INDEX "IX_stripe_transactions_PurchaseId" ON stripe_transactions ("PurchaseId");
 
 
 CREATE UNIQUE INDEX "IX_stripe_transactions_PaymentIntentId" ON stripe_transactions ("PaymentIntentId");

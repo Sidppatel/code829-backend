@@ -27,8 +27,8 @@ public class EventPlatformDbContext(
     public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<EventTicketType> EventTicketTypes => Set<EventTicketType>();
     public DbSet<Table> Tables => Set<Table>();
-    public DbSet<Booking> Bookings => Set<Booking>();
-    public DbSet<BookingTicket> BookingTickets => Set<BookingTicket>();
+    public DbSet<Purchase> Purchases => Set<Purchase>();
+    public DbSet<PurchaseTicket> PurchaseTickets => Set<PurchaseTicket>();
     public DbSet<StripeTransaction> StripeTransactions => Set<StripeTransaction>();
 
     // Images
@@ -47,8 +47,8 @@ public class EventPlatformDbContext(
     public DbSet<EventView> EventViews => Set<EventView>();
     public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
     public DbSet<TableView> TableViews => Set<TableView>();
-    public DbSet<BookingView> BookingViews => Set<BookingView>();
-    public DbSet<BookingTicketView> BookingTicketViews => Set<BookingTicketView>();
+    public DbSet<PurchaseView> PurchaseViews => Set<PurchaseView>();
+    public DbSet<PurchaseTicketView> PurchaseTicketViews => Set<PurchaseTicketView>();
     public DbSet<VenueView> VenueViews => Set<VenueView>();
     public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
@@ -368,31 +368,31 @@ public class EventPlatformDbContext(
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<Booking>(entity =>
+        modelBuilder.Entity<Purchase>(entity =>
         {
-            entity.ToTable("bookings", t =>
+            entity.ToTable("purchases", t =>
             {
-                t.HasCheckConstraint("CK_bookings_Status",
+                t.HasCheckConstraint("CK_purchases_Status",
                     "\"Status\" IN ('Pending','Paid','CheckedIn','Cancelled','Refunded','Expired')");
-                t.HasCheckConstraint("CK_bookings_SubtotalCents",
+                t.HasCheckConstraint("CK_purchases_SubtotalCents",
                     "\"SubtotalCents\" >= 0");
-                t.HasCheckConstraint("CK_bookings_FeeCents",
+                t.HasCheckConstraint("CK_purchases_FeeCents",
                     "\"FeeCents\" >= 0");
-                t.HasCheckConstraint("CK_bookings_TotalCents",
+                t.HasCheckConstraint("CK_purchases_TotalCents",
                     "\"TotalCents\" >= 0");
-                t.HasCheckConstraint("CK_bookings_TotalFormula",
+                t.HasCheckConstraint("CK_purchases_TotalFormula",
                     "\"TotalCents\" = \"SubtotalCents\" + \"FeeCents\"");
-                t.HasCheckConstraint("CK_bookings_SeatsReserved",
+                t.HasCheckConstraint("CK_purchases_SeatsReserved",
                     "\"SeatsReserved\" IS NULL OR \"SeatsReserved\" > 0");
             });
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.BookingNumber).IsUnique();
+            entity.HasIndex(e => e.PurchaseNumber).IsUnique();
             entity.HasIndex(e => e.QrToken).IsUnique().HasFilter("\"QrToken\" IS NOT NULL");
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => new { e.UserId, e.CreatedAt });
             entity.HasIndex(e => new { e.EventId, e.Status });
-            entity.Property(e => e.BookingNumber).HasMaxLength(20);
+            entity.Property(e => e.PurchaseNumber).HasMaxLength(20);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.QrToken).HasMaxLength(128);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
@@ -405,28 +405,28 @@ public class EventPlatformDbContext(
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<BookingTicket>(entity =>
+        modelBuilder.Entity<PurchaseTicket>(entity =>
         {
-            entity.ToTable("booking_tickets", t =>
+            entity.ToTable("purchase_tickets", t =>
             {
-                t.HasCheckConstraint("CK_booking_tickets_Status",
+                t.HasCheckConstraint("CK_purchase_tickets_Status",
                     "\"Status\" IN ('Unassigned','Invited','Claimed','CheckedIn')");
-                t.HasCheckConstraint("CK_booking_tickets_SeatNumber",
+                t.HasCheckConstraint("CK_purchase_tickets_SeatNumber",
                     "\"SeatNumber\" > 0");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.QrToken).IsUnique();
             entity.HasIndex(e => e.InviteTokenHash).IsUnique()
                 .HasFilter("\"InviteTokenHash\" IS NOT NULL");
-            entity.HasIndex(e => new { e.BookingId, e.SeatNumber }).IsUnique();
+            entity.HasIndex(e => new { e.PurchaseId, e.SeatNumber }).IsUnique();
             entity.HasIndex(e => e.GuestUserId);
             entity.Property(e => e.TicketCode).HasMaxLength(20);
             entity.Property(e => e.QrToken).HasMaxLength(128);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.InviteTokenHash).HasMaxLength(128);
             entity.Property(e => e.InvitedEmail).HasMaxLength(256);
-            entity.HasOne(e => e.Booking).WithMany(b => b.Tickets)
-                .HasForeignKey(e => e.BookingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Purchase).WithMany(b => b.Tickets)
+                .HasForeignKey(e => e.PurchaseId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.GuestUser).WithMany()
                 .HasForeignKey(e => e.GuestUserId).IsRequired(false)
                 .OnDelete(DeleteBehavior.SetNull);
@@ -468,8 +468,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.RefundId).HasMaxLength(128);
             entity.Property(e => e.TaxCalculationId).HasMaxLength(128);
             entity.Property(e => e.TaxTransactionId).HasMaxLength(128);
-            entity.HasOne(e => e.Booking).WithOne(b => b.StripeTransaction)
-                .HasForeignKey<StripeTransaction>(e => e.BookingId)
+            entity.HasOne(e => e.Purchase).WithOne(b => b.StripeTransaction)
+                .HasForeignKey<StripeTransaction>(e => e.PurchaseId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -593,15 +593,15 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.Id);
         });
 
-        modelBuilder.Entity<BookingView>(entity =>
+        modelBuilder.Entity<PurchaseView>(entity =>
         {
-            entity.ToView("v_bookings");
+            entity.ToView("v_purchases");
             entity.HasKey(e => e.Id);
         });
 
-        modelBuilder.Entity<BookingTicketView>(entity =>
+        modelBuilder.Entity<PurchaseTicketView>(entity =>
         {
-            entity.ToView("v_booking_tickets");
+            entity.ToView("v_purchase_tickets");
             entity.HasKey(e => e.Id);
         });
 

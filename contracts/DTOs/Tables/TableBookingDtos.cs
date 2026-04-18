@@ -20,7 +20,7 @@ public record ReleaseBeaconRequest(
 };
 
 public record CancelBeaconRequest(
-    Guid BookingId,
+    Guid PurchaseId,
     string Token
 );
 

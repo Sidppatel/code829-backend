@@ -3,21 +3,21 @@ namespace Contracts.DTOs.Admin;
 public record DashboardStatsDto(
     int TotalEvents,
     int PublishedEvents,
-    int TotalBookings,
-    int PaidBookings,
-    int CheckedInBookings,
+    int TotalPurchases,
+    int PaidPurchases,
+    int CheckedInPurchases,
     long TotalRevenueCents,
     int TotalUsers,
     int TotalVenues,
     List<EventRevenueDto> TopEvents,
-    Dictionary<string, int> BookingsByStatus,
+    Dictionary<string, int> PurchasesByStatus,
     Dictionary<string, int> EventsByCategory
 );
 
 public record EventRevenueDto(
     Guid EventId,
     string Title,
-    int BookingCount,
+    int PurchaseCount,
     long RevenueCents
 );
 
@@ -36,22 +36,22 @@ public record NextEventDashboardDto(
     string? ImagePath,
     string LayoutMode,
     int DaysUntil,
-    int TotalBookings,
-    int PaidBookings,
-    int CheckedInBookings,
-    int PendingBookings,
-    int CancelledBookings,
-    int RefundedBookings,
+    int TotalPurchases,
+    int PaidPurchases,
+    int CheckedInPurchases,
+    int PendingPurchases,
+    int CancelledPurchases,
+    int RefundedPurchases,
     long RevenueCents,
     long PotentialRevenueCents,
     int TotalCapacity,
     int SoldCount,
-    List<RecentBookingDto> RecentBookings
+    List<RecentPurchaseDto> RecentPurchases
 );
 
-public record RecentBookingDto(
+public record RecentPurchaseDto(
     Guid Id,
-    string BookingNumber,
+    string PurchaseNumber,
     string UserName,
     string UserEmail,
     string Status,

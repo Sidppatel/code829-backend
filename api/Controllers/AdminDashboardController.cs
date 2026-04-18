@@ -21,10 +21,10 @@ public class AdminDashboardController(
     {
         var totalEvents = await context.EventViews.AsNoTracking().CountAsync();
         var publishedEvents = await context.EventViews.AsNoTracking().CountAsync(e => e.Status == "Published");
-        var totalBookings = await context.BookingViews.AsNoTracking().CountAsync();
-        var paidBookings = await context.BookingViews.AsNoTracking().CountAsync(b => b.Status == "Paid");
-        var checkedIn = await context.BookingViews.AsNoTracking().CountAsync(b => b.Status == "CheckedIn");
-        var revenueList = await context.BookingViews.AsNoTracking()
+        var totalPurchases = await context.PurchaseViews.AsNoTracking().CountAsync();
+        var paidPurchases = await context.PurchaseViews.AsNoTracking().CountAsync(b => b.Status == "Paid");
+        var checkedIn = await context.PurchaseViews.AsNoTracking().CountAsync(b => b.Status == "CheckedIn");
+        var revenueList = await context.PurchaseViews.AsNoTracking()
             .Where(b => b.Status == "Paid" || b.Status == "CheckedIn")
             .Select(b => b.TotalCents)
             .ToListAsync();
@@ -32,7 +32,7 @@ public class AdminDashboardController(
         var totalUsers = (await userProc.GetCountsAsync()).Total;
         var totalVenues = await context.VenueViews.AsNoTracking().CountAsync();
 
-        var topEventsRaw = await context.BookingViews.AsNoTracking()
+        var topEventsRaw = await context.PurchaseViews.AsNoTracking()
             .Where(b => b.Status == "Paid" || b.Status == "CheckedIn")
             .GroupBy(b => new { b.EventId, b.EventTitle })
             .Select(g => new { g.Key.EventId, g.Key.EventTitle, Count = g.Count(), Revenue = g.Sum(b => b.TotalCents) })
@@ -41,7 +41,7 @@ public class AdminDashboardController(
             .ToListAsync();
         var topEvents = topEventsRaw.Select(e => new EventRevenueDto(e.EventId, e.EventTitle, e.Count, e.Revenue)).ToList();
 
-        var bookingsByStatus = await context.BookingViews.AsNoTracking()
+        var purchasesByStatus = await context.PurchaseViews.AsNoTracking()
             .GroupBy(b => b.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Status, x => x.Count);
@@ -52,8 +52,8 @@ public class AdminDashboardController(
             .ToDictionaryAsync(x => x.Category, x => x.Count);
 
         return Ok(new DashboardStatsDto(
-            totalEvents, publishedEvents, totalBookings, paidBookings, checkedIn,
-            totalRevenue, totalUsers, totalVenues, topEvents, bookingsByStatus, eventsByCategory
+            totalEvents, publishedEvents, totalPurchases, paidPurchases, checkedIn,
+            totalRevenue, totalUsers, totalVenues, topEvents, purchasesByStatus, eventsByCategory
         ));
     }
 
@@ -77,16 +77,16 @@ public class AdminDashboardController(
         if (ev is null)
             return Ok(new { hasUpcoming = false });
 
-        var bookings = await context.BookingViews.AsNoTracking()
+        var purchases = await context.PurchaseViews.AsNoTracking()
             .Where(b => b.EventId == ev.Id)
             .ToListAsync();
 
-        var paid = bookings.Count(b => b.Status == "Paid");
-        var checkedInCount = bookings.Count(b => b.Status == "CheckedIn");
-        var pending = bookings.Count(b => b.Status == "Pending");
-        var cancelled = bookings.Count(b => b.Status == "Cancelled");
-        var refunded = bookings.Count(b => b.Status == "Refunded");
-        var revenue = bookings
+        var paid = purchases.Count(b => b.Status == "Paid");
+        var checkedInCount = purchases.Count(b => b.Status == "CheckedIn");
+        var pending = purchases.Count(b => b.Status == "Pending");
+        var cancelled = purchases.Count(b => b.Status == "Cancelled");
+        var refunded = purchases.Count(b => b.Status == "Refunded");
+        var revenue = purchases
             .Where(b => b.Status is "Paid" or "CheckedIn")
             .Sum(b => (long)b.TotalCents);
 
@@ -102,10 +102,10 @@ public class AdminDashboardController(
         else
             potentialRevenue = tables.Sum(t => (long)t.PriceCents);
 
-        var recentBookings = bookings
+        var recentPurchases = purchases
             .OrderByDescending(b => b.CreatedAt)
             .Take(8)
-            .Select(b => new RecentBookingDto(b.Id, b.BookingNumber,
+            .Select(b => new RecentPurchaseDto(b.Id, b.PurchaseNumber,
                 $"{b.UserFirstName} {b.UserLastName}", b.UserEmail,
                 b.Status, b.TotalCents, b.CreatedAt))
             .ToList();
@@ -119,9 +119,9 @@ public class AdminDashboardController(
                 ev.Id, ev.Title, ev.Slug, ev.Status, ev.Category,
                 ev.StartDate, ev.EndDate, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
                 ev.ImagePath, ev.LayoutMode, daysUntil,
-                bookings.Count, paid, checkedInCount, pending, cancelled, refunded,
+                purchases.Count, paid, checkedInCount, pending, cancelled, refunded,
                 revenue, potentialRevenue, totalCapacity, soldCount,
-                recentBookings
+                recentPurchases
             )
         });
     }

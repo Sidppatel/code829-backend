@@ -15,7 +15,7 @@ namespace Api.Controllers;
 public class WebhooksController(
     ISecretsProvider secrets,
     IStripeTransactionProcedures stripeTransactionProc,
-    IBookingProcedures bookingProc,
+    IPurchaseProcedures purchaseProc,
     ITaxService taxService,
     IPaymentService paymentService,
     IConnectionMultiplexer redis
@@ -112,16 +112,16 @@ public class WebhooksController(
         if ((int)paymentIntent.AmountReceived != expectedAmount)
         {
             Log.Error(
-                "[Webhook] PAYMENT_AMOUNT_MISMATCH intent={IntentId} booking={BookingId} expected={Expected} received={Received}",
-                paymentIntent.Id, txn.BookingId, expectedAmount, paymentIntent.AmountReceived);
+                "[Webhook] PAYMENT_AMOUNT_MISMATCH intent={IntentId} purchase={PurchaseId} expected={Expected} received={Received}",
+                paymentIntent.Id, txn.PurchaseId, expectedAmount, paymentIntent.AmountReceived);
             await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Failed");
-            await bookingProc.CancelBookingAsync(txn.BookingId);
+            await purchaseProc.CancelPurchaseAsync(txn.PurchaseId);
             return;
         }
 
         await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Succeeded");
-        await bookingProc.ConfirmBookingAsync(txn.BookingId, "");
-        Log.Information("[Webhook] Payment confirmed for booking {BookingId}", txn.BookingId);
+        await purchaseProc.ConfirmPurchaseAsync(txn.PurchaseId, "");
+        Log.Information("[Webhook] Payment confirmed for purchase {PurchaseId}", txn.PurchaseId);
 
         // Enrich with Stripe fee data
         await EnrichTransactionAsync(paymentIntent.Id, txn.TaxCalculationId);
@@ -200,10 +200,10 @@ public class WebhooksController(
             return;
 
         await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Failed");
-        await bookingProc.CancelBookingAsync(txn.BookingId);
+        await purchaseProc.CancelPurchaseAsync(txn.PurchaseId);
 
-        Log.Warning("[Webhook] Payment failed for booking {BookingId}: {Reason}",
-            txn.BookingId, paymentIntent.LastPaymentError?.Message ?? "unknown");
+        Log.Warning("[Webhook] Payment failed for purchase {PurchaseId}: {Reason}",
+            txn.PurchaseId, paymentIntent.LastPaymentError?.Message ?? "unknown");
     }
 
     private async Task HandleRefundUpdated(Event stripeEvent)
@@ -218,8 +218,8 @@ public class WebhooksController(
         if (refund.Status == "succeeded" && txn.Status != PaymentStatus.Refunded)
         {
             await stripeTransactionProc.UpdateStatusAsync(refund.PaymentIntentId, "Refunded");
-            await bookingProc.RefundBookingAsync(txn.BookingId);
-            Log.Information("[Webhook] Refund synced for booking {BookingId}", txn.BookingId);
+            await purchaseProc.RefundPurchaseAsync(txn.PurchaseId);
+            Log.Information("[Webhook] Refund synced for purchase {PurchaseId}", txn.PurchaseId);
         }
     }
 }

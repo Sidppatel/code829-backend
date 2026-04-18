@@ -1,6 +1,6 @@
 namespace Db.Repositories.StoredProcedures;
 
-public record TicketClaimResult(Guid TicketId, Guid BookingId);
+public record TicketClaimResult(Guid TicketId, Guid PurchaseId);
 
 public interface ITicketProcedures
 {

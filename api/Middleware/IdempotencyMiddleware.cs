@@ -9,9 +9,9 @@ namespace Api.Middleware;
 
 /// <summary>
 /// Idempotency for POST/PUT. Client-supplied Idempotency-Key is honored when present.
-/// Booking-critical paths (POST /bookings, POST /bookings/{id}/confirm*) also get a
+/// Purchase-critical paths (POST /purchases, POST /purchases/{id}/confirm*) also get a
 /// server-generated fallback key derived from userId + path + body hash so double-tap
-/// without a client key can't create duplicate bookings.
+/// without a client key can't create duplicate purchases.
 /// </summary>
 public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
 {
@@ -19,11 +19,11 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
     private static readonly TimeSpan FallbackTtl = TimeSpan.FromMinutes(5);
     private static readonly HashSet<string> IdempotentMethods = ["POST", "PUT"];
 
-    // Booking-critical paths where we insist on idempotency even if the client forgot a header.
-    private static readonly string[] EnforcedPathPrefixes = ["/bookings"];
+    // Purchase-critical paths where we insist on idempotency even if the client forgot a header.
+    private static readonly string[] EnforcedPathPrefixes = ["/purchases"];
     private static readonly string[] EnforcedPathSuffixes = ["/confirm", "/confirm-by-intent"];
-    // Pure read-style POSTs under /bookings that never mutate state — skip enforcement.
-    private static readonly string[] ExemptPaths = ["/bookings/quote"];
+    // Pure read-style POSTs under /purchases that never mutate state — skip enforcement.
+    private static readonly string[] ExemptPaths = ["/purchases/quote"];
 
     public async Task InvokeAsync(HttpContext context)
     {

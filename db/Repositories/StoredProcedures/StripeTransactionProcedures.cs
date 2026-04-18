@@ -4,14 +4,14 @@ namespace Db.Repositories.StoredProcedures;
 
 public class StripeTransactionProcedures(EventPlatformDbContext context) : IStripeTransactionProcedures
 {
-    public async Task<Guid> CreateAsync(Guid bookingId, string intentId, int amountCents,
+    public async Task<Guid> CreateAsync(Guid purchaseId, string intentId, int amountCents,
         int? transferAmountCents = null, string? taxCalculationId = null,
         string currency = "usd", CancellationToken ct = default)
     {
         var result = await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_create_stripe_transaction(@p0, @p1, @p2, @p3, @p4, @p5) AS \"Value\"",
-                bookingId, intentId, amountCents,
+                purchaseId, intentId, amountCents,
                 (object?)transferAmountCents ?? DBNull.Value,
                 (object?)taxCalculationId ?? DBNull.Value,
                 currency)
