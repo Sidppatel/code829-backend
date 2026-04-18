@@ -578,14 +578,12 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_events");
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.AdminUserId).HasColumnName("OrganizerId");
         });
 
         modelBuilder.Entity<EventSummaryView>(entity =>
         {
             entity.ToView("v_event_summary");
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.AdminUserId).HasColumnName("OrganizerId");
         });
 
         modelBuilder.Entity<TableView>(entity =>
@@ -598,7 +596,6 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_purchases");
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.AdminUserId).HasColumnName("OrganizerId");
         });
 
         modelBuilder.Entity<PurchaseTicketView>(entity =>
