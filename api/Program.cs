@@ -353,7 +353,9 @@ var builder = WebApplication.CreateBuilder(args);
         var defaultOrigins = app.Environment.IsDevelopment()
             ? "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176"  // Dev: public, admin, staff, developer ports
             : "http://localhost:5173";
-        var originsStr = await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins) ?? defaultOrigins;
+        var originsStr = Environment.GetEnvironmentVariable("CORS_ORIGINS") 
+            ?? await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins) 
+            ?? defaultOrigins;
         corsOrigins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 

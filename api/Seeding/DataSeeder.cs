@@ -118,7 +118,7 @@ public static class DataSeeder
         }
 
         var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-        if (env == "Production")
+        if (env is not null && env != "Development")
         {
             var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "https://code829.com";
             var current = await settings.GetOrDefaultAsync("frontend_url");
