@@ -67,8 +67,6 @@ namespace db.Migrations
                     Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    FailedLoginAttempts = table.Column<int>(type: "integer", nullable: false),
-                    LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     AvatarPath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     StripeConnectedAccountId = table.Column<string>(type: "text", nullable: true),
@@ -87,7 +85,7 @@ namespace db.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
                     Key = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Value = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: false),
+                    EncryptedValue = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: false),
                     Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
@@ -259,32 +257,6 @@ namespace db.Migrations
                         principalTable: "addresses",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "admin_password_reset_tokens",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    IsUsed = table.Column<bool>(type: "boolean", nullable: false),
-                    UsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_admin_password_reset_tokens", x => x.Id);
-                    table.CheckConstraint("CK_admin_password_reset_tokens_Usage", "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
-                    table.ForeignKey(
-                        name: "FK_admin_password_reset_tokens_admin_users_AdminUserId",
-                        column: x => x.AdminUserId,
-                        principalTable: "admin_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -720,22 +692,6 @@ namespace db.Migrations
                 column: "Timestamp");
 
             migrationBuilder.CreateIndex(
-                name: "IX_admin_password_reset_tokens_AdminUserId",
-                table: "admin_password_reset_tokens",
-                column: "AdminUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_password_reset_tokens_ExpiresAt",
-                table: "admin_password_reset_tokens",
-                column: "ExpiresAt");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_password_reset_tokens_TokenHash",
-                table: "admin_password_reset_tokens",
-                column: "TokenHash",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_admin_users_Email",
                 table: "admin_users",
                 column: "Email",
@@ -752,6 +708,73 @@ namespace db.Migrations
                 table: "app_settings",
                 column: "Key",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchase_tickets_PurchaseId_SeatNumber",
+                table: "purchase_tickets",
+                columns: new[] { "PurchaseId", "SeatNumber" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchase_tickets_GuestUserId",
+                table: "purchase_tickets",
+                column: "GuestUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchase_tickets_InviteTokenHash",
+                table: "purchase_tickets",
+                column: "InviteTokenHash",
+                unique: true,
+                filter: "\"InviteTokenHash\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchase_tickets_QrToken",
+                table: "purchase_tickets",
+                column: "QrToken",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_PurchaseNumber",
+                table: "purchases",
+                column: "PurchaseNumber",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_EventId_Status",
+                table: "purchases",
+                columns: new[] { "EventId", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_EventTicketTypeId",
+                table: "purchases",
+                column: "EventTicketTypeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_QrToken",
+                table: "purchases",
+                column: "QrToken",
+                unique: true,
+                filter: "\"QrToken\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_Status",
+                table: "purchases",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_TableId",
+                table: "purchases",
+                column: "TableId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_UserId",
+                table: "purchases",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchases_UserId_CreatedAt",
+                table: "purchases",
+                columns: new[] { "UserId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_developer_logs_Severity",
@@ -910,82 +933,15 @@ namespace db.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_purchase_tickets_GuestUserId",
-                table: "purchase_tickets",
-                column: "GuestUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchase_tickets_InviteTokenHash",
-                table: "purchase_tickets",
-                column: "InviteTokenHash",
-                unique: true,
-                filter: "\"InviteTokenHash\" IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchase_tickets_PurchaseId_SeatNumber",
-                table: "purchase_tickets",
-                columns: new[] { "PurchaseId", "SeatNumber" },
+                name: "IX_stripe_transactions_PurchaseId",
+                table: "stripe_transactions",
+                column: "PurchaseId",
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchase_tickets_QrToken",
-                table: "purchase_tickets",
-                column: "QrToken",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_EventId_Status",
-                table: "purchases",
-                columns: new[] { "EventId", "Status" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_EventTicketTypeId",
-                table: "purchases",
-                column: "EventTicketTypeId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_PurchaseNumber",
-                table: "purchases",
-                column: "PurchaseNumber",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_QrToken",
-                table: "purchases",
-                column: "QrToken",
-                unique: true,
-                filter: "\"QrToken\" IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_Status",
-                table: "purchases",
-                column: "Status");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_TableId",
-                table: "purchases",
-                column: "TableId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_UserId",
-                table: "purchases",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchases_UserId_CreatedAt",
-                table: "purchases",
-                columns: new[] { "UserId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_stripe_transactions_PaymentIntentId",
                 table: "stripe_transactions",
                 column: "PaymentIntentId",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_stripe_transactions_PurchaseId",
-                table: "stripe_transactions",
-                column: "PurchaseId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1061,6 +1017,1209 @@ namespace db.Migrations
                 name: "IX_venues_Name",
                 table: "venues",
                 column: "Name");
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_events AS
+SELECT
+    e.""Id"" AS ""Id"",
+    e.""Title"" AS ""Title"",
+    e.""Slug"" AS ""Slug"",
+    e.""Description"" AS ""Description"",
+    e.""Status""::text AS ""Status"",
+    COALESCE(e.""Category""::text, '') AS ""Category"",
+    e.""StartDate"" AS ""StartDate"",
+    e.""EndDate"" AS ""EndDate"",
+    e.""ImagePath"" AS ""ImagePath"",
+    e.""IsFeatured"" AS ""IsFeatured"",
+    e.""LayoutMode""::text AS ""LayoutMode"",
+    e.""MaxCapacity"" AS ""MaxCapacity"",
+    ettp.min_price::int AS ""PricePerPersonCents"",
+    e.""GridRows"" AS ""GridRows"",
+    e.""GridCols"" AS ""GridCols"",
+    e.""PublishedAt"" AS ""PublishedAt"",
+    e.""ScheduledPublishAt"" AS ""ScheduledPublishAt"",
+    e.""VenueId"" AS ""VenueId"",
+    e.""OrganizerId"" AS ""OrganizerId"",
+    e.""CreatedAt"" AS ""CreatedAt"",
+    e.""UpdatedAt"" AS ""UpdatedAt"",
+    v.""Name"" AS ""VenueName"",
+    COALESCE(a.""Line1"", '') AS ""VenueAddress"",
+    COALESCE(a.""City"", '') AS ""VenueCity"",
+    COALESCE(a.""State"", '') AS ""VenueState"",
+    COALESCE(a.""ZipCode"", '') AS ""VenueZipCode"",
+    v.""Description"" AS ""VenueDescription"",
+    v.""ImagePath"" AS ""VenueImagePath"",
+    v.""Phone"" AS ""VenuePhone"",
+    v.""Email"" AS ""VenueEmail"",
+    v.""Website"" AS ""VenueWebsite"",
+    v.""IsActive"" AS ""VenueIsActive"",
+    v.""CreatedAt"" AS ""VenueCreatedAt"",
+    COALESCE(au.""FirstName"", '') AS ""OrganizerFirstName"",
+    COALESCE(au.""LastName"", '') AS ""OrganizerLastName"",
+    COALESCE(
+        e.""MaxCapacity"",
+        CASE
+            WHEN e.""LayoutMode""::text = 'Grid' THEN table_cap.total_seats
+            ELSE ett_cap.total_qty
+        END,
+        0
+    )::int AS ""TotalCapacity"",
+    COALESCE(bs.sold, 0)::int AS ""TotalSold"",
+    COALESCE(ts.available, 0)::int AS ""AvailableTables"",
+    ts.min_price::int AS ""MinTablePriceCents"",
+    ettp.min_price::int AS ""MinTicketTypePriceCents"",
+    ts.min_total_price::int AS ""DisplayMinTablePriceCents"",
+    ettp.min_total_price::int AS ""DisplayMinTicketTypePriceCents""
+FROM events e
+JOIN venues v ON e.""VenueId"" = v.""Id""
+LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
+LEFT JOIN admin_users au ON e.""OrganizerId"" = au.""Id""
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(b.""SeatsReserved""), COUNT(*))::int AS sold
+    FROM purchases b
+    WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid','CheckedIn')
+) bs ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS available, MIN(et.""PriceCents"") AS min_price, MIN(et.""PriceCents"" + COALESCE(et.""PlatformFeeCents"", 0)) AS min_total_price
+    FROM tables t
+    JOIN event_tables et ON t.""EventTableId"" = et.""Id""
+    WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true AND t.""Status"" = 'Available'
+) ts ON true
+LEFT JOIN LATERAL (
+    SELECT MIN(ett.""PriceCents"") AS min_price, MIN(ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0)) AS min_total_price
+    FROM event_ticket_types ett
+    WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
+) ettp ON true
+LEFT JOIN LATERAL (
+    SELECT SUM(ett.""MaxQuantity"") AS total_qty
+    FROM event_ticket_types ett
+    WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
+) ett_cap ON true
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(et.""Capacity""), 0)::int AS total_seats
+    FROM tables t
+    JOIN event_tables et ON t.""EventTableId"" = et.""Id""
+    WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true
+) table_cap ON true;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_event_summary AS
+SELECT
+    e.""Id"" AS ""Id"",
+    e.""Title"" AS ""Title"",
+    e.""Slug"" AS ""Slug"",
+    e.""Status""::text AS ""Status"",
+    COALESCE(e.""Category""::text, '') AS ""Category"",
+    e.""StartDate"" AS ""StartDate"",
+    e.""EndDate"" AS ""EndDate"",
+    e.""ImagePath"" AS ""ImagePath"",
+    img.""StorageKey"" AS ""PrimaryImageKey"",
+    e.""IsFeatured"" AS ""IsFeatured"",
+    e.""LayoutMode""::text AS ""LayoutMode"",
+    ettp.min_price::int AS ""PricePerPersonCents"",
+    e.""MaxCapacity"" AS ""MaxCapacity"",
+    e.""VenueId"" AS ""VenueId"",
+    v.""Name"" AS ""VenueName"",
+    COALESCE(a.""City"", '') AS ""VenueCity"",
+    COALESCE(a.""State"", '') AS ""VenueState"",
+    e.""OrganizerId"" AS ""OrganizerId"",
+    COALESCE(au.""FirstName"" || ' ' || au.""LastName"", '') AS ""OrganizerName"",
+    COALESCE(
+        e.""MaxCapacity"",
+        CASE
+            WHEN e.""LayoutMode""::text = 'Grid' THEN table_cap.total_seats
+            ELSE ett_cap.total_qty
+        END,
+        0
+    )::int AS ""TotalCapacity"",
+    COALESCE(bs.sold, 0)::int AS ""TotalSold"",
+    COALESCE(ts.available, 0)::int AS ""AvailableTables"",
+    ts.min_price::int AS ""MinTablePriceCents"",
+    ettp.min_price::int AS ""MinTicketTypePriceCents"",
+    ts.min_total_price::int AS ""DisplayMinTablePriceCents"",
+    ettp.min_total_price::int AS ""DisplayMinTicketTypePriceCents"",
+    e.""CreatedAt"" AS ""CreatedAt""
+FROM events e
+JOIN venues v ON e.""VenueId"" = v.""Id""
+LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
+LEFT JOIN admin_users au ON e.""OrganizerId"" = au.""Id""
+LEFT JOIN LATERAL (
+    SELECT ""StorageKey""
+    FROM images
+    WHERE ""EntityType"" = 'event' AND ""EntityId"" = e.""Id"" AND ""IsPrimary"" = true
+    LIMIT 1
+) img ON true
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(b.""SeatsReserved""), COUNT(*))::int AS sold
+    FROM purchases b
+    WHERE b.""EventId"" = e.""Id"" AND b.""Status"" IN ('Paid','CheckedIn')
+) bs ON true
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS available, MIN(et.""PriceCents"") AS min_price, MIN(et.""PriceCents"" + COALESCE(et.""PlatformFeeCents"", 0)) AS min_total_price
+    FROM tables t
+    JOIN event_tables et ON t.""EventTableId"" = et.""Id""
+    WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true AND t.""Status"" = 'Available'
+) ts ON true
+LEFT JOIN LATERAL (
+    SELECT MIN(ett.""PriceCents"") AS min_price, MIN(ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0)) AS min_total_price
+    FROM event_ticket_types ett
+    WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
+) ettp ON true
+LEFT JOIN LATERAL (
+    SELECT SUM(ett.""MaxQuantity"") AS total_qty
+    FROM event_ticket_types ett
+    WHERE ett.""EventId"" = e.""Id"" AND ett.""IsActive"" = true
+) ett_cap ON true
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(et.""Capacity""), 0)::int AS total_seats
+    FROM tables t
+    JOIN event_tables et ON t.""EventTableId"" = et.""Id""
+    WHERE t.""EventId"" = e.""Id"" AND t.""IsActive"" = true
+) table_cap ON true;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_user_profile AS
+SELECT
+    u.""Id"", u.""Email"", u.""FirstName"", u.""LastName"",
+    u.""IsActive"", u.""LastLoginAt"",
+    u.""Phone"", u.""OptInLocationEmail"", u.""HasCompletedOnboarding"",
+    u.""AvatarPath"", u.""CreatedAt"",
+    a.""Line1"" AS ""AddressLine1"",
+    a.""City"", a.""State"", a.""ZipCode""
+FROM users u
+LEFT JOIN addresses a ON u.""AddressId"" = a.""Id"";
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_tables AS
+SELECT
+    t.""Id"", t.""EventId"", t.""EventTableId"",
+    t.""Label"", t.""GridRow"", t.""GridCol"",
+    t.""IsActive"", t.""SortOrder"",
+    t.""Status""::text,
+    t.""LockedByUserId"", t.""LockExpiresAt"",
+    t.""CreatedAt"", t.""UpdatedAt"",
+    et.""Capacity"", et.""Shape""::text, et.""Color"",
+    et.""PriceCents"", et.""PlatformFeeCents"",
+    et.""PriceCents"" + COALESCE(et.""PlatformFeeCents"", 0) AS ""TotalPriceCents"",
+    et.""Label"" AS ""EventTableLabel""
+FROM tables t
+JOIN event_tables et ON t.""EventTableId"" = et.""Id"";
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_purchases AS
+SELECT
+    b.""Id"", b.""PurchaseNumber"", b.""Status""::text,
+    b.""SubtotalCents"", b.""FeeCents"", b.""TotalCents"",
+    b.""QrToken"", b.""SeatsReserved"", b.""CreatedAt"",
+    b.""UserId"",
+    u.""Email"" AS ""UserEmail"",
+    u.""FirstName"" AS ""UserFirstName"",
+    u.""LastName"" AS ""UserLastName"",
+    b.""EventId"",
+    e.""Title"" AS ""EventTitle"",
+    e.""Slug"" AS ""EventSlug"",
+    e.""StartDate"" AS ""EventStartDate"",
+    e.""EndDate"" AS ""EventEndDate"",
+    COALESCE(e.""Category""::text, '') AS ""EventCategory"",
+    e.""ImagePath"" AS ""EventImagePath"",
+    v.""Name"" AS ""VenueName"",
+    COALESCE(addr.""Line1"", '') AS ""VenueAddress"",
+    COALESCE(addr.""City"", '') AS ""VenueCity"",
+    COALESCE(addr.""State"", '') AS ""VenueState"",
+    b.""TableId"",
+    tbl.""Label"" AS ""TableLabel"",
+    b.""EventTicketTypeId"",
+    ett.""Label"" AS ""EventTicketTypeLabel"",
+    st.""Id"" AS ""StripeTransactionId"",
+    st.""PaymentIntentId"",
+    st.""TaxCalculationId"",
+    st.""TaxTransactionId"",
+    st.""Status""::text AS ""PaymentStatus"",
+    st.""AmountCents"" AS ""PaymentAmountCents"",
+    st.""TotalChargedCents"",
+    st.""TaxAmountCents"",
+    st.""StripeFeesCents"",
+    st.""TransferAmountCents"",
+    st.""PaidAt"", st.""RefundedAt"",
+    COALESCE(tc.cnt, 0)::int AS ""TicketCount"",
+    e.""OrganizerId""
+FROM purchases b
+JOIN users u ON b.""UserId"" = u.""Id""
+JOIN events e ON b.""EventId"" = e.""Id""
+JOIN venues v ON e.""VenueId"" = v.""Id""
+LEFT JOIN addresses addr ON v.""AddressId"" = addr.""Id""
+LEFT JOIN tables tbl ON b.""TableId"" = tbl.""Id""
+LEFT JOIN event_ticket_types ett ON b.""EventTicketTypeId"" = ett.""Id""
+LEFT JOIN stripe_transactions st ON st.""PurchaseId"" = b.""Id""
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS cnt FROM purchase_tickets bt WHERE bt.""PurchaseId"" = b.""Id""
+) tc ON true;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_purchase_tickets AS
+SELECT
+    bt.""Id"", bt.""TicketCode"", bt.""QrToken"", bt.""SeatNumber"",
+    bt.""Status""::text,
+    bt.""CreatedAt"",
+    bt.""InvitedEmail"", bt.""InviteSentAt"", bt.""InviteExpiresAt"", bt.""ClaimedAt"",
+    bt.""PurchaseId"",
+    b.""PurchaseNumber"", b.""Status""::text AS ""PurchaseStatus"",
+    bt.""GuestUserId"",
+    gu.""Email"" AS ""GuestEmail"",
+    gu.""FirstName"" AS ""GuestFirstName"",
+    gu.""LastName"" AS ""GuestLastName"",
+    e.""Id"" AS ""EventId"",
+    e.""Title"" AS ""EventTitle"",
+    e.""StartDate"" AS ""EventStartDate"",
+    e.""EndDate"" AS ""EventEndDate"",
+    v.""Name"" AS ""VenueName"",
+    COALESCE(addr.""City"", '') AS ""VenueCity"",
+    b.""UserId"" AS ""PurchaseUserId"",
+    bu.""Email"" AS ""PurchaseUserEmail""
+FROM purchase_tickets bt
+JOIN purchases b ON bt.""PurchaseId"" = b.""Id""
+JOIN events e ON b.""EventId"" = e.""Id""
+JOIN venues v ON e.""VenueId"" = v.""Id""
+LEFT JOIN addresses addr ON v.""AddressId"" = addr.""Id""
+LEFT JOIN users gu ON bt.""GuestUserId"" = gu.""Id""
+JOIN users bu ON b.""UserId"" = bu.""Id"";
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_venues AS
+SELECT
+    v.""Id"", v.""Name"", v.""Description"", v.""ImagePath"",
+    v.""Phone"", v.""Email"", v.""Website"",
+    v.""IsActive"", v.""CreatedAt"",
+    COALESCE(a.""Line1"", '') AS ""AddressLine1"",
+    a.""Line2"" AS ""AddressLine2"",
+    COALESCE(a.""City"", '') AS ""City"",
+    COALESCE(a.""State"", '') AS ""State"",
+    COALESCE(a.""ZipCode"", '') AS ""ZipCode"",
+    COALESCE(ec.cnt, 0)::int AS ""EventCount""
+FROM venues v
+LEFT JOIN addresses a ON v.""AddressId"" = a.""Id""
+LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS cnt FROM events e WHERE e.""VenueId"" = v.""Id""
+) ec ON true;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_event_tables_summary AS
+SELECT
+    et.""Id"", et.""EventId"", et.""Label"", et.""Capacity"",
+    et.""Shape""::text, et.""Color"", et.""PriceCents"", et.""PlatformFeeCents"",
+    et.""IsActive"",
+    COALESCE(ts.total, 0)::int AS ""TotalTables"",
+    COALESCE(ts.available, 0)::int AS ""AvailableTables"",
+    COALESCE(ts.locked, 0)::int AS ""LockedTables"",
+    COALESCE(ts.booked, 0)::int AS ""BookedTables""
+FROM event_tables et
+LEFT JOIN LATERAL (
+    SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE t.""Status"" = 'Available' AND t.""IsActive"")::int AS available,
+        COUNT(*) FILTER (WHERE t.""Status"" = 'Locked')::int AS locked,
+        COUNT(*) FILTER (WHERE t.""Status"" = 'Booked')::int AS booked
+    FROM tables t WHERE t.""EventTableId"" = et.""Id""
+) ts ON true;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE VIEW v_event_ticket_types_summary AS
+SELECT
+    ett.""Id"", ett.""EventId"", ett.""Label"", ett.""PriceCents"",
+    ett.""PlatformFeeCents"", ett.""MaxQuantity"", ett.""SortOrder"", ett.""IsActive"",
+    ett.""Description"",
+    ett.""PriceCents"" + COALESCE(ett.""PlatformFeeCents"", 0) AS ""TotalPriceCents"",
+    COALESCE(bs.sold, 0)::int AS ""SoldCount"",
+    CASE
+        WHEN ett.""MaxQuantity"" IS NULL THEN -1
+        ELSE GREATEST(0, ett.""MaxQuantity"" - COALESCE(bs.sold, 0))
+    END::int AS ""AvailableCount""
+FROM event_ticket_types ett
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(b.""SeatsReserved""), 0)::int AS sold
+    FROM purchases b
+    WHERE b.""EventTicketTypeId"" = ett.""Id""
+      AND b.""Status"" IN ('Pending', 'Paid', 'CheckedIn')
+) bs ON true;
+");
+
+            // ─── AUTH STORED PROCEDURES ───────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_magic_link(
+    p_email text, p_token_hash text, p_expires_at timestamptz
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO magic_link_tokens (""Id"", ""TokenHash"", ""Email"", ""ExpiresAt"", ""IsUsed"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_token_hash, p_email, p_expires_at, false, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_consume_magic_link(p_token_hash text)
+RETURNS TABLE (
+    ""Id"" uuid, ""Email"" text, ""ExpiresAt"" timestamptz
+) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+    UPDATE magic_link_tokens
+    SET ""IsUsed"" = true, ""UsedAt"" = now(), ""UpdatedAt"" = now()
+    WHERE ""TokenHash"" = p_token_hash AND ""IsUsed"" = false AND ""ExpiresAt"" > now()
+    RETURNING magic_link_tokens.""Id"", magic_link_tokens.""Email""::text, magic_link_tokens.""ExpiresAt"";
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_upsert_user(
+    p_email text, p_email_hash text, p_first_name text, p_last_name text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    SELECT ""Id"" INTO v_id FROM users WHERE ""Email"" = p_email;
+    IF v_id IS NULL THEN
+        INSERT INTO users (""Id"", ""Email"", ""EmailHash"", ""FirstName"", ""LastName"",
+            ""IsActive"", ""LastLoginAt"", ""OptInLocationEmail"", ""HasCompletedOnboarding"",
+            ""CreatedAt"", ""UpdatedAt"")
+        VALUES (gen_random_uuid(), p_email, p_email_hash, p_first_name, p_last_name,
+            true, now(), false, false, now(), now())
+        RETURNING ""Id"" INTO v_id;
+    ELSE
+        UPDATE users SET ""LastLoginAt"" = now(), ""UpdatedAt"" = now() WHERE ""Id"" = v_id;
+    END IF;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_user_last_login(p_user_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE users SET ""LastLoginAt"" = now(), ""UpdatedAt"" = now() WHERE ""Id"" = p_user_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_device_session(
+    p_user_id uuid, p_session_hash text, p_fingerprint text,
+    p_device_name text, p_ip text, p_expires_at timestamptz
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO device_sessions (""Id"", ""UserId"", ""SessionHash"", ""DeviceFingerprint"",
+        ""DeviceName"", ""IpAddress"", ""LastActivityAt"", ""ExpiresAt"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_user_id, p_session_hash, p_fingerprint,
+        p_device_name, p_ip, now(), p_expires_at, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_revoke_device_session(p_session_hash text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE device_sessions SET ""RevokedAt"" = now(), ""UpdatedAt"" = now()
+    WHERE ""SessionHash"" = p_session_hash AND ""RevokedAt"" IS NULL;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_revoke_all_user_sessions(
+    p_user_id uuid, p_except_hash text DEFAULT NULL
+) RETURNS int LANGUAGE plpgsql AS $$
+DECLARE v_count int;
+BEGIN
+    UPDATE device_sessions SET ""RevokedAt"" = now(), ""UpdatedAt"" = now()
+    WHERE ""UserId"" = p_user_id AND ""RevokedAt"" IS NULL
+      AND (p_except_hash IS NULL OR ""SessionHash"" <> p_except_hash);
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_cleanup_expired_sessions() RETURNS int LANGUAGE plpgsql AS $$
+DECLARE v_count int;
+BEGIN
+    DELETE FROM device_sessions
+    WHERE ""ExpiresAt"" < now()
+       OR (""RevokedAt"" IS NOT NULL AND ""RevokedAt"" < now() - interval '7 days');
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_session_activity(p_session_hash text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE device_sessions SET ""LastActivityAt"" = now() WHERE ""SessionHash"" = p_session_hash;
+END; $$;
+");
+
+            // ─── USER STORED PROCEDURES ───────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_user_profile(
+    p_user_id uuid, p_first_name text, p_last_name text, p_phone text,
+    p_address text, p_city text, p_state text, p_zip text, p_opt_in bool
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_address_id uuid;
+BEGIN
+    SELECT ""AddressId"" INTO v_address_id FROM users WHERE ""Id"" = p_user_id;
+    IF v_address_id IS NULL AND (p_address IS NOT NULL OR p_city IS NOT NULL) THEN
+        INSERT INTO addresses (""Id"", ""Line1"", ""City"", ""State"", ""ZipCode"", ""CreatedAt"", ""UpdatedAt"")
+        VALUES (gen_random_uuid(), COALESCE(p_address,''), COALESCE(p_city,''),
+            COALESCE(p_state,''), COALESCE(p_zip,''), now(), now())
+        RETURNING ""Id"" INTO v_address_id;
+        UPDATE users SET ""AddressId"" = v_address_id WHERE ""Id"" = p_user_id;
+    ELSIF v_address_id IS NOT NULL THEN
+        UPDATE addresses SET
+            ""Line1"" = COALESCE(p_address, ""Line1""),
+            ""City"" = COALESCE(p_city, ""City""),
+            ""State"" = COALESCE(p_state, ""State""),
+            ""ZipCode"" = COALESCE(p_zip, ""ZipCode""),
+            ""UpdatedAt"" = now()
+        WHERE ""Id"" = v_address_id;
+    END IF;
+    UPDATE users SET
+        ""FirstName"" = COALESCE(p_first_name, ""FirstName""),
+        ""LastName"" = COALESCE(p_last_name, ""LastName""),
+        ""Phone"" = p_phone,
+        ""OptInLocationEmail"" = COALESCE(p_opt_in, ""OptInLocationEmail""),
+        ""HasCompletedOnboarding"" = true,
+        ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_user_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_user_avatar(p_user_id uuid, p_avatar_path text)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE users SET ""AvatarPath"" = p_avatar_path, ""UpdatedAt"" = now() WHERE ""Id"" = p_user_id;
+END; $$;
+");
+
+            // ─── EVENT STORED PROCEDURES ──────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_event(
+    p_title text, p_slug text, p_description text, p_status text, p_category text,
+    p_start_date timestamptz, p_end_date timestamptz, p_image_path text, p_is_featured bool,
+    p_layout_mode text, p_max_capacity int, p_price_per_person_cents int,
+    p_platform_fee_percent int, p_platform_fee_cents int,
+    p_grid_rows int, p_grid_cols int, p_venue_id uuid, p_organizer_id uuid,
+    p_scheduled_publish_at timestamptz DEFAULT NULL
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO events (""Id"", ""Title"", ""Slug"", ""Description"", ""Status"", ""Category"",
+        ""StartDate"", ""EndDate"", ""ImagePath"", ""IsFeatured"", ""LayoutMode"",
+        ""MaxCapacity"", ""GridRows"", ""GridCols"", ""VenueId"", ""OrganizerId"",
+        ""ScheduledPublishAt"", ""PublishedAt"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_title, p_slug, p_description, p_status,
+        CASE WHEN p_category = '' THEN NULL ELSE p_category END,
+        p_start_date, p_end_date, p_image_path, COALESCE(p_is_featured, false), p_layout_mode,
+        p_max_capacity, p_grid_rows, p_grid_cols, p_venue_id, p_organizer_id,
+        p_scheduled_publish_at,
+        CASE WHEN p_status = 'Published' THEN now() ELSE NULL END,
+        now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_event(
+    p_id uuid, p_title text, p_slug text, p_description text, p_category text,
+    p_start_date timestamptz, p_end_date timestamptz, p_image_path text, p_is_featured bool,
+    p_layout_mode text, p_max_capacity int, p_price_per_person_cents int,
+    p_platform_fee_percent int, p_platform_fee_cents int,
+    p_grid_rows int, p_grid_cols int, p_venue_id uuid,
+    p_scheduled_publish_at timestamptz DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE events SET
+        ""Title"" = COALESCE(p_title, ""Title""),
+        ""Slug"" = COALESCE(p_slug, ""Slug""),
+        ""Description"" = COALESCE(p_description, ""Description""),
+        ""Category"" = CASE WHEN p_category IS NULL THEN ""Category""
+                           WHEN p_category = '' THEN NULL
+                           ELSE p_category END,
+        ""StartDate"" = COALESCE(p_start_date, ""StartDate""),
+        ""EndDate"" = COALESCE(p_end_date, ""EndDate""),
+        ""ImagePath"" = COALESCE(p_image_path, ""ImagePath""),
+        ""IsFeatured"" = COALESCE(p_is_featured, ""IsFeatured""),
+        ""LayoutMode"" = COALESCE(p_layout_mode, ""LayoutMode""),
+        ""MaxCapacity"" = p_max_capacity,
+        ""GridRows"" = p_grid_rows,
+        ""GridCols"" = p_grid_cols,
+        ""VenueId"" = COALESCE(p_venue_id, ""VenueId""),
+        ""ScheduledPublishAt"" = p_scheduled_publish_at,
+        ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_change_event_status(
+    p_id uuid, p_status text, p_scheduled_publish_at timestamptz DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE events SET
+        ""Status"" = p_status,
+        ""PublishedAt"" = CASE WHEN p_status = 'Published' AND ""PublishedAt"" IS NULL THEN now() ELSE ""PublishedAt"" END,
+        ""ScheduledPublishAt"" = p_scheduled_publish_at,
+        ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_publish_scheduled_events() RETURNS int LANGUAGE plpgsql AS $$
+DECLARE v_count int;
+BEGIN
+    UPDATE events SET
+        ""Status"" = 'Published', ""PublishedAt"" = now(),
+        ""ScheduledPublishAt"" = NULL, ""UpdatedAt"" = now()
+    WHERE ""Status"" = 'Draft'
+      AND ""ScheduledPublishAt"" IS NOT NULL
+      AND ""ScheduledPublishAt"" <= now();
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END; $$;
+");
+
+            // ─── EVENT TICKET TYPE STORED PROCEDURES ──────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_event_ticket_type(
+    p_event_id uuid, p_label text, p_price_cents int,
+    p_platform_fee_cents int, p_max_quantity int, p_sort_order int,
+    p_description text DEFAULT NULL
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO event_ticket_types (""Id"", ""EventId"", ""Label"", ""PriceCents"", ""PlatformFeeCents"",
+        ""MaxQuantity"", ""SortOrder"", ""Description"", ""IsActive"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_event_id, p_label, p_price_cents, p_platform_fee_cents,
+        p_max_quantity, p_sort_order, p_description, true, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_event_ticket_type(
+    p_id uuid, p_label text, p_price_cents int,
+    p_platform_fee_cents int, p_max_quantity int, p_sort_order int, p_is_active bool,
+    p_description text DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE event_ticket_types SET
+        ""Label"" = COALESCE(p_label, ""Label""),
+        ""PriceCents"" = COALESCE(p_price_cents, ""PriceCents""),
+        ""PlatformFeeCents"" = p_platform_fee_cents,
+        ""MaxQuantity"" = p_max_quantity,
+        ""SortOrder"" = COALESCE(p_sort_order, ""SortOrder""),
+        ""Description"" = COALESCE(p_description, ""Description""),
+        ""IsActive"" = COALESCE(p_is_active, ""IsActive""),
+        ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_delete_event_ticket_type(p_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE event_ticket_types SET ""IsActive"" = false, ""UpdatedAt"" = now() WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            // ─── VENUE STORED PROCEDURES ──────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_venue(
+    p_name text, p_description text, p_image_path text,
+    p_phone text, p_email text, p_website text,
+    p_line1 text, p_line2 text, p_city text, p_state text, p_zip text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid; v_addr_id uuid;
+BEGIN
+    INSERT INTO addresses (""Id"", ""Line1"", ""Line2"", ""City"", ""State"", ""ZipCode"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), COALESCE(p_line1,''), p_line2, COALESCE(p_city,''),
+        COALESCE(p_state,''), COALESCE(p_zip,''), now(), now())
+    RETURNING ""Id"" INTO v_addr_id;
+    INSERT INTO venues (""Id"", ""Name"", ""Description"", ""ImagePath"", ""Phone"", ""Email"",
+        ""Website"", ""IsActive"", ""AddressId"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_name, p_description, p_image_path, p_phone, p_email,
+        p_website, true, v_addr_id, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_venue(
+    p_id uuid, p_name text, p_description text, p_image_path text,
+    p_phone text, p_email text, p_website text, p_is_active bool,
+    p_line1 text, p_city text, p_state text, p_zip text
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_addr_id uuid;
+BEGIN
+    SELECT ""AddressId"" INTO v_addr_id FROM venues WHERE ""Id"" = p_id;
+    IF v_addr_id IS NOT NULL THEN
+        UPDATE addresses SET
+            ""Line1"" = COALESCE(p_line1, ""Line1""),
+            ""City"" = COALESCE(p_city, ""City""),
+            ""State"" = COALESCE(p_state, ""State""),
+            ""ZipCode"" = COALESCE(p_zip, ""ZipCode""),
+            ""UpdatedAt"" = now()
+        WHERE ""Id"" = v_addr_id;
+    END IF;
+    UPDATE venues SET
+        ""Name"" = COALESCE(p_name, ""Name""),
+        ""Description"" = COALESCE(p_description, ""Description""),
+        ""ImagePath"" = COALESCE(p_image_path, ""ImagePath""),
+        ""Phone"" = p_phone, ""Email"" = p_email, ""Website"" = p_website,
+        ""IsActive"" = COALESCE(p_is_active, ""IsActive""),
+        ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            // ─── TABLE/LAYOUT STORED PROCEDURES ──────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_event_table(
+    p_event_id uuid, p_label text, p_capacity int, p_shape text, p_color text,
+    p_price_cents int, p_platform_fee_cents int, p_template_id uuid
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO event_tables (""Id"", ""EventId"", ""Label"", ""Capacity"", ""Shape"", ""Color"",
+        ""PriceCents"", ""PlatformFeeCents"", ""IsActive"", ""TableTemplateId"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_event_id, p_label, p_capacity, p_shape, p_color,
+        p_price_cents, p_platform_fee_cents, true, p_template_id, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_table(
+    p_event_table_id uuid, p_event_id uuid, p_label text,
+    p_grid_row int, p_grid_col int, p_sort_order int
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO tables (""Id"", ""EventTableId"", ""EventId"", ""Label"", ""GridRow"", ""GridCol"",
+        ""SortOrder"", ""IsActive"", ""Status"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_event_table_id, p_event_id, p_label,
+        p_grid_row, p_grid_col, p_sort_order, true, 'Available', now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_lock_table(
+    p_user_id uuid, p_event_id uuid, p_table_id uuid, p_hold_minutes int
+) RETURNS TABLE(""Id"" uuid, ""Label"" text, ""LockExpiresAt"" timestamptz) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+    UPDATE tables SET
+        ""Status"" = 'Locked', ""LockedByUserId"" = p_user_id,
+        ""LockExpiresAt"" = now() + (p_hold_minutes || ' minutes')::interval,
+        ""UpdatedAt"" = now()
+    WHERE tables.""Id"" = p_table_id AND tables.""EventId"" = p_event_id
+      AND tables.""Status"" = 'Available' AND tables.""IsActive"" = true
+    RETURNING tables.""Id"", tables.""Label""::text, tables.""LockExpiresAt"";
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_release_table_lock(
+    p_user_id uuid, p_event_id uuid, p_table_id uuid
+) RETURNS bool LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE tables SET ""Status"" = 'Available', ""LockedByUserId"" = NULL,
+        ""LockExpiresAt"" = NULL, ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_table_id AND ""EventId"" = p_event_id
+      AND ""LockedByUserId"" = p_user_id AND ""Status"" = 'Locked';
+    RETURN FOUND;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_mark_table_booked(p_table_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE tables SET ""Status"" = 'Booked', ""LockedByUserId"" = NULL,
+        ""LockExpiresAt"" = NULL, ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_table_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_cleanup_expired_locks() RETURNS int LANGUAGE plpgsql AS $$
+DECLARE v_count int;
+BEGIN
+    UPDATE tables SET ""Status"" = 'Available', ""LockedByUserId"" = NULL,
+        ""LockExpiresAt"" = NULL, ""UpdatedAt"" = now()
+    WHERE ""Status"" = 'Locked' AND ""LockExpiresAt"" < now();
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END; $$;
+");
+
+            // ─── PURCHASE STORED PROCEDURES ────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_purchase(
+    p_user_id uuid, p_event_id uuid, p_table_id uuid, p_seats int,
+    p_event_ticket_type_id uuid,
+    p_subtotal_cents int, p_fee_cents int, p_total_cents int,
+    p_purchase_number text, p_status text DEFAULT 'Pending'
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO purchases (""Id"", ""PurchaseNumber"", ""Status"", ""UserId"", ""EventId"", ""TableId"",
+        ""SeatsReserved"", ""EventTicketTypeId"", ""SubtotalCents"", ""FeeCents"", ""TotalCents"",
+        ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_purchase_number, p_status, p_user_id, p_event_id, p_table_id,
+        p_seats, p_event_ticket_type_id, p_subtotal_cents, p_fee_cents, p_total_cents,
+        now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_confirm_purchase(p_purchase_id uuid, p_qr_token text)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_table_id uuid; v_seats int; v_seat int;
+BEGIN
+    UPDATE purchases SET ""Status"" = 'Paid', ""QrToken"" = p_qr_token, ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_purchase_id AND ""Status"" = 'Pending'
+    RETURNING ""TableId"", ""SeatsReserved"" INTO v_table_id, v_seats;
+    IF v_table_id IS NOT NULL THEN
+        PERFORM sp_mark_table_booked(v_table_id);
+    END IF;
+    v_seats := COALESCE(v_seats, 1);
+    FOR v_seat IN 1..v_seats LOOP
+        INSERT INTO purchase_tickets (""Id"", ""PurchaseId"", ""TicketCode"", ""QrToken"",
+            ""SeatNumber"", ""Status"", ""CreatedAt"", ""UpdatedAt"")
+        VALUES (gen_random_uuid(), p_purchase_id,
+            'TKT-' || UPPER(SUBSTRING(gen_random_uuid()::text FROM 1 FOR 8)),
+            encode(gen_random_bytes(32), 'hex'),
+            v_seat, 'Unassigned', now(), now());
+    END LOOP;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_cancel_purchase(p_purchase_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_table_id uuid;
+BEGIN
+    UPDATE purchases SET ""Status"" = 'Cancelled', ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_purchase_id RETURNING ""TableId"" INTO v_table_id;
+    IF v_table_id IS NOT NULL THEN
+        UPDATE tables SET ""Status"" = 'Available', ""LockedByUserId"" = NULL,
+            ""LockExpiresAt"" = NULL, ""UpdatedAt"" = now()
+        WHERE ""Id"" = v_table_id AND ""Status"" IN ('Locked','Booked');
+    END IF;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_refund_purchase(p_purchase_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_table_id uuid;
+BEGIN
+    UPDATE purchases SET ""Status"" = 'Refunded', ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_purchase_id RETURNING ""TableId"" INTO v_table_id;
+    UPDATE stripe_transactions SET ""Status"" = 'Refunded', ""RefundedAt"" = now(), ""UpdatedAt"" = now()
+    WHERE ""PurchaseId"" = p_purchase_id;
+    IF v_table_id IS NOT NULL THEN
+        UPDATE tables SET ""Status"" = 'Available', ""LockedByUserId"" = NULL,
+            ""LockExpiresAt"" = NULL, ""UpdatedAt"" = now()
+        WHERE ""Id"" = v_table_id;
+    END IF;
+END; $$;
+");
+
+            // ─── TICKET STORED PROCEDURES ─────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_invite_ticket(
+    p_ticket_id uuid, p_invite_hash text, p_email text, p_expires_at timestamptz
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE purchase_tickets SET
+        ""InviteTokenHash"" = p_invite_hash, ""InvitedEmail"" = p_email,
+        ""InviteSentAt"" = now(), ""InviteExpiresAt"" = p_expires_at,
+        ""Status"" = 'Invited', ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_ticket_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_claim_ticket(p_invite_hash text, p_guest_user_id uuid)
+RETURNS TABLE(""TicketId"" uuid, ""PurchaseId"" uuid) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+    UPDATE purchase_tickets SET
+        ""GuestUserId"" = p_guest_user_id, ""ClaimedAt"" = now(),
+        ""Status"" = 'Claimed', ""UpdatedAt"" = now()
+    WHERE ""InviteTokenHash"" = p_invite_hash AND ""Status"" = 'Invited' AND ""InviteExpiresAt"" > now()
+    RETURNING purchase_tickets.""Id"" AS ""TicketId"", purchase_tickets.""PurchaseId"";
+END; $$;
+");
+
+            // ─── STRIPE TRANSACTION STORED PROCEDURES ──────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_stripe_transaction(
+    p_purchase_id uuid, p_intent_id text, p_amount_cents int,
+    p_transfer_amount_cents int DEFAULT NULL, p_tax_calculation_id text DEFAULT NULL,
+    p_currency text DEFAULT 'usd'
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO stripe_transactions (""Id"", ""PurchaseId"", ""PaymentIntentId"", ""Status"",
+        ""AmountCents"", ""TransferAmountCents"", ""TaxCalculationId"", ""Currency"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_purchase_id, p_intent_id, 'RequiresConfirmation',
+        p_amount_cents, p_transfer_amount_cents, p_tax_calculation_id, p_currency, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_stripe_transaction_status(p_intent_id text, p_status text)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE stripe_transactions SET
+        ""Status"" = p_status,
+        ""PaidAt"" = CASE WHEN p_status IN ('Succeeded','Refunded') AND ""PaidAt"" IS NULL THEN now() ELSE ""PaidAt"" END,
+        ""RefundedAt"" = CASE WHEN p_status = 'Refunded' THEN now() ELSE ""RefundedAt"" END,
+        ""UpdatedAt"" = now()
+    WHERE ""PaymentIntentId"" = p_intent_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_enrich_stripe_transaction(
+    p_intent_id text, p_total_charged_cents int, p_tax_amount_cents int, p_stripe_fees_cents int
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE stripe_transactions SET
+        ""TotalChargedCents"" = p_total_charged_cents,
+        ""TaxAmountCents"" = p_tax_amount_cents,
+        ""StripeFeesCents"" = p_stripe_fees_cents,
+        ""UpdatedAt"" = now()
+    WHERE ""PaymentIntentId"" = p_intent_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_set_stripe_tax_transaction_id(p_intent_id text, p_tax_transaction_id text)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE stripe_transactions SET
+        ""TaxTransactionId"" = p_tax_transaction_id,
+        ""UpdatedAt"" = now()
+    WHERE ""PaymentIntentId"" = p_intent_id;
+END; $$;
+");
+
+            // ─── IMAGE STORED PROCEDURES ──────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_image(
+    p_entity_type text, p_entity_id uuid, p_storage_key text, p_original_name text,
+    p_size_bytes int, p_width int, p_height int,
+    p_is_primary bool, p_sort_order int, p_uploaded_by uuid
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    IF p_is_primary THEN
+        UPDATE images SET ""IsPrimary"" = false, ""UpdatedAt"" = now()
+        WHERE ""EntityType"" = p_entity_type AND ""EntityId"" = p_entity_id AND ""IsPrimary"" = true;
+    END IF;
+    INSERT INTO images (""Id"", ""EntityType"", ""EntityId"", ""StorageKey"", ""OriginalName"",
+        ""SizeBytes"", ""Width"", ""Height"", ""IsPrimary"", ""SortOrder"", ""UploadedById"",
+        ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_entity_type, p_entity_id, p_storage_key, p_original_name,
+        p_size_bytes, p_width, p_height, p_is_primary, p_sort_order, p_uploaded_by,
+        now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_delete_image(p_image_id uuid) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE v_key text;
+BEGIN
+    DELETE FROM images WHERE ""Id"" = p_image_id RETURNING ""StorageKey"" INTO v_key;
+    RETURN v_key;
+END; $$;
+");
+
+            // ─── SETTINGS STORED PROCEDURES ───────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_upsert_setting(
+    p_key text, p_encrypted_value text, p_description text DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO app_settings (""Id"", ""Key"", ""EncryptedValue"", ""Description"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_key, p_encrypted_value, p_description, now(), now())
+    ON CONFLICT (""Key"") DO UPDATE SET
+        ""EncryptedValue"" = EXCLUDED.""EncryptedValue"",
+        ""Description"" = COALESCE(EXCLUDED.""Description"", app_settings.""Description""),
+        ""UpdatedAt"" = now();
+END; $$;
+");
+
+            // ─── LOGGING STORED PROCEDURES ────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_admin_log(
+    p_action text, p_actor_id uuid, p_actor_email text, p_actor_role text,
+    p_entity_type text, p_entity_id uuid, p_description text,
+    p_metadata_json text, p_ip text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO admin_logs (""Id"", ""Timestamp"", ""Action"", ""ActorId"", ""ActorEmail"", ""ActorRole"",
+        ""EntityType"", ""EntityId"", ""Description"", ""MetadataJson"", ""IpAddress"")
+    VALUES (gen_random_uuid(), now(), p_action, p_actor_id, p_actor_email, p_actor_role,
+        p_entity_type, p_entity_id, p_description, p_metadata_json, p_ip)
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_developer_log(
+    p_severity text, p_message text, p_exception_type text, p_stack_trace text,
+    p_request_path text, p_request_method text, p_status_code int,
+    p_user_id uuid, p_ip text, p_correlation_id text, p_metadata_json text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO developer_logs (""Id"", ""Timestamp"", ""Severity"", ""Message"", ""ExceptionType"",
+        ""StackTrace"", ""RequestPath"", ""RequestMethod"", ""StatusCode"", ""UserId"",
+        ""IpAddress"", ""CorrelationId"", ""MetadataJson"")
+    VALUES (gen_random_uuid(), now(), p_severity, p_message, p_exception_type, p_stack_trace,
+        p_request_path, p_request_method, p_status_code, p_user_id,
+        p_ip, p_correlation_id, p_metadata_json)
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_system_log(
+    p_category text, p_action text, p_source text,
+    p_entity_type text, p_entity_id uuid,
+    p_before_json text, p_after_json text,
+    p_actor_id uuid, p_correlation_id text, p_duration_ms bigint, p_metadata_json text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO system_logs (""Id"", ""Timestamp"", ""Category"", ""Action"", ""Source"",
+        ""EntityType"", ""EntityId"", ""BeforeJson"", ""AfterJson"", ""ActorId"",
+        ""CorrelationId"", ""DurationMs"", ""MetadataJson"")
+    VALUES (gen_random_uuid(), now(), p_category, p_action, p_source,
+        p_entity_type, p_entity_id, p_before_json, p_after_json, p_actor_id,
+        p_correlation_id, p_duration_ms, p_metadata_json)
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_email_log(
+    p_recipient text, p_subject text, p_body text, p_status text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO email_logs (""Id"", ""Timestamp"", ""Recipient"", ""Subject"", ""Body"", ""Status"")
+    VALUES (gen_random_uuid(), now(), p_recipient, p_subject, p_body, p_status)
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_cleanup_old_logs(
+    p_dev_days int, p_admin_days int, p_system_days int
+) RETURNS int LANGUAGE plpgsql AS $$
+DECLARE v_total int := 0; v_count int;
+BEGIN
+    DELETE FROM developer_logs WHERE ""Timestamp"" < now() - (p_dev_days || ' days')::interval;
+    GET DIAGNOSTICS v_count = ROW_COUNT; v_total := v_total + v_count;
+    DELETE FROM admin_logs WHERE ""Timestamp"" < now() - (p_admin_days || ' days')::interval;
+    GET DIAGNOSTICS v_count = ROW_COUNT; v_total := v_total + v_count;
+    DELETE FROM system_logs WHERE ""Timestamp"" < now() - (p_system_days || ' days')::interval;
+    GET DIAGNOSTICS v_count = ROW_COUNT; v_total := v_total + v_count;
+    RETURN v_total;
+END; $$;
+");
+
+            // ─── FEEDBACK STORED PROCEDURE ────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_feedback(
+    p_name text, p_email text, p_type text, p_message text, p_rating int,
+    p_user_id uuid, p_user_agent text, p_ip text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO feedbacks (""Id"", ""Name"", ""Email"", ""Type"", ""Message"", ""Rating"",
+        ""UserId"", ""UserAgent"", ""IpAddress"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (gen_random_uuid(), p_name, p_email, p_type, p_message, p_rating,
+        p_user_id, p_user_agent, p_ip, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            // ─── ADMIN USER STORED PROCEDURES ────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_admin_user(
+    p_email text, p_email_hash text, p_first_name text, p_last_name text,
+    p_password_hash text, p_role text
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO admin_users (""Email"", ""EmailHash"", ""FirstName"", ""LastName"",
+        ""PasswordHash"", ""Role"", ""IsActive"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (p_email, p_email_hash, p_first_name, p_last_name,
+        p_password_hash, p_role, true, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_admin_user(
+    p_id uuid, p_first_name text DEFAULT NULL, p_last_name text DEFAULT NULL,
+    p_phone text DEFAULT NULL, p_role text DEFAULT NULL,
+    p_is_active boolean DEFAULT NULL, p_avatar_path text DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE admin_users SET
+        ""FirstName"" = COALESCE(p_first_name, ""FirstName""),
+        ""LastName"" = COALESCE(p_last_name, ""LastName""),
+        ""Phone"" = COALESCE(p_phone, ""Phone""),
+        ""Role"" = COALESCE(p_role, ""Role""),
+        ""IsActive"" = COALESCE(p_is_active, ""IsActive""),
+        ""AvatarPath"" = COALESCE(p_avatar_path, ""AvatarPath""),
+        ""UpdatedAt"" = now()
+    WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_admin_password(p_id uuid, p_password_hash text)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE admin_users SET ""PasswordHash"" = p_password_hash, ""UpdatedAt"" = now() WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_update_admin_last_login(p_id uuid)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE admin_users SET ""LastLoginAt"" = now(), ""UpdatedAt"" = now() WHERE ""Id"" = p_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_create_admin_device_session(
+    p_admin_user_id uuid, p_session_hash text, p_fingerprint text,
+    p_device_name text, p_ip text, p_expires_at timestamptz
+) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+    INSERT INTO device_sessions (""AdminUserId"", ""SessionHash"", ""DeviceFingerprint"",
+        ""DeviceName"", ""IpAddress"", ""LastActivityAt"", ""ExpiresAt"", ""CreatedAt"", ""UpdatedAt"")
+    VALUES (p_admin_user_id, p_session_hash, p_fingerprint,
+        p_device_name, p_ip, now(), p_expires_at, now(), now())
+    RETURNING ""Id"" INTO v_id;
+    RETURN v_id;
+END; $$;
+");
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION sp_revoke_all_admin_sessions(
+    p_admin_user_id uuid, p_except_hash text DEFAULT NULL
+) RETURNS int LANGUAGE plpgsql AS $$
+DECLARE v_count int;
+BEGIN
+    UPDATE device_sessions SET ""RevokedAt"" = now()
+    WHERE ""AdminUserId"" = p_admin_user_id AND ""RevokedAt"" IS NULL
+      AND (p_except_hash IS NULL OR ""SessionHash"" <> p_except_hash);
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END; $$;
+");
+
+            // ─── AUDIT TRIGGER ────────────────────────────────────────────────────────────
+
+            migrationBuilder.Sql(@"
+CREATE OR REPLACE FUNCTION fn_audit_trigger() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        INSERT INTO system_logs (""Id"", ""Timestamp"", ""Category"", ""Action"", ""Source"",
+            ""EntityType"", ""EntityId"", ""BeforeJson"", ""AfterJson"")
+        VALUES (gen_random_uuid(), now(), 'EntityChange', 'Delete', TG_TABLE_NAME,
+            TG_TABLE_NAME, (OLD.""Id"")::uuid, row_to_json(OLD)::text, NULL);
+        RETURN OLD;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO system_logs (""Id"", ""Timestamp"", ""Category"", ""Action"", ""Source"",
+            ""EntityType"", ""EntityId"", ""BeforeJson"", ""AfterJson"")
+        VALUES (gen_random_uuid(), now(), 'EntityChange', 'Update', TG_TABLE_NAME,
+            TG_TABLE_NAME, (NEW.""Id"")::uuid, row_to_json(OLD)::text, row_to_json(NEW)::text);
+        RETURN NEW;
+    ELSIF TG_OP = 'INSERT' THEN
+        INSERT INTO system_logs (""Id"", ""Timestamp"", ""Category"", ""Action"", ""Source"",
+            ""EntityType"", ""EntityId"", ""BeforeJson"", ""AfterJson"")
+        VALUES (gen_random_uuid(), now(), 'EntityChange', 'Insert', TG_TABLE_NAME,
+            TG_TABLE_NAME, (NEW.""Id"")::uuid, NULL, row_to_json(NEW)::text);
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END; $$;
+");
+
+            var auditTables = new[]
+            {
+                "users", "addresses", "events", "venues", "event_tables", "tables",
+                "purchases", "purchase_tickets", "stripe_transactions", "images", "feedbacks",
+                "magic_link_tokens", "device_sessions", "app_settings", "table_templates"
+            };
+            foreach (var table in auditTables)
+            {
+                migrationBuilder.Sql($@"
+CREATE TRIGGER trg_{table}_audit AFTER INSERT OR UPDATE OR DELETE ON {table}
+FOR EACH ROW EXECUTE FUNCTION fn_audit_trigger();
+");
+            }
+
         }
 
         /// <inheritdoc />
@@ -1070,10 +2229,10 @@ namespace db.Migrations
                 name: "admin_logs");
 
             migrationBuilder.DropTable(
-                name: "admin_password_reset_tokens");
+                name: "app_settings");
 
             migrationBuilder.DropTable(
-                name: "app_settings");
+                name: "purchase_tickets");
 
             migrationBuilder.DropTable(
                 name: "developer_logs");
@@ -1095,9 +2254,6 @@ namespace db.Migrations
 
             migrationBuilder.DropTable(
                 name: "magic_link_tokens");
-
-            migrationBuilder.DropTable(
-                name: "purchase_tickets");
 
             migrationBuilder.DropTable(
                 name: "stripe_transactions");
