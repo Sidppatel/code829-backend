@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Purchases;
 
 public record PurchaseDto(
-    Guid PurchaseId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid PurchaseId,
     string PurchaseNumber,
     string Status,
     Guid UserId,

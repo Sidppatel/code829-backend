@@ -6,7 +6,9 @@ public record SubmitFeedbackRequest(
     string Type,
     string Message,
     int Rating,
-    string? Diagnostics = null
+    string? Diagnostics = null,
+    string? PageUrl = null,
+    string? StepsToReproduce = null
 );
 
 public record FeedbackDto(

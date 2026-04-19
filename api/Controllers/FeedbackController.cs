@@ -41,9 +41,21 @@ public class FeedbackController(
         if (claim is not null && Guid.TryParse(claim.Value, out var uid))
             userId = uid;
 
+        // Merge pageUrl + stepsToReproduce into the diagnostics blob (no schema change needed).
+        var diagDict = new System.Collections.Generic.Dictionary<string, object?>();
+        if (!string.IsNullOrWhiteSpace(request.PageUrl))
+            diagDict["pageUrl"] = request.PageUrl.Trim();
+        if (!string.IsNullOrWhiteSpace(request.StepsToReproduce))
+            diagDict["stepsToReproduce"] = request.StepsToReproduce.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Diagnostics))
+            diagDict["client"] = System.Text.Json.JsonSerializer.Deserialize<object>(request.Diagnostics);
+
+        var diagnostics = diagDict.Count > 0
+            ? System.Text.Json.JsonSerializer.Serialize(diagDict)
+            : null;
+
         // Cap diagnostics payload to 16KB to avoid abuse.
-        var diagnostics = request.Diagnostics;
-        if (!string.IsNullOrWhiteSpace(diagnostics) && diagnostics.Length > 16_384)
+        if (diagnostics is not null && diagnostics.Length > 16_384)
             diagnostics = diagnostics[..16_384];
 
         await feedbackProc.CreateFeedbackAsync(
@@ -51,7 +63,7 @@ public class FeedbackController(
             request.Message.Trim(), request.Rating, userId,
             Request.Headers.UserAgent.ToString(),
             HttpContext.Connection.RemoteIpAddress?.ToString(),
-            string.IsNullOrWhiteSpace(diagnostics) ? null : diagnostics);
+            diagnostics);
 
         Log.Information("[Feedback] New {Type} feedback from {Name} (rating={Rating})", request.Type, request.Name, request.Rating);
 
