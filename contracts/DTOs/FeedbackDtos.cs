@@ -5,7 +5,8 @@ public record SubmitFeedbackRequest(
     string? Email,
     string Type,
     string Message,
-    int Rating
+    int Rating,
+    string? Diagnostics = null
 );
 
 public record FeedbackDto(
@@ -17,5 +18,6 @@ public record FeedbackDto(
     int Rating,
     Guid? UserId,
     string? UserName,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string? Diagnostics = null
 );

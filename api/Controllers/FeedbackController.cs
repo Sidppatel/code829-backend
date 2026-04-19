@@ -41,11 +41,17 @@ public class FeedbackController(
         if (claim is not null && Guid.TryParse(claim.Value, out var uid))
             userId = uid;
 
+        // Cap diagnostics payload to 16KB to avoid abuse.
+        var diagnostics = request.Diagnostics;
+        if (!string.IsNullOrWhiteSpace(diagnostics) && diagnostics.Length > 16_384)
+            diagnostics = diagnostics[..16_384];
+
         await feedbackProc.CreateFeedbackAsync(
             request.Name.Trim(), request.Email?.Trim() ?? "", request.Type,
             request.Message.Trim(), request.Rating, userId,
             Request.Headers.UserAgent.ToString(),
-            HttpContext.Connection.RemoteIpAddress?.ToString());
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            string.IsNullOrWhiteSpace(diagnostics) ? null : diagnostics);
 
         Log.Information("[Feedback] New {Type} feedback from {Name} (rating={Rating})", request.Type, request.Name, request.Rating);
 
@@ -79,7 +85,7 @@ public class FeedbackController(
             .Select(f => new FeedbackDto(
                 f.FeedbackId, f.Name, f.Email, f.Type, f.Message, f.Rating,
                 f.UserId, f.UserFullName,
-                f.CreatedAt
+                f.CreatedAt, f.Diagnostics
             ))
             .ToListAsync();
 

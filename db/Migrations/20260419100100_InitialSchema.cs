@@ -412,6 +412,7 @@ namespace db.Migrations
                     UserId = table.Column<Guid>(type: "uuid", nullable: true),
                     UserAgent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
+                    Diagnostics = table.Column<string>(type: "jsonb", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },

@@ -9,6 +9,7 @@ SELECT
     f."UserId",
     f."UserAgent",
     f."IpAddress",
+    f."Diagnostics"::text AS "Diagnostics",
     f."CreatedAt",
     CASE WHEN u."Id" IS NOT NULL
          THEN u."FirstName" || ' ' || u."LastName"

@@ -634,6 +634,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Message).HasMaxLength(2000);
             entity.Property(e => e.UserAgent).HasMaxLength(512);
             entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.Property(e => e.Diagnostics).HasColumnType("jsonb");
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.Type);

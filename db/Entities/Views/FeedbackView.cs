@@ -11,6 +11,7 @@ public class FeedbackView
     public Guid? UserId { get; set; }
     public string? UserAgent { get; set; }
     public string? IpAddress { get; set; }
+    public string? Diagnostics { get; set; }
     public DateTime CreatedAt { get; set; }
     public string? UserFullName { get; set; }
 }

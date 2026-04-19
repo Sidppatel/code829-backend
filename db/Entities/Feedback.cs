@@ -11,4 +11,5 @@ public class Feedback : BaseEntity
     public User? User { get; set; }
     public string? UserAgent { get; set; }
     public string? IpAddress { get; set; }
+    public string? Diagnostics { get; set; }         // JSON blob: console log buffer, URL, app version
 }
