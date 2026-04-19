@@ -439,12 +439,18 @@ public class EventsController(
             .OrderBy(tt => tt.SortOrder)
             .ToListAsync();
 
-        var types = rawTypes.Select(tt => new EventTicketTypeDto(
-            tt.EventTicketTypeId, tt.Label, tt.PriceCents, null,
-            tt.TotalPriceCents,
-            tt.MaxQuantity, tt.SortOrder, tt.IsActive,
-            tt.SoldCount, tt.AvailableCount,
-            IsSoldOut: tt.AvailableCount <= 0)).ToList();
+        var eventRemaining = Math.Max(0, (ev.TotalCapacity > 0 ? ev.TotalCapacity : ev.MaxCapacity ?? 0) - ev.TotalSold);
+        var types = rawTypes.Select(tt =>
+        {
+            // AvailableCount == -1 means MaxQuantity is NULL (unlimited per type) — cap by event remaining
+            var available = tt.AvailableCount == -1 ? eventRemaining : tt.AvailableCount;
+            return new EventTicketTypeDto(
+                tt.EventTicketTypeId, tt.Label, tt.PriceCents, null,
+                tt.TotalPriceCents,
+                tt.MaxQuantity, tt.SortOrder, tt.IsActive,
+                tt.SoldCount, available,
+                IsSoldOut: available <= 0);
+        }).ToList();
 
         return Ok(new EventTicketTypesResponse(id, types));
     }
