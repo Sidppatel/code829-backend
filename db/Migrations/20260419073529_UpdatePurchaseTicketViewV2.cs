@@ -10,7 +10,7 @@ namespace db.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_purchase_tickets_v2.sql"));
+            migrationBuilder.Sql(MigrationSqlLoader.Load("v_purchase_tickets.sql"));
         }
 
         /// <inheritdoc />

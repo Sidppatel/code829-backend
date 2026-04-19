@@ -17,7 +17,11 @@ SELECT
     v."Name" AS "VenueName",
     COALESCE(addr."City", '') AS "VenueCity",
     b."UserId" AS "PurchaseUserId",
-    bu."Email" AS "PurchaseUserEmail"
+    bu."Email" AS "PurchaseUserEmail",
+    bt."InviteTokenHash",
+    bu."FirstName" AS "PurchaseUserFirstName",
+    bu."LastName" AS "PurchaseUserLastName",
+    b."TableId" AS "PurchaseTableId"
 FROM purchase_tickets bt
 JOIN purchases b ON bt."PurchaseId" = b."Id"
 JOIN events e ON b."EventId" = e."Id"
