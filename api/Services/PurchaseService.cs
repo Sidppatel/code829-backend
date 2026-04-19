@@ -267,7 +267,7 @@ public class PurchaseService(
 
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
-        var checkinLink = $"{frontendUrl}/purchase/{purchaseId}/checkin";
+        var checkinLink = $"{frontendUrl}/purchases/{purchaseId}/tickets";
         // Email is a notification, not a purchase invariant — a failure here (bad Resend domain,
         // network, etc.) should not un-confirm a paid purchase. Log and continue.
         try
