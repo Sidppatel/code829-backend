@@ -98,6 +98,20 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
                 ], ct);
     }
 
+    public async Task<bool> SetUserActiveAsync(Guid userId, bool isActive, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<bool>("SELECT sp_set_user_active({0}, {1}) AS \"Value\"", userId, isActive)
+            .FirstAsync(ct);
+    }
+
+    public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<bool>("SELECT sp_delete_user({0}) AS \"Value\"", userId)
+            .FirstAsync(ct);
+    }
+
     private sealed class UserCountsRow
     {
         public int Total { get; set; }

@@ -27,6 +27,7 @@ public class DeveloperController(
     ISecretsProvider secrets,
     IImageService imageService,
     IAdminUserProcedures adminUserProc,
+    IUserProcedures userProc,
     IEncryptionService encryptionService
 ) : ControllerBase
 {
@@ -41,14 +42,16 @@ public class DeveloperController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        // ARCH-EXCEPTION: email_logs is append-only diagnostic data; dynamic filter + paginate.
-        var query = context.EmailLogs.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(recipient))
-            query = query.Where(e => e.Recipient.Contains(recipient));
+        var recipientParam = (object?)recipient ?? DBNull.Value;
 
-        var totalCount = await query.CountAsync();
-        var items = await query.OrderByDescending(e => e.Timestamp)
-            .Skip((page - 1) * pageSize).Take(pageSize)
+        var totalCount = await context.Database
+            .SqlQueryRaw<int>("SELECT sp_count_email_logs({0}) AS \"Value\"", recipientParam)
+            .FirstAsync();
+
+        var items = await context.EmailLogs
+            .FromSqlRaw("SELECT * FROM sp_get_email_logs({0}, {1}, {2})",
+                recipientParam, (page - 1) * pageSize, pageSize)
+            .AsNoTracking()
             .Select(e => new EmailLogDto(e.Id, e.Recipient, e.Subject, e.Body, e.Status, e.Timestamp))
             .ToListAsync();
 
@@ -67,21 +70,24 @@ public class DeveloperController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        // ARCH-EXCEPTION: developer_logs is append-only error log; dynamic severity/path filter.
-        var query = context.DeveloperLogs.AsQueryable();
-
+        string? normalizedSeverity = null;
         if (!string.IsNullOrWhiteSpace(severity) && Enum.TryParse<LogSeverity>(severity, true, out var sev))
-            query = query.Where(l => l.Severity == sev);
-        if (!string.IsNullOrWhiteSpace(path))
-            query = query.Where(l => l.RequestPath != null && l.RequestPath.Contains(path));
-        if (from.HasValue)
-            query = query.Where(l => l.Timestamp >= from.Value);
-        if (to.HasValue)
-            query = query.Where(l => l.Timestamp <= to.Value);
+            normalizedSeverity = sev.ToString();
 
-        var totalCount = await query.CountAsync();
-        var items = await query.OrderByDescending(l => l.Timestamp)
-            .Skip((page - 1) * pageSize).Take(pageSize)
+        var severityParam = (object?)normalizedSeverity ?? DBNull.Value;
+        var pathParam = (object?)path ?? DBNull.Value;
+        var fromParam = (object?)from ?? DBNull.Value;
+        var toParam = (object?)to ?? DBNull.Value;
+
+        var totalCount = await context.Database
+            .SqlQueryRaw<int>("SELECT sp_count_developer_logs({0}, {1}, {2}, {3}) AS \"Value\"",
+                severityParam, pathParam, fromParam, toParam)
+            .FirstAsync();
+
+        var items = await context.DeveloperLogs
+            .FromSqlRaw("SELECT * FROM sp_get_developer_logs({0}, {1}, {2}, {3}, {4}, {5})",
+                severityParam, pathParam, fromParam, toParam, (page - 1) * pageSize, pageSize)
+            .AsNoTracking()
             .Select(l => new DeveloperLogDto(
                 l.Id, l.Timestamp, l.Severity.ToString(), l.Message, l.ExceptionType,
                 l.StackTrace, l.RequestPath, l.RequestMethod, l.StatusCode,
@@ -104,18 +110,18 @@ public class DeveloperController(
     {
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        // ARCH-EXCEPTION: system_logs is append-only audit log with before/after JSON; cursor-paginated.
-        var query = context.SystemLogs.AsQueryable();
-
-        if (after.HasValue)
-            query = query.Where(l => l.Timestamp < after.Value);
+        string? normalizedCategory = null;
         if (!string.IsNullOrWhiteSpace(category) && Enum.TryParse<LogCategory>(category, true, out var cat))
-            query = query.Where(l => l.Category == cat);
-        if (!string.IsNullOrWhiteSpace(entityType))
-            query = query.Where(l => l.EntityType == entityType);
+            normalizedCategory = cat.ToString();
 
-        var items = await query.OrderByDescending(l => l.Timestamp)
-            .Take(pageSize + 1) // Fetch one extra to detect hasMore
+        var afterParam = (object?)after ?? DBNull.Value;
+        var categoryParam = (object?)normalizedCategory ?? DBNull.Value;
+        var entityTypeParam = (object?)entityType ?? DBNull.Value;
+
+        var items = await context.SystemLogs
+            .FromSqlRaw("SELECT * FROM sp_get_system_logs({0}, {1}, {2}, {3})",
+                afterParam, categoryParam, entityTypeParam, pageSize + 1)
+            .AsNoTracking()
             .Select(l => new SystemLogDto(
                 l.Id, l.Timestamp, l.Category.ToString(), l.Action, l.Source,
                 l.EntityType, l.EntityId, l.BeforeJson, l.AfterJson,
@@ -340,11 +346,9 @@ public class DeveloperController(
     [HttpPut("users/{id:guid}/status")]
     public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] bool isActive)
     {
-        var user = await context.Users.FindAsync(id); // ARCH-EXCEPTION: developer-only admin toggle; direct find ok for immediate cleanup.
-        if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+        var updated = await userProc.SetUserActiveAsync(id, isActive);
+        if (!updated) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
-        user.IsActive = isActive;
-        await context.SaveChangesAsync();
         Log.Information("[Developer] User {UserId} status updated to {Status}", id, isActive);
         return Ok(new { message = "User status updated" });
     }
@@ -355,11 +359,9 @@ public class DeveloperController(
     [HttpDelete("users/{id:guid}")]
     public async Task<IActionResult> DeleteUser(Guid id)
     {
-        var user = await context.Users.FindAsync(id); // ARCH-EXCEPTION: developer-only admin deletion; direct find ok for immediate cleanup.
-        if (user is null) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+        var deleted = await userProc.DeleteUserAsync(id);
+        if (!deleted) return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
 
-        context.Users.Remove(user); // ARCH-EXCEPTION: developer-only admin deletion; direct remove ok for immediate cleanup.
-        await context.SaveChangesAsync();
         Log.Information("[Developer] User {UserId} deleted", id);
         return Ok(new { message = "User deleted successfully" });
     }

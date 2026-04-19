@@ -37,4 +37,14 @@ public class ImageProcedures(EventPlatformDbContext context) : IImageProcedures
 
         return result;
     }
+
+    public async Task<string?> GetPrimaryImageKeyAsync(string entityType, Guid entityId, CancellationToken ct = default)
+    {
+        var result = await context.Database
+            .SqlQueryRaw<string?>(
+                "SELECT sp_get_primary_image_key({0}, {1}) AS \"Value\"",
+                entityType, entityId)
+            .FirstOrDefaultAsync(ct);
+        return result;
+    }
 }

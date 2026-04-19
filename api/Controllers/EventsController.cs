@@ -18,6 +18,7 @@ namespace Api.Controllers;
 public class EventsController(
     EventPlatformDbContext context,
     IEventProcedures eventProc,
+    IImageProcedures imageProc,
     IFileStorageService fileStorage,
     ISettingsService settings,
     IConnectionMultiplexer redis
@@ -478,13 +479,7 @@ public class EventsController(
 
     private async Task<string?> ResolveEventImageUrlAsync(Guid eventId)
     {
-        // ARCH-EXCEPTION: trivial single-field projection for the primary image storage key.
-        // Not worth a dedicated SP; read-only and scoped to one entity.
-        var primary = await context.Images
-            .Where(img => img.EntityType == "event" && img.EntityId == eventId && img.IsPrimary)
-            .Select(img => img.StorageKey)
-            .FirstOrDefaultAsync();
-
+        var primary = await imageProc.GetPrimaryImageKeyAsync("event", eventId);
         return primary is not null ? fileStorage.GetPublicUrl($"{primary}_card.webp") : null;
     }
 }

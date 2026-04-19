@@ -28,21 +28,20 @@ public class DeveloperLogsController(EventPlatformDbContext context) : Controlle
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        // ARCH-EXCEPTION: admin_logs is append-only audit log; dynamic filter + paginate for developer view.
-        var query = context.AdminLogs.AsQueryable();
+        var actionParam = (object?)action ?? DBNull.Value;
+        var entityTypeParam = (object?)entityType ?? DBNull.Value;
+        var fromParam = (object?)from ?? DBNull.Value;
+        var toParam = (object?)to ?? DBNull.Value;
 
-        if (!string.IsNullOrWhiteSpace(action))
-            query = query.Where(l => l.Action.Contains(action));
-        if (!string.IsNullOrWhiteSpace(entityType))
-            query = query.Where(l => l.EntityType == entityType);
-        if (from.HasValue)
-            query = query.Where(l => l.Timestamp >= from.Value);
-        if (to.HasValue)
-            query = query.Where(l => l.Timestamp <= to.Value);
+        var totalCount = await context.Database
+            .SqlQueryRaw<int>("SELECT sp_count_admin_logs({0}, {1}, {2}, {3}) AS \"Value\"",
+                actionParam, entityTypeParam, fromParam, toParam)
+            .FirstAsync();
 
-        var totalCount = await query.CountAsync();
-        var items = await query.OrderByDescending(l => l.Timestamp)
-            .Skip((page - 1) * pageSize).Take(pageSize)
+        var items = await context.AdminLogs
+            .FromSqlRaw("SELECT * FROM sp_get_admin_logs({0}, {1}, {2}, {3}, {4}, {5})",
+                actionParam, entityTypeParam, fromParam, toParam, (page - 1) * pageSize, pageSize)
+            .AsNoTracking()
             .Select(l => new AdminLogDto(
                 l.Id, l.Timestamp, l.Action, l.AdminUserId, l.ActorEmail, l.ActorRole,
                 l.EntityType, l.EntityId, l.Description, l.MetadataJson, l.IpAddress))
