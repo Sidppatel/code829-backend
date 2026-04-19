@@ -20,7 +20,7 @@ public record EventTableDto(
 );
 
 public record EventTableTypeInfo(
-    Guid EventTableId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTableId,
     string Label,
     int Capacity,
     string Shape,
