@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Events;
 
 public record EventTableTypeSummaryDto(
-    Guid EventTableId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTableId,
     string Label,
     int Capacity,
     string Shape,

@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Logs;
 
 public record EmailLogDto(
-    Guid EmailLogId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EmailLogId,
     string Recipient,
     string Subject,
     string Body,

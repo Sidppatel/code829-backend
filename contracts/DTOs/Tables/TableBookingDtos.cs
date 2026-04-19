@@ -25,7 +25,7 @@ public record CancelBeaconRequest(
 );
 
 public record TableLockDto(
-    Guid TableId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid TableId,
     string TableLabel,
     Guid EventId,
     Guid UserId,

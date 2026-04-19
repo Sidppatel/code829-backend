@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Logs;
 
 public record SystemLogDto(
-    Guid SystemLogId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid SystemLogId,
     DateTime Timestamp,
     string Category,
     string Action,
