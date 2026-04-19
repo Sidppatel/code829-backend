@@ -192,7 +192,7 @@ public class AuthService(
         OptInLocationEmail: user.OptInLocationEmail,
         HasCompletedOnboarding: user.HasCompletedOnboarding,
         ImageUrl: user.Image?.StorageKey is not null
-            ? fileStorage.GetPublicUrl(user.Image.StorageKey)
+            ? fileStorage.GetPublicUrl($"{user.Image.StorageKey}.webp")
             : null
     );
 

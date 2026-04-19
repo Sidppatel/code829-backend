@@ -220,7 +220,7 @@ public class AdminAuthService(
         LastLoginAt: admin.LastLoginAt,
         Phone: admin.Phone,
         ImageUrl: admin.Image?.StorageKey is not null
-            ? fileStorage.GetPublicUrl(admin.Image.StorageKey)
+            ? fileStorage.GetPublicUrl($"{admin.Image.StorageKey}.webp")
             : null
     );
 
