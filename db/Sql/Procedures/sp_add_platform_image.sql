@@ -24,10 +24,10 @@ DECLARE
     v_is_primary boolean;
     v_has_primary boolean;
 BEGIN
-    SELECT COALESCE(MAX("SortOrder") + 1, 0) INTO v_sort_order
-    FROM platform_images;
+    SELECT COALESCE(MAX(pi."SortOrder") + 1, 0) INTO v_sort_order
+    FROM platform_images pi;
 
-    SELECT EXISTS(SELECT 1 FROM platform_images WHERE "IsPrimary" = true)
+    SELECT EXISTS(SELECT 1 FROM platform_images pi WHERE pi."IsPrimary" = true)
     INTO v_has_primary;
     v_is_primary := NOT v_has_primary;
 

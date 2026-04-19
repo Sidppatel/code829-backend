@@ -27,7 +27,7 @@ BEGIN
     SELECT COALESCE(MAX(vi."SortOrder") + 1, 0) INTO v_sort_order
     FROM venue_images vi WHERE vi."VenueId" = p_venue_id;
 
-    SELECT EXISTS(SELECT 1 FROM venue_images WHERE "VenueId" = p_venue_id AND "IsPrimary" = true)
+    SELECT EXISTS(SELECT 1 FROM venue_images vi WHERE vi."VenueId" = p_venue_id AND vi."IsPrimary" = true)
     INTO v_has_primary;
     v_is_primary := NOT v_has_primary;
 
