@@ -1,5 +1,6 @@
 using System.Net;
 using Api.Middleware;
+using Api.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -14,6 +15,7 @@ public class RateLimitingMiddlewareTests
     private readonly Mock<IConnectionMultiplexer> _redis;
     private readonly Mock<IDatabase> _redisDb;
     private readonly Mock<IWebHostEnvironment> _env;
+    private readonly Mock<ISettingsService> _settings;
 
     public RateLimitingMiddlewareTests()
     {
@@ -22,6 +24,9 @@ public class RateLimitingMiddlewareTests
         _redis.Setup(r => r.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(_redisDb.Object);
         _env = new Mock<IWebHostEnvironment>();
         _env.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        _settings = new Mock<ISettingsService>();
+        // Default: rate limiting enabled
+        _settings.Setup(s => s.GetOrDefaultAsync("rate_limit_disabled", "false")).ReturnsAsync("false");
     }
 
     [Fact]
@@ -39,7 +44,7 @@ public class RateLimitingMiddlewareTests
             return Task.CompletedTask;
         };
 
-        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object, _settings.Object);
         var context = CreateHttpContext("192.168.1.1", "/events");
 
         await middleware.InvokeAsync(context);
@@ -63,7 +68,7 @@ public class RateLimitingMiddlewareTests
             return Task.CompletedTask;
         };
 
-        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object, _settings.Object);
         var context = CreateHttpContext("192.168.1.1", "/events");
 
         await middleware.InvokeAsync(context);
@@ -87,7 +92,7 @@ public class RateLimitingMiddlewareTests
             .ReturnsAsync(true);
 
         RequestDelegate next = _ => Task.CompletedTask;
-        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object, _settings.Object);
 
         // Two different IPs
         await middleware.InvokeAsync(CreateHttpContext("10.0.0.1", "/events"));

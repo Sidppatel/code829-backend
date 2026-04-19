@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Api.Services;
 using StackExchange.Redis;
 
 namespace Api.Middleware;
@@ -7,8 +8,9 @@ namespace Api.Middleware;
 /// Redis-based rate limiting middleware for distributed deployments.
 /// Default: 30 requests per 15 minutes for general endpoints.
 /// Stricter limits for auth (5/min) and seat hold (20/min) endpoints.
+/// Set AppSetting "rate_limit_disabled" = "true" to bypass all limits (useful for testing).
 /// </summary>
-public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env)
+public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env, ISettingsService settings)
 {
     private const int DefaultLimit = 200;
     private static readonly TimeSpan DefaultWindow = TimeSpan.FromMinutes(15);
@@ -40,6 +42,15 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
         // loopback IPs even if they reach the app, so misconfiguration can't disable limits.
         var remoteIp = context.Connection.RemoteIpAddress;
         if (env.IsDevelopment() && remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp))
+        {
+            await next(context);
+            return;
+        }
+
+        // DB flag: set AppSetting "rate_limit_disabled" = "true" to bypass all limits.
+        // Cached in Redis for 30s, so changes take effect within half a minute.
+        var disabled = await settings.GetOrDefaultAsync("rate_limit_disabled", "false");
+        if (string.Equals(disabled, "true", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;

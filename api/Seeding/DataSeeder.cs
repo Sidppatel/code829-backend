@@ -106,6 +106,7 @@ public static class DataSeeder
             ["admin_log_retention_days"] = ("365", "Admin log retention in days"),
             ["system_log_retention_days"] = ("30", "System log retention in days"),
             ["s3_region"] = ("auto", "Cloudflare R2 region (always 'auto')"),
+            ["rate_limit_disabled"] = ("false", "Set to 'true' to bypass all rate limits (testing only)"),
         };
 
         foreach (var (key, (value, description)) in defaults)
