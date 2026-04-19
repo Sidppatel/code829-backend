@@ -1,5 +1,8 @@
+using System.Security.Claims;
+using Api.Services;
 using Contracts.DTOs;
 using Api.Middleware;
+using Contracts.DTOs.Admin;
 using Contracts.DTOs.CheckIn;
 using Contracts.Enums;
 using Db;
@@ -17,14 +20,43 @@ namespace Api.Controllers;
 [RequireRole(UserRole.Staff)]
 public class CheckInController(
     EventPlatformDbContext context,
-    ICheckInProcedures checkInProc
+    ICheckInProcedures checkInProc,
+    IAdminUserEventProcedures adminUserEventProc,
+    IFileStorageService fileStorage
 ) : ControllerBase
 {
+    private Guid GetCurrentAdminId() =>
+        Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    [HttpGet("events")]
+    public async Task<IActionResult> GetAccessibleEvents()
+    {
+        var adminId = GetCurrentAdminId();
+        var events = await adminUserEventProc.ListEventsForStaffAsync(adminId);
+
+        var dtos = events.Select(e => new StaffEventDto(
+            e.Id, e.Title, e.Slug, e.StartDate, e.EndDate, e.Status.ToString(),
+            e.ImagePath is not null ? fileStorage.GetPublicUrl(e.ImagePath) : null
+        )).ToList();
+
+        return Ok(new { items = dtos });
+    }
+
     [HttpPost("scan")]
     public async Task<IActionResult> Scan([FromBody] ScanRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.QrToken))
             return BadRequest(new ScanResponse(false, "QR token is required", null, null, null, null, null));
+
+        if (request.EventId is null)
+            return BadRequest(new ApiError(400, "EventId is required", HttpContext.TraceIdentifier));
+
+        var adminId = GetCurrentAdminId();
+        var canAccess = await adminUserEventProc.CanAccessEventAsync(adminId, request.EventId.Value);
+        if (!canAccess)
+            return StatusCode(403, new ApiError(403,
+                "You are not assigned to this event or access has expired",
+                HttpContext.TraceIdentifier));
 
         var ticketResult = await checkInProc.ScanTicketAsync(request.QrToken);
         if (ticketResult is not null)
@@ -67,6 +99,13 @@ public class CheckInController(
     [HttpGet("events/{eventId:guid}/stats")]
     public async Task<IActionResult> GetStats(Guid eventId)
     {
+        var adminId = GetCurrentAdminId();
+        var canAccess = await adminUserEventProc.CanAccessEventAsync(adminId, eventId);
+        if (!canAccess)
+            return StatusCode(403, new ApiError(403,
+                "You are not assigned to this event or access has expired",
+                HttpContext.TraceIdentifier));
+
         var ev = await context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));

@@ -24,6 +24,7 @@ public class EventPlatformDbContext(
 
     // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<AdminUserEvent> AdminUserEvents => Set<AdminUserEvent>();
     public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<EventTicketType> EventTicketTypes => Set<EventTicketType>();
     public DbSet<Table> Tables => Set<Table>();
@@ -58,6 +59,7 @@ public class EventPlatformDbContext(
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
     public DbSet<EventTicketTypeSummaryView> EventTicketTypeSummaryViews => Set<EventTicketTypeSummaryView>();
     public DbSet<AdminUserView> AdminUserViews => Set<AdminUserView>();
+    public DbSet<AdminUserEventView> AdminUserEventViews => Set<AdminUserEventView>();
     public DbSet<DeviceSessionView> DeviceSessionViews => Set<DeviceSessionView>();
     public DbSet<InvitationView> InvitationViews => Set<InvitationView>();
     public DbSet<FeedbackView> FeedbackViews => Set<FeedbackView>();
@@ -343,6 +345,21 @@ public class EventPlatformDbContext(
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, Description = e.Description! })
                   .HasIndex(e => e.SearchVector).HasMethod("GIN");
 #pragma warning restore CS8603
+        });
+
+        modelBuilder.Entity<AdminUserEvent>(entity =>
+        {
+            entity.ToTable("admin_user_events");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.AdminUserId, e.EventId }).IsUnique();
+            entity.HasIndex(e => e.EventId);
+            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.AssignedByAdminUser).WithMany()
+                .HasForeignKey(e => e.AssignedByAdminUserId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Table>(entity =>
@@ -701,6 +718,12 @@ public class EventPlatformDbContext(
             entity.ToView("v_admin_users");
             entity.HasKey(e => e.AdminUserId);
             entity.Property(e => e.Role).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<AdminUserEventView>(entity =>
+        {
+            entity.ToView("v_admin_user_events");
+            entity.HasKey(e => e.AdminUserEventId);
         });
 
         modelBuilder.Entity<DeviceSessionView>(entity =>

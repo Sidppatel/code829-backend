@@ -176,6 +176,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILayoutProcedures, Db.Repositories.StoredProcedures.LayoutProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminPasswordResetTokenProcedures, Db.Repositories.StoredProcedures.AdminPasswordResetTokenProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ICheckInProcedures, Db.Repositories.StoredProcedures.CheckInProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminUserEventProcedures, Db.Repositories.StoredProcedures.AdminUserEventProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();

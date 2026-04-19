@@ -24,8 +24,10 @@ public class DeveloperEventsController(
     IFileStorageService fileStorage,
     IAdminLogService adminLog,
     ISettingsService settings,
-    IEventImageService eventImageService
-) : AdminEventsController(context, eventProc, tableProc, layoutProc, ticketTypeProc, fileStorage, adminLog, settings, eventImageService)
+    IEventImageService eventImageService,
+    IAdminUserEventProcedures adminUserEventProc,
+    IAdminUserProcedures adminUserProc
+) : AdminEventsController(context, eventProc, tableProc, layoutProc, ticketTypeProc, fileStorage, adminLog, settings, eventImageService, adminUserEventProc, adminUserProc)
 {
     [HttpGet("{id:guid}/fees")]
     public async Task<IActionResult> GetEventFees(Guid id)

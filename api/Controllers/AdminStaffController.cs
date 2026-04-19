@@ -40,7 +40,7 @@ public class AdminStaffController(
         var query = context.AdminUserViews.AsNoTracking();
 
         if (!isDeveloper)
-            query = query.Where(a => a.Role == AdminRole.Staff);
+            query = query.Where(a => a.Role == AdminRole.Staff && a.IsActive);
 
         if (!string.IsNullOrWhiteSpace(search))
         {

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
+using Contracts.DTOs.Admin;
 using Contracts.DTOs.Events;
 using Contracts.DTOs.Images;
 using Contracts.DTOs.Venues;
@@ -30,7 +31,9 @@ public class AdminEventsController(
     IFileStorageService fileStorage,
     IAdminLogService adminLog,
     ISettingsService settingsService,
-    IEventImageService eventImageService
+    IEventImageService eventImageService,
+    IAdminUserEventProcedures adminUserEventProc,
+    IAdminUserProcedures adminUserProc
 ) : ControllerBase
 {
     // Exposed so derived controllers (e.g. DeveloperEventsController) can reuse these
@@ -613,6 +616,59 @@ public class AdminEventsController(
             return BadRequest(new ApiError(400, "Cannot delete — active purchases exist for this ticket type", HttpContext.TraceIdentifier));
 
         await ticketTypeProc.DeleteAsync(typeId);
+        return NoContent();
+    }
+
+    // ─── Per-event staff assignment ─────────────────────────────
+
+    [HttpGet("{eventId:guid}/staff")]
+    public async Task<IActionResult> ListEventStaff(Guid eventId)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        var rows = await adminUserEventProc.ListStaffForEventAsync(eventId);
+        var dtos = rows.Select(r => new EventStaffDto(
+            r.AdminUserEventId, r.AdminUserId, r.FirstName, r.LastName, r.Email, r.CreatedAt)).ToList();
+        return Ok(new { items = dtos });
+    }
+
+    [HttpPost("{eventId:guid}/staff")]
+    public async Task<IActionResult> AssignEventStaff(Guid eventId, [FromBody] AssignStaffRequest request)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        var target = await adminUserProc.GetByIdAsync(request.AdminUserId);
+        if (target is null)
+            return NotFound(new ApiError(404, "Staff user not found", HttpContext.TraceIdentifier));
+        if (!target.IsActive)
+            return BadRequest(new ApiError(400, "Cannot assign a disabled account", HttpContext.TraceIdentifier));
+        if (target.Role != AdminRole.Staff)
+            return BadRequest(new ApiError(400, "Only Staff users can be assigned to events", HttpContext.TraceIdentifier));
+
+        var assignmentId = await adminUserEventProc.AssignAsync(request.AdminUserId, eventId, GetCurrentUserId());
+
+        await adminLog.LogAsync("staff.assigned_to_event", "AdminUserEvent", eventId,
+            $"Assigned {target.FirstName} {target.LastName} to event '{ev.Title}'");
+
+        return Ok(new { adminUserEventId = assignmentId, message = "Staff assigned" });
+    }
+
+    [HttpDelete("{eventId:guid}/staff/{adminUserId:guid}")]
+    public async Task<IActionResult> UnassignEventStaff(Guid eventId, Guid adminUserId)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        await adminUserEventProc.UnassignAsync(adminUserId, eventId);
+
+        await adminLog.LogAsync("staff.unassigned_from_event", "AdminUserEvent", eventId,
+            $"Unassigned staff {adminUserId} from event '{ev.Title}'");
+
         return NoContent();
     }
 
