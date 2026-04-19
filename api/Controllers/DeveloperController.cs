@@ -118,14 +118,14 @@ public class DeveloperController(
         var categoryParam = (object?)normalizedCategory ?? DBNull.Value;
         var entityTypeParam = (object?)entityType ?? DBNull.Value;
 
-        var items = await context.SystemLogs
+        var items = await context.SystemLogViews
             .FromSqlRaw("SELECT * FROM sp_get_system_logs({0}, {1}, {2}, {3})",
                 afterParam, categoryParam, entityTypeParam, pageSize + 1)
             .AsNoTracking()
             .Select(l => new SystemLogDto(
-                l.Id, l.Timestamp, l.Category.ToString(), l.Action, l.Source,
+                l.Id, l.Timestamp, l.Category, l.Action, l.Source,
                 l.EntityType, l.EntityId, l.BeforeJson, l.AfterJson,
-                l.AdminUserId, l.CorrelationId, l.DurationMs, l.MetadataJson))
+                l.UserId, l.UserEmail, l.UserRole, l.CorrelationId, l.DurationMs, l.MetadataJson))
             .ToListAsync();
 
         var hasMore = items.Count > pageSize;

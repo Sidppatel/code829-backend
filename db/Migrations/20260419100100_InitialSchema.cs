@@ -15,6 +15,8 @@ namespace db.Migrations
             migrationBuilder.AlterDatabase()
                 .Annotation("Npgsql:PostgresExtension:pg_trgm", ",,");
 
+            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
+
             migrationBuilder.CreateTable(
                 name: "addresses",
                 columns: table => new
@@ -41,8 +43,6 @@ namespace db.Migrations
                     Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     Action = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     AdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    ActorEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    ActorRole = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     EntityType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     EntityId = table.Column<Guid>(type: "uuid", nullable: true),
                     Description = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
@@ -196,7 +196,7 @@ namespace db.Migrations
                     EntityId = table.Column<Guid>(type: "uuid", nullable: true),
                     BeforeJson = table.Column<string>(type: "text", nullable: true),
                     AfterJson = table.Column<string>(type: "text", nullable: true),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
                     CorrelationId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     DurationMs = table.Column<long>(type: "bigint", nullable: true),
                     MetadataJson = table.Column<string>(type: "text", nullable: true)
@@ -1226,7 +1226,6 @@ namespace db.Migrations
                 table: "venues",
                 column: "Name");
 
-            // Views first (procedures may reference them), then procedures.
             MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
             MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
         }

@@ -1,11 +1,13 @@
-namespace Db.Entities;
+namespace Db.Entities.Views;
 
-public class AdminLog
+public class AdminLogView
 {
     public Guid Id { get; set; }
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    public required string Action { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string Action { get; set; } = string.Empty;
     public Guid? AdminUserId { get; set; }
+    public string? AdminEmail { get; set; }
+    public string? AdminRole { get; set; }
     public string? EntityType { get; set; }
     public Guid? EntityId { get; set; }
     public string? Description { get; set; }

@@ -24,8 +24,8 @@ DECLARE
     v_is_primary boolean;
     v_has_primary boolean;
 BEGIN
-    SELECT COALESCE(MAX("SortOrder") + 1, 0) INTO v_sort_order
-    FROM venue_images WHERE "VenueId" = p_venue_id;
+    SELECT COALESCE(MAX(vi."SortOrder") + 1, 0) INTO v_sort_order
+    FROM venue_images vi WHERE vi."VenueId" = p_venue_id;
 
     SELECT EXISTS(SELECT 1 FROM venue_images WHERE "VenueId" = p_venue_id AND "IsPrimary" = true)
     INTO v_has_primary;

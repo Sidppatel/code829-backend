@@ -64,6 +64,8 @@ public class EventPlatformDbContext(
     public DbSet<EventImageView> EventImageViews => Set<EventImageView>();
     public DbSet<VenueImageView> VenueImageViews => Set<VenueImageView>();
     public DbSet<PlatformImageView> PlatformImageViews => Set<PlatformImageView>();
+    public DbSet<AdminLogView> AdminLogViews => Set<AdminLogView>();
+    public DbSet<SystemLogView> SystemLogViews => Set<SystemLogView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -585,8 +587,6 @@ public class EventPlatformDbContext(
             entity.HasIndex(e => e.Timestamp);
             entity.HasIndex(e => e.Action);
             entity.Property(e => e.Action).HasMaxLength(128);
-            entity.Property(e => e.ActorEmail).HasMaxLength(256);
-            entity.Property(e => e.ActorRole).HasMaxLength(20);
             entity.Property(e => e.EntityType).HasMaxLength(64);
             entity.Property(e => e.Description).HasMaxLength(2048);
             entity.Property(e => e.IpAddress).HasMaxLength(45);
@@ -738,6 +738,19 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_platform_images");
             entity.HasKey(e => e.PlatformImageId);
+        });
+
+        modelBuilder.Entity<AdminLogView>(entity =>
+        {
+            entity.ToView("v_admin_logs");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<SystemLogView>(entity =>
+        {
+            entity.ToView("v_system_logs");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Category).HasMaxLength(30);
         });
     }
 }

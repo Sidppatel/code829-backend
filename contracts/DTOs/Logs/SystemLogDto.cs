@@ -10,7 +10,9 @@ public record SystemLogDto(
     Guid? EntityId,
     string? BeforeJson,
     string? AfterJson,
-    Guid? AdminUserId,
+    Guid? UserId,
+    string? UserEmail,
+    string? UserRole,
     string? CorrelationId,
     long? DurationMs,
     string? MetadataJson
