@@ -8,6 +8,10 @@ BEGIN
         "LockExpiresAt" = now() + (p_hold_minutes || ' minutes')::interval,
         "UpdatedAt" = now()
     WHERE tables."Id" = p_table_id AND tables."EventId" = p_event_id
-      AND tables."Status" = 'Available' AND tables."IsActive" = true
+      AND tables."IsActive" = true
+      AND (
+          tables."Status" = 'Available'
+          OR (tables."Status" = 'Locked' AND tables."LockExpiresAt" <= now())
+      )
     RETURNING tables."Id", tables."Label"::text, tables."LockExpiresAt";
 END; $$;
