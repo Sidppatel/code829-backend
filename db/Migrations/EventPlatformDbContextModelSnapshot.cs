@@ -1134,6 +1134,21 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.PurchaseTable", b =>
+                {
+                    b.Property<Guid>("PurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TableId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PurchaseId", "TableId");
+
+                    b.HasIndex("TableId");
+
+                    b.ToTable("purchase_tables", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2635,6 +2650,25 @@ namespace db.Migrations
                     b.Navigation("GuestUser");
 
                     b.Navigation("Purchase");
+                });
+
+            modelBuilder.Entity("Db.Entities.PurchaseTable", b =>
+                {
+                    b.HasOne("Db.Entities.Purchase", "Purchase")
+                        .WithMany()
+                        .HasForeignKey("PurchaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Db.Entities.Table", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Purchase");
+
+                    b.Navigation("Table");
                 });
 
             modelBuilder.Entity("Db.Entities.StripeTransaction", b =>

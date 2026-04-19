@@ -1057,14 +1057,34 @@ namespace db.Migrations
 
             // --- PURCHASE TABLES (multi-table support) ------------------------------------
 
-            migrationBuilder.Sql(@"
-CREATE TABLE purchase_tables (
-    ""PurchaseId"" uuid NOT NULL REFERENCES purchases(""Id"") ON DELETE CASCADE,
-    ""TableId"" uuid NOT NULL REFERENCES tables(""Id"") ON DELETE CASCADE,
-    PRIMARY KEY (""PurchaseId"", ""TableId"")
-);
-CREATE INDEX ""IX_purchase_tables_TableId"" ON purchase_tables (""TableId"");
-");
+            migrationBuilder.CreateTable(
+                name: "purchase_tables",
+                columns: table => new
+                {
+                    PurchaseId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TableId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_purchase_tables", x => new { x.PurchaseId, x.TableId });
+                    table.ForeignKey(
+                        name: "FK_purchase_tables_purchases_PurchaseId",
+                        column: x => x.PurchaseId,
+                        principalTable: "purchases",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_purchase_tables_tables_TableId",
+                        column: x => x.TableId,
+                        principalTable: "tables",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchase_tables_TableId",
+                table: "purchase_tables",
+                column: "TableId");
 
             // --- VIEWS --------------------------------------------------------------------
 
@@ -1363,6 +1383,9 @@ FOR EACH ROW EXECUTE FUNCTION fn_audit_trigger();
 
             migrationBuilder.DropTable(
                 name: "magic_link_tokens");
+
+            migrationBuilder.DropTable(
+                name: "purchase_tables");
 
             migrationBuilder.DropTable(
                 name: "purchase_tickets");

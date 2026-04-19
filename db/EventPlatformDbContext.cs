@@ -29,6 +29,7 @@ public class EventPlatformDbContext(
     public DbSet<Table> Tables => Set<Table>();
     public DbSet<Purchase> Purchases => Set<Purchase>();
     public DbSet<PurchaseTicket> PurchaseTickets => Set<PurchaseTicket>();
+    public DbSet<PurchaseTable> PurchaseTables => Set<PurchaseTable>();
     public DbSet<StripeTransaction> StripeTransactions => Set<StripeTransaction>();
 
     // Images
@@ -431,6 +432,17 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.GuestUser).WithMany()
                 .HasForeignKey(e => e.GuestUserId).IsRequired(false)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<PurchaseTable>(entity =>
+        {
+            entity.ToTable("purchase_tables");
+            entity.HasKey(e => new { e.PurchaseId, e.TableId });
+            entity.HasIndex(e => e.TableId);
+            entity.HasOne(e => e.Purchase).WithMany()
+                .HasForeignKey(e => e.PurchaseId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Table).WithMany()
+                .HasForeignKey(e => e.TableId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<StripeTransaction>(entity =>
