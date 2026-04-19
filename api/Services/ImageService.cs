@@ -30,11 +30,9 @@ public class ImageService(
         var detailVariant = variants.First(v => v.Suffix == "");
 
         var baseKey = $"{entityType}/{Guid.NewGuid()}";
-        foreach (var variant in variants)
-        {
-            var key = $"{baseKey}{variant.Suffix}.webp";
-            await fileStorage.SaveWithKeyAsync(variant.Stream, key, "image/webp");
-        }
+        // Upload all variants to storage in parallel — independent network calls.
+        await Task.WhenAll(variants.Select(variant =>
+            fileStorage.SaveWithKeyAsync(variant.Stream, $"{baseKey}{variant.Suffix}.webp", "image/webp")));
 
         var existing = await imageRepo.GetByEntityAsync(entityType, entityId);
         var sortOrder = existing.Count;

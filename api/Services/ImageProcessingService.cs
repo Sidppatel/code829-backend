@@ -38,35 +38,28 @@ public class ImageProcessingService : IImageProcessingService
         using var image = await Image.LoadAsync(input);
 
         var variants = VariantsByEntity.GetValueOrDefault(entityType, VariantsByEntity["event"]);
-        var results = new List<ProcessedImage>();
+        var resizeMode = entityType == "user" ? ResizeMode.Crop : ResizeMode.Max;
 
-        foreach (var variant in variants)
+        // Process all variants in parallel — each clone is independent so this is safe.
+        var tasks = variants.Select(async variant =>
         {
-            var clone = image.Clone(ctx =>
-            {
+            using var clone = image.Clone(ctx =>
                 ctx.Resize(new ResizeOptions
                 {
                     Size = new Size(variant.MaxWidth, variant.MaxHeight),
-                    Mode = entityType == "user" ? ResizeMode.Crop : ResizeMode.Max
-                });
-            });
+                    Mode = resizeMode
+                }));
 
+            var width = clone.Width;
+            var height = clone.Height;
             var ms = new MemoryStream();
             await clone.SaveAsWebpAsync(ms, new WebpEncoder { Quality = 80 });
             ms.Position = 0;
 
-            results.Add(new ProcessedImage(
-                ms,
-                variant.Suffix,
-                clone.Width,
-                clone.Height,
-                (int)ms.Length
-            ));
+            return new ProcessedImage(ms, variant.Suffix, width, height, (int)ms.Length);
+        });
 
-            clone.Dispose();
-        }
-
-        return results;
+        return [.. await Task.WhenAll(tasks)];
     }
 
     public async Task<(int Width, int Height)> GetDimensionsAsync(Stream input)
