@@ -24,7 +24,7 @@ public record CreateTableTemplateRequest(
 // ─── Event Tables (per-event table types) ────────────────────
 
 public record EventTableResponse(
-    Guid EventTableId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTableId,
     string Label,
     int Capacity,
     string Shape,
@@ -65,7 +65,7 @@ public record EventLayoutResponse(
 );
 
 public record LayoutTableResponse(
-    Guid TableId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid TableId,
     string Label,
     int GridRow,
     int GridCol,
