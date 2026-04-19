@@ -76,7 +76,32 @@ public class AdminEventsController(
             .Take(pageSize)
             .ToListAsync();
 
-        var dtos = items.Select(MapToDto).ToList();
+        var gridEventIds = items.Where(e => e.LayoutMode == "Grid").Select(e => e.EventId).ToList();
+        var tableStats = new Dictionary<Guid, (int total, int booked)>();
+        if (gridEventIds.Any())
+        {
+            var stats = await context.EventTablesSummaryViews.AsNoTracking()
+                .Where(t => gridEventIds.Contains(t.EventId) && t.IsActive)
+                .GroupBy(t => t.EventId)
+                .Select(g => new { 
+                    EventId = g.Key, 
+                    TotalTables = g.Sum(x => x.TotalTables),
+                    BookedTables = g.Sum(x => x.BookedTables) 
+                })
+                .ToListAsync();
+                
+            foreach (var stat in stats)
+                tableStats[stat.EventId] = (stat.TotalTables, stat.BookedTables);
+        }
+
+        var dtos = items.Select(e => {
+            var dto = MapToDto(e);
+            if (e.LayoutMode == "Grid" && tableStats.TryGetValue(e.EventId, out var ts))
+            {
+                return dto with { TotalTables = ts.total, BookedTables = ts.booked };
+            }
+            return dto;
+        }).ToList();
         return Ok(new PagedResponse<EventDto>(dtos, totalCount, page, pageSize));
     }
 

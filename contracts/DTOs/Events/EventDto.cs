@@ -34,5 +34,7 @@ public record EventDto(
     List<EventTicketTypeDto>? TicketTypes = null,
     List<EventTableTypeSummaryDto>? TableTypes = null,
     // Raw (pre-fee) price for admin surfaces. Not populated on public responses.
-    int? PricePerPersonCents = null
+    int? PricePerPersonCents = null,
+    int TotalTables = 0,
+    int BookedTables = 0
 );
