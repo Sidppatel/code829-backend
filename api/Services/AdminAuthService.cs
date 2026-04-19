@@ -14,6 +14,7 @@ public class AdminAuthService(
     EventPlatformDbContext context,
     IAdminUserProcedures adminProc,
     IAuthProcedures authProc,
+    IAdminPasswordResetTokenProcedures pwdResetProc,
     IFileStorageService fileStorage,
     IConnectionMultiplexer redis,
     IJwtService jwtService,
@@ -157,16 +158,11 @@ public class AdminAuthService(
         var expiryMinutes = int.Parse(
             await settingsService.GetOrDefaultAsync("password_reset_expiry_minutes", "60") ?? "60");
 
-        var resetToken = new AdminPasswordResetToken
-        {
-            AdminUserId = admin.Id,
-            TokenHash = tokenHash,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes),
-            Email = normalizedEmail
-        };
-
-        context.AdminPasswordResetTokens.Add(resetToken); // ARCH-EXCEPTION: Dedicated tokens table for admins, no SP wrapper yet
-        await context.SaveChangesAsync();
+        await pwdResetProc.CreateAsync(
+            admin.Id,
+            tokenHash,
+            DateTime.UtcNow.AddMinutes(expiryMinutes),
+            normalizedEmail);
 
         var frontendUrl = origin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
@@ -184,24 +180,20 @@ public class AdminAuthService(
     public async Task ResetPasswordAsync(string token, string newPassword)
     {
         var tokenHash = HashToken(token);
-        var resetToken = await context.AdminPasswordResetTokens // ARCH-EXCEPTION: Verified reset token lookup
-            .Include(t => t.AdminUser) // ARCH-EXCEPTION: Verified reset token lookup
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow); // ARCH-EXCEPTION: Verified reset token lookup
+        var resetToken = await pwdResetProc.GetByHashAsync(tokenHash);
 
-        if (resetToken is null)
+        if (resetToken is null || resetToken.IsUsed || resetToken.ExpiresAt <= DateTime.UtcNow)
             throw new UnauthorizedAccessException("Invalid or expired reset token");
 
         var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         await adminProc.UpdatePasswordAsync(resetToken.AdminUserId, newHash);
 
-        resetToken.IsUsed = true;
-        resetToken.UsedAt = DateTime.UtcNow;
-        await context.SaveChangesAsync();
+        await pwdResetProc.InvalidateAsync(tokenHash);
 
         // Revoke all sessions for this user to force re-login with new password
         await RevokeAllSessionsAsync(resetToken.AdminUserId, null);
 
-        Log.Information("[AdminAuth] Password reset successful for {Email}", resetToken.AdminUser.Email);
+        Log.Information("[AdminAuth] Password reset successful for {Email}", resetToken.AdminEmail);
     }
 
     private async Task<(string RawToken, string Hash)> CreateDeviceSessionAsync(Guid adminUserId, string? deviceName, string? ip)
