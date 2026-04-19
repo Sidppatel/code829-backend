@@ -21,7 +21,8 @@ public class EventsController(
     IImageProcedures imageProc,
     IFileStorageService fileStorage,
     ISettingsService settings,
-    IConnectionMultiplexer redis
+    IConnectionMultiplexer redis,
+    IEventImageService eventImageService
 ) : ControllerBase
 {
     private static readonly TimeSpan ListCacheTtl = TimeSpan.FromSeconds(30);
@@ -291,6 +292,17 @@ public class EventsController(
         var defaultOpenFee = int.Parse(await settings.GetOrDefaultAsync("default_platform_fee_open_cents", "1000") ?? "1000");
 
         return Ok(MapEventDto(ev, imageUrl, defaultOpenFee));
+    }
+
+    [HttpGet("{id:guid}/images")]
+    public async Task<IActionResult> GetPublicImages(Guid id)
+    {
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.EventId == id && e.Status == "Published");
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+
+        var list = await eventImageService.ListAsync(id);
+        return Ok(list);
     }
 
     [HttpGet("{id:guid}/schema")]
