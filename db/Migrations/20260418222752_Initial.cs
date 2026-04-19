@@ -1092,6 +1092,8 @@ CREATE INDEX ""IX_purchase_tables_TableId"" ON purchase_tables (""TableId"");
 
             migrationBuilder.Sql(MigrationSqlLoader.Load("v_invitations.sql"));
 
+            migrationBuilder.Sql(MigrationSqlLoader.Load("v_feedbacks.sql"));
+
             // --- AUTH STORED PROCEDURES ---------------------------------------------------
 
             migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_magic_link.sql"));

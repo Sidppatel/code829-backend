@@ -66,12 +66,7 @@ public class FeedbackController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        // ARCH-EXCEPTION: feedback admin list with User join. No dedicated feedback view exists
-        // and the endpoint is Admin-only, paginated, read-only. Adding an SP wrapper adds no
-        // safety vs. a straight LINQ read of two tables.
-        var query = context.Feedbacks
-            .Include(f => f.User)
-            .AsQueryable();
+        var query = context.FeedbackViews.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(type))
             query = query.Where(f => f.Type == type);
@@ -82,8 +77,8 @@ public class FeedbackController(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(f => new FeedbackDto(
-                f.Id, f.Name, f.Email, f.Type, f.Message, f.Rating,
-                f.UserId, f.User != null ? f.User.FirstName + " " + f.User.LastName : null,
+                f.FeedbackId, f.Name, f.Email, f.Type, f.Message, f.Rating,
+                f.UserId, f.UserFullName,
                 f.CreatedAt
             ))
             .ToListAsync();

@@ -56,6 +56,7 @@ public class EventPlatformDbContext(
     public DbSet<AdminUserView> AdminUserViews => Set<AdminUserView>();
     public DbSet<DeviceSessionView> DeviceSessionViews => Set<DeviceSessionView>();
     public DbSet<InvitationView> InvitationViews => Set<InvitationView>();
+    public DbSet<FeedbackView> FeedbackViews => Set<FeedbackView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -647,6 +648,12 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.InvitationId);
             entity.Property(e => e.Role).HasConversion<string>();
             entity.Property(e => e.Status).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<FeedbackView>(entity =>
+        {
+            entity.ToView("v_feedbacks");
+            entity.HasKey(e => e.FeedbackId);
         });
     }
 }
