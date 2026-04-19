@@ -83,6 +83,20 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
                 ], ct);
     }
 
+    public async Task<Guid?> SetUserAvatarImageAsync(Guid userId, Guid imageId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<Guid?>("SELECT sp_set_user_avatar_image({0}, {1}) AS \"Value\"", userId, imageId)
+            .FirstAsync(ct);
+    }
+
+    public async Task<Guid?> ClearUserAvatarImageAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<Guid?>("SELECT sp_clear_user_avatar_image({0}) AS \"Value\"", userId)
+            .FirstAsync(ct);
+    }
+
     public async Task<bool> SetUserActiveAsync(Guid userId, bool isActive, CancellationToken ct = default)
     {
         return await context.Database

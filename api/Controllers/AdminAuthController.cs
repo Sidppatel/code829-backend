@@ -16,7 +16,9 @@ namespace Api.Controllers;
 public class AdminAuthController(
     IAdminAuthService adminAuthService,
     IInvitationService invitationService,
-    IWebHostEnvironment environment
+    IWebHostEnvironment environment,
+    IImageService imageService,
+    IFileStorageService fileStorage
 ) : ControllerBase
 {
     // Admin-side sessions are split across three cookie names (session_admin, session_staff,
@@ -197,6 +199,29 @@ public class AdminAuthController(
 
         var admin = await adminAuthService.GetCurrentAdminAsync(userId);
         return Ok(admin);
+    }
+
+    [HttpPost("me/avatar")]
+    [Authorize]
+    [RequireRole(UserRole.Staff)]
+    public async Task<IActionResult> UploadAvatar(IFormFile file)
+    {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var storageKey = await imageService.ReplaceAvatarAsync(adminId, "admin_user", file);
+        return Ok(new { url = fileStorage.GetPublicUrl(storageKey) });
+    }
+
+    [HttpDelete("me/avatar")]
+    [Authorize]
+    [RequireRole(UserRole.Staff)]
+    public async Task<IActionResult> DeleteAvatar()
+    {
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        await imageService.DeleteAvatarAsync(adminId, "admin_user");
+        return NoContent();
     }
 
     [HttpPut("password")]

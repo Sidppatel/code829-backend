@@ -13,6 +13,8 @@ public interface IUserProcedures
     Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default);
     Task<UserCounts> GetCountsAsync(CancellationToken ct = default);
     Task UpdateUserProfileAsync(Guid userId, string? firstName, string? lastName, string? phone, string? address, string? city, string? state, string? zip, bool? optIn, CancellationToken ct = default);
+    Task<Guid?> SetUserAvatarImageAsync(Guid userId, Guid imageId, CancellationToken ct = default);
+    Task<Guid?> ClearUserAvatarImageAsync(Guid userId, CancellationToken ct = default);
     Task<bool> SetUserActiveAsync(Guid userId, bool isActive, CancellationToken ct = default);
     Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default);
 }

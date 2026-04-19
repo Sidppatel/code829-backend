@@ -18,6 +18,8 @@ namespace Api.Controllers;
 public class AuthController(
     IAuthService authService,
     IWebHostEnvironment environment,
+    IImageService imageService,
+    IFileStorageService fileStorage,
     Db.Repositories.StoredProcedures.IUserProcedures userProc
 ) : ControllerBase
 {
@@ -210,19 +212,28 @@ public class AuthController(
     [HttpPost("me/avatar")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public IActionResult UploadAvatar(IFormFile file)
+    public async Task<IActionResult> UploadAvatar(IFormFile file)
     {
-        // TODO Phase 2: rewrite with AvatarImageId FK flow
-        return StatusCode(501, new ApiError(501, "Avatar upload not yet implemented", HttpContext.TraceIdentifier));
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+
+        var storageKey = await imageService.ReplaceAvatarAsync(userId.Value, "user", file);
+        return Ok(new { url = fileStorage.GetPublicUrl(storageKey) });
     }
 
     [HttpDelete("me/avatar")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public IActionResult DeleteAvatar()
+    public async Task<IActionResult> DeleteAvatar()
     {
-        // TODO Phase 2: rewrite with AvatarImageId FK flow
-        return StatusCode(501, new ApiError(501, "Avatar delete not yet implemented", HttpContext.TraceIdentifier));
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+
+        await imageService.DeleteAvatarAsync(userId.Value, "user");
+        return NoContent();
     }
 
     // ── Helpers ──────────────────────────────────────────────────

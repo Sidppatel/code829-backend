@@ -61,6 +61,20 @@ public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserPro
                 ], ct);
     }
 
+    public async Task<Guid?> SetAdminUserAvatarImageAsync(Guid adminUserId, Guid imageId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<Guid?>("SELECT sp_set_admin_user_avatar_image({0}, {1}) AS \"Value\"", adminUserId, imageId)
+            .FirstAsync(ct);
+    }
+
+    public async Task<Guid?> ClearAdminUserAvatarImageAsync(Guid adminUserId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<Guid?>("SELECT sp_clear_admin_user_avatar_image({0}) AS \"Value\"", adminUserId)
+            .FirstAsync(ct);
+    }
+
     public async Task UpdatePasswordAsync(Guid id, string passwordHash, CancellationToken ct = default)
     {
         await context.Database

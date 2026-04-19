@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using Contracts.DTOs.Images;
 using Db.Entities;
 using Db.Repositories;
+using Db.Repositories.StoredProcedures;
+using Microsoft.AspNetCore.Http;
 using Serilog;
 
 namespace Api.Services;
@@ -9,13 +11,15 @@ namespace Api.Services;
 public class ImageService(
     IFileStorageService fileStorage,
     IImageProcessingService imageProcessing,
-    IImageRepository imageRepo
+    IImageRepository imageRepo,
+    IUserProcedures userProc,
+    IAdminUserProcedures adminUserProc
 ) : IImageService
 {
     public async Task<ImageUploadResponse> UploadAsync(
         Stream fileStream, string fileName, string entityType, Guid entityId,
         Guid? uploadedById, string? uploaderType = null,
-        string? altText = null, string? caption = null)
+        string? altText = null, string? caption = null, string tag = "Generic")
     {
         using var buffered = new MemoryStream();
         await fileStream.CopyToAsync(buffered);
@@ -41,7 +45,7 @@ public class ImageService(
             EntityType = entityType,
             EntityId = entityId,
             StorageKey = baseKey,
-            Tag = "Generic",
+            Tag = tag,
             OriginalName = Path.GetFileName(fileName),
             SizeBytes = detailVariant.SizeBytes,
             Width = detailVariant.Width,
@@ -124,6 +128,34 @@ public class ImageService(
             if (img is not null) img.SortOrder = i;
         }
         await imageRepo.SaveChangesAsync();
+    }
+
+    public async Task<string> ReplaceAvatarAsync(Guid ownerId, string uploaderType, IFormFile file)
+    {
+        var result = await UploadAsync(
+            file.OpenReadStream(), file.FileName,
+            entityType: uploaderType, entityId: ownerId,
+            uploadedById: ownerId, uploaderType: uploaderType,
+            tag: "ProfilePic");
+
+        Guid? oldImageId = uploaderType == "admin_user"
+            ? await adminUserProc.SetAdminUserAvatarImageAsync(ownerId, result.ImageId)
+            : await userProc.SetUserAvatarImageAsync(ownerId, result.ImageId);
+
+        if (oldImageId.HasValue)
+            await DeleteAsync(oldImageId.Value);
+
+        return result.StorageKey;
+    }
+
+    public async Task DeleteAvatarAsync(Guid ownerId, string uploaderType)
+    {
+        Guid? oldImageId = uploaderType == "admin_user"
+            ? await adminUserProc.ClearAdminUserAvatarImageAsync(ownerId)
+            : await userProc.ClearUserAvatarImageAsync(ownerId);
+
+        if (oldImageId.HasValue)
+            await DeleteAsync(oldImageId.Value);
     }
 
     private ImageDto MapToDto(Image i) => new(
