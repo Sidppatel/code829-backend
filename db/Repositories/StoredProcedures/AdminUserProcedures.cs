@@ -11,7 +11,7 @@ public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserPro
     {
         return await context.AdminUsers
             .FromSqlRaw("SELECT * FROM sp_get_admin_by_id({0})", id)
-            .Include(a => a.AvatarImage)
+            .Include(a => a.Image)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
     }
@@ -20,7 +20,7 @@ public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserPro
     {
         return await context.AdminUsers
             .FromSqlRaw("SELECT * FROM sp_get_admin_by_email({0})", email)
-            .Include(a => a.AvatarImage)
+            .Include(a => a.Image)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
     }
@@ -45,7 +45,7 @@ public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserPro
     }
 
     public async Task UpdateAsync(Guid id, string? firstName = null, string? lastName = null, string? phone = null,
-        string? role = null, bool? isActive = null, Guid? avatarImageId = null, CancellationToken ct = default)
+        string? role = null, bool? isActive = null, Guid? imageId = null, CancellationToken ct = default)
     {
         await context.Database
             .ExecuteSqlRawAsync(
@@ -57,21 +57,21 @@ public class AdminUserProcedures(EventPlatformDbContext context) : IAdminUserPro
                     new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)phone ?? DBNull.Value },
                     new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)role ?? DBNull.Value },
                     new NpgsqlParameter("p5", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value },
-                    new NpgsqlParameter("p6", NpgsqlDbType.Uuid) { Value = (object?)avatarImageId ?? DBNull.Value }
+                    new NpgsqlParameter("p6", NpgsqlDbType.Uuid) { Value = (object?)imageId ?? DBNull.Value }
                 ], ct);
     }
 
-    public async Task<Guid?> SetAdminUserAvatarImageAsync(Guid adminUserId, Guid imageId, CancellationToken ct = default)
+    public async Task<Guid?> SetAdminUserImageAsync(Guid adminUserId, Guid imageId, CancellationToken ct = default)
     {
         return await context.Database
-            .SqlQueryRaw<Guid?>("SELECT sp_set_admin_user_avatar_image({0}, {1}) AS \"Value\"", adminUserId, imageId)
+            .SqlQueryRaw<Guid?>("SELECT sp_set_admin_user_image({0}, {1}) AS \"Value\"", adminUserId, imageId)
             .FirstAsync(ct);
     }
 
-    public async Task<Guid?> ClearAdminUserAvatarImageAsync(Guid adminUserId, CancellationToken ct = default)
+    public async Task<Guid?> ClearAdminUserImageAsync(Guid adminUserId, CancellationToken ct = default)
     {
         return await context.Database
-            .SqlQueryRaw<Guid?>("SELECT sp_clear_admin_user_avatar_image({0}) AS \"Value\"", adminUserId)
+            .SqlQueryRaw<Guid?>("SELECT sp_clear_admin_user_image({0}) AS \"Value\"", adminUserId)
             .FirstAsync(ct);
     }
 

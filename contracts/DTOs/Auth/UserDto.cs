@@ -14,5 +14,5 @@ public record UserDto(
     string? Phone,
     bool OptInLocationEmail,
     bool HasCompletedOnboarding,
-    string? AvatarUrl
+    string? ImageUrl
 );

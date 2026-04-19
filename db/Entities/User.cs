@@ -17,6 +17,6 @@ public class User : BaseEntity
     public bool OptInLocationEmail { get; set; }
     public bool HasCompletedOnboarding { get; set; }
 
-    public Guid? AvatarImageId { get; set; }
-    public Image? AvatarImage { get; set; }
+    public Guid? ImageId { get; set; }
+    public Image? Image { get; set; }
 }

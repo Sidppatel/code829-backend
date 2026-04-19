@@ -15,8 +15,6 @@ namespace db.Migrations
             migrationBuilder.AlterDatabase()
                 .Annotation("Npgsql:PostgresExtension:pg_trgm", ",,");
 
-            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
-
             migrationBuilder.CreateTable(
                 name: "addresses",
                 columns: table => new
@@ -52,39 +50,6 @@ namespace db.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_admin_logs", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "admin_users",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    PasswordHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    FailedLoginAttempts = table.Column<int>(type: "integer", nullable: false),
-                    LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    AvatarImageId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
-                    StripeConnectedAccountId = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_admin_users", x => x.Id);
-                    table.CheckConstraint("CK_admin_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
-                    table.ForeignKey(
-                        name: "FK_admin_users_images_AvatarImageId",
-                        column: x => x.AvatarImageId,
-                        principalTable: "images",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -151,7 +116,6 @@ namespace db.Migrations
                     EntityType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     EntityId = table.Column<Guid>(type: "uuid", nullable: false),
                     StorageKey = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Tag = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false, defaultValue: "Generic"),
                     OriginalName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     SizeBytes = table.Column<int>(type: "integer", nullable: false),
                     Width = table.Column<int>(type: "integer", nullable: false),
@@ -163,13 +127,13 @@ namespace db.Migrations
                     Caption = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
                     ContentType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     Checksum = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    Tag = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false, defaultValue: "Generic"),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_images", x => x.Id);
-                    table.CheckConstraint("CK_images_Tag", "\"Tag\" IN ('ProfilePic','EventImage','VenueImage','Logo','Banner','Gallery','Generic')");
                 });
 
             migrationBuilder.CreateTable(
@@ -239,42 +203,6 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "users",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    AddressId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Phone = table.Column<string>(type: "text", nullable: true),
-                    OptInLocationEmail = table.Column<bool>(type: "boolean", nullable: false),
-                    HasCompletedOnboarding = table.Column<bool>(type: "boolean", nullable: false),
-                    AvatarImageId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_users", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_users_addresses_AddressId",
-                        column: x => x.AddressId,
-                        principalTable: "addresses",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_users_images_AvatarImageId",
-                        column: x => x.AvatarImageId,
-                        principalTable: "images",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "venues",
                 columns: table => new
                 {
@@ -299,6 +227,127 @@ namespace db.Migrations
                         principalTable: "addresses",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "admin_users",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    PasswordHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    FailedLoginAttempts = table.Column<int>(type: "integer", nullable: false),
+                    LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    StripeConnectedAccountId = table.Column<string>(type: "text", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_admin_users", x => x.Id);
+                    table.CheckConstraint("CK_admin_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
+                    table.ForeignKey(
+                        name: "FK_admin_users_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "platform_images",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Tag = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_platform_images", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_platform_images_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "users",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    AddressId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Phone = table.Column<string>(type: "text", nullable: true),
+                    OptInLocationEmail = table.Column<bool>(type: "boolean", nullable: false),
+                    HasCompletedOnboarding = table.Column<bool>(type: "boolean", nullable: false),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_users", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_users_addresses_AddressId",
+                        column: x => x.AddressId,
+                        principalTable: "addresses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_users_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "venue_images",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_venue_images", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_venue_images_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_venue_images_venues_VenueId",
+                        column: x => x.VenueId,
+                        principalTable: "venues",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -328,6 +377,60 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "events",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Slug = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    Description = table.Column<string>(type: "character varying(8192)", maxLength: 8192, nullable: true),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Category = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ImagePath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    IsFeatured = table.Column<bool>(type: "boolean", nullable: false),
+                    LayoutMode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    MaxCapacity = table.Column<int>(type: "integer", nullable: true),
+                    PublishedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ScheduledPublishAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    GridRows = table.Column<int>(type: "integer", nullable: true),
+                    GridCols = table.Column<int>(type: "integer", nullable: true),
+                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
+                        .Annotation("Npgsql:TsVectorConfig", "english")
+                        .Annotation("Npgsql:TsVectorProperties", new[] { "Title", "Description" }),
+                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_events", x => x.Id);
+                    table.CheckConstraint("CK_events_Category", "\"Category\" IS NULL OR \"Category\" IN ('Music','Business','Social','Dining','Tech','Arts','Family','Sports')");
+                    table.CheckConstraint("CK_events_CompletedRequiresPublish", "\"Status\" <> 'Completed' OR \"PublishedAt\" IS NOT NULL");
+                    table.CheckConstraint("CK_events_DateRange", "\"EndDate\" > \"StartDate\"");
+                    table.CheckConstraint("CK_events_DraftNoPublishDate", "\"Status\" <> 'Draft' OR \"PublishedAt\" IS NULL");
+                    table.CheckConstraint("CK_events_GridDimensions", "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
+                    table.CheckConstraint("CK_events_LayoutMode", "\"LayoutMode\" IN ('Grid','Open')");
+                    table.CheckConstraint("CK_events_MaxCapacity", "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
+                    table.CheckConstraint("CK_events_PublishLifecycle", "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
+                    table.CheckConstraint("CK_events_Status", "\"Status\" IN ('Draft','Published','Completed','Cancelled')");
+                    table.ForeignKey(
+                        name: "FK_events_admin_users_AdminUserId",
+                        column: x => x.AdminUserId,
+                        principalTable: "admin_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_events_venues_VenueId",
+                        column: x => x.VenueId,
+                        principalTable: "venues",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "invitations",
                 columns: table => new
                 {
@@ -351,29 +454,6 @@ namespace db.Migrations
                         name: "FK_invitations_admin_users_InvitedByAdminUserId",
                         column: x => x.InvitedByAdminUserId,
                         principalTable: "admin_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "platform_images",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Tag = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    SortOrder = table.Column<int>(type: "integer", nullable: false),
-                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_platform_images", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_platform_images_images_ImageId",
-                        column: x => x.ImageId,
-                        principalTable: "images",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -442,84 +522,35 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "events",
+                name: "admin_user_events",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Slug = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
-                    Description = table.Column<string>(type: "character varying(8192)", maxLength: 8192, nullable: true),
-                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    Category = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
-                    StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ImagePath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    IsFeatured = table.Column<bool>(type: "boolean", nullable: false),
-                    LayoutMode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    MaxCapacity = table.Column<int>(type: "integer", nullable: true),
-                    PublishedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ScheduledPublishAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    GridRows = table.Column<int>(type: "integer", nullable: true),
-                    GridCols = table.Column<int>(type: "integer", nullable: true),
-                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
-                        .Annotation("Npgsql:TsVectorConfig", "english")
-                        .Annotation("Npgsql:TsVectorProperties", new[] { "Title", "Description" }),
-                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
                     AdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AssignedByAdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_events", x => x.Id);
-                    table.CheckConstraint("CK_events_Category", "\"Category\" IS NULL OR \"Category\" IN ('Music','Business','Social','Dining','Tech','Arts','Family','Sports')");
-                    table.CheckConstraint("CK_events_CompletedRequiresPublish", "\"Status\" <> 'Completed' OR \"PublishedAt\" IS NOT NULL");
-                    table.CheckConstraint("CK_events_DateRange", "\"EndDate\" > \"StartDate\"");
-                    table.CheckConstraint("CK_events_DraftNoPublishDate", "\"Status\" <> 'Draft' OR \"PublishedAt\" IS NULL");
-                    table.CheckConstraint("CK_events_GridDimensions", "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
-                    table.CheckConstraint("CK_events_LayoutMode", "\"LayoutMode\" IN ('Grid','Open')");
-                    table.CheckConstraint("CK_events_MaxCapacity", "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
-                    table.CheckConstraint("CK_events_PublishLifecycle", "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
-                    table.CheckConstraint("CK_events_Status", "\"Status\" IN ('Draft','Published','Completed','Cancelled')");
+                    table.PrimaryKey("PK_admin_user_events", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_events_admin_users_AdminUserId",
+                        name: "FK_admin_user_events_admin_users_AdminUserId",
                         column: x => x.AdminUserId,
                         principalTable: "admin_users",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_events_venues_VenueId",
-                        column: x => x.VenueId,
-                        principalTable: "venues",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "venue_images",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SortOrder = table.Column<int>(type: "integer", nullable: false),
-                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_venue_images", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_venue_images_images_ImageId",
-                        column: x => x.ImageId,
-                        principalTable: "images",
-                        principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_venue_images_venues_VenueId",
-                        column: x => x.VenueId,
-                        principalTable: "venues",
+                        name: "FK_admin_user_events_admin_users_AssignedByAdminUserId",
+                        column: x => x.AssignedByAdminUserId,
+                        principalTable: "admin_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_admin_user_events_events_EventId",
+                        column: x => x.EventId,
+                        principalTable: "events",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -853,6 +884,22 @@ namespace db.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_admin_user_events_AdminUserId_EventId",
+                table: "admin_user_events",
+                columns: new[] { "AdminUserId", "EventId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_admin_user_events_AssignedByAdminUserId",
+                table: "admin_user_events",
+                column: "AssignedByAdminUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_admin_user_events_EventId",
+                table: "admin_user_events",
+                column: "EventId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_admin_users_Email",
                 table: "admin_users",
                 column: "Email",
@@ -863,6 +910,11 @@ namespace db.Migrations
                 table: "admin_users",
                 column: "EmailHash",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_admin_users_ImageId",
+                table: "admin_users",
+                column: "ImageId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_app_settings_Key",
@@ -1192,19 +1244,9 @@ namespace db.Migrations
                 column: "LockedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_admin_users_AvatarImageId",
-                table: "admin_users",
-                column: "AvatarImageId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_users_AddressId",
                 table: "users",
                 column: "AddressId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_users_AvatarImageId",
-                table: "users",
-                column: "AvatarImageId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_users_Email",
@@ -1217,6 +1259,11 @@ namespace db.Migrations
                 table: "users",
                 column: "EmailHash",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_users_ImageId",
+                table: "users",
+                column: "ImageId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_venue_images_ImageId",
@@ -1251,6 +1298,7 @@ namespace db.Migrations
                 table: "venues",
                 column: "Name");
 
+            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
             MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
             MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
         }
@@ -1263,6 +1311,9 @@ namespace db.Migrations
 
             migrationBuilder.DropTable(
                 name: "admin_password_reset_tokens");
+
+            migrationBuilder.DropTable(
+                name: "admin_user_events");
 
             migrationBuilder.DropTable(
                 name: "app_settings");
@@ -1310,9 +1361,6 @@ namespace db.Migrations
                 name: "purchases");
 
             migrationBuilder.DropTable(
-                name: "images");
-
-            migrationBuilder.DropTable(
                 name: "event_ticket_types");
 
             migrationBuilder.DropTable(
@@ -1335,6 +1383,9 @@ namespace db.Migrations
 
             migrationBuilder.DropTable(
                 name: "venues");
+
+            migrationBuilder.DropTable(
+                name: "images");
 
             migrationBuilder.DropTable(
                 name: "addresses");

@@ -13,6 +13,6 @@ public interface IImageService
     Task<bool> DeleteAsync(Guid imageId);
     Task SetPrimaryAsync(Guid imageId);
     Task ReorderAsync(string entityType, Guid entityId, List<Guid> imageIds);
-    Task<string> ReplaceAvatarAsync(Guid ownerId, string uploaderType, IFormFile file);
-    Task DeleteAvatarAsync(Guid ownerId, string uploaderType);
+    Task<string> ReplaceImageAsync(Guid ownerId, string uploaderType, IFormFile file);
+    Task DeleteImageAsync(Guid ownerId, string uploaderType);
 }

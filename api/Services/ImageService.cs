@@ -130,7 +130,7 @@ public class ImageService(
         await imageRepo.SaveChangesAsync();
     }
 
-    public async Task<string> ReplaceAvatarAsync(Guid ownerId, string uploaderType, IFormFile file)
+    public async Task<string> ReplaceImageAsync(Guid ownerId, string uploaderType, IFormFile file)
     {
         var result = await UploadAsync(
             file.OpenReadStream(), file.FileName,
@@ -139,8 +139,8 @@ public class ImageService(
             tag: "ProfilePic");
 
         Guid? oldImageId = uploaderType == "admin_user"
-            ? await adminUserProc.SetAdminUserAvatarImageAsync(ownerId, result.ImageId)
-            : await userProc.SetUserAvatarImageAsync(ownerId, result.ImageId);
+            ? await adminUserProc.SetAdminUserImageAsync(ownerId, result.ImageId)
+            : await userProc.SetUserImageAsync(ownerId, result.ImageId);
 
         if (oldImageId.HasValue)
             await DeleteAsync(oldImageId.Value);
@@ -148,11 +148,11 @@ public class ImageService(
         return result.StorageKey;
     }
 
-    public async Task DeleteAvatarAsync(Guid ownerId, string uploaderType)
+    public async Task DeleteImageAsync(Guid ownerId, string uploaderType)
     {
         Guid? oldImageId = uploaderType == "admin_user"
-            ? await adminUserProc.ClearAdminUserAvatarImageAsync(ownerId)
-            : await userProc.ClearUserAvatarImageAsync(ownerId);
+            ? await adminUserProc.ClearAdminUserImageAsync(ownerId)
+            : await userProc.ClearUserImageAsync(ownerId);
 
         if (oldImageId.HasValue)
             await DeleteAsync(oldImageId.Value);

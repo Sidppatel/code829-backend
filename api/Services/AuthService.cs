@@ -191,8 +191,8 @@ public class AuthService(
         Phone: user.Phone,
         OptInLocationEmail: user.OptInLocationEmail,
         HasCompletedOnboarding: user.HasCompletedOnboarding,
-        AvatarUrl: user.AvatarImage?.StorageKey is not null
-            ? fileStorage.GetPublicUrl(user.AvatarImage.StorageKey)
+        ImageUrl: user.Image?.StorageKey is not null
+            ? fileStorage.GetPublicUrl(user.Image.StorageKey)
             : null
     );
 

@@ -12,7 +12,7 @@ public class AdminUserView
     public AdminRole Role { get; set; }
     public bool IsActive { get; set; }
     public DateTime? LastLoginAt { get; set; }
-    public string? AvatarImageStorageKey { get; set; }
+    public string? ImageStorageKey { get; set; }
     public string? Phone { get; set; }
     public string? StripeConnectedAccountId { get; set; }
     public DateTime CreatedAt { get; set; }

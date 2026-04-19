@@ -201,26 +201,26 @@ public class AdminAuthController(
         return Ok(admin);
     }
 
-    [HttpPost("me/avatar")]
+    [HttpPost("me/image")]
     [Authorize]
     [RequireRole(UserRole.Staff)]
-    public async Task<IActionResult> UploadAvatar(IFormFile file)
+    public async Task<IActionResult> UploadImage(IFormFile file)
     {
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var storageKey = await imageService.ReplaceAvatarAsync(adminId, "admin_user", file);
+        var storageKey = await imageService.ReplaceImageAsync(adminId, "admin_user", file);
         return Ok(new { url = fileStorage.GetPublicUrl(storageKey) });
     }
 
-    [HttpDelete("me/avatar")]
+    [HttpDelete("me/image")]
     [Authorize]
     [RequireRole(UserRole.Staff)]
-    public async Task<IActionResult> DeleteAvatar()
+    public async Task<IActionResult> DeleteImage()
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        await imageService.DeleteAvatarAsync(adminId, "admin_user");
+        await imageService.DeleteImageAsync(adminId, "admin_user");
         return NoContent();
     }
 

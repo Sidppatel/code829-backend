@@ -125,8 +125,8 @@ public class InvitationService(
             CreatedAt: admin.CreatedAt,
             LastLoginAt: admin.LastLoginAt,
             Phone: admin.Phone,
-            AvatarUrl: admin.AvatarImage?.StorageKey is not null
-                ? fileStorage.GetPublicUrl(admin.AvatarImage.StorageKey)
+            ImageUrl: admin.Image?.StorageKey is not null
+                ? fileStorage.GetPublicUrl(admin.Image.StorageKey)
                 : null
         );
 

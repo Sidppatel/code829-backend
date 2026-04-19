@@ -11,7 +11,7 @@ public class UserProfileView
     public string? Phone { get; set; }
     public bool OptInLocationEmail { get; set; }
     public bool HasCompletedOnboarding { get; set; }
-    public string? AvatarImageStorageKey { get; set; }
+    public string? ImageStorageKey { get; set; }
     public DateTime CreatedAt { get; set; }
 
     // Address

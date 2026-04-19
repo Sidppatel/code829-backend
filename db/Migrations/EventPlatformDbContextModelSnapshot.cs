@@ -177,9 +177,6 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid?>("AvatarImageId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -202,6 +199,9 @@ namespace db.Migrations
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<Guid?>("ImageId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -241,13 +241,13 @@ namespace db.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AvatarImageId");
-
                     b.HasIndex("Email")
                         .IsUnique();
 
                     b.HasIndex("EmailHash")
                         .IsUnique();
+
+                    b.HasIndex("ImageId");
 
                     b.ToTable("admin_users", null, t =>
                         {
@@ -921,6 +921,7 @@ namespace db.Migrations
 
                     b.Property<string>("Tag")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasDefaultValue("Generic");
@@ -1606,9 +1607,6 @@ namespace db.Migrations
                     b.Property<Guid?>("AddressId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AvatarImageId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1631,6 +1629,9 @@ namespace db.Migrations
 
                     b.Property<bool>("HasCompletedOnboarding")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ImageId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -1658,13 +1659,13 @@ namespace db.Migrations
 
                     b.HasIndex("AddressId");
 
-                    b.HasIndex("AvatarImageId");
-
                     b.HasIndex("Email")
                         .IsUnique();
 
                     b.HasIndex("EmailHash")
                         .IsUnique();
+
+                    b.HasIndex("ImageId");
 
                     b.ToTable("users", (string)null);
                 });
@@ -1880,9 +1881,6 @@ namespace db.Migrations
                     b.Property<Guid>("AdminUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AvatarImageStorageKey")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1896,6 +1894,9 @@ namespace db.Migrations
 
                     b.Property<string>("FirstName")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageStorageKey")
                         .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
@@ -2910,9 +2911,6 @@ namespace db.Migrations
                     b.Property<string>("AddressLine1")
                         .HasColumnType("text");
 
-                    b.Property<string>("AvatarImageStorageKey")
-                        .HasColumnType("text");
-
                     b.Property<string>("City")
                         .HasColumnType("text");
 
@@ -2929,6 +2927,9 @@ namespace db.Migrations
 
                     b.Property<bool>("HasCompletedOnboarding")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("ImageStorageKey")
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -3086,12 +3087,12 @@ namespace db.Migrations
 
             modelBuilder.Entity("Db.Entities.AdminUser", b =>
                 {
-                    b.HasOne("Db.Entities.Image", "AvatarImage")
+                    b.HasOne("Db.Entities.Image", "Image")
                         .WithMany()
-                        .HasForeignKey("AvatarImageId")
+                        .HasForeignKey("ImageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("AvatarImage");
+                    b.Navigation("Image");
                 });
 
             modelBuilder.Entity("Db.Entities.AdminUserEvent", b =>
@@ -3350,14 +3351,14 @@ namespace db.Migrations
                         .HasForeignKey("AddressId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Db.Entities.Image", "AvatarImage")
+                    b.HasOne("Db.Entities.Image", "Image")
                         .WithMany()
-                        .HasForeignKey("AvatarImageId")
+                        .HasForeignKey("ImageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Address");
 
-                    b.Navigation("AvatarImage");
+                    b.Navigation("Image");
                 });
 
             modelBuilder.Entity("Db.Entities.Venue", b =>

@@ -209,10 +209,10 @@ public class AuthController(
         return Ok(new { message = "Profile updated successfully" });
     }
 
-    [HttpPost("me/avatar")]
+    [HttpPost("me/image")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> UploadAvatar(IFormFile file)
+    public async Task<IActionResult> UploadImage(IFormFile file)
     {
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
@@ -220,19 +220,19 @@ public class AuthController(
         var userId = GetUserId();
         if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
-        var storageKey = await imageService.ReplaceAvatarAsync(userId.Value, "user", file);
+        var storageKey = await imageService.ReplaceImageAsync(userId.Value, "user", file);
         return Ok(new { url = fileStorage.GetPublicUrl(storageKey) });
     }
 
-    [HttpDelete("me/avatar")]
+    [HttpDelete("me/image")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> DeleteAvatar()
+    public async Task<IActionResult> DeleteImage()
     {
         var userId = GetUserId();
         if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
 
-        await imageService.DeleteAvatarAsync(userId.Value, "user");
+        await imageService.DeleteImageAsync(userId.Value, "user");
         return NoContent();
     }
 

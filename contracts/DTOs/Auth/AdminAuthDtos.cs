@@ -5,7 +5,7 @@ public record AdminLoginRequest(string Email, string Password);
 public record AdminUserDto(
     Guid AdminUserId, string Email, string FirstName, string LastName,
     string Role, bool IsActive, DateTime CreatedAt, DateTime? LastLoginAt,
-    string? Phone, string? AvatarUrl);
+    string? Phone, string? ImageUrl);
 
 public record AdminAuthResponse(AdminUserDto User, string? Token = null);
 

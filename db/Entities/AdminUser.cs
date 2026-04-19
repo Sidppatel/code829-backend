@@ -14,8 +14,8 @@ public class AdminUser : BaseEntity
     public DateTime? LastLoginAt { get; set; }
     public int FailedLoginAttempts { get; set; }
     public DateTime? LockedUntil { get; set; }
-    public Guid? AvatarImageId { get; set; }
-    public Image? AvatarImage { get; set; }
+    public Guid? ImageId { get; set; }
+    public Image? Image { get; set; }
     public string? Phone { get; set; }
 
     /// <summary>

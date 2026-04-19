@@ -12,7 +12,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         var user = await context.Users
             .FromSqlRaw("SELECT * FROM sp_get_user_by_id({0})", userId)
             .Include(u => u.Address)
-            .Include(u => u.AvatarImage)
+            .Include(u => u.Image)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
         return user;
@@ -23,7 +23,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         var user = await context.Users
             .FromSqlRaw("SELECT * FROM sp_get_user_by_email({0})", email)
             .Include(u => u.Address)
-            .Include(u => u.AvatarImage)
+            .Include(u => u.Image)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
         return user;
@@ -34,7 +34,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         var user = await context.Users
             .FromSqlRaw("SELECT * FROM sp_get_user_by_email_hash({0})", emailHash)
             .Include(u => u.Address)
-            .Include(u => u.AvatarImage)
+            .Include(u => u.Image)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
         return user;
@@ -45,7 +45,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         return await context.Users
             .FromSqlRaw("SELECT * FROM sp_list_users()")
             .Include(u => u.Address)
-            .Include(u => u.AvatarImage)
+            .Include(u => u.Image)
             .AsNoTracking()
             .ToListAsync(ct);
     }
@@ -83,17 +83,17 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
                 ], ct);
     }
 
-    public async Task<Guid?> SetUserAvatarImageAsync(Guid userId, Guid imageId, CancellationToken ct = default)
+    public async Task<Guid?> SetUserImageAsync(Guid userId, Guid imageId, CancellationToken ct = default)
     {
         return await context.Database
-            .SqlQueryRaw<Guid?>("SELECT sp_set_user_avatar_image({0}, {1}) AS \"Value\"", userId, imageId)
+            .SqlQueryRaw<Guid?>("SELECT sp_set_user_image({0}, {1}) AS \"Value\"", userId, imageId)
             .FirstAsync(ct);
     }
 
-    public async Task<Guid?> ClearUserAvatarImageAsync(Guid userId, CancellationToken ct = default)
+    public async Task<Guid?> ClearUserImageAsync(Guid userId, CancellationToken ct = default)
     {
         return await context.Database
-            .SqlQueryRaw<Guid?>("SELECT sp_clear_user_avatar_image({0}) AS \"Value\"", userId)
+            .SqlQueryRaw<Guid?>("SELECT sp_clear_user_image({0}) AS \"Value\"", userId)
             .FirstAsync(ct);
     }
 
