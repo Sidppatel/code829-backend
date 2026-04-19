@@ -26,4 +26,6 @@ public interface IEventProcedures
     Task DeleteEventAsync(Guid id, CancellationToken ct = default);
 
     Task<EventStats?> GetEventStatsAsync(Guid id, CancellationToken ct = default);
+
+    Task<List<Guid>> SearchEventsAsync(string query, CancellationToken ct = default);
 }

@@ -72,6 +72,13 @@ public class EventProcedures(EventPlatformDbContext context) : IEventProcedures
         return row is null ? null : new EventStats(row.TotalSold, row.MaxCapacity, row.FillRatePct, row.GrossRevenueCents);
     }
 
+    public async Task<List<Guid>> SearchEventsAsync(string query, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<Guid>("SELECT \"EventId\" AS \"Value\" FROM sp_search_events({0})", query)
+            .ToListAsync(ct);
+    }
+
     private sealed class EventStatsRow
     {
         public int TotalSold { get; set; }

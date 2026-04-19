@@ -6,6 +6,7 @@ using Contracts.DTOs.Events;
 using Contracts.DTOs.Venues;
 using Contracts.Enums;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
@@ -16,6 +17,7 @@ namespace Api.Controllers;
 [Route("events")]
 public class EventsController(
     EventPlatformDbContext context,
+    IEventProcedures eventProc,
     IFileStorageService fileStorage,
     ISettingsService settings,
     IConnectionMultiplexer redis
@@ -62,23 +64,7 @@ public class EventsController(
             }
             else
             {
-                // ARCH-EXCEPTION: FTS requires the events.SearchVector tsvector column which is
-                // not projected onto v_events. PlainToTsQuery + Matches is only valid against the
-                // raw tsvector. The projection is read-only (.Select(e => e.Id)) — no writes.
-                var ftsIds = await context.Events
-                    .Where(e => e.Status == EventStatus.Published && e.SearchVector!.Matches(EF.Functions.PlainToTsQuery(trimmedSearch)))
-                    .Select(e => e.Id)
-                    .ToListAsync();
-
-                // ARCH-EXCEPTION: pg_trgm similarity operates on the underlying events.Title;
-                // projecting through v_events would still require the raw table for the operator.
-                var trigramIds = await context.Events
-                    .Where(e => e.Status == EventStatus.Published)
-                    .Where(e => EF.Functions.TrigramsSimilarity(e.Title, trimmedSearch) > 0.1)
-                    .Select(e => e.Id)
-                    .ToListAsync();
-
-                var matchIds = ftsIds.Union(trigramIds).Distinct().ToList();
+                var matchIds = await eventProc.SearchEventsAsync(trimmedSearch);
 
                 if (matchIds.Count == 0)
                 {
