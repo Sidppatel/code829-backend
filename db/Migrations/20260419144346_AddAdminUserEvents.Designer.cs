@@ -180,9 +180,8 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("AvatarPath")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                    b.Property<Guid?>("AvatarImageId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -244,6 +243,8 @@ namespace db.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AvatarImageId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -1602,9 +1603,8 @@ namespace db.Migrations
                     b.Property<Guid?>("AddressId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AvatarPath")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                    b.Property<Guid?>("AvatarImageId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -1654,6 +1654,8 @@ namespace db.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AddressId");
+
+                    b.HasIndex("AvatarImageId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -1875,7 +1877,7 @@ namespace db.Migrations
                     b.Property<Guid>("AdminUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AvatarPath")
+                    b.Property<string>("AvatarImageStorageKey")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -2905,7 +2907,7 @@ namespace db.Migrations
                     b.Property<string>("AddressLine1")
                         .HasColumnType("text");
 
-                    b.Property<string>("AvatarPath")
+                    b.Property<string>("AvatarImageStorageKey")
                         .HasColumnType("text");
 
                     b.Property<string>("City")
@@ -3328,6 +3330,16 @@ namespace db.Migrations
                     b.Navigation("LockedByUser");
                 });
 
+            modelBuilder.Entity("Db.Entities.AdminUser", b =>
+                {
+                    b.HasOne("Db.Entities.Image", "AvatarImage")
+                        .WithMany()
+                        .HasForeignKey("AvatarImageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AvatarImage");
+                });
+
             modelBuilder.Entity("Db.Entities.User", b =>
                 {
                     b.HasOne("Db.Entities.Address", "Address")
@@ -3335,7 +3347,14 @@ namespace db.Migrations
                         .HasForeignKey("AddressId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Db.Entities.Image", "AvatarImage")
+                        .WithMany()
+                        .HasForeignKey("AvatarImageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Address");
+
+                    b.Navigation("AvatarImage");
                 });
 
             modelBuilder.Entity("Db.Entities.Venue", b =>
