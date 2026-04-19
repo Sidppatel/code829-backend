@@ -90,10 +90,10 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
 
     // ─── Event tables ──────────────────────────────────────────────
 
-    public async Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, CancellationToken ct = default)
+    public async Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, int? platformFeeCents = null, CancellationToken ct = default)
     {
         await context.Database.ExecuteSqlRawAsync(
-            "SELECT sp_update_event_table(@p0, @p1, @p2, @p3, @p4, @p5, @p6)",
+            "SELECT sp_update_event_table(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)",
             [
                 new NpgsqlParameter("p0", id),
                 new NpgsqlParameter("p1", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value },
@@ -101,7 +101,8 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
                 new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)shape ?? DBNull.Value },
                 new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)color ?? DBNull.Value },
                 new NpgsqlParameter("p5", NpgsqlDbType.Integer) { Value = (object?)priceCents ?? DBNull.Value },
-                new NpgsqlParameter("p6", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value }
+                new NpgsqlParameter("p6", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value },
+                new NpgsqlParameter("p7", NpgsqlDbType.Integer) { Value = (object?)platformFeeCents ?? DBNull.Value }
             ], ct);
     }
 

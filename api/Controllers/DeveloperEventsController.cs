@@ -125,11 +125,9 @@ public class DeveloperEventsController(
                         HttpContext.TraceIdentifier));
             }
 
-            // ARCH-EXCEPTION: UpdateEventTable SP doesn't expose PlatformFeeCents; this is a
-            // scalar write on an already-validated row (developer role + sales+lock check).
-            var targetId = tt.Id;
-            await Context.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE event_tables SET \"PlatformFeeCents\" = {feeCents}, \"UpdatedAt\" = now() WHERE \"Id\" = {targetId}");
+            await layoutProc.UpdateEventTableAsync(
+                tt.Id, label: null, capacity: null, shape: null, color: null,
+                priceCents: null, isActive: null, platformFeeCents: feeCents);
         }
 
         return Ok(new { message = "Table type fees updated" });

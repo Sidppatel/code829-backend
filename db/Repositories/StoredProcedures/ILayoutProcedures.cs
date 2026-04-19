@@ -17,7 +17,7 @@ public interface ILayoutProcedures
     Task UpdateEventGridAsync(Guid id, int? gridRows, int? gridCols, CancellationToken ct = default);
 
     // Event tables
-    Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, CancellationToken ct = default);
+    Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, int? platformFeeCents = null, CancellationToken ct = default);
     Task DeleteEventTableAsync(Guid id, CancellationToken ct = default);
     Task<EventTable?> GetEventTableByIdAsync(Guid id, CancellationToken ct = default);
     Task<List<EventTable>> ListEventTablesForEventAsync(Guid eventId, CancellationToken ct = default);
