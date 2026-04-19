@@ -112,7 +112,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.EmailHash).HasMaxLength(128);
             entity.Property(e => e.FirstName).HasMaxLength(128);
             entity.Property(e => e.LastName).HasMaxLength(128);
-            entity.Property(e => e.AvatarPath).HasMaxLength(512);
+            entity.HasOne(e => e.AvatarImage).WithMany().HasForeignKey(e => e.AvatarImageId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
@@ -133,8 +134,9 @@ public class EventPlatformDbContext(
             entity.Property(e => e.LastName).HasMaxLength(128);
             entity.Property(e => e.PasswordHash).HasMaxLength(256);
             entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.AvatarPath).HasMaxLength(512);
             entity.Property(e => e.Phone).HasMaxLength(20);
+            entity.HasOne(e => e.AvatarImage).WithMany().HasForeignKey(e => e.AvatarImageId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Invitation>(entity =>
@@ -526,6 +528,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Caption).HasMaxLength(1024);
             entity.Property(e => e.ContentType).HasMaxLength(64);
             entity.Property(e => e.Checksum).HasMaxLength(128);
+            entity.Property(e => e.Tag).HasMaxLength(50).HasDefaultValue("Generic");
         });
 
         modelBuilder.Entity<VenueImage>(entity =>

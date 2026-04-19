@@ -69,7 +69,7 @@ namespace db.Migrations
                     LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     FailedLoginAttempts = table.Column<int>(type: "integer", nullable: false),
                     LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    AvatarPath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    AvatarImageId = table.Column<Guid>(type: "uuid", nullable: true),
                     Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     StripeConnectedAccountId = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
@@ -79,6 +79,12 @@ namespace db.Migrations
                 {
                     table.PrimaryKey("PK_admin_users", x => x.Id);
                     table.CheckConstraint("CK_admin_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
+                    table.ForeignKey(
+                        name: "FK_admin_users_images_AvatarImageId",
+                        column: x => x.AvatarImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -145,6 +151,7 @@ namespace db.Migrations
                     EntityType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     EntityId = table.Column<Guid>(type: "uuid", nullable: false),
                     StorageKey = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Tag = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false, defaultValue: "Generic"),
                     OriginalName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     SizeBytes = table.Column<int>(type: "integer", nullable: false),
                     Width = table.Column<int>(type: "integer", nullable: false),
@@ -162,6 +169,7 @@ namespace db.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_images", x => x.Id);
+                    table.CheckConstraint("CK_images_Tag", "\"Tag\" IN ('ProfilePic','EventImage','VenueImage','Logo','Banner','Gallery','Generic')");
                 });
 
             migrationBuilder.CreateTable(
@@ -245,7 +253,7 @@ namespace db.Migrations
                     Phone = table.Column<string>(type: "text", nullable: true),
                     OptInLocationEmail = table.Column<bool>(type: "boolean", nullable: false),
                     HasCompletedOnboarding = table.Column<bool>(type: "boolean", nullable: false),
-                    AvatarPath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    AvatarImageId = table.Column<Guid>(type: "uuid", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
@@ -256,6 +264,12 @@ namespace db.Migrations
                         name: "FK_users_addresses_AddressId",
                         column: x => x.AddressId,
                         principalTable: "addresses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_users_images_AvatarImageId",
+                        column: x => x.AvatarImageId,
+                        principalTable: "images",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                 });
@@ -1178,9 +1192,19 @@ namespace db.Migrations
                 column: "LockedByUserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_admin_users_AvatarImageId",
+                table: "admin_users",
+                column: "AvatarImageId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_users_AddressId",
                 table: "users",
                 column: "AddressId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_users_AvatarImageId",
+                table: "users",
+                column: "AvatarImageId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_users_Email",

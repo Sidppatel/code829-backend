@@ -18,7 +18,6 @@ namespace Api.Controllers;
 public class AuthController(
     IAuthService authService,
     IWebHostEnvironment environment,
-    IImageService imageService,
     Db.Repositories.StoredProcedures.IUserProcedures userProc
 ) : ControllerBase
 {
@@ -211,48 +210,19 @@ public class AuthController(
     [HttpPost("me/avatar")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> UploadAvatar(IFormFile file)
+    public IActionResult UploadAvatar(IFormFile file)
     {
-        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
-        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
-
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
-
-        var user = await userProc.GetByIdAsync(userId.Value);
-        if (user is null)
-            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
-
-        var oldImages = await imageService.GetByEntityAsync("user", userId.Value);
-        foreach (var old in oldImages)
-            await imageService.DeleteAsync(old.ImageId);
-
-        var result = await imageService.UploadAsync(file.OpenReadStream(), file.FileName, "user", userId.Value, userId.Value, uploaderType: "user");
-
-        await userProc.UpdateUserAvatarAsync(userId.Value, result.StorageKey);
-
-        return Ok(result);
+        // TODO Phase 2: rewrite with AvatarImageId FK flow
+        return StatusCode(501, new ApiError(501, "Avatar upload not yet implemented", HttpContext.TraceIdentifier));
     }
 
     [HttpDelete("me/avatar")]
     [Authorize]
     [RequireRole(UserRole.User)]
-    public async Task<IActionResult> DeleteAvatar()
+    public IActionResult DeleteAvatar()
     {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
-
-        var user = await userProc.GetByIdAsync(userId.Value);
-        if (user is null)
-            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
-
-        var images = await imageService.GetByEntityAsync("user", userId.Value);
-        foreach (var img in images)
-            await imageService.DeleteAsync(img.ImageId);
-
-        await userProc.ClearUserAvatarAsync(userId.Value);
-
-        return NoContent();
+        // TODO Phase 2: rewrite with AvatarImageId FK flow
+        return StatusCode(501, new ApiError(501, "Avatar delete not yet implemented", HttpContext.TraceIdentifier));
     }
 
     // ── Helpers ──────────────────────────────────────────────────

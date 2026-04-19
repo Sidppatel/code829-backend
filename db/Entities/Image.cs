@@ -16,4 +16,5 @@ public class Image : BaseEntity
     public string? Caption { get; set; }
     public string? ContentType { get; set; }   // e.g. "image/webp"
     public string? Checksum { get; set; }      // sha256 hex
+    public required string Tag { get; set; } = "Generic";
 }

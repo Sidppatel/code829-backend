@@ -12,6 +12,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         var user = await context.Users
             .FromSqlRaw("SELECT * FROM sp_get_user_by_id({0})", userId)
             .Include(u => u.Address)
+            .Include(u => u.AvatarImage)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
         return user;
@@ -22,6 +23,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         var user = await context.Users
             .FromSqlRaw("SELECT * FROM sp_get_user_by_email({0})", email)
             .Include(u => u.Address)
+            .Include(u => u.AvatarImage)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
         return user;
@@ -32,6 +34,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         var user = await context.Users
             .FromSqlRaw("SELECT * FROM sp_get_user_by_email_hash({0})", emailHash)
             .Include(u => u.Address)
+            .Include(u => u.AvatarImage)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
         return user;
@@ -42,6 +45,7 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         return await context.Users
             .FromSqlRaw("SELECT * FROM sp_list_users()")
             .Include(u => u.Address)
+            .Include(u => u.AvatarImage)
             .AsNoTracking()
             .ToListAsync(ct);
     }
@@ -76,25 +80,6 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
                     new NpgsqlParameter("p6", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value },
                     new NpgsqlParameter("p7", NpgsqlDbType.Text) { Value = (object?)zip ?? DBNull.Value },
                     new NpgsqlParameter("p8", NpgsqlDbType.Boolean) { Value = (object?)optIn ?? DBNull.Value }
-                ], ct);
-    }
-
-    public async Task UpdateUserAvatarAsync(Guid userId, string avatarPath, CancellationToken ct = default)
-    {
-        await context.Database
-            .ExecuteSqlRawAsync(
-                "SELECT sp_update_user_avatar(@p0, @p1)",
-                [userId, avatarPath], ct);
-    }
-
-    public async Task ClearUserAvatarAsync(Guid userId, CancellationToken ct = default)
-    {
-        await context.Database
-            .ExecuteSqlRawAsync(
-                "SELECT sp_update_user_avatar(@p0, @p1)",
-                [
-                    new NpgsqlParameter("p0", userId),
-                    new NpgsqlParameter("p1", NpgsqlDbType.Text) { Value = DBNull.Value }
                 ], ct);
     }
 

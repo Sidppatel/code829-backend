@@ -3,8 +3,9 @@ SELECT
     u."Id" AS "UserId", u."Email", u."FirstName", u."LastName",
     u."IsActive", u."LastLoginAt",
     u."Phone", u."OptInLocationEmail", u."HasCompletedOnboarding",
-    u."AvatarPath", u."CreatedAt",
+    i."StorageKey" AS "AvatarImageStorageKey", u."CreatedAt",
     a."Line1" AS "AddressLine1",
     a."City", a."State", a."ZipCode"
 FROM users u
-LEFT JOIN addresses a ON u."AddressId" = a."Id";
+LEFT JOIN addresses a ON u."AddressId" = a."Id"
+LEFT JOIN images i ON u."AvatarImageId" = i."Id";

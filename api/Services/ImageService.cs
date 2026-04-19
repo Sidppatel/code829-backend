@@ -41,6 +41,7 @@ public class ImageService(
             EntityType = entityType,
             EntityId = entityId,
             StorageKey = baseKey,
+            Tag = "Generic",
             OriginalName = Path.GetFileName(fileName),
             SizeBytes = detailVariant.SizeBytes,
             Width = detailVariant.Width,

@@ -71,3 +71,4 @@ graphify-out/
 
 # graphify local interpreter pointer
 .graphify_python
+.claude/**
