@@ -398,9 +398,17 @@ public class EventsController(
                     status = "Booked";
                     break;
                 case "Locked":
-                    isLockedByYou = userId.HasValue && t.LockedByUserId == userId.Value;
-                    status = isLockedByYou ? "HeldByYou" : "Held";
-                    holdExpiresAt = isLockedByYou ? t.LockExpiresAt : null;
+                    var lockExpired = t.LockExpiresAt.HasValue && t.LockExpiresAt.Value <= DateTime.UtcNow;
+                    if (lockExpired)
+                    {
+                        status = "Available";
+                    }
+                    else
+                    {
+                        isLockedByYou = userId.HasValue && t.LockedByUserId == userId.Value;
+                        status = isLockedByYou ? "HeldByYou" : "Held";
+                        holdExpiresAt = isLockedByYou ? t.LockExpiresAt : null;
+                    }
                     break;
                 default:
                     status = "Available";
