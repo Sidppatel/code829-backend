@@ -600,6 +600,52 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.EventImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_event_images_EventId_PrimaryUnique")
+                        .HasFilter("\"IsPrimary\" = true");
+
+                    b.HasIndex("ImageId");
+
+                    b.HasIndex("EventId", "ImageId")
+                        .IsUnique();
+
+                    b.HasIndex("EventId", "SortOrder");
+
+                    b.ToTable("event_images", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.EventTable", b =>
                 {
                     b.Property<Guid>("Id")
@@ -792,6 +838,22 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<string>("AltText")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Checksum")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -807,9 +869,6 @@ namespace db.Migrations
 
                     b.Property<int>("Height")
                         .HasColumnType("integer");
-
-                    b.Property<bool>("IsPrimary")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("OriginalName")
                         .HasMaxLength(255)
@@ -1681,6 +1740,58 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_device_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.EventImageView", b =>
+                {
+                    b.Property<Guid>("EventImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AltText")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Caption")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContentType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OriginalName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("EventImageId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_event_images", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.EventSummaryView", b =>
@@ -2608,6 +2719,25 @@ namespace db.Migrations
                     b.Navigation("AdminUser");
 
                     b.Navigation("Venue");
+                });
+
+            modelBuilder.Entity("Db.Entities.EventImage", b =>
+                {
+                    b.HasOne("Db.Entities.Event", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Db.Entities.Image", "Image")
+                        .WithMany()
+                        .HasForeignKey("ImageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("Image");
                 });
 
             modelBuilder.Entity("Db.Entities.EventTable", b =>

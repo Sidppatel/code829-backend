@@ -34,6 +34,7 @@ public class EventPlatformDbContext(
 
     // Images
     public DbSet<Image> Images => Set<Image>();
+    public DbSet<EventImage> EventImages => Set<EventImage>();
 
     // User-facing
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
@@ -58,6 +59,7 @@ public class EventPlatformDbContext(
     public DbSet<DeviceSessionView> DeviceSessionViews => Set<DeviceSessionView>();
     public DbSet<InvitationView> InvitationViews => Set<InvitationView>();
     public DbSet<FeedbackView> FeedbackViews => Set<FeedbackView>();
+    public DbSet<EventImageView> EventImageViews => Set<EventImageView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -497,6 +499,26 @@ public class EventPlatformDbContext(
             entity.Property(e => e.StorageKey).HasMaxLength(500);
             entity.Property(e => e.OriginalName).HasMaxLength(255);
             entity.Property(e => e.UploaderType).HasMaxLength(10);
+            entity.Property(e => e.AltText).HasMaxLength(512);
+            entity.Property(e => e.Caption).HasMaxLength(1024);
+            entity.Property(e => e.ContentType).HasMaxLength(64);
+            entity.Property(e => e.Checksum).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<EventImage>(entity =>
+        {
+            entity.ToTable("event_images");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EventId, e.ImageId }).IsUnique();
+            entity.HasIndex(e => new { e.EventId, e.SortOrder });
+            entity.HasIndex(e => e.EventId)
+                .IsUnique()
+                .HasFilter("\"IsPrimary\" = true")
+                .HasDatabaseName("IX_event_images_EventId_PrimaryUnique");
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ─── Logging ─────────────────────────────────────────────
@@ -666,6 +688,12 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_feedbacks");
             entity.HasKey(e => e.FeedbackId);
+        });
+
+        modelBuilder.Entity<EventImageView>(entity =>
+        {
+            entity.ToView("v_event_images");
+            entity.HasKey(e => e.EventImageId);
         });
     }
 }

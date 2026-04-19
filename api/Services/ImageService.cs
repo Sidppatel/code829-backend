@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Contracts.DTOs.Images;
 using Db.Entities;
 using Db.Repositories;
@@ -12,12 +13,18 @@ public class ImageService(
 ) : IImageService
 {
     public async Task<ImageUploadResponse> UploadAsync(
-        Stream fileStream, string fileName, string entityType, Guid entityId, Guid? uploadedById, string? uploaderType = null)
+        Stream fileStream, string fileName, string entityType, Guid entityId,
+        Guid? uploadedById, string? uploaderType = null,
+        string? altText = null, string? caption = null)
     {
-        var variants = await imageProcessing.ProcessAsync(fileStream, entityType);
+        using var buffered = new MemoryStream();
+        await fileStream.CopyToAsync(buffered);
+        var checksum = ComputeSha256(buffered.ToArray());
+        buffered.Position = 0;
+
+        var variants = await imageProcessing.ProcessAsync(buffered, entityType);
         var detailVariant = variants.First(v => v.Suffix == "");
 
-        // Upload all variants to storage
         var baseKey = $"{entityType}/{Guid.NewGuid()}";
         foreach (var variant in variants)
         {
@@ -25,9 +32,8 @@ public class ImageService(
             await fileStorage.SaveWithKeyAsync(variant.Stream, key, "image/webp");
         }
 
-        // Check if this is the first image for the entity
         var existing = await imageRepo.GetByEntityAsync(entityType, entityId);
-        var isPrimary = existing.Count == 0;
+        var sortOrder = existing.Count;
 
         var image = new Image
         {
@@ -39,10 +45,13 @@ public class ImageService(
             SizeBytes = detailVariant.SizeBytes,
             Width = detailVariant.Width,
             Height = detailVariant.Height,
-            IsPrimary = isPrimary,
-            SortOrder = existing.Count,
+            SortOrder = sortOrder,
             UploadedById = uploadedById,
-            UploaderType = uploaderType
+            UploaderType = uploaderType,
+            AltText = altText,
+            Caption = caption,
+            ContentType = "image/webp",
+            Checksum = checksum
         };
 
         await imageRepo.AddAsync(image);
@@ -50,7 +59,6 @@ public class ImageService(
 
         Log.Information("[Image] Uploaded {EntityType}/{EntityId} ({Variants} variants)", entityType, entityId, variants.Count);
 
-        // Dispose variant streams
         foreach (var v in variants) v.Stream.Dispose();
 
         var storageKey = $"{baseKey}.webp";
@@ -60,14 +68,14 @@ public class ImageService(
             fileStorage.GetPublicUrl(storageKey),
             fileStorage.GetPublicUrl($"{baseKey}_thumb.webp"),
             fileStorage.GetPublicUrl($"{baseKey}_card.webp"),
-            isPrimary
+            sortOrder == 0  // first uploaded is primary
         );
     }
 
     public async Task<List<ImageDto>> GetByEntityAsync(string entityType, Guid entityId)
     {
         var images = await imageRepo.GetByEntityAsync(entityType, entityId);
-        return images.Take(50).Select(i => MapToDto(i)).ToList();
+        return images.Take(50).Select(MapToDto).ToList();
     }
 
     public async Task<bool> DeleteAsync(Guid imageId)
@@ -75,30 +83,12 @@ public class ImageService(
         var image = await imageRepo.GetByIdAsync(imageId);
         if (image is null) return false;
 
-        // Delete all variant files from storage
         var suffixes = GetSuffixes(image.EntityType);
         foreach (var suffix in suffixes)
-        {
             await fileStorage.DeleteAsync($"{image.StorageKey}{suffix}.webp");
-        }
-
-        var wasPrimary = image.IsPrimary;
-        var entityType = image.EntityType;
-        var entityId = image.EntityId;
 
         await imageRepo.DeleteAsync(image);
         await imageRepo.SaveChangesAsync();
-
-        // If deleted image was primary, promote the next one
-        if (wasPrimary)
-        {
-            var remaining = await imageRepo.GetByEntityAsync(entityType, entityId);
-            if (remaining.Count > 0)
-            {
-                remaining[0].IsPrimary = true;
-                await imageRepo.SaveChangesAsync();
-            }
-        }
 
         Log.Information("[Image] Deleted image {ImageId}", imageId);
         return true;
@@ -109,14 +99,18 @@ public class ImageService(
         var image = await imageRepo.GetByIdAsync(imageId);
         if (image is null) return;
 
-        // Unset current primary
-        var currentPrimary = await imageRepo.GetPrimaryAsync(image.EntityType, image.EntityId);
-        if (currentPrimary is not null)
-        {
-            currentPrimary.IsPrimary = false;
-        }
+        // Promote to primary by setting SortOrder = 0 and shifting others up.
+        var all = await imageRepo.GetByEntityAsync(image.EntityType, image.EntityId);
+        var target = all.FirstOrDefault(x => x.Id == imageId);
+        if (target is null) return;
 
-        image.IsPrimary = true;
+        var oldOrder = target.SortOrder;
+        if (oldOrder == 0) return;
+
+        foreach (var img in all.Where(x => x.SortOrder < oldOrder))
+            img.SortOrder++;
+
+        target.SortOrder = 0;
         await imageRepo.SaveChangesAsync();
     }
 
@@ -142,9 +136,12 @@ public class ImageService(
         i.SizeBytes,
         i.Width,
         i.Height,
-        i.IsPrimary,
+        i.SortOrder == 0,   // primary = lowest sort order
         i.SortOrder,
-        i.CreatedAt
+        i.CreatedAt,
+        i.AltText,
+        i.Caption,
+        i.ContentType
     );
 
     private static string[] GetSuffixes(string entityType) => entityType switch
@@ -152,4 +149,10 @@ public class ImageService(
         "user" or "platform" => ["", "_thumb"],
         _ => ["", "_card", "_thumb"]
     };
+
+    private static string ComputeSha256(byte[] bytes)
+    {
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
 }

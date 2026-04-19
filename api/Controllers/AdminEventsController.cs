@@ -4,6 +4,7 @@ using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
 using Contracts.DTOs.Events;
+using Contracts.DTOs.Images;
 using Contracts.DTOs.Venues;
 using Contracts.Enums;
 using Db;
@@ -28,7 +29,8 @@ public class AdminEventsController(
     IEventTicketTypeProcedures ticketTypeProc,
     IFileStorageService fileStorage,
     IAdminLogService adminLog,
-    ISettingsService settingsService
+    ISettingsService settingsService,
+    IEventImageService eventImageService
 ) : ControllerBase
 {
     // Exposed so derived controllers (e.g. DeveloperEventsController) can reuse these
@@ -283,6 +285,75 @@ public class AdminEventsController(
             null, null, null, null, null, null, null, null, null, null);
 
         return Ok(new { imageUrl = fileStorage.GetPublicUrl(path) });
+    }
+
+    [HttpPost("{eventId:guid}/images")]
+    public async Task<IActionResult> AddEventImage(Guid eventId, IFormFile file, [FromForm] string? altText = null, [FromForm] string? caption = null)
+    {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        var result = await eventImageService.AddAsync(eventId, file.OpenReadStream(), file.FileName, GetCurrentUserId(), altText, caption);
+        await adminLog.LogAsync("event.image.add", "Event", eventId, $"Added image {result.ImageId}");
+        return Ok(result);
+    }
+
+    [HttpGet("{eventId:guid}/images")]
+    public async Task<IActionResult> ListEventImages(Guid eventId)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        var list = await eventImageService.ListAsync(eventId);
+        return Ok(list);
+    }
+
+    [HttpPut("{eventId:guid}/images/order")]
+    public async Task<IActionResult> ReorderEventImages(Guid eventId, [FromBody] ReorderEventImagesRequest request)
+    {
+        if (request.ImageIds is null || request.ImageIds.Count == 0)
+            return BadRequest(new ApiError(400, "imageIds required", HttpContext.TraceIdentifier));
+        if (request.ImageIds.Distinct().Count() != request.ImageIds.Count)
+            return BadRequest(new ApiError(400, "imageIds must be unique", HttpContext.TraceIdentifier));
+
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        await eventImageService.ReorderAsync(eventId, request.ImageIds);
+        await adminLog.LogAsync("event.image.reorder", "Event", eventId, $"Reordered {request.ImageIds.Count} images");
+        return NoContent();
+    }
+
+    [HttpPut("{eventId:guid}/images/{imageId:guid}/primary")]
+    public async Task<IActionResult> SetEventImagePrimary(Guid eventId, Guid imageId)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        var ok = await eventImageService.SetPrimaryAsync(eventId, imageId);
+        if (!ok) return NotFound(new ApiError(404, "Image not found on this event", HttpContext.TraceIdentifier));
+        await adminLog.LogAsync("event.image.setPrimary", "Event", eventId, $"Set primary image {imageId}");
+        return NoContent();
+    }
+
+    [HttpDelete("{eventId:guid}/images/{imageId:guid}")]
+    public async Task<IActionResult> DeleteEventImage(Guid eventId, Guid imageId)
+    {
+        var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+        if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
+        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+
+        var ok = await eventImageService.RemoveAsync(eventId, imageId);
+        if (!ok) return NotFound(new ApiError(404, "Image not found on this event", HttpContext.TraceIdentifier));
+        await adminLog.LogAsync("event.image.delete", "Event", eventId, $"Deleted image {imageId}");
+        return NoContent();
     }
 
     [HttpPut("{id:guid}/status")]

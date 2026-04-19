@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NpgsqlTypes;
 
@@ -7,7 +7,7 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class InitialSchema : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -149,10 +149,13 @@ namespace db.Migrations
                     SizeBytes = table.Column<int>(type: "integer", nullable: false),
                     Width = table.Column<int>(type: "integer", nullable: false),
                     Height = table.Column<int>(type: "integer", nullable: false),
-                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
                     SortOrder = table.Column<int>(type: "integer", nullable: false),
                     UploadedById = table.Column<Guid>(type: "uuid", nullable: true),
                     UploaderType = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    AltText = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    Caption = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    ContentType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    Checksum = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
@@ -455,6 +458,35 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "event_images",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_event_images", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_event_images_events_EventId",
+                        column: x => x.EventId,
+                        principalTable: "events",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_event_images_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "event_tables",
                 columns: table => new
                 {
@@ -622,6 +654,30 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "purchase_tables",
+                columns: table => new
+                {
+                    PurchaseId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TableId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_purchase_tables", x => new { x.PurchaseId, x.TableId });
+                    table.ForeignKey(
+                        name: "FK_purchase_tables_purchases_PurchaseId",
+                        column: x => x.PurchaseId,
+                        principalTable: "purchases",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_purchase_tables_tables_TableId",
+                        column: x => x.TableId,
+                        principalTable: "tables",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "purchase_tickets",
                 columns: table => new
                 {
@@ -785,6 +841,29 @@ namespace db.Migrations
                 column: "Timestamp");
 
             migrationBuilder.CreateIndex(
+                name: "IX_event_images_EventId_ImageId",
+                table: "event_images",
+                columns: new[] { "EventId", "ImageId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_event_images_EventId_PrimaryUnique",
+                table: "event_images",
+                column: "EventId",
+                unique: true,
+                filter: "\"IsPrimary\" = true");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_event_images_EventId_SortOrder",
+                table: "event_images",
+                columns: new[] { "EventId", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_event_images_ImageId",
+                table: "event_images",
+                column: "ImageId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_event_tables_EventId_Label",
                 table: "event_tables",
                 columns: new[] { "EventId", "Label" });
@@ -897,6 +976,11 @@ namespace db.Migrations
                 table: "magic_link_tokens",
                 column: "TokenHash",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_purchase_tables_TableId",
+                table: "purchase_tables",
+                column: "TableId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_purchase_tickets_GuestUserId",
@@ -1051,304 +1135,9 @@ namespace db.Migrations
                 table: "venues",
                 column: "Name");
 
-            // --- EXTENSIONS ---------------------------------------------------------------
-
-            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
-
-            // --- PURCHASE TABLES (multi-table support) ------------------------------------
-
-            migrationBuilder.CreateTable(
-                name: "purchase_tables",
-                columns: table => new
-                {
-                    PurchaseId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TableId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_purchase_tables", x => new { x.PurchaseId, x.TableId });
-                    table.ForeignKey(
-                        name: "FK_purchase_tables_purchases_PurchaseId",
-                        column: x => x.PurchaseId,
-                        principalTable: "purchases",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_purchase_tables_tables_TableId",
-                        column: x => x.TableId,
-                        principalTable: "tables",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_purchase_tables_TableId",
-                table: "purchase_tables",
-                column: "TableId");
-
-            // --- VIEWS --------------------------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_events.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_event_summary.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_user_profile.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_tables.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_purchases.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_purchase_tickets.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_venues.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_event_tables_summary.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_event_ticket_types_summary.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_admin_users.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_device_sessions.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_invitations.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("v_feedbacks.sql"));
-
-            // --- AUTH STORED PROCEDURES ---------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_magic_link.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_consume_magic_link.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_upsert_user.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_user_last_login.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_device_session.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_revoke_device_session.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_revoke_all_user_sessions.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_cleanup_expired_sessions.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_session_activity.sql"));
-
-            // --- USER STORED PROCEDURES ---------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_user_profile.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_user_avatar.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_user_by_id.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_user_by_email.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_user_by_email_hash.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_list_users.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_user_exists_by_email.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_user_counts.sql"));
-
-            // --- EVENT STORED PROCEDURES --------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_event.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_event.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_change_event_status.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_publish_scheduled_events.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_delete_event.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_event_stats.sql"));
-
-            // --- EVENT TICKET TYPE STORED PROCEDURES --------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_event_ticket_type.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_event_ticket_type.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_delete_event_ticket_type.sql"));
-
-            // --- VENUE STORED PROCEDURES --------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_venue.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_venue.sql"));
-
-            // --- TABLE/LAYOUT STORED PROCEDURES ------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_event_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_event_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_delete_event_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_event_table_by_id.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_list_event_tables_for_event.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_list_existing_event_table_template_ids.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_delete_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_table_by_id.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_list_tables_for_event.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_lock_table.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_release_table_lock.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_mark_table_booked.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_cleanup_expired_locks.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_event_has_active_purchases.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_event_table_has_active_purchases.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_event_table_has_locked_tables.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_locked_table_ids.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_event_by_id_for_layout.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_event_grid.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_save_event_layout.sql"));
-
-            // --- TABLE TEMPLATE STORED PROCEDURES -----------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_table_template.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_table_template.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_deactivate_table_template.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_table_template_by_id.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_list_active_table_templates.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_list_active_table_templates_by_ids.sql"));
-
-            // --- PURCHASE STORED PROCEDURES ------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_purchase.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_confirm_purchase.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_cancel_purchase.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_refund_purchase.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_reserve_open_capacity.sql"));
-
-            // --- TICKET STORED PROCEDURES -------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_invite_ticket.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_claim_ticket.sql"));
-
-            // --- STRIPE TRANSACTION STORED PROCEDURES --------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_stripe_transaction.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_stripe_transaction_status.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_enrich_stripe_transaction.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_set_stripe_tax_transaction_id.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_stripe_transaction_by_intent.sql"));
-
-            // --- IMAGE STORED PROCEDURES --------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_image.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_delete_image.sql"));
-
-            // --- SETTINGS STORED PROCEDURES -----------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_upsert_setting.sql"));
-
-            // --- LOGGING STORED PROCEDURES ------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_admin_log.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_developer_log.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_system_log.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_email_log.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_cleanup_old_logs.sql"));
-
-            // --- FEEDBACK STORED PROCEDURE ------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_feedback.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_delete_feedback.sql"));
-
-            // --- ADMIN USER STORED PROCEDURES --------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_admin_user.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_admin_user.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_admin_password.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_update_admin_last_login.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_admin_device_session.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_revoke_all_admin_sessions.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_admin_by_id.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_admin_by_email.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_admin_exists_by_email.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_increment_admin_failed_login.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_reset_admin_lockout.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_create_invitation.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_pending_invitation_by_email.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_get_invitation_by_token_hash.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_accept_invitation.sql"));
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("sp_revoke_invitation.sql"));
-
-            // --- AUDIT TRIGGER ------------------------------------------------------------
-
-            migrationBuilder.Sql(MigrationSqlLoader.Load("fn_audit_trigger.sql"));
-
-            var auditTables = new[]
-            {
-                "users", "addresses", "events", "venues", "event_tables", "tables",
-                "purchases", "purchase_tickets", "stripe_transactions", "images", "feedbacks",
-                "magic_link_tokens", "device_sessions", "app_settings", "table_templates"
-            };
-            foreach (var table in auditTables)
-            {
-                migrationBuilder.Sql($@"
-CREATE TRIGGER trg_{table}_audit AFTER INSERT OR UPDATE OR DELETE ON {table}
-FOR EACH ROW EXECUTE FUNCTION fn_audit_trigger();
-");
-            }
+            // Views first (procedures may reference them), then procedures.
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
         }
 
         /// <inheritdoc />
@@ -1373,10 +1162,10 @@ FOR EACH ROW EXECUTE FUNCTION fn_audit_trigger();
                 name: "email_logs");
 
             migrationBuilder.DropTable(
-                name: "feedbacks");
+                name: "event_images");
 
             migrationBuilder.DropTable(
-                name: "images");
+                name: "feedbacks");
 
             migrationBuilder.DropTable(
                 name: "invitations");
@@ -1395,6 +1184,9 @@ FOR EACH ROW EXECUTE FUNCTION fn_audit_trigger();
 
             migrationBuilder.DropTable(
                 name: "system_logs");
+
+            migrationBuilder.DropTable(
+                name: "images");
 
             migrationBuilder.DropTable(
                 name: "purchases");

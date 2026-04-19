@@ -16,7 +16,9 @@ public class ImageRepository(EventPlatformDbContext context) : IImageRepository
 
     public async Task<Image?> GetPrimaryAsync(string entityType, Guid entityId)
         => await context.Images
-            .FirstOrDefaultAsync(i => i.EntityType == entityType && i.EntityId == entityId && i.IsPrimary);
+            .Where(i => i.EntityType == entityType && i.EntityId == entityId)
+            .OrderBy(i => i.SortOrder)
+            .FirstOrDefaultAsync();
 
     public async Task AddAsync(Image image)
         => await context.Images.AddAsync(image);

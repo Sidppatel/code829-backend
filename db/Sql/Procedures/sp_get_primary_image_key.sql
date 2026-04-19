@@ -1,6 +1,18 @@
 CREATE OR REPLACE FUNCTION sp_get_primary_image_key(p_entity_type text, p_entity_id uuid)
 RETURNS text LANGUAGE sql STABLE AS $$
-    SELECT "StorageKey" FROM images
-    WHERE "EntityType" = p_entity_type AND "EntityId" = p_entity_id AND "IsPrimary" = true
-    LIMIT 1;
+    SELECT CASE
+        WHEN p_entity_type = 'event' THEN (
+            SELECT i."StorageKey"
+            FROM event_images ei
+            JOIN images i ON i."Id" = ei."ImageId"
+            WHERE ei."EventId" = p_entity_id AND ei."IsPrimary" = true
+            LIMIT 1
+        )
+        ELSE (
+            SELECT "StorageKey" FROM images
+            WHERE "EntityType" = p_entity_type AND "EntityId" = p_entity_id
+            ORDER BY "SortOrder" ASC
+            LIMIT 1
+        )
+    END;
 $$;

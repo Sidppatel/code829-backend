@@ -39,9 +39,10 @@ JOIN venues v ON e."VenueId" = v."Id"
 LEFT JOIN addresses a ON v."AddressId" = a."Id"
 LEFT JOIN admin_users au ON e."AdminUserId" = au."Id"
 LEFT JOIN LATERAL (
-    SELECT "StorageKey"
-    FROM images
-    WHERE "EntityType" = 'event' AND "EntityId" = e."Id" AND "IsPrimary" = true
+    SELECT i."StorageKey"
+    FROM event_images ei
+    JOIN images i ON i."Id" = ei."ImageId"
+    WHERE ei."EventId" = e."Id" AND ei."IsPrimary" = true
     LIMIT 1
 ) img ON true
 LEFT JOIN LATERAL (

@@ -164,6 +164,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ITicketProcedures, Db.Repositories.StoredProcedures.TicketProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeTransactionProcedures, Db.Repositories.StoredProcedures.StripeTransactionProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IImageProcedures, Db.Repositories.StoredProcedures.ImageProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventImageProcedures, Db.Repositories.StoredProcedures.EventImageProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ISettingsProcedures, Db.Repositories.StoredProcedures.SettingsProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IFeedbackProcedures, Db.Repositories.StoredProcedures.FeedbackProcedures>();
@@ -186,6 +187,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IImageRepository, ImageRepository>();
     builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
     builder.Services.AddScoped<IImageService, ImageService>();
+    builder.Services.AddScoped<IEventImageService, EventImageService>();
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
     // Conditional service registration: mock in dev, real in prod
