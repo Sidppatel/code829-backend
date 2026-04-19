@@ -21,4 +21,5 @@ public class VenueView
 
     // Aggregates
     public int EventCount { get; set; }
+    public string? PrimaryImageKey { get; set; }
 }

@@ -1,6 +1,7 @@
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
+using Contracts.DTOs.Images;
 using Contracts.DTOs.Venues;
 using Contracts.Enums;
 using Db;
@@ -19,7 +20,8 @@ namespace Api.Controllers;
 public class AdminVenuesController(
     EventPlatformDbContext context,
     IVenueProcedures venueProc,
-    IFileStorageService fileStorage
+    IFileStorageService fileStorage,
+    IVenueImageService venueImageService
 ) : ControllerBase
 {
     [HttpGet]
@@ -101,6 +103,73 @@ public class AdminVenuesController(
 
         await venueProc.UpdateVenueAsync(id, null, null, null, null, null, null, false, null, null, null, null);
         return NoContent();
+    }
+
+    [HttpPost("{venueId:guid}/images")]
+    public async Task<IActionResult> AddVenueImage(Guid venueId, IFormFile file, [FromForm] string? altText = null, [FromForm] string? caption = null)
+    {
+        var (valid, error) = Helpers.FileUploadValidator.Validate(file);
+        if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
+
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.VenueId == venueId);
+        if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
+
+        var adminId = GetCurrentUserId();
+        var result = await venueImageService.AddAsync(venueId, file.OpenReadStream(), file.FileName, adminId, altText, caption);
+        return Ok(result);
+    }
+
+    [HttpGet("{venueId:guid}/images")]
+    public async Task<IActionResult> ListVenueImages(Guid venueId)
+    {
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.VenueId == venueId);
+        if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
+
+        var list = await venueImageService.ListAsync(venueId);
+        return Ok(list);
+    }
+
+    [HttpPut("{venueId:guid}/images/order")]
+    public async Task<IActionResult> ReorderVenueImages(Guid venueId, [FromBody] ReorderVenueImagesRequest request)
+    {
+        if (request.ImageIds is null || request.ImageIds.Count == 0)
+            return BadRequest(new ApiError(400, "imageIds required", HttpContext.TraceIdentifier));
+        if (request.ImageIds.Distinct().Count() != request.ImageIds.Count)
+            return BadRequest(new ApiError(400, "imageIds must be unique", HttpContext.TraceIdentifier));
+
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.VenueId == venueId);
+        if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
+
+        await venueImageService.ReorderAsync(venueId, request.ImageIds);
+        return NoContent();
+    }
+
+    [HttpPut("{venueId:guid}/images/{imageId:guid}/primary")]
+    public async Task<IActionResult> SetVenueImagePrimary(Guid venueId, Guid imageId)
+    {
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.VenueId == venueId);
+        if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
+
+        var ok = await venueImageService.SetPrimaryAsync(venueId, imageId);
+        if (!ok) return NotFound(new ApiError(404, "Image not found on this venue", HttpContext.TraceIdentifier));
+        return NoContent();
+    }
+
+    [HttpDelete("{venueId:guid}/images/{imageId:guid}")]
+    public async Task<IActionResult> DeleteVenueImage(Guid venueId, Guid imageId)
+    {
+        var venueExists = await context.VenueViews.AsNoTracking().AnyAsync(v => v.VenueId == venueId);
+        if (!venueExists) return NotFound(new ApiError(404, "Venue not found", HttpContext.TraceIdentifier));
+
+        var ok = await venueImageService.RemoveAsync(venueId, imageId);
+        if (!ok) return NotFound(new ApiError(404, "Image not found on this venue", HttpContext.TraceIdentifier));
+        return NoContent();
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var claim = System.Security.Claims.ClaimTypes.NameIdentifier;
+        return Guid.Parse(User.FindFirst(claim)!.Value);
     }
 
     private VenueDto MapToDto(VenueView v) => new(

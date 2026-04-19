@@ -14,10 +14,6 @@ internal static class MigrationSqlLoader
         return reader.ReadToEnd();
     }
 
-    /// <summary>
-    /// Loads and emits every embedded SQL file under the given resource folder
-    /// (e.g. "Sql.Views" or "Sql.Procedures") in alphabetical order.
-    /// </summary>
     internal static void LoadAll(MigrationBuilder migrationBuilder, string folder)
     {
         var asm = typeof(MigrationSqlLoader).Assembly;

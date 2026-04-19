@@ -342,6 +342,29 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "platform_images",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Tag = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_platform_images", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_platform_images_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "device_sessions",
                 columns: table => new
                 {
@@ -455,6 +478,35 @@ namespace db.Migrations
                         principalTable: "venues",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "venue_images",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_venue_images", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_venue_images_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_venue_images_venues_VenueId",
+                        column: x => x.VenueId,
+                        principalTable: "venues",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -978,6 +1030,22 @@ namespace db.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_platform_images_ImageId",
+                table: "platform_images",
+                column: "ImageId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_platform_images_SortOrder",
+                table: "platform_images",
+                column: "SortOrder");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_platform_images_Tag",
+                table: "platform_images",
+                column: "Tag");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_purchase_tables_TableId",
                 table: "purchase_tables",
                 column: "TableId");
@@ -1126,6 +1194,29 @@ namespace db.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_venue_images_ImageId",
+                table: "venue_images",
+                column: "ImageId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_venue_images_VenueId_ImageId",
+                table: "venue_images",
+                columns: new[] { "VenueId", "ImageId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_venue_images_VenueId_PrimaryUnique",
+                table: "venue_images",
+                column: "VenueId",
+                unique: true,
+                filter: "\"IsPrimary\" = true");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_venue_images_VenueId_SortOrder",
+                table: "venue_images",
+                columns: new[] { "VenueId", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_venues_AddressId",
                 table: "venues",
                 column: "AddressId");
@@ -1174,6 +1265,9 @@ namespace db.Migrations
                 name: "magic_link_tokens");
 
             migrationBuilder.DropTable(
+                name: "platform_images");
+
+            migrationBuilder.DropTable(
                 name: "purchase_tables");
 
             migrationBuilder.DropTable(
@@ -1186,10 +1280,13 @@ namespace db.Migrations
                 name: "system_logs");
 
             migrationBuilder.DropTable(
-                name: "images");
+                name: "venue_images");
 
             migrationBuilder.DropTable(
                 name: "purchases");
+
+            migrationBuilder.DropTable(
+                name: "images");
 
             migrationBuilder.DropTable(
                 name: "event_ticket_types");

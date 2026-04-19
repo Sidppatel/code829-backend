@@ -35,6 +35,8 @@ public class EventPlatformDbContext(
     // Images
     public DbSet<Image> Images => Set<Image>();
     public DbSet<EventImage> EventImages => Set<EventImage>();
+    public DbSet<VenueImage> VenueImages => Set<VenueImage>();
+    public DbSet<PlatformImage> PlatformImages => Set<PlatformImage>();
 
     // User-facing
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
@@ -60,6 +62,8 @@ public class EventPlatformDbContext(
     public DbSet<InvitationView> InvitationViews => Set<InvitationView>();
     public DbSet<FeedbackView> FeedbackViews => Set<FeedbackView>();
     public DbSet<EventImageView> EventImageViews => Set<EventImageView>();
+    public DbSet<VenueImageView> VenueImageViews => Set<VenueImageView>();
+    public DbSet<PlatformImageView> PlatformImageViews => Set<PlatformImageView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -505,6 +509,34 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Checksum).HasMaxLength(128);
         });
 
+        modelBuilder.Entity<VenueImage>(entity =>
+        {
+            entity.ToTable("venue_images");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.VenueId, e.ImageId }).IsUnique();
+            entity.HasIndex(e => new { e.VenueId, e.SortOrder });
+            entity.HasIndex(e => e.VenueId)
+                .IsUnique()
+                .HasFilter("\"IsPrimary\" = true")
+                .HasDatabaseName("IX_venue_images_VenueId_PrimaryUnique");
+            entity.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlatformImage>(entity =>
+        {
+            entity.ToTable("platform_images");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.ImageId).IsUnique();
+            entity.HasIndex(e => e.SortOrder);
+            entity.HasIndex(e => e.Tag);
+            entity.Property(e => e.Tag).HasMaxLength(64);
+            entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<EventImage>(entity =>
         {
             entity.ToTable("event_images");
@@ -694,6 +726,18 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_event_images");
             entity.HasKey(e => e.EventImageId);
+        });
+
+        modelBuilder.Entity<VenueImageView>(entity =>
+        {
+            entity.ToView("v_venue_images");
+            entity.HasKey(e => e.VenueImageId);
+        });
+
+        modelBuilder.Entity<PlatformImageView>(entity =>
+        {
+            entity.ToView("v_platform_images");
+            entity.HasKey(e => e.PlatformImageId);
         });
     }
 }

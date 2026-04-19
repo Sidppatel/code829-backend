@@ -8,6 +8,13 @@ RETURNS text LANGUAGE sql STABLE AS $$
             WHERE ei."EventId" = p_entity_id AND ei."IsPrimary" = true
             LIMIT 1
         )
+        WHEN p_entity_type = 'venue' THEN (
+            SELECT i."StorageKey"
+            FROM venue_images vi
+            JOIN images i ON i."Id" = vi."ImageId"
+            WHERE vi."VenueId" = p_entity_id AND vi."IsPrimary" = true
+            LIMIT 1
+        )
         ELSE (
             SELECT "StorageKey" FROM images
             WHERE "EntityType" = p_entity_type AND "EntityId" = p_entity_id

@@ -1021,6 +1021,48 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.PlatformImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tag")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImageId")
+                        .IsUnique();
+
+                    b.HasIndex("SortOrder");
+
+                    b.HasIndex("Tag");
+
+                    b.ToTable("platform_images", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Purchase", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1643,6 +1685,52 @@ namespace db.Migrations
                     b.ToTable("venues", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.VenueImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("VenueId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImageId");
+
+                    b.HasIndex("VenueId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_venue_images_VenueId_PrimaryUnique")
+                        .HasFilter("\"IsPrimary\" = true");
+
+                    b.HasIndex("VenueId", "ImageId")
+                        .IsUnique();
+
+                    b.HasIndex("VenueId", "SortOrder");
+
+                    b.ToTable("venue_images", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.AdminUserView", b =>
                 {
                     b.Property<Guid>("AdminUserId")
@@ -2232,6 +2320,58 @@ namespace db.Migrations
                     b.ToView("v_invitations", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.Views.PlatformImageView", b =>
+                {
+                    b.Property<Guid>("PlatformImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AltText")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Caption")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContentType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OriginalName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Tag")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PlatformImageId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_platform_images", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.PurchaseTicketView", b =>
                 {
                     b.Property<Guid>("PurchaseTicketId")
@@ -2615,6 +2755,58 @@ namespace db.Migrations
                     b.ToView("v_user_profile", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.Views.VenueImageView", b =>
+                {
+                    b.Property<Guid>("VenueImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AltText")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Caption")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContentType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OriginalName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("VenueId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("VenueImageId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_venue_images", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.VenueView", b =>
                 {
                     b.Property<Guid>("VenueId")
@@ -2654,6 +2846,9 @@ namespace db.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Phone")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PrimaryImageKey")
                         .HasColumnType("text");
 
                     b.Property<string>("State")
@@ -2790,6 +2985,17 @@ namespace db.Migrations
                     b.Navigation("InvitedBy");
                 });
 
+            modelBuilder.Entity("Db.Entities.PlatformImage", b =>
+                {
+                    b.HasOne("Db.Entities.Image", "Image")
+                        .WithMany()
+                        .HasForeignKey("ImageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Image");
+                });
+
             modelBuilder.Entity("Db.Entities.Purchase", b =>
                 {
                     b.HasOne("Db.Entities.Event", "Event")
@@ -2915,6 +3121,25 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Address");
+                });
+
+            modelBuilder.Entity("Db.Entities.VenueImage", b =>
+                {
+                    b.HasOne("Db.Entities.Image", "Image")
+                        .WithMany()
+                        .HasForeignKey("ImageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Db.Entities.Venue", "Venue")
+                        .WithMany()
+                        .HasForeignKey("VenueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Image");
+
+                    b.Navigation("Venue");
                 });
 
             modelBuilder.Entity("Db.Entities.EventTable", b =>
