@@ -1,4 +1,4 @@
-namespace Db.Migrations;
+namespace db.Migrations;
 
 internal static class MigrationSqlLoader
 {

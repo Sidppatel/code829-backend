@@ -1,0 +1,5 @@
+CREATE OR REPLACE FUNCTION sp_list_users()
+RETURNS SETOF users
+LANGUAGE sql STABLE AS $$
+    SELECT * FROM users ORDER BY "CreatedAt";
+$$;
