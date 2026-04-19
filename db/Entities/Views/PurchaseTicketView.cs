@@ -39,4 +39,12 @@ public class PurchaseTicketView
     // Purchase owner
     public Guid PurchaseUserId { get; set; }
     public string PurchaseUserEmail { get; set; } = string.Empty;
+    public string PurchaseUserFirstName { get; set; } = string.Empty;
+    public string PurchaseUserLastName { get; set; } = string.Empty;
+
+    // Invite token hash (for claim-by-token lookups via view)
+    public string? InviteTokenHash { get; set; }
+
+    // Purchase table (for claim info table label)
+    public Guid? PurchaseTableId { get; set; }
 }
