@@ -32,11 +32,11 @@ BEGIN
     v_is_primary := NOT v_has_primary;
 
     INSERT INTO images ("Id", "EntityType", "EntityId", "StorageKey", "OriginalName",
-        "SizeBytes", "Width", "Height", "IsPrimary", "SortOrder",
+        "SizeBytes", "Width", "Height", "SortOrder",
         "UploadedById", "UploaderType", "AltText", "Caption", "ContentType", "Checksum",
         "CreatedAt", "UpdatedAt")
     VALUES (gen_random_uuid(), 'event', p_event_id, p_storage_key, p_original_name,
-        p_size_bytes, p_width, p_height, false, v_sort_order,
+        p_size_bytes, p_width, p_height, v_sort_order,
         p_uploaded_by, p_uploader_type, p_alt_text, p_caption, p_content_type, p_checksum,
         now(), now())
     RETURNING "Id" INTO v_image_id;
