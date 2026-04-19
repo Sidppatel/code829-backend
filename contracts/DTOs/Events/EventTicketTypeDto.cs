@@ -1,7 +1,7 @@
 namespace Contracts.DTOs.Events;
 
 public record EventTicketTypeDto(
-    Guid EventTicketTypeId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTicketTypeId,
     string Label,
     int PriceCents,
     int? PlatformFeeCents,
