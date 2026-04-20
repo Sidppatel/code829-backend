@@ -31,7 +31,7 @@ public class InvitationService(
 
         var existingPending = await invitationProc.GetPendingByEmailAsync(normalizedEmail);
         if (existingPending is not null)
-            throw new InvalidOperationException("A pending invitation already exists for this email");
+            await invitationProc.RevokeAsync(existingPending.Id);
 
         var inviter = await adminUserProc.GetByIdAsync(invitedByAdminUserId)
             ?? throw new KeyNotFoundException("Inviter not found");
