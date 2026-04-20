@@ -111,15 +111,19 @@ public class AdminStaffController(
         var admin = await adminUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Staff user not found", HttpContext.TraceIdentifier));
 
-        if (!isDeveloper && admin.Role != AdminRole.Staff)
-            return StatusCode(403, new ApiError(403, "Admins can only manage Staff users", HttpContext.TraceIdentifier));
+        // Admins can manage Staff and Admin users, but not Developers
+        if (!isDeveloper && admin.Role == AdminRole.Developer)
+            return StatusCode(403, new ApiError(403, "Admins cannot manage Developer users", HttpContext.TraceIdentifier));
 
-        if (!isDeveloper && request.Role is not null && request.Role != "Staff")
-            return StatusCode(403, new ApiError(403, "Admins cannot promote Staff to a higher role", HttpContext.TraceIdentifier));
+        // Admins can promote Staff to Admin, but not to Developer
+        if (!isDeveloper && request.Role is not null && request.Role == "Developer")
+            return StatusCode(403, new ApiError(403, "Admins cannot assign the Developer role", HttpContext.TraceIdentifier));
+
+        var allowedRole = (isDeveloper || request.Role == "Admin" || request.Role == "Staff") ? request.Role : null;
 
         await adminUserProc.UpdateAsync(id,
             firstName: request.FirstName, lastName: request.LastName,
-            phone: request.Phone, role: isDeveloper ? request.Role : null, isActive: request.IsActive);
+            phone: request.Phone, role: allowedRole, isActive: request.IsActive);
 
         // When disabling an account, revoke all their sessions to force immediate logout
         if (request.IsActive == false)
