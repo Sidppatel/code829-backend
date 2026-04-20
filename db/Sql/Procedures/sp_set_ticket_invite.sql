@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_set_ticket_invite(
     p_ticket_id uuid, p_invite_hash text, p_email text, p_expires_at timestamptz
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE v_updated int;
 BEGIN
     UPDATE purchase_tickets SET
         "InviteTokenHash" = p_invite_hash,
@@ -11,5 +12,8 @@ BEGIN
         "GuestUserId" = NULL,
         "ClaimedAt" = NULL,
         "UpdatedAt" = now()
-    WHERE "Id" = p_ticket_id;
+    WHERE "Id" = p_ticket_id
+      AND "Status" IN ('Unassigned', 'Invited');
+    GET DIAGNOSTICS v_updated = ROW_COUNT;
+    RETURN v_updated > 0;
 END; $$;

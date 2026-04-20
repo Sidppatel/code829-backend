@@ -4,11 +4,12 @@ namespace Db.Repositories.StoredProcedures;
 
 public class TicketProcedures(EventPlatformDbContext context) : ITicketProcedures
 {
-    public async Task SetInviteAsync(Guid ticketId, string inviteHash, string email, DateTime expiresAt, CancellationToken ct = default)
+    public async Task<bool> SetInviteAsync(Guid ticketId, string inviteHash, string email, DateTime expiresAt, CancellationToken ct = default)
     {
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT sp_set_ticket_invite(@p0, @p1, @p2, @p3)",
-            [ticketId, inviteHash, email, expiresAt], ct);
+        var rows = await context.Database
+            .SqlQueryRaw<bool>("SELECT sp_set_ticket_invite(@p0, @p1, @p2, @p3)", ticketId, inviteHash, email, expiresAt)
+            .ToListAsync(ct);
+        return rows.FirstOrDefault();
     }
 
     public async Task RevokeInviteAsync(Guid ticketId, CancellationToken ct = default)
@@ -32,11 +33,12 @@ public class TicketProcedures(EventPlatformDbContext context) : ITicketProcedure
             : new TicketClaimByTokenResult(row.TicketId, row.Success, row.Message, row.AlreadyByMe);
     }
 
-    public async Task ClaimSelfAsync(Guid ticketId, Guid userId, CancellationToken ct = default)
+    public async Task<bool> ClaimSelfAsync(Guid ticketId, Guid userId, CancellationToken ct = default)
     {
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT sp_claim_ticket_self(@p0, @p1)",
-            [ticketId, userId], ct);
+        var rows = await context.Database
+            .SqlQueryRaw<bool>("SELECT sp_claim_ticket_self(@p0, @p1)", ticketId, userId)
+            .ToListAsync(ct);
+        return rows.FirstOrDefault();
     }
 
     private sealed class TicketClaimByTokenRow

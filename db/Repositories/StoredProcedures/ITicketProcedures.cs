@@ -6,8 +6,8 @@ public record TicketClaimByTokenResult(Guid? TicketId, bool Success, string Mess
 
 public interface ITicketProcedures
 {
-    Task SetInviteAsync(Guid ticketId, string inviteHash, string email, DateTime expiresAt, CancellationToken ct = default);
+    Task<bool> SetInviteAsync(Guid ticketId, string inviteHash, string email, DateTime expiresAt, CancellationToken ct = default);
     Task RevokeInviteAsync(Guid ticketId, CancellationToken ct = default);
     Task<TicketClaimByTokenResult> ClaimByTokenAsync(string inviteHash, Guid guestUserId, CancellationToken ct = default);
-    Task ClaimSelfAsync(Guid ticketId, Guid userId, CancellationToken ct = default);
+    Task<bool> ClaimSelfAsync(Guid ticketId, Guid userId, CancellationToken ct = default);
 }

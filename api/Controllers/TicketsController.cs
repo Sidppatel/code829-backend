@@ -113,7 +113,9 @@ public class TicketsController(
         var normalizedEmail = request.Email.ToLowerInvariant().Trim();
         var expiresAt = DateTime.UtcNow.AddDays(7);
 
-        await ticketProc.SetInviteAsync(ticket.PurchaseTicketId, tokenHash, normalizedEmail, expiresAt);
+        var invited = await ticketProc.SetInviteAsync(ticket.PurchaseTicketId, tokenHash, normalizedEmail, expiresAt);
+        if (!invited)
+            return Conflict(new ApiError(409, "This ticket has already been claimed. Revoke it first.", HttpContext.TraceIdentifier));
 
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
@@ -156,7 +158,9 @@ public class TicketsController(
         if (ticket.Status == nameof(TicketStatus.Claimed) && ticket.GuestUserId == userId)
             return Ok(new { message = "Already claimed by you", ticketId = ticket.PurchaseTicketId });
 
-        await ticketProc.ClaimSelfAsync(ticket.PurchaseTicketId, userId);
+        var claimed = await ticketProc.ClaimSelfAsync(ticket.PurchaseTicketId, userId);
+        if (!claimed)
+            return Conflict(new ApiError(409, "This ticket has already been claimed. Revoke it first.", HttpContext.TraceIdentifier));
 
         Log.Information("[Tickets] {TicketCode} self-claimed by owner {UserId}", ticket.TicketCode, userId);
         return Ok(new { message = "Ticket claimed", ticketId = ticket.PurchaseTicketId });
