@@ -1,14 +1,42 @@
 # Base images pinned by digest to prevent unreviewed image drift / supply-chain
 # substitution. Refresh digests with Dependabot/Renovate on a schedule; do not
 # bump blindly — validate the rebuilt image before promoting.
+
+# =========================
+# BUILD STAGE
+# =========================
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:732cd42c6f659814c9804ad7b05c7f761e83ef8379c5b2fdc3af673353caff73 AS build
 WORKDIR /src
-COPY . .
-RUN dotnet restore backend.slnx
-RUN dotnet publish api/api.csproj -c Release -o /app/publish --no-restore
 
+# 1. Copy solution + every project file before restoring so the restore
+#    layer is only invalidated when dependencies actually change.
+COPY backend.slnx ./
+COPY api/api.csproj                   ./api/
+COPY contracts/contracts.csproj       ./contracts/
+COPY db/db.csproj                     ./db/
+COPY tests/Api.Tests/Api.Tests.csproj ./tests/Api.Tests/
+COPY tools/Analyzers/Analyzers.csproj ./tools/Analyzers/
+
+# 2. Restore (cached until any .csproj or .slnx changes)
+RUN dotnet restore backend.slnx
+
+# 3. Copy the rest of the source
+COPY . .
+
+# 4. Publish — no restore, no native app host (smaller image, faster publish)
+RUN dotnet publish api/api.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore \
+    -p:UseAppHost=false
+
+# =========================
+# RUNTIME STAGE
+# =========================
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:1201dde897ab436b7c6b386f6dbd4f9a3ca0245f9c5a8aac8f8bcdccb4c7d484 AS runtime
+
 RUN apk add --no-cache krb5-libs
+
 WORKDIR /app
 
 # Ensure the app user has permission to write to /app and its subdirectories
