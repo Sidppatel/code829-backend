@@ -139,8 +139,8 @@ public class AdminStaffController(
         if (!Enum.TryParse<AdminRole>(request.Role, true, out var role))
             return BadRequest(new ApiError(400, "Invalid role", HttpContext.TraceIdentifier));
 
-        if (!isDeveloper && role != AdminRole.Staff)
-            return StatusCode(403, new ApiError(403, "Admins can only invite Staff users", HttpContext.TraceIdentifier));
+        if (!isDeveloper && role == AdminRole.Developer)
+            return StatusCode(403, new ApiError(403, "Admins cannot invite Developer users", HttpContext.TraceIdentifier));
 
         try
         {
