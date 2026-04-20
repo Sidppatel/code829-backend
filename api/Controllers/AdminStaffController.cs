@@ -40,7 +40,7 @@ public class AdminStaffController(
         var query = context.AdminUserViews.AsNoTracking();
 
         if (!isDeveloper)
-            query = query.Where(a => a.Role == AdminRole.Staff && a.IsActive);
+            query = query.Where(a => a.Role == AdminRole.Staff);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -170,6 +170,48 @@ public class AdminStaffController(
             Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
 
         return Ok(new { items = invitations });
+    }
+
+    /// <summary>
+    /// List active Admin-role users. Accessible by Admins (read-only view) and Developers.
+    /// </summary>
+    [HttpGet]
+    [Route("~/admin/admins")]
+    public async Task<IActionResult> GetAdmins(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null)
+    {
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        page = Math.Max(1, page);
+
+        var query = context.AdminUserViews.AsNoTracking()
+            .Where(a => a.Role == AdminRole.Admin && a.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(a =>
+                a.Email.ToLower().Contains(term) ||
+                a.FirstName.ToLower().Contains(term) ||
+                a.LastName.ToLower().Contains(term));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var admins = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new
+            {
+                a.AdminUserId, a.FirstName, a.LastName, a.Email,
+                Role = a.Role.ToString(),
+                a.IsActive, a.CreatedAt, a.LastLoginAt
+            })
+            .ToListAsync();
+
+        return Ok(new { items = admins, totalCount, page, pageSize });
     }
 
     /// <summary>
