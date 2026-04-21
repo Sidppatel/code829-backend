@@ -44,10 +44,10 @@ public class RateLimitingMiddlewareTests
             return Task.CompletedTask;
         };
 
-        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object, _settings.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
         var context = CreateHttpContext("192.168.1.1", "/events");
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _settings.Object);
 
         nextCalled.Should().BeTrue();
         context.Response.StatusCode.Should().NotBe(429);
@@ -68,10 +68,10 @@ public class RateLimitingMiddlewareTests
             return Task.CompletedTask;
         };
 
-        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object, _settings.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
         var context = CreateHttpContext("192.168.1.1", "/events");
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _settings.Object);
 
         nextCalled.Should().BeFalse();
         context.Response.StatusCode.Should().Be(429);
@@ -92,11 +92,11 @@ public class RateLimitingMiddlewareTests
             .ReturnsAsync(true);
 
         RequestDelegate next = _ => Task.CompletedTask;
-        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object, _settings.Object);
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
 
         // Two different IPs
-        await middleware.InvokeAsync(CreateHttpContext("10.0.0.1", "/events"));
-        await middleware.InvokeAsync(CreateHttpContext("10.0.0.2", "/events"));
+        await middleware.InvokeAsync(CreateHttpContext("10.0.0.1", "/events"), _settings.Object);
+        await middleware.InvokeAsync(CreateHttpContext("10.0.0.2", "/events"), _settings.Object);
 
         // Each IP should have its own counter key
         counters.Should().HaveCount(2);

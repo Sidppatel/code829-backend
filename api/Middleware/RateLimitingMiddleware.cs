@@ -10,7 +10,7 @@ namespace Api.Middleware;
 /// Stricter limits for auth (5/min) and seat hold (20/min) endpoints.
 /// Set AppSetting "rate_limit_disabled" = "true" to bypass all limits (useful for testing).
 /// </summary>
-public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env, ISettingsService settings)
+public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env)
 {
     private const int DefaultLimit = 200;
     private static readonly TimeSpan DefaultWindow = TimeSpan.FromMinutes(15);
@@ -36,7 +36,7 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
     private static readonly string[] ConfirmPathSuffixes = ["/confirm", "/confirm-by-intent"];
     private static readonly string[] BeaconPaths = ["/purchases/cancel-beacon", "/tables/release-beacon"];
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, ISettingsService settings)
     {
         // Skip rate limiting for loopback ONLY in Development — in Production we never trust
         // loopback IPs even if they reach the app, so misconfiguration can't disable limits.
