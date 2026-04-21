@@ -55,16 +55,22 @@ namespace db.Migrations
                     END LOOP;
                 END $$;");
 
-            // 3. Drop the six SPs whose signatures (param types or return shape) changed
-            //    in this release — CREATE OR REPLACE can't rewrite those, so they must be
-            //    dropped before the loader reinstalls them.
+            // 3. Drop SPs whose signatures (param types, param names, or return shape)
+            //    changed in this release — CREATE OR REPLACE can't rewrite those, so they
+            //    must be dropped before the loader reinstalls them.
+            //    The three sp_*_admin_log* SPs keep their public names (portal contract)
+            //    but rename their p_admin_user_id param → p_business_user_id, which PG
+            //    rejects with 42P13 unless dropped first.
             migrationBuilder.Sql(@"
                 DROP FUNCTION IF EXISTS sp_claim_ticket_self(uuid, uuid) CASCADE;
                 DROP FUNCTION IF EXISTS sp_create_event(text, text, text, text, text, timestamp with time zone, timestamp with time zone, text, boolean, text, integer, integer, integer, integer, integer, integer, uuid, uuid, timestamp with time zone) CASCADE;
                 DROP FUNCTION IF EXISTS sp_list_events_for_staff(uuid, integer) CASCADE;
                 DROP FUNCTION IF EXISTS sp_list_staff_for_event(uuid) CASCADE;
                 DROP FUNCTION IF EXISTS sp_set_ticket_invite(uuid, text, text, timestamp with time zone) CASCADE;
-                DROP FUNCTION IF EXISTS sp_staff_can_access_event(uuid, uuid, integer) CASCADE;");
+                DROP FUNCTION IF EXISTS sp_staff_can_access_event(uuid, uuid, integer) CASCADE;
+                DROP FUNCTION IF EXISTS sp_create_admin_log(text, uuid, text, uuid, text, text, text) CASCADE;
+                DROP FUNCTION IF EXISTS sp_get_admin_logs(text, text, timestamptz, timestamptz, integer, integer) CASCADE;
+                DROP FUNCTION IF EXISTS sp_count_admin_logs(text, text, timestamptz, timestamptz) CASCADE;");
 
             // 4. Rename cross-table FK columns (rows untouched; PG updates dependent
             //    constraints and indexes in place via their attnum references).
