@@ -5,7 +5,7 @@ namespace Db.Repositories;
 public interface ILogRepository
 {
     Task AddDeveloperLogAsync(DeveloperLog log);
-    Task AddAdminLogAsync(AdminLog log);
+    Task AddAdminLogAsync(BusinessLog log);
     Task AddSystemLogAsync(SystemLog log);
     Task AddEmailLogAsync(EmailLog log);
     Task<int> CleanupDeveloperLogsAsync(int retentionDays);

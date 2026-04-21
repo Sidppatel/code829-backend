@@ -70,7 +70,46 @@ namespace db.Migrations
                     b.ToTable("addresses", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminLog", b =>
+            modelBuilder.Entity("Db.Entities.AppSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("app_settings", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.BusinessLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,7 +121,7 @@ namespace db.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<Guid?>("AdminUserId")
+                    b.Property<Guid?>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Description")
@@ -114,17 +153,17 @@ namespace db.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.ToTable("admin_logs", (string)null);
+                    b.ToTable("business_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminPasswordResetToken", b =>
+            modelBuilder.Entity("Db.Entities.BusinessPasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid>("AdminUserId")
+                    b.Property<Guid>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -157,20 +196,20 @@ namespace db.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AdminUserId");
+                    b.HasIndex("BusinessUserId");
 
                     b.HasIndex("ExpiresAt");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
 
-                    b.ToTable("admin_password_reset_tokens", null, t =>
+                    b.ToTable("business_password_reset_tokens", null, t =>
                         {
-                            t.HasCheckConstraint("CK_admin_password_reset_tokens_Usage", "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_business_password_reset_tokens_Usage", "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
                         });
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminUser", b =>
+            modelBuilder.Entity("Db.Entities.BusinessUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -249,23 +288,23 @@ namespace db.Migrations
 
                     b.HasIndex("ImageId");
 
-                    b.ToTable("admin_users", null, t =>
+                    b.ToTable("business_users", null, t =>
                         {
-                            t.HasCheckConstraint("CK_admin_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
+                            t.HasCheckConstraint("CK_business_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
                         });
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminUserEvent", b =>
+            modelBuilder.Entity("Db.Entities.BusinessUserEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid>("AdminUserId")
+                    b.Property<Guid?>("AssignedByBusinessUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AssignedByAdminUserId")
+                    b.Property<Guid>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -283,53 +322,14 @@ namespace db.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssignedByAdminUserId");
+                    b.HasIndex("AssignedByBusinessUserId");
 
                     b.HasIndex("EventId");
 
-                    b.HasIndex("AdminUserId", "EventId")
+                    b.HasIndex("BusinessUserId", "EventId")
                         .IsUnique();
 
-                    b.ToTable("admin_user_events", (string)null);
-                });
-
-            modelBuilder.Entity("Db.Entities.AppSetting", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Key")
-                        .IsUnique();
-
-                    b.ToTable("app_settings", (string)null);
+                    b.ToTable("business_user_events", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.DeveloperLog", b =>
@@ -339,7 +339,7 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid?>("AdminUserId")
+                    b.Property<Guid?>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CorrelationId")
@@ -405,7 +405,7 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid?>("AdminUserId")
+                    b.Property<Guid?>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -449,7 +449,7 @@ namespace db.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AdminUserId");
+                    b.HasIndex("BusinessUserId");
 
                     b.HasIndex("SessionHash")
                         .IsUnique();
@@ -462,7 +462,7 @@ namespace db.Migrations
 
                     b.ToTable("device_sessions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_device_sessions_UserType", "(\"UserId\" IS NOT NULL AND \"AdminUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"AdminUserId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_device_sessions_UserType", "(\"UserId\" IS NOT NULL AND \"BusinessUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"BusinessUserId\" IS NOT NULL)");
                         });
                 });
 
@@ -510,7 +510,7 @@ namespace db.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<Guid>("AdminUserId")
+                    b.Property<Guid>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Category")
@@ -590,7 +590,7 @@ namespace db.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AdminUserId");
+                    b.HasIndex("BusinessUserId");
 
                     b.HasIndex("Category");
 
@@ -971,7 +971,7 @@ namespace db.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("InvitedByAdminUserId")
+                    b.Property<Guid>("InvitedByBusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Role")
@@ -998,7 +998,7 @@ namespace db.Migrations
 
                     b.HasIndex("Email");
 
-                    b.HasIndex("InvitedByAdminUserId");
+                    b.HasIndex("InvitedByBusinessUserId");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
@@ -1773,7 +1773,7 @@ namespace db.Migrations
                     b.ToTable("venue_images", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.Views.AdminLogView", b =>
+            modelBuilder.Entity("Db.Entities.Views.BusinessLogView", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -1782,14 +1782,14 @@ namespace db.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("AdminEmail")
+                    b.Property<string>("BusinessUserEmail")
                         .HasColumnType("text");
 
-                    b.Property<string>("AdminRole")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("AdminUserId")
+                    b.Property<Guid?>("BusinessUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("BusinessUserRole")
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -1813,22 +1813,22 @@ namespace db.Migrations
 
                     b.ToTable((string)null);
 
-                    b.ToView("v_admin_logs", (string)null);
+                    b.ToView("v_business_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.Views.AdminUserEventView", b =>
+            modelBuilder.Entity("Db.Entities.Views.BusinessUserEventView", b =>
                 {
-                    b.Property<Guid>("AdminUserEventId")
+                    b.Property<Guid>("BusinessUserEventId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AdminUserId")
+                    b.Property<Guid?>("AssignedByBusinessUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("AdminUserIsActive")
+                    b.Property<Guid>("BusinessUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("BusinessUserIsActive")
                         .HasColumnType("boolean");
-
-                    b.Property<Guid?>("AssignedByAdminUserId")
-                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1869,16 +1869,16 @@ namespace db.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("AdminUserEventId");
+                    b.HasKey("BusinessUserEventId");
 
                     b.ToTable((string)null);
 
-                    b.ToView("v_admin_user_events", (string)null);
+                    b.ToView("v_business_user_events", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.Views.AdminUserView", b =>
+            modelBuilder.Entity("Db.Entities.Views.BusinessUserView", b =>
                 {
-                    b.Property<Guid>("AdminUserId")
+                    b.Property<Guid>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1922,11 +1922,11 @@ namespace db.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("AdminUserId");
+                    b.HasKey("BusinessUserId");
 
                     b.ToTable((string)null);
 
-                    b.ToView("v_admin_users", (string)null);
+                    b.ToView("v_business_users", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.DeviceSessionView", b =>
@@ -1934,7 +1934,7 @@ namespace db.Migrations
                     b.Property<Guid>("DeviceSessionId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AdminUserId")
+                    b.Property<Guid?>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -2032,11 +2032,11 @@ namespace db.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AdminUserId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("AvailableTables")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("BusinessUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -2227,11 +2227,11 @@ namespace db.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AdminUserId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("AvailableTables")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("BusinessUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -2435,7 +2435,7 @@ namespace db.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("InvitedByAdminUserId")
+                    b.Property<Guid>("InvitedByBusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("InviterFirstName")
@@ -2632,7 +2632,7 @@ namespace db.Migrations
                     b.Property<Guid>("PurchaseId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AdminUserId")
+                    b.Property<Guid>("BusinessUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -3074,18 +3074,18 @@ namespace db.Migrations
                     b.ToView("v_venues", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminPasswordResetToken", b =>
+            modelBuilder.Entity("Db.Entities.BusinessPasswordResetToken", b =>
                 {
-                    b.HasOne("Db.Entities.AdminUser", "AdminUser")
+                    b.HasOne("Db.Entities.BusinessUser", "BusinessUser")
                         .WithMany()
-                        .HasForeignKey("AdminUserId")
+                        .HasForeignKey("BusinessUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("AdminUser");
+                    b.Navigation("BusinessUser");
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminUser", b =>
+            modelBuilder.Entity("Db.Entities.BusinessUser", b =>
                 {
                     b.HasOne("Db.Entities.Image", "Image")
                         .WithMany()
@@ -3095,18 +3095,18 @@ namespace db.Migrations
                     b.Navigation("Image");
                 });
 
-            modelBuilder.Entity("Db.Entities.AdminUserEvent", b =>
+            modelBuilder.Entity("Db.Entities.BusinessUserEvent", b =>
                 {
-                    b.HasOne("Db.Entities.AdminUser", "AdminUser")
+                    b.HasOne("Db.Entities.BusinessUser", "AssignedByBusinessUser")
                         .WithMany()
-                        .HasForeignKey("AdminUserId")
+                        .HasForeignKey("AssignedByBusinessUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Db.Entities.BusinessUser", "BusinessUser")
+                        .WithMany()
+                        .HasForeignKey("BusinessUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("Db.Entities.AdminUser", "AssignedByAdminUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedByAdminUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Db.Entities.Event", "Event")
                         .WithMany()
@@ -3114,18 +3114,18 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("AdminUser");
+                    b.Navigation("AssignedByBusinessUser");
 
-                    b.Navigation("AssignedByAdminUser");
+                    b.Navigation("BusinessUser");
 
                     b.Navigation("Event");
                 });
 
             modelBuilder.Entity("Db.Entities.DeviceSession", b =>
                 {
-                    b.HasOne("Db.Entities.AdminUser", "AdminUser")
+                    b.HasOne("Db.Entities.BusinessUser", "BusinessUser")
                         .WithMany()
-                        .HasForeignKey("AdminUserId")
+                        .HasForeignKey("BusinessUserId")
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Db.Entities.User", "User")
@@ -3133,16 +3133,16 @@ namespace db.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation("AdminUser");
+                    b.Navigation("BusinessUser");
 
                     b.Navigation("User");
                 });
 
             modelBuilder.Entity("Db.Entities.Event", b =>
                 {
-                    b.HasOne("Db.Entities.AdminUser", "AdminUser")
+                    b.HasOne("Db.Entities.BusinessUser", "BusinessUser")
                         .WithMany()
-                        .HasForeignKey("AdminUserId")
+                        .HasForeignKey("BusinessUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -3152,7 +3152,7 @@ namespace db.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("AdminUser");
+                    b.Navigation("BusinessUser");
 
                     b.Navigation("Venue");
                 });
@@ -3217,9 +3217,9 @@ namespace db.Migrations
 
             modelBuilder.Entity("Db.Entities.Invitation", b =>
                 {
-                    b.HasOne("Db.Entities.AdminUser", "InvitedBy")
+                    b.HasOne("Db.Entities.BusinessUser", "InvitedBy")
                         .WithMany()
-                        .HasForeignKey("InvitedByAdminUserId")
+                        .HasForeignKey("InvitedByBusinessUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

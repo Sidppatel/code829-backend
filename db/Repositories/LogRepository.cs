@@ -11,9 +11,9 @@ public class LogRepository(EventPlatformDbContext context) : ILogRepository
         await context.SaveChangesAsync();
     }
 
-    public async Task AddAdminLogAsync(AdminLog log)
+    public async Task AddAdminLogAsync(BusinessLog log)
     {
-        context.AdminLogs.Add(log);
+        context.BusinessLogs.Add(log);
         await context.SaveChangesAsync();
     }
 
@@ -40,7 +40,7 @@ public class LogRepository(EventPlatformDbContext context) : ILogRepository
     public async Task<int> CleanupAdminLogsAsync(int retentionDays)
     {
         var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
-        return await context.AdminLogs
+        return await context.BusinessLogs
             .Where(l => l.Timestamp < cutoff)
             .ExecuteDeleteAsync();
     }

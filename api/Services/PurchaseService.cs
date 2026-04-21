@@ -19,7 +19,7 @@ public class PurchaseService(
     IPricingService pricingService,
     IEmailService emailService,
     ISettingsService settings,
-    IAdminUserProcedures adminProc
+    IBusinessUserProcedures businessUserProc
 ) : IPurchaseService
 {
     public async Task<PurchaseDto> CreateAsync(Guid userId, CreatePurchaseRequest request)
@@ -77,7 +77,7 @@ public class PurchaseService(
         var estimatedTaxCents = pricing.TaxCents;
         var totalSeats = tables.Sum(t => t.Capacity);
 
-        var organizer = await adminProc.GetByIdAsync(ev.AdminUserId);
+        var organizer = await businessUserProc.GetByIdAsync(ev.BusinessUserId);
 
         // Generate purchase number up-front so we can attach it to the PaymentIntent metadata.
         var purchaseNumber = GeneratePurchaseNumber();
@@ -173,7 +173,7 @@ public class PurchaseService(
         var taxCalculationId = pricing.TaxCalculationId;
         var estimatedTaxCents = pricing.TaxCents;
 
-        var organizer = await adminProc.GetByIdAsync(ev.AdminUserId);
+        var organizer = await businessUserProc.GetByIdAsync(ev.BusinessUserId);
 
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(

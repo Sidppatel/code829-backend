@@ -18,7 +18,7 @@ SELECT
     e."PublishedAt" AS "PublishedAt",
     e."ScheduledPublishAt" AS "ScheduledPublishAt",
     e."VenueId" AS "VenueId",
-    e."AdminUserId" AS "AdminUserId",
+    e."BusinessUserId" AS "BusinessUserId",
     e."CreatedAt" AS "CreatedAt",
     e."UpdatedAt" AS "UpdatedAt",
     v."Name" AS "VenueName",
@@ -52,7 +52,7 @@ SELECT
 FROM events e
 JOIN venues v ON e."VenueId" = v."Id"
 LEFT JOIN addresses a ON v."AddressId" = a."Id"
-LEFT JOIN admin_users au ON e."AdminUserId" = au."Id"
+LEFT JOIN business_users au ON e."BusinessUserId" = au."Id"
 LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(b."SeatsReserved"), COUNT(*))::int AS sold
     FROM purchases b

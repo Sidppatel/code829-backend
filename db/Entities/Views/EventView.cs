@@ -20,7 +20,7 @@ public class EventView
     public DateTime? PublishedAt { get; set; }
     public DateTime? ScheduledPublishAt { get; set; }
     public Guid VenueId { get; set; }
-    public Guid AdminUserId { get; set; }
+    public Guid BusinessUserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

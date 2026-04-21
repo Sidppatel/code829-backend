@@ -1299,8 +1299,6 @@ namespace db.Migrations
                 column: "Name");
 
             migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
-            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
-            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
         }
 
         /// <inheritdoc />

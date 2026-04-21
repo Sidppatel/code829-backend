@@ -90,7 +90,7 @@ public class AdminAuthController(
 
             // Role-vs-portal gate: a Staff account cannot obtain a session_developer cookie
             // even if they know developer creds, and vice versa. Match the X-Portal header
-            // against the admin's actual role before issuing a cookie. AdminUserDto.Role is a
+            // against the admin's actual role before issuing a cookie. BusinessUserDto.Role is a
             // string name; parse back to the enum for numeric comparison.
             var portal = Helpers.PortalHelper.ReadPortal(Request);
             var minRole = Helpers.PortalHelper.MinRoleForPortal(portal);
@@ -183,7 +183,7 @@ public class AdminAuthController(
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var admin = await adminAuthService.GetCurrentAdminAsync(userId);
-        if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
+        if (admin is null) return NotFound(new ApiError(404, "Business user not found", HttpContext.TraceIdentifier));
         return Ok(admin);
     }
 
@@ -191,11 +191,11 @@ public class AdminAuthController(
     [Authorize]
     [RequireRole(UserRole.Staff)]
     public async Task<IActionResult> UpdateProfile(
-        [FromBody] UpdateAdminUserRequest request,
-        [FromServices] Db.Repositories.StoredProcedures.IAdminUserProcedures adminProc)
+        [FromBody] UpdateBusinessUserRequest request,
+        [FromServices] Db.Repositories.StoredProcedures.IBusinessUserProcedures businessUserProc)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        await adminProc.UpdateAsync(userId, firstName: request.FirstName, lastName: request.LastName, phone: request.Phone);
+        await businessUserProc.UpdateAsync(userId, firstName: request.FirstName, lastName: request.LastName, phone: request.Phone);
 
         var admin = await adminAuthService.GetCurrentAdminAsync(userId);
         return Ok(admin);
@@ -210,7 +210,7 @@ public class AdminAuthController(
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var storageKey = await imageService.ReplaceImageAsync(adminId, "admin_user", file);
+        var storageKey = await imageService.ReplaceImageAsync(adminId, "business_user", file);
         return Ok(new { url = fileStorage.GetPublicUrl(storageKey) });
     }
 
@@ -220,14 +220,14 @@ public class AdminAuthController(
     public async Task<IActionResult> DeleteImage()
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        await imageService.DeleteImageAsync(adminId, "admin_user");
+        await imageService.DeleteImageAsync(adminId, "business_user");
         return NoContent();
     }
 
     [HttpPut("password")]
     [Authorize]
     [RequireRole(UserRole.Staff)]
-    public async Task<IActionResult> ChangePassword([FromBody] ChangeAdminPasswordRequest request)
+    public async Task<IActionResult> ChangePassword([FromBody] ChangeBusinessUserPasswordRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
             return BadRequest(new ApiError(400, "Both current and new passwords are required", HttpContext.TraceIdentifier));

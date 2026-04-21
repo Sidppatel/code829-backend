@@ -32,8 +32,8 @@ public class AdminEventsController(
     IAdminLogService adminLog,
     ISettingsService settingsService,
     IEventImageService eventImageService,
-    IAdminUserEventProcedures adminUserEventProc,
-    IAdminUserProcedures adminUserProc
+    IBusinessUserEventProcedures businessUserEventProc,
+    IBusinessUserProcedures businessUserProc
 ) : ControllerBase
 {
     // Exposed so derived controllers (e.g. DeveloperEventsController) can reuse these
@@ -214,7 +214,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         string? newSlug = null;
         if (request.Title is not null)
@@ -306,7 +306,7 @@ public class AdminEventsController(
 
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var path = await fileStorage.SaveAsync(file.OpenReadStream(), "events", file.FileName);
         await eventProc.UpdateEventAsync(id, null, null, null, null, null, null, path,
@@ -323,7 +323,7 @@ public class AdminEventsController(
 
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var result = await eventImageService.AddAsync(eventId, file.OpenReadStream(), file.FileName, GetCurrentUserId(), altText, caption);
         await adminLog.LogAsync("event.image.add", "Event", eventId, $"Added image {result.ImageId}");
@@ -335,7 +335,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var list = await eventImageService.ListAsync(eventId);
         return Ok(list);
@@ -351,7 +351,7 @@ public class AdminEventsController(
 
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         await eventImageService.ReorderAsync(eventId, request.ImageIds);
         await adminLog.LogAsync("event.image.reorder", "Event", eventId, $"Reordered {request.ImageIds.Count} images");
@@ -363,7 +363,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var ok = await eventImageService.SetPrimaryAsync(eventId, imageId);
         if (!ok) return NotFound(new ApiError(404, "Image not found on this event", HttpContext.TraceIdentifier));
@@ -376,7 +376,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var ok = await eventImageService.RemoveAsync(eventId, imageId);
         if (!ok) return NotFound(new ApiError(404, "Image not found on this event", HttpContext.TraceIdentifier));
@@ -389,7 +389,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         if (!Enum.TryParse<EventStatus>(request.Status, true, out var newStatus))
             return BadRequest(new ApiError(400, "Invalid status", HttpContext.TraceIdentifier));
@@ -422,7 +422,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var stats = await eventProc.GetEventStatsAsync(id);
         if (stats is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
@@ -436,7 +436,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         if (ev.Status != EventStatus.Draft.ToString())
             return BadRequest(new ApiError(400, "Only draft events can be deleted", HttpContext.TraceIdentifier));
@@ -454,7 +454,7 @@ public class AdminEventsController(
     {
         var original = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (original is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(original.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(original.BusinessUserId)) return Forbid();
 
         var organizerId = GetCurrentUserId();
         var slug = GenerateSlug(original.Title + " copy");
@@ -536,7 +536,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
         if (ev.LayoutMode != "Open")
             return BadRequest(new ApiError(400, "Ticket types are only available for Open layout events", HttpContext.TraceIdentifier));
 
@@ -567,7 +567,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var existing = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstOrDefaultAsync(tt => tt.EventTicketTypeId == typeId && tt.EventId == id);
@@ -604,7 +604,7 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var existing = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstOrDefaultAsync(tt => tt.EventTicketTypeId == typeId && tt.EventId == id);
@@ -626,11 +626,11 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
-        var rows = await adminUserEventProc.ListStaffForEventAsync(eventId);
+        var rows = await businessUserEventProc.ListStaffForEventAsync(eventId);
         var dtos = rows.Select(r => new EventStaffDto(
-            r.AdminUserEventId, r.AdminUserId, r.FirstName, r.LastName, r.Email, r.CreatedAt)).ToList();
+            r.BusinessUserEventId, r.BusinessUserId, r.FirstName, r.LastName, r.Email, r.CreatedAt)).ToList();
         return Ok(new { items = dtos });
     }
 
@@ -639,9 +639,9 @@ public class AdminEventsController(
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
-        var target = await adminUserProc.GetByIdAsync(request.AdminUserId);
+        var target = await businessUserProc.GetByIdAsync(request.BusinessUserId);
         if (target is null)
             return NotFound(new ApiError(404, "Staff user not found", HttpContext.TraceIdentifier));
         if (!target.IsActive)
@@ -649,25 +649,25 @@ public class AdminEventsController(
         if (target.Role != AdminRole.Staff)
             return BadRequest(new ApiError(400, "Only Staff users can be assigned to events", HttpContext.TraceIdentifier));
 
-        var assignmentId = await adminUserEventProc.AssignAsync(request.AdminUserId, eventId, GetCurrentUserId());
+        var assignmentId = await businessUserEventProc.AssignAsync(request.BusinessUserId, eventId, GetCurrentUserId());
 
-        await adminLog.LogAsync("staff.assigned_to_event", "AdminUserEvent", eventId,
+        await adminLog.LogAsync("staff.assigned_to_event", "BusinessUserEvent", eventId,
             $"Assigned {target.FirstName} {target.LastName} to event '{ev.Title}'");
 
-        return Ok(new { adminUserEventId = assignmentId, message = "Staff assigned" });
+        return Ok(new { businessUserEventId = assignmentId, message = "Staff assigned" });
     }
 
-    [HttpDelete("{eventId:guid}/staff/{adminUserId:guid}")]
-    public async Task<IActionResult> UnassignEventStaff(Guid eventId, Guid adminUserId)
+    [HttpDelete("{eventId:guid}/staff/{businessUserId:guid}")]
+    public async Task<IActionResult> UnassignEventStaff(Guid eventId, Guid businessUserId)
     {
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
-        await adminUserEventProc.UnassignAsync(adminUserId, eventId);
+        await businessUserEventProc.UnassignAsync(businessUserId, eventId);
 
-        await adminLog.LogAsync("staff.unassigned_from_event", "AdminUserEvent", eventId,
-            $"Unassigned staff {adminUserId} from event '{ev.Title}'");
+        await adminLog.LogAsync("staff.unassigned_from_event", "BusinessUserEvent", eventId,
+            $"Unassigned staff {businessUserId} from event '{ev.Title}'");
 
         return NoContent();
     }
@@ -696,7 +696,7 @@ public class AdminEventsController(
             e.VenueId,
             e.VenueName,
             null,
-            e.AdminUserId,
+            e.BusinessUserId,
             $"{e.OrganizerFirstName} {e.OrganizerLastName}",
             e.CreatedAt,
             e.MaxCapacity ?? 0,

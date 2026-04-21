@@ -122,7 +122,7 @@ public class AdminPurchasesController(
 
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == purchase.EventId);
-        if (ev is not null && ev.AdminUserId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
+        if (ev is not null && ev.BusinessUserId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
             return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
 
         await InvalidatePurchaseCaches();

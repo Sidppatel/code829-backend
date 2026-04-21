@@ -485,7 +485,7 @@ public class EventsController(
                 ev.VenuePhone, ev.VenueEmail, ev.VenueWebsite,
                 ev.VenueIsActive, ev.VenueCreatedAt
             ),
-            ev.AdminUserId,
+            ev.BusinessUserId,
             $"{ev.OrganizerFirstName} {ev.OrganizerLastName}",
             ev.CreatedAt,
             ev.TotalCapacity,

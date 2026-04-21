@@ -4,7 +4,7 @@ public class DeviceSessionView
 {
     public Guid DeviceSessionId { get; set; }
     public Guid? UserId { get; set; }
-    public Guid? AdminUserId { get; set; }
+    public Guid? BusinessUserId { get; set; }
     public string SessionHash { get; set; } = string.Empty;
     public string? DeviceFingerprint { get; set; }
     public string? DeviceName { get; set; }

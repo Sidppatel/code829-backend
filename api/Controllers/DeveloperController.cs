@@ -26,7 +26,7 @@ public class DeveloperController(
     IAppSettingRepository settingsRepo,
     ISecretsProvider secrets,
     IImageService imageService,
-    IAdminUserProcedures adminUserProc,
+    IBusinessUserProcedures businessUserProc,
     IUserProcedures userProc,
     IEncryptionService encryptionService
 ) : ControllerBase
@@ -91,7 +91,7 @@ public class DeveloperController(
             .Select(l => new DeveloperLogDto(
                 l.Id, l.Timestamp, l.Severity.ToString(), l.Message, l.ExceptionType,
                 l.StackTrace, l.RequestPath, l.RequestMethod, l.StatusCode,
-                l.AdminUserId, l.IpAddress, l.CorrelationId, l.MetadataJson))
+                l.BusinessUserId, l.IpAddress, l.CorrelationId, l.MetadataJson))
             .ToListAsync();
 
         return Ok(new PagedResponse<DeveloperLogDto>(items, totalCount, page, pageSize));
@@ -379,7 +379,7 @@ public class DeveloperController(
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        var query = context.AdminUserViews.AsNoTracking();
+        var query = context.BusinessUserViews.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -401,7 +401,7 @@ public class DeveloperController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.AdminUserId, a.FirstName, a.LastName, a.Email,
+                a.BusinessUserId, a.FirstName, a.LastName, a.Email,
                 Role = a.Role.ToString(),
                 a.IsActive, a.CreatedAt, a.LastLoginAt, a.Phone
             })
@@ -414,7 +414,7 @@ public class DeveloperController(
     /// Create a new admin user.
     /// </summary>
     [HttpPost("admin-users")]
-    public async Task<IActionResult> CreateAdminUser([FromBody] CreateAdminUserRequest request)
+    public async Task<IActionResult> CreateAdminUser([FromBody] CreateBusinessUserRequest request)
     {
         if (!Enum.TryParse<AdminRole>(request.Role, true, out var role))
             return BadRequest(new ApiError(400, "Invalid role. Must be Staff, Admin, or Developer", HttpContext.TraceIdentifier));
@@ -425,13 +425,13 @@ public class DeveloperController(
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        if (await adminUserProc.ExistsByEmailAsync(normalizedEmail))
+        if (await businessUserProc.ExistsByEmailAsync(normalizedEmail))
             return Conflict(new ApiError(409, "An admin user with this email already exists", HttpContext.TraceIdentifier));
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var emailHash = encryptionService.HashEmail(normalizedEmail);
 
-        var id = await adminUserProc.CreateAsync(
+        var id = await businessUserProc.CreateAsync(
             normalizedEmail, emailHash, request.FirstName.Trim(), request.LastName.Trim(),
             passwordHash, role.ToString());
 
@@ -442,9 +442,9 @@ public class DeveloperController(
     /// Update an admin user (role, active status, profile).
     /// </summary>
     [HttpPut("admin-users/{id:guid}")]
-    public async Task<IActionResult> UpdateAdminUser(Guid id, [FromBody] UpdateAdminUserRequest request)
+    public async Task<IActionResult> UpdateAdminUser(Guid id, [FromBody] UpdateBusinessUserRequest request)
     {
-        var admin = await adminUserProc.GetByIdAsync(id);
+        var admin = await businessUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
         if (request.Role is not null && !Enum.TryParse<AdminRole>(request.Role, true, out _))
@@ -453,7 +453,7 @@ public class DeveloperController(
         if (admin.Role == AdminRole.Developer && request.Role is not null && request.Role != "Developer")
             return BadRequest(new ApiError(400, "Cannot demote a Developer", HttpContext.TraceIdentifier));
 
-        await adminUserProc.UpdateAsync(id,
+        await businessUserProc.UpdateAsync(id,
             firstName: request.FirstName, lastName: request.LastName,
             phone: request.Phone, role: request.Role, isActive: request.IsActive);
 
@@ -464,9 +464,9 @@ public class DeveloperController(
     /// Reset an admin user's password (developer privilege, no current password needed).
     /// </summary>
     [HttpPut("admin-users/{id:guid}/reset-password")]
-    public async Task<IActionResult> ResetAdminPassword(Guid id, [FromBody] ResetAdminPasswordRequest request)
+    public async Task<IActionResult> ResetAdminPassword(Guid id, [FromBody] ResetBusinessUserPasswordRequest request)
     {
-        var admin = await adminUserProc.GetByIdAsync(id);
+        var admin = await businessUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
         var (pwValid2, pwError2) = Api.Helpers.PasswordValidator.Validate(request.NewPassword);
@@ -474,7 +474,7 @@ public class DeveloperController(
             return BadRequest(new ApiError(400, pwError2!, HttpContext.TraceIdentifier));
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        await adminUserProc.UpdatePasswordAsync(id, passwordHash);
+        await businessUserProc.UpdatePasswordAsync(id, passwordHash);
 
         return Ok(new { message = "Password reset" });
     }
@@ -485,13 +485,13 @@ public class DeveloperController(
     [HttpDelete("admin-users/{id:guid}")]
     public async Task<IActionResult> DeactivateAdminUser(Guid id)
     {
-        var admin = await adminUserProc.GetByIdAsync(id);
+        var admin = await businessUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Admin user not found", HttpContext.TraceIdentifier));
 
         if (admin.Role == AdminRole.Developer)
             return BadRequest(new ApiError(400, "Cannot deactivate a Developer", HttpContext.TraceIdentifier));
 
-        await adminUserProc.UpdateAsync(id, isActive: false);
+        await businessUserProc.UpdateAsync(id, isActive: false);
         return Ok(new { message = "Admin user deactivated" });
     }
 

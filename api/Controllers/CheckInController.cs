@@ -21,7 +21,7 @@ namespace Api.Controllers;
 public class CheckInController(
     EventPlatformDbContext context,
     ICheckInProcedures checkInProc,
-    IAdminUserEventProcedures adminUserEventProc,
+    IBusinessUserEventProcedures businessUserEventProc,
     IFileStorageService fileStorage
 ) : ControllerBase
 {
@@ -32,7 +32,7 @@ public class CheckInController(
     public async Task<IActionResult> GetAccessibleEvents()
     {
         var adminId = GetCurrentAdminId();
-        var events = await adminUserEventProc.ListEventsForStaffAsync(adminId);
+        var events = await businessUserEventProc.ListEventsForStaffAsync(adminId);
 
         var dtos = events.Select(e => new StaffEventDto(
             e.Id, e.Title, e.Slug, e.StartDate, e.EndDate, e.Status.ToString(),
@@ -52,7 +52,7 @@ public class CheckInController(
             return BadRequest(new ApiError(400, "EventId is required", HttpContext.TraceIdentifier));
 
         var adminId = GetCurrentAdminId();
-        var canAccess = await adminUserEventProc.CanAccessEventAsync(adminId, request.EventId.Value);
+        var canAccess = await businessUserEventProc.CanAccessEventAsync(adminId, request.EventId.Value);
         if (!canAccess)
             return StatusCode(403, new ApiError(403,
                 "You are not assigned to this event or access has expired",
@@ -100,7 +100,7 @@ public class CheckInController(
     public async Task<IActionResult> GetStats(Guid eventId)
     {
         var adminId = GetCurrentAdminId();
-        var canAccess = await adminUserEventProc.CanAccessEventAsync(adminId, eventId);
+        var canAccess = await businessUserEventProc.CanAccessEventAsync(adminId, eventId);
         if (!canAccess)
             return StatusCode(403, new ApiError(403,
                 "You are not assigned to this event or access has expired",
