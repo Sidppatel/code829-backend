@@ -10,12 +10,12 @@ public class EventPlatformDbContext(
 {
     // Core entities
     public DbSet<User> Users => Set<User>();
-    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+    public DbSet<BusinessUser> BusinessUsers => Set<BusinessUser>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
-    public DbSet<AdminPasswordResetToken> AdminPasswordResetTokens => Set<AdminPasswordResetToken>();
+    public DbSet<BusinessPasswordResetToken> BusinessPasswordResetTokens => Set<BusinessPasswordResetToken>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
 
     // Template/parent entities
@@ -24,7 +24,7 @@ public class EventPlatformDbContext(
 
     // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
-    public DbSet<AdminUserEvent> AdminUserEvents => Set<AdminUserEvent>();
+    public DbSet<BusinessUserEvent> BusinessUserEvents => Set<BusinessUserEvent>();
     public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<EventTicketType> EventTicketTypes => Set<EventTicketType>();
     public DbSet<Table> Tables => Set<Table>();
@@ -44,7 +44,7 @@ public class EventPlatformDbContext(
 
     // Logging
     public DbSet<DeveloperLog> DeveloperLogs => Set<DeveloperLog>();
-    public DbSet<AdminLog> AdminLogs => Set<AdminLog>();
+    public DbSet<BusinessLog> BusinessLogs => Set<BusinessLog>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
 
@@ -58,15 +58,15 @@ public class EventPlatformDbContext(
     public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
     public DbSet<EventTicketTypeSummaryView> EventTicketTypeSummaryViews => Set<EventTicketTypeSummaryView>();
-    public DbSet<AdminUserView> AdminUserViews => Set<AdminUserView>();
-    public DbSet<AdminUserEventView> AdminUserEventViews => Set<AdminUserEventView>();
+    public DbSet<BusinessUserView> BusinessUserViews => Set<BusinessUserView>();
+    public DbSet<BusinessUserEventView> BusinessUserEventViews => Set<BusinessUserEventView>();
     public DbSet<DeviceSessionView> DeviceSessionViews => Set<DeviceSessionView>();
     public DbSet<InvitationView> InvitationViews => Set<InvitationView>();
     public DbSet<FeedbackView> FeedbackViews => Set<FeedbackView>();
     public DbSet<EventImageView> EventImageViews => Set<EventImageView>();
     public DbSet<VenueImageView> VenueImageViews => Set<VenueImageView>();
     public DbSet<PlatformImageView> PlatformImageViews => Set<PlatformImageView>();
-    public DbSet<AdminLogView> AdminLogViews => Set<AdminLogView>();
+    public DbSet<BusinessLogView> BusinessLogViews => Set<BusinessLogView>();
     public DbSet<SystemLogView> SystemLogViews => Set<SystemLogView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -118,11 +118,11 @@ public class EventPlatformDbContext(
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<AdminUser>(entity =>
+        modelBuilder.Entity<BusinessUser>(entity =>
         {
-            entity.ToTable("admin_users", t =>
+            entity.ToTable("business_users", t =>
             {
-                t.HasCheckConstraint("CK_admin_users_Role",
+                t.HasCheckConstraint("CK_business_users_Role",
                     "\"Role\" IN ('Staff','Admin','Developer')");
             });
             entity.HasKey(e => e.Id);
@@ -157,7 +157,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.InvitedBy)
                 .WithMany()
-                .HasForeignKey(e => e.InvitedByAdminUserId)
+                .HasForeignKey(e => e.InvitedByBusinessUserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -186,20 +186,20 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Email).HasMaxLength(256);
         });
 
-        modelBuilder.Entity<AdminPasswordResetToken>(entity =>
+        modelBuilder.Entity<BusinessPasswordResetToken>(entity =>
         {
-            entity.ToTable("admin_password_reset_tokens", t =>
+            entity.ToTable("business_password_reset_tokens", t =>
             {
-                t.HasCheckConstraint("CK_admin_password_reset_tokens_Usage",
+                t.HasCheckConstraint("CK_business_password_reset_tokens_Usage",
                     "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.TokenHash).IsUnique();
-            entity.HasIndex(e => e.AdminUserId);
+            entity.HasIndex(e => e.BusinessUserId);
             entity.HasIndex(e => e.ExpiresAt);
             entity.Property(e => e.TokenHash).HasMaxLength(128);
             entity.Property(e => e.Email).HasMaxLength(256);
-            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+            entity.HasOne(e => e.BusinessUser).WithMany().HasForeignKey(e => e.BusinessUserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -208,7 +208,7 @@ public class EventPlatformDbContext(
             entity.ToTable("device_sessions", t =>
             {
                 t.HasCheckConstraint("CK_device_sessions_UserType",
-                    "(\"UserId\" IS NOT NULL AND \"AdminUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"AdminUserId\" IS NOT NULL)");
+                    "(\"UserId\" IS NOT NULL AND \"BusinessUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"BusinessUserId\" IS NOT NULL)");
             });
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.SessionHash).IsUnique();
@@ -221,7 +221,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.IpAddress).HasMaxLength(45);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
                 .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+            entity.HasOne(e => e.BusinessUser).WithMany().HasForeignKey(e => e.BusinessUserId)
                 .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -341,7 +341,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.LayoutMode).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.Venue).WithMany(v => v.Events).HasForeignKey(e => e.VenueId)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+            entity.HasOne(e => e.BusinessUser).WithMany().HasForeignKey(e => e.BusinessUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 #pragma warning disable CS8603
             entity.HasGeneratedTsVectorColumn(e => e.SearchVector, "english", e => new { e.Title, Description = e.Description! })
@@ -349,18 +349,18 @@ public class EventPlatformDbContext(
 #pragma warning restore CS8603
         });
 
-        modelBuilder.Entity<AdminUserEvent>(entity =>
+        modelBuilder.Entity<BusinessUserEvent>(entity =>
         {
-            entity.ToTable("admin_user_events");
+            entity.ToTable("business_user_events");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.AdminUserId, e.EventId }).IsUnique();
+            entity.HasIndex(e => new { e.BusinessUserId, e.EventId }).IsUnique();
             entity.HasIndex(e => e.EventId);
-            entity.HasOne(e => e.AdminUser).WithMany().HasForeignKey(e => e.AdminUserId)
+            entity.HasOne(e => e.BusinessUser).WithMany().HasForeignKey(e => e.BusinessUserId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.AssignedByAdminUser).WithMany()
-                .HasForeignKey(e => e.AssignedByAdminUserId)
+            entity.HasOne(e => e.AssignedByBusinessUser).WithMany()
+                .HasForeignKey(e => e.AssignedByBusinessUserId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -598,9 +598,9 @@ public class EventPlatformDbContext(
             entity.Property(e => e.CorrelationId).HasMaxLength(64);
         });
 
-        modelBuilder.Entity<AdminLog>(entity =>
+        modelBuilder.Entity<BusinessLog>(entity =>
         {
-            entity.ToTable("admin_logs");
+            entity.ToTable("business_logs");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Timestamp).HasDefaultValueSql("now()");
@@ -716,17 +716,17 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.EventTicketTypeId);
         });
 
-        modelBuilder.Entity<AdminUserView>(entity =>
+        modelBuilder.Entity<BusinessUserView>(entity =>
         {
-            entity.ToView("v_admin_users");
-            entity.HasKey(e => e.AdminUserId);
+            entity.ToView("v_business_users");
+            entity.HasKey(e => e.BusinessUserId);
             entity.Property(e => e.Role).HasConversion<string>();
         });
 
-        modelBuilder.Entity<AdminUserEventView>(entity =>
+        modelBuilder.Entity<BusinessUserEventView>(entity =>
         {
-            entity.ToView("v_admin_user_events");
-            entity.HasKey(e => e.AdminUserEventId);
+            entity.ToView("v_business_user_events");
+            entity.HasKey(e => e.BusinessUserEventId);
         });
 
         modelBuilder.Entity<DeviceSessionView>(entity =>
@@ -767,9 +767,9 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.PlatformImageId);
         });
 
-        modelBuilder.Entity<AdminLogView>(entity =>
+        modelBuilder.Entity<BusinessLogView>(entity =>
         {
-            entity.ToView("v_admin_logs");
+            entity.ToView("v_business_logs");
             entity.HasKey(e => e.Id);
         });
 

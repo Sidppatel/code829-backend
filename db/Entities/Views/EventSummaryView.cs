@@ -19,7 +19,7 @@ public class EventSummaryView
     public string VenueName { get; set; } = null!;
     public string VenueCity { get; set; } = null!;
     public string VenueState { get; set; } = null!;
-    public Guid AdminUserId { get; set; }
+    public Guid BusinessUserId { get; set; }
     public string OrganizerName { get; set; } = null!;
     public int TotalCapacity { get; set; }
     public int TotalSold { get; set; }

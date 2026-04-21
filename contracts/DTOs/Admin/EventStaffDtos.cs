@@ -1,10 +1,10 @@
 namespace Contracts.DTOs.Admin;
 
-public record AssignStaffRequest(Guid AdminUserId);
+public record AssignStaffRequest(Guid BusinessUserId);
 
 public record EventStaffDto(
-    Guid AdminUserEventId,
-    Guid AdminUserId,
+    Guid BusinessUserEventId,
+    Guid BusinessUserId,
     string FirstName,
     string LastName,
     string Email,

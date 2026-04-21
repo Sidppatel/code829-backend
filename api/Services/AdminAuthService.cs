@@ -12,9 +12,9 @@ namespace Api.Services;
 
 public class AdminAuthService(
     EventPlatformDbContext context,
-    IAdminUserProcedures adminProc,
+    IBusinessUserProcedures businessProc,
     IAuthProcedures authProc,
-    IAdminPasswordResetTokenProcedures pwdResetProc,
+    IBusinessPasswordResetTokenProcedures pwdResetProc,
     IFileStorageService fileStorage,
     IConnectionMultiplexer redis,
     IJwtService jwtService,
@@ -25,16 +25,15 @@ public class AdminAuthService(
     private const int MaxFailedAttempts = 5;
     private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
-    public async Task<(AdminUserDto User, string SessionToken, string Jwt)> LoginAsync(string email, string password, string? deviceName, string? ip)
+    public async Task<(BusinessUserDto User, string SessionToken, string Jwt)> LoginAsync(string email, string password, string? deviceName, string? ip)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
 
-        var admin = await adminProc.GetByEmailAsync(normalizedEmail);
+        var admin = await businessProc.GetByEmailAsync(normalizedEmail);
 
         if (admin is null || !admin.IsActive)
             throw new UnauthorizedAccessException("Invalid email or password");
 
-        // Check account lockout
         if (admin.LockedUntil.HasValue && admin.LockedUntil.Value > DateTime.UtcNow)
         {
             var remaining = (int)Math.Ceiling((admin.LockedUntil.Value - DateTime.UtcNow).TotalMinutes);
@@ -43,30 +42,29 @@ public class AdminAuthService(
 
         if (!BCrypt.Net.BCrypt.Verify(password, admin.PasswordHash))
         {
-            await adminProc.IncrementFailedLoginAsync(admin.Id, MaxFailedAttempts, (int)LockoutDuration.TotalMinutes);
+            await businessProc.IncrementFailedLoginAsync(admin.Id, MaxFailedAttempts, (int)LockoutDuration.TotalMinutes);
             if (admin.FailedLoginAttempts + 1 >= MaxFailedAttempts)
                 Log.Warning("[AdminAuth] Account locked for {Email} after {Attempts} failed attempts", admin.Email, admin.FailedLoginAttempts + 1);
             throw new UnauthorizedAccessException("Invalid email or password");
         }
 
-        // Reset lockout on successful login
         if (admin.FailedLoginAttempts > 0)
-            await adminProc.ResetLockoutAsync(admin.Id);
+            await businessProc.ResetLockoutAsync(admin.Id);
 
-        await adminProc.UpdateLastLoginAsync(admin.Id);
+        await businessProc.UpdateLastLoginAsync(admin.Id);
 
         var (sessionToken, _) = await CreateDeviceSessionAsync(admin.Id, deviceName, ip);
-        var dto = MapAdminUserDto(admin);
+        var dto = MapBusinessUserDto(admin);
         var jwt = await jwtService.GenerateAdminJwtAsync(admin);
 
         Log.Information("[AdminAuth] Login for {Email} ({Role})", admin.Email, admin.Role);
         return (dto, sessionToken, jwt);
     }
 
-    public async Task<AdminUserDto?> GetCurrentAdminAsync(Guid adminUserId)
+    public async Task<BusinessUserDto?> GetCurrentAdminAsync(Guid businessUserId)
     {
-        var admin = await adminProc.GetByIdAsync(adminUserId);
-        return admin is null ? null : MapAdminUserDto(admin);
+        var admin = await businessProc.GetByIdAsync(businessUserId);
+        return admin is null ? null : MapBusinessUserDto(admin);
     }
 
     public async Task LogoutAsync(string sessionHash)
@@ -76,11 +74,11 @@ public class AdminAuthService(
         await db.KeyDeleteAsync($"session:{sessionHash}");
     }
 
-    public async Task<List<DeviceSessionDto>> GetSessionsAsync(Guid adminUserId, string? currentSessionHash)
+    public async Task<List<DeviceSessionDto>> GetSessionsAsync(Guid businessUserId, string? currentSessionHash)
     {
         var sessions = await context.DeviceSessionViews
             .AsNoTracking()
-            .Where(s => s.AdminUserId == adminUserId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
+            .Where(s => s.BusinessUserId == businessUserId && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow)
             .OrderByDescending(s => s.LastActivityAt)
             .Take(50)
             .ToListAsync();
@@ -95,11 +93,11 @@ public class AdminAuthService(
         )).ToList();
     }
 
-    public async Task RevokeSessionAsync(Guid sessionId, Guid adminUserId)
+    public async Task RevokeSessionAsync(Guid sessionId, Guid businessUserId)
     {
         var session = await context.DeviceSessionViews
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.DeviceSessionId == sessionId && s.AdminUserId == adminUserId && s.RevokedAt == null);
+            .FirstOrDefaultAsync(s => s.DeviceSessionId == sessionId && s.BusinessUserId == businessUserId && s.RevokedAt == null);
 
         if (session is null)
             throw new KeyNotFoundException("Session not found");
@@ -109,15 +107,15 @@ public class AdminAuthService(
         await db.KeyDeleteAsync($"session:{session.SessionHash}");
     }
 
-    public async Task RevokeAllSessionsAsync(Guid adminUserId, string? exceptSessionHash)
+    public async Task RevokeAllSessionsAsync(Guid businessUserId, string? exceptSessionHash)
     {
         var hashes = await context.DeviceSessionViews
             .AsNoTracking()
-            .Where(s => s.AdminUserId == adminUserId && s.RevokedAt == null && (exceptSessionHash == null || s.SessionHash != exceptSessionHash))
+            .Where(s => s.BusinessUserId == businessUserId && s.RevokedAt == null && (exceptSessionHash == null || s.SessionHash != exceptSessionHash))
             .Select(s => s.SessionHash)
             .ToListAsync();
 
-        await adminProc.RevokeAllSessionsAsync(adminUserId, exceptSessionHash);
+        await businessProc.RevokeAllSessionsAsync(businessUserId, exceptSessionHash);
 
         var db = redis.GetDatabase();
         var keys = hashes.Select(h => (RedisKey)$"session:{h}").ToArray();
@@ -125,16 +123,16 @@ public class AdminAuthService(
             await db.KeyDeleteAsync(keys);
     }
 
-    public async Task ChangePasswordAsync(Guid adminUserId, string currentPassword, string newPassword)
+    public async Task ChangePasswordAsync(Guid businessUserId, string currentPassword, string newPassword)
     {
-        var admin = await adminProc.GetByIdAsync(adminUserId)
-            ?? throw new KeyNotFoundException("Admin user not found");
+        var admin = await businessProc.GetByIdAsync(businessUserId)
+            ?? throw new KeyNotFoundException("Business user not found");
 
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, admin.PasswordHash))
             throw new UnauthorizedAccessException("Current password is incorrect");
 
         var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        await adminProc.UpdatePasswordAsync(adminUserId, newHash);
+        await businessProc.UpdatePasswordAsync(businessUserId, newHash);
 
         Log.Information("[AdminAuth] Password changed for {Email}", admin.Email);
     }
@@ -142,12 +140,11 @@ public class AdminAuthService(
     public async Task RequestPasswordResetAsync(string email, string? origin)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        var admin = await adminProc.GetByEmailAsync(normalizedEmail);
+        var admin = await businessProc.GetByEmailAsync(normalizedEmail);
 
-        // Security requirement: show unauthorizied if user doesn't exist as admin
         if (admin is null || !admin.IsActive)
         {
-            Log.Warning("[AdminAuth] Password reset requested for non-existent or inactive admin: {Email}", normalizedEmail);
+            Log.Warning("[AdminAuth] Password reset requested for non-existent or inactive business user: {Email}", normalizedEmail);
             throw new UnauthorizedAccessException("Unauthorized");
         }
 
@@ -186,31 +183,30 @@ public class AdminAuthService(
             throw new UnauthorizedAccessException("Invalid or expired reset token");
 
         var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-        await adminProc.UpdatePasswordAsync(resetToken.AdminUserId, newHash);
+        await businessProc.UpdatePasswordAsync(resetToken.BusinessUserId, newHash);
 
         await pwdResetProc.InvalidateAsync(tokenHash);
 
-        // Revoke all sessions for this user to force re-login with new password
-        await RevokeAllSessionsAsync(resetToken.AdminUserId, null);
+        await RevokeAllSessionsAsync(resetToken.BusinessUserId, null);
 
-        Log.Information("[AdminAuth] Password reset successful for {Email}", resetToken.AdminEmail);
+        Log.Information("[AdminAuth] Password reset successful for {Email}", resetToken.BusinessUserEmail);
     }
 
-    private async Task<(string RawToken, string Hash)> CreateDeviceSessionAsync(Guid adminUserId, string? deviceName, string? ip)
+    private async Task<(string RawToken, string Hash)> CreateDeviceSessionAsync(Guid businessUserId, string? deviceName, string? ip)
     {
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var rawToken = Convert.ToBase64String(tokenBytes);
         var sessionHash = HashToken(rawToken);
 
-        await adminProc.CreateDeviceSessionAsync(
-            adminUserId, sessionHash, null, deviceName, ip,
+        await businessProc.CreateDeviceSessionAsync(
+            businessUserId, sessionHash, null, deviceName, ip,
             DateTime.UtcNow.AddDays(90));
 
         return (rawToken, sessionHash);
     }
 
-    private AdminUserDto MapAdminUserDto(AdminUser admin) => new(
-        AdminUserId: admin.Id,
+    private BusinessUserDto MapBusinessUserDto(BusinessUser admin) => new(
+        BusinessUserId: admin.Id,
         Email: admin.Email,
         FirstName: admin.FirstName,
         LastName: admin.LastName,

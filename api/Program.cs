@@ -171,12 +171,12 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IFeedbackProcedures, Db.Repositories.StoredProcedures.FeedbackProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventTicketTypeProcedures, Db.Repositories.StoredProcedures.EventTicketTypeProcedures>();
-    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminUserProcedures, Db.Repositories.StoredProcedures.AdminUserProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserProcedures, Db.Repositories.StoredProcedures.BusinessUserProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IInvitationProcedures, Db.Repositories.StoredProcedures.InvitationProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILayoutProcedures, Db.Repositories.StoredProcedures.LayoutProcedures>();
-    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminPasswordResetTokenProcedures, Db.Repositories.StoredProcedures.AdminPasswordResetTokenProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessPasswordResetTokenProcedures, Db.Repositories.StoredProcedures.BusinessPasswordResetTokenProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ICheckInProcedures, Db.Repositories.StoredProcedures.CheckInProcedures>();
-    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAdminUserEventProcedures, Db.Repositories.StoredProcedures.AdminUserEventProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserEventProcedures, Db.Repositories.StoredProcedures.BusinessUserEventProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();

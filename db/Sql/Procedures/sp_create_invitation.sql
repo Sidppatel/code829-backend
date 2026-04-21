@@ -5,7 +5,7 @@ CREATE OR REPLACE FUNCTION sp_create_invitation(
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO invitations ("Id", "Email", "TokenHash", "Role",
-        "InvitedByAdminUserId", "Status", "ExpiresAt", "CreatedAt", "UpdatedAt")
+        "InvitedByBusinessUserId", "Status", "ExpiresAt", "CreatedAt", "UpdatedAt")
     VALUES (gen_random_uuid(), p_email, p_token_hash, p_role,
         p_invited_by, 'Pending', p_expires_at, now(), now())
     RETURNING "Id" INTO v_id;

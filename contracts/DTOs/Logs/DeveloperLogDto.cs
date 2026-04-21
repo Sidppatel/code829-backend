@@ -10,7 +10,7 @@ public record DeveloperLogDto(
     string? RequestPath,
     string? RequestMethod,
     int? StatusCode,
-    Guid? AdminUserId,
+    Guid? BusinessUserId,
     string? IpAddress,
     string? CorrelationId,
     string? MetadataJson

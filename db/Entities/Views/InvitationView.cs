@@ -8,7 +8,7 @@ public class InvitationView
     public string Email { get; set; } = string.Empty;
     public string TokenHash { get; set; } = string.Empty;
     public AdminRole Role { get; set; }
-    public Guid InvitedByAdminUserId { get; set; }
+    public Guid InvitedByBusinessUserId { get; set; }
     public InvitationStatus Status { get; set; }
     public DateTime ExpiresAt { get; set; }
     public DateTime? AcceptedAt { get; set; }

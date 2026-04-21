@@ -13,7 +13,7 @@ public class ImageService(
     IImageProcessingService imageProcessing,
     IImageRepository imageRepo,
     IUserProcedures userProc,
-    IAdminUserProcedures adminUserProc
+    IBusinessUserProcedures businessUserProc
 ) : IImageService
 {
     public async Task<ImageUploadResponse> UploadAsync(
@@ -136,8 +136,8 @@ public class ImageService(
             uploadedById: ownerId, uploaderType: uploaderType,
             tag: "ProfilePic");
 
-        Guid? oldImageId = uploaderType == "admin_user"
-            ? await adminUserProc.SetAdminUserImageAsync(ownerId, result.ImageId)
+        Guid? oldImageId = uploaderType == "business_user"
+            ? await businessUserProc.SetBusinessUserImageAsync(ownerId, result.ImageId)
             : await userProc.SetUserImageAsync(ownerId, result.ImageId);
 
         if (oldImageId.HasValue)
@@ -148,8 +148,8 @@ public class ImageService(
 
     public async Task DeleteImageAsync(Guid ownerId, string uploaderType)
     {
-        Guid? oldImageId = uploaderType == "admin_user"
-            ? await adminUserProc.ClearAdminUserImageAsync(ownerId)
+        Guid? oldImageId = uploaderType == "business_user"
+            ? await businessUserProc.ClearBusinessUserImageAsync(ownerId)
             : await userProc.ClearUserImageAsync(ownerId);
 
         if (oldImageId.HasValue)

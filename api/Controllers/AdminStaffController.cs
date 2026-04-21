@@ -18,7 +18,7 @@ namespace Api.Controllers;
 [RequireRole(UserRole.Admin)]
 public class AdminStaffController(
     EventPlatformDbContext context,
-    IAdminUserProcedures adminUserProc,
+    IBusinessUserProcedures businessUserProc,
     IEncryptionService encryptionService,
     IInvitationService invitationService,
     IAdminAuthService adminAuthService
@@ -37,7 +37,7 @@ public class AdminStaffController(
         page = Math.Max(1, page);
 
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
-        var query = context.AdminUserViews.AsNoTracking();
+        var query = context.BusinessUserViews.AsNoTracking();
 
         if (!isDeveloper)
             query = query.Where(a => a.Role == AdminRole.Staff);
@@ -59,7 +59,7 @@ public class AdminStaffController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.AdminUserId, a.FirstName, a.LastName, a.Email,
+                a.BusinessUserId, a.FirstName, a.LastName, a.Email,
                 Role = a.Role.ToString(),
                 a.IsActive, a.CreatedAt, a.LastLoginAt, a.Phone
             })
@@ -72,7 +72,7 @@ public class AdminStaffController(
     /// Admin creates a Staff user.
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> CreateStaff([FromBody] CreateAdminUserRequest request)
+    public async Task<IActionResult> CreateStaff([FromBody] CreateBusinessUserRequest request)
     {
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
 
@@ -88,13 +88,13 @@ public class AdminStaffController(
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        if (await adminUserProc.ExistsByEmailAsync(normalizedEmail))
-            return Conflict(new ApiError(409, "An admin user with this email already exists", HttpContext.TraceIdentifier));
+        if (await businessUserProc.ExistsByEmailAsync(normalizedEmail))
+            return Conflict(new ApiError(409, "A business user with this email already exists", HttpContext.TraceIdentifier));
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var emailHash = encryptionService.HashEmail(normalizedEmail);
 
-        var id = await adminUserProc.CreateAsync(
+        var id = await businessUserProc.CreateAsync(
             normalizedEmail, emailHash, request.FirstName.Trim(), request.LastName.Trim(),
             passwordHash, role.ToString());
 
@@ -105,27 +105,24 @@ public class AdminStaffController(
     /// Admin updates a Staff user (limited: no role promotion beyond Staff for non-Developers).
     /// </summary>
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> UpdateStaff(Guid id, [FromBody] UpdateAdminUserRequest request)
+    public async Task<IActionResult> UpdateStaff(Guid id, [FromBody] UpdateBusinessUserRequest request)
     {
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
-        var admin = await adminUserProc.GetByIdAsync(id);
+        var admin = await businessUserProc.GetByIdAsync(id);
         if (admin is null) return NotFound(new ApiError(404, "Staff user not found", HttpContext.TraceIdentifier));
 
-        // Admins can manage Staff and Admin users, but not Developers
         if (!isDeveloper && admin.Role == AdminRole.Developer)
             return StatusCode(403, new ApiError(403, "Admins cannot manage Developer users", HttpContext.TraceIdentifier));
 
-        // Admins can promote Staff to Admin, but not to Developer
         if (!isDeveloper && request.Role is not null && request.Role == "Developer")
             return StatusCode(403, new ApiError(403, "Admins cannot assign the Developer role", HttpContext.TraceIdentifier));
 
         var allowedRole = (isDeveloper || request.Role == "Admin" || request.Role == "Staff") ? request.Role : null;
 
-        await adminUserProc.UpdateAsync(id,
+        await businessUserProc.UpdateAsync(id,
             firstName: request.FirstName, lastName: request.LastName,
             phone: request.Phone, role: allowedRole, isActive: request.IsActive);
 
-        // When disabling an account, revoke all their sessions to force immediate logout
         if (request.IsActive == false)
             await adminAuthService.RevokeAllSessionsAsync(id, exceptSessionHash: null);
 
@@ -148,8 +145,8 @@ public class AdminStaffController(
 
         try
         {
-            var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-            var invitation = await invitationService.CreateAsync(request.Email, role, adminUserId);
+            var businessUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            var invitation = await invitationService.CreateAsync(request.Email, role, businessUserId);
             return Created($"/admin/staff/invitations/{invitation.InvitationId}", invitation);
         }
         catch (InvalidOperationException ex)
@@ -166,11 +163,10 @@ public class AdminStaffController(
         [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
     {
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
-        var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+        var businessUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
 
-        // Developers see all invitations, admins see only theirs
         var invitations = await invitationService.ListAsync(
-            isDeveloper ? null : adminUserId,
+            isDeveloper ? null : businessUserId,
             Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
 
         return Ok(new { items = invitations });
@@ -189,7 +185,7 @@ public class AdminStaffController(
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        var query = context.AdminUserViews.AsNoTracking()
+        var query = context.BusinessUserViews.AsNoTracking()
             .Where(a => a.Role == AdminRole.Admin && a.IsActive);
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -209,7 +205,7 @@ public class AdminStaffController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.AdminUserId, a.FirstName, a.LastName, a.Email,
+                a.BusinessUserId, a.FirstName, a.LastName, a.Email,
                 Role = a.Role.ToString(),
                 a.IsActive, a.CreatedAt, a.LastLoginAt
             })
@@ -226,8 +222,8 @@ public class AdminStaffController(
     {
         try
         {
-            var adminUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-            await invitationService.RevokeAsync(id, adminUserId);
+            var businessUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            await invitationService.RevokeAsync(id, businessUserId);
             return Ok(new { message = "Invitation revoked" });
         }
         catch (KeyNotFoundException)

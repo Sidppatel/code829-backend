@@ -92,7 +92,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var eventTables = await layoutProc.ListEventTablesForEventAsync(eventId);
         return Ok((await MapEventTables(eventTables, eventId)).ToList());
@@ -103,7 +103,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         TableTemplate? template = null;
         if (request.TableTemplateId.HasValue)
@@ -147,7 +147,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var et = await layoutProc.GetEventTableByIdAsync(id);
         if (et is null || et.EventId != eventId)
@@ -183,7 +183,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var et = await layoutProc.GetEventTableByIdAsync(id);
         if (et is null || et.EventId != eventId)
@@ -205,7 +205,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var tables = await context_TableViews_ForEvent(eventId);
         return Ok(new EventLayoutResponse(
@@ -218,7 +218,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
 
@@ -250,7 +250,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var db = redis.GetDatabase();
         var json = JsonSerializer.Serialize(request, JsonOpts);
@@ -263,7 +263,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(DraftKey(eventId));
@@ -292,7 +292,7 @@ public class AdminLayoutController(
 
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
         var tablesJson = SerializeTablesForSave(request.Tables);
@@ -309,7 +309,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var eventTable = await layoutProc.GetEventTableByIdAsync(request.EventTableId);
         if (eventTable is null || eventTable.EventId != eventId)
@@ -331,7 +331,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var table = await layoutProc.GetTableByIdAsync(tableId);
         if (table is null || table.EventId != eventId)
@@ -367,7 +367,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var table = await layoutProc.GetTableByIdAsync(tableId);
         if (table is null || table.EventId != eventId)
@@ -388,7 +388,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var tables = await context_TableViews_ForEvent(eventId, activeOnly: true);
         var purchaseInfo = await GetPurchaseInfoForEvent(eventId);
@@ -435,7 +435,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var tables = await context_TableViews_ForEvent(eventId, activeOnly: true);
         var totalTables = tables.Count;
@@ -454,7 +454,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
         var layoutLocked = await layoutProc.EventHasActivePurchasesAsync(eventId);
@@ -468,7 +468,7 @@ public class AdminLayoutController(
     {
         var ev = await layoutProc.GetEventByIdForLayoutAsync(eventId);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        if (!IsOwnerOrDeveloper(ev.AdminUserId)) return Forbid();
+        if (!IsOwnerOrDeveloper(ev.BusinessUserId)) return Forbid();
 
         var existingTemplateIds = await layoutProc.ListExistingEventTableTemplateIdsAsync(eventId);
         var uniqueIds = request.TableTemplateIds.Distinct().ToList();

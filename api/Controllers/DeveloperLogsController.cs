@@ -38,16 +38,15 @@ public class DeveloperLogsController(EventPlatformDbContext context) : Controlle
                 actionParam, entityTypeParam, fromParam, toParam)
             .FirstAsync();
 
-        var items = await context.AdminLogViews
+        var items = await context.BusinessLogViews
             .FromSqlRaw("SELECT * FROM sp_get_admin_logs({0}, {1}, {2}, {3}, {4}, {5})",
                 actionParam, entityTypeParam, fromParam, toParam, (page - 1) * pageSize, pageSize)
             .AsNoTracking()
             .Select(l => new AdminLogDto(
-                l.Id, l.Timestamp, l.Action, l.AdminUserId, l.AdminEmail, l.AdminRole,
+                l.Id, l.Timestamp, l.Action, l.BusinessUserId, l.BusinessUserEmail, l.BusinessUserRole,
                 l.EntityType, l.EntityId, l.Description, l.MetadataJson, l.IpAddress))
             .ToListAsync();
 
         return Ok(new PagedResponse<AdminLogDto>(items, totalCount, page, pageSize));
     }
 }
-

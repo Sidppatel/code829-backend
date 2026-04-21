@@ -41,7 +41,7 @@ public class PurchaseServiceTests : IDisposable
         _pricingService = new Mock<IPricingService>();
         _emailService = new Mock<IEmailService>();
         _settingsService = new Mock<ISettingsService>();
-        var adminProcMock = new Mock<IAdminUserProcedures>();
+        var adminProcMock = new Mock<IBusinessUserProcedures>();
 
         _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync("10");
@@ -89,7 +89,7 @@ public class PurchaseServiceTests : IDisposable
             StartDate = DateTime.UtcNow.AddDays(1),
             EndDate = DateTime.UtcNow.AddDays(2),
             VenueId = venue.Id,
-            AdminUserId = _userId
+            BusinessUserId = _userId
         };
         _context.Events.Add(ev);
         _context.SaveChanges();

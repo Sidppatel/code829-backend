@@ -17,7 +17,7 @@ SELECT
     v."Name" AS "VenueName",
     COALESCE(a."City", '') AS "VenueCity",
     COALESCE(a."State", '') AS "VenueState",
-    e."AdminUserId" AS "AdminUserId",
+    e."BusinessUserId" AS "BusinessUserId",
     COALESCE(au."FirstName" || ' ' || au."LastName", '') AS "OrganizerName",
     COALESCE(
         e."MaxCapacity",
@@ -37,7 +37,7 @@ SELECT
 FROM events e
 JOIN venues v ON e."VenueId" = v."Id"
 LEFT JOIN addresses a ON v."AddressId" = a."Id"
-LEFT JOIN admin_users au ON e."AdminUserId" = au."Id"
+LEFT JOIN business_users au ON e."BusinessUserId" = au."Id"
 LEFT JOIN LATERAL (
     SELECT i."StorageKey"
     FROM event_images ei

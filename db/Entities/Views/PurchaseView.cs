@@ -59,5 +59,5 @@ public class PurchaseView
     public int TicketCount { get; set; }
 
     // Organizer
-    public Guid AdminUserId { get; set; }
+    public Guid BusinessUserId { get; set; }
 }

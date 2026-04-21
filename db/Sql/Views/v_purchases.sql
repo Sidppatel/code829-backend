@@ -34,7 +34,7 @@ SELECT
     st."TransferAmountCents",
     st."PaidAt", st."RefundedAt",
     COALESCE(tc.cnt, 0)::int AS "TicketCount",
-    e."AdminUserId"
+    e."BusinessUserId"
 FROM purchases b
 JOIN users u ON b."UserId" = u."Id"
 JOIN events e ON b."EventId" = e."Id"

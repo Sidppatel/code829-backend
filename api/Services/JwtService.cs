@@ -22,7 +22,7 @@ public class JwtService(ISecretsProvider secrets) : IJwtService
         return await GenerateJwtAsync(claims);
     }
 
-    public async Task<string> GenerateAdminJwtAsync(AdminUser admin)
+    public async Task<string> GenerateAdminJwtAsync(BusinessUser admin)
     {
         var claims = new[]
         {

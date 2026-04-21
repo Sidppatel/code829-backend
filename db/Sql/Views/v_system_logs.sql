@@ -16,4 +16,4 @@ SELECT
     sl."DurationMs",
     sl."MetadataJson"
 FROM system_logs sl
-LEFT JOIN admin_users au ON au."Id" = sl."UserId";
+LEFT JOIN business_users au ON au."Id" = sl."UserId";

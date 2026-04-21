@@ -21,7 +21,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         IJwtService jwtService,
         IConnectionMultiplexer redis,
         IUserProcedures userProc,
-        IAdminUserProcedures adminProc)
+        IBusinessUserProcedures businessUserProc)
     {
         // Per-portal cookie lookup: each frontend declares which portal it is via X-Portal,
         // so we know exactly which cookie to resolve. Missing/unknown header = no session.
@@ -73,7 +73,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         // and session_admin / session_staff / session_developer to an admin session. This catches
         // stale cookies after DB reseeds and blocks any cross-portal resolution attempts.
         var isAdminPortal = PortalHelper.IsAdminPortal(portal);
-        if (isAdminPortal && !session.AdminUserId.HasValue)
+        if (isAdminPortal && !session.BusinessUserId.HasValue)
         {
             httpContext.Response.Cookies.Delete(cookieName);
             await next(httpContext);
@@ -100,9 +100,9 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             }
             jwt = await jwtService.GenerateUserJwtAsync(user);
         }
-        else if (session.AdminUserId.HasValue)
+        else if (session.BusinessUserId.HasValue)
         {
-            var admin = await adminProc.GetByIdAsync(session.AdminUserId.Value);
+            var admin = await businessUserProc.GetByIdAsync(session.BusinessUserId.Value);
             if (admin is null || !admin.IsActive)
             {
                 httpContext.Response.Cookies.Delete(cookieName);

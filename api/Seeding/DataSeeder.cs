@@ -31,17 +31,17 @@ public static class DataSeeder
         var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
         var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
         var authProc = scope.ServiceProvider.GetRequiredService<IAuthProcedures>();
-        var adminProc = scope.ServiceProvider.GetRequiredService<IAdminUserProcedures>();
+        var businessUserProc = scope.ServiceProvider.GetRequiredService<IBusinessUserProcedures>();
 
-        await SeedAdminUsersAsync(context, encryption, adminProc);
+        await SeedAdminUsersAsync(context, encryption, businessUserProc);
         await SeedUsersAsync(context, encryption, authProc);
         await SeedSettingsAsync(settingsService);
         await SeedTableTemplatesAsync(context);
     }
 
-    private static async Task SeedAdminUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IAdminUserProcedures adminProc)
+    private static async Task SeedAdminUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IBusinessUserProcedures businessUserProc)
     {
-        if (await context.AdminUsers.AnyAsync())
+        if (await context.BusinessUsers.AnyAsync())
             return;
 
         var admins = new (string Email, string FirstName, string LastName, AdminRole Role, string Password)[]
@@ -55,10 +55,10 @@ public static class DataSeeder
         foreach (var (email, firstName, lastName, role, password) in admins)
         {
             var hash = BCrypt.Net.BCrypt.HashPassword(password);
-            await adminProc.CreateAsync(email, encryption.HashEmail(email), firstName, lastName, hash, role.ToString());
+            await businessUserProc.CreateAsync(email, encryption.HashEmail(email), firstName, lastName, hash, role.ToString());
         }
 
-        Log.Information("[Seed] Created {Count} admin users via SP", admins.Length);
+        Log.Information("[Seed] Created {Count} business users via SP", admins.Length);
     }
 
     private static async Task SeedUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IAuthProcedures authProc)
