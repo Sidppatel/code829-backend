@@ -7,7 +7,9 @@ CREATE OR REPLACE FUNCTION sp_reserve_open_capacity(
     p_fee_cents int,
     p_total_cents int,
     p_purchase_number text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_id uuid;
     v_layout text;

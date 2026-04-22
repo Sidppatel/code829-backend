@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_update_event_table(
     p_id uuid, p_label text, p_capacity int, p_shape text, p_color text,
     p_price_cents int, p_is_active bool
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE event_tables SET
         "Label" = COALESCE(p_label, "Label"),

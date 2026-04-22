@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_set_venue_primary_image(
     p_venue_id uuid,
     p_image_id uuid
-) RETURNS boolean LANGUAGE plpgsql AS $$
+) RETURNS boolean LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_exists boolean;
 BEGIN

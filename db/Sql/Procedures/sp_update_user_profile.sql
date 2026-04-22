@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_update_user_profile(
     p_user_id uuid, p_first_name text, p_last_name text, p_phone text,
     p_address text, p_city text, p_state text, p_zip text, p_opt_in bool
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_address_id uuid;
 BEGIN
     SELECT "AddressId" INTO v_address_id FROM users WHERE "Id" = p_user_id;

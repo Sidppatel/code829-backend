@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_cleanup_old_logs(
     p_dev_days int, p_admin_days int, p_system_days int
-) RETURNS int LANGUAGE plpgsql AS $$
+) RETURNS int LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_total int := 0; v_count int;
 BEGIN
     DELETE FROM developer_logs WHERE "Timestamp" < now() - (p_dev_days || ' days')::interval;

@@ -16,7 +16,9 @@ CREATE OR REPLACE FUNCTION sp_add_event_image(
     "EventImageId" uuid,
     "SortOrder" int,
     "IsPrimary" boolean
-) LANGUAGE plpgsql AS $$
+) LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_image_id uuid;
     v_event_image_id uuid;

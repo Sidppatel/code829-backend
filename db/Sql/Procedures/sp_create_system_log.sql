@@ -3,7 +3,9 @@ CREATE OR REPLACE FUNCTION sp_create_system_log(
     p_entity_type text, p_entity_id uuid,
     p_before_json text, p_after_json text,
     p_user_id uuid, p_correlation_id text, p_duration_ms bigint, p_metadata_json text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO system_logs ("Id", "Timestamp", "Category", "Action", "Source",

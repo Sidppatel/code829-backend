@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_set_user_image(
     p_user_id uuid, p_image_id uuid
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_old_image_id uuid;
 BEGIN

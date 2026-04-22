@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_update_stripe_transaction_status(p_intent_id text, p_status text)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE stripe_transactions SET
         "Status" = p_status,

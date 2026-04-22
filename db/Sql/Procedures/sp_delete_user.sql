@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_delete_user(p_user_id uuid)
-RETURNS bool LANGUAGE plpgsql AS $$
+RETURNS bool LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_found bool;
 BEGIN

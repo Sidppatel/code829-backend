@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION sp_refund_purchase(p_purchase_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION sp_refund_purchase(p_purchase_id uuid) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE purchases SET "Status" = 'Refunded', "UpdatedAt" = now()
     WHERE "Id" = p_purchase_id;

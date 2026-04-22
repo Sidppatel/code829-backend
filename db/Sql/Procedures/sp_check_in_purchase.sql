@@ -7,7 +7,9 @@ RETURNS TABLE(
     "EventTitle" text,
     "StatusStr" text,
     "CheckedInAt" timestamptz
-) LANGUAGE plpgsql AS $$
+) LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_purchase_id uuid;
     v_purchase_number text;

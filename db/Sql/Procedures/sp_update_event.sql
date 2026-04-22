@@ -5,7 +5,9 @@ CREATE OR REPLACE FUNCTION sp_update_event(
     p_platform_fee_percent int, p_platform_fee_cents int,
     p_grid_rows int, p_grid_cols int, p_venue_id uuid,
     p_scheduled_publish_at timestamptz DEFAULT NULL
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE events SET
         "Title" = COALESCE(p_title, "Title"),

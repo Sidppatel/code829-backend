@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_save_event_layout(
     p_event_id uuid, p_grid_rows int, p_grid_cols int,
     p_tables jsonb, p_locked_ids uuid[]
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_request_ids uuid[];
     v_table jsonb;

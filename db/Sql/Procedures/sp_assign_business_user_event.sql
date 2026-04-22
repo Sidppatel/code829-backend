@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_assign_business_user_event(
     p_business_user_id uuid, p_event_id uuid, p_assigned_by_business_user_id uuid DEFAULT NULL
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO business_user_events ("BusinessUserId", "EventId", "AssignedByBusinessUserId", "CreatedAt", "UpdatedAt")

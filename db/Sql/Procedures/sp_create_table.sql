@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_create_table(
     p_event_table_id uuid, p_event_id uuid, p_label text,
     p_grid_row int, p_grid_col int, p_sort_order int
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO tables ("Id", "EventTableId", "EventId", "Label", "GridRow", "GridCol",

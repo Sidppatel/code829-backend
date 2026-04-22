@@ -2,7 +2,9 @@ CREATE OR REPLACE FUNCTION sp_create_developer_log(
     p_severity text, p_message text, p_exception_type text, p_stack_trace text,
     p_request_path text, p_request_method text, p_status_code int,
     p_user_id uuid, p_ip text, p_correlation_id text, p_metadata_json text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO developer_logs ("Id", "Timestamp", "Severity", "Message", "ExceptionType",

@@ -15,7 +15,9 @@ RETURNS TABLE(
     "AssignedByBusinessUserId" uuid,
     "CreatedAt" timestamptz,
     "UpdatedAt" timestamptz
-) LANGUAGE sql STABLE AS $$
+) LANGUAGE sql STABLE
+    SET search_path = public, extensions, pg_catalog
+AS $$
     SELECT
         aue."Id", aue."BusinessUserId",
         au."FirstName"::text, au."LastName"::text, au."Email"::text,

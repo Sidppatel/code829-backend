@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_update_table_template(
     p_id uuid, p_name text, p_capacity int, p_shape text,
     p_color text, p_price_cents int, p_is_active bool
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE table_templates SET
         "Name" = COALESCE(p_name, "Name"),

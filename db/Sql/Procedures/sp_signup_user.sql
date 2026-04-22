@@ -4,7 +4,9 @@ CREATE OR REPLACE FUNCTION sp_signup_user(
     p_first_name text,
     p_last_name text,
     p_password_hash text
-) RETURNS SETOF users LANGUAGE plpgsql AS $$
+) RETURNS SETOF users LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_id uuid;
 BEGIN

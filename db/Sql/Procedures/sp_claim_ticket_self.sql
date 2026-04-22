@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_claim_ticket_self(
     p_ticket_id uuid, p_user_id uuid
-) RETURNS boolean LANGUAGE plpgsql AS $$
+) RETURNS boolean LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_updated int;
 BEGIN
     UPDATE purchase_tickets SET

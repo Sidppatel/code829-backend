@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION sp_cancel_purchase(p_purchase_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION sp_cancel_purchase(p_purchase_id uuid) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE purchases SET "Status" = 'Cancelled', "UpdatedAt" = now()
     WHERE "Id" = p_purchase_id;

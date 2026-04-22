@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_get_primary_image_key(p_entity_type text, p_entity_id uuid)
-RETURNS text LANGUAGE sql STABLE AS $$
+RETURNS text LANGUAGE sql STABLE
+    SET search_path = public, extensions, pg_catalog
+AS $$
     SELECT CASE
         WHEN p_entity_type = 'event' THEN (
             SELECT i."StorageKey"

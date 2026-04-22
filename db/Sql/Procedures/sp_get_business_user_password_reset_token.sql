@@ -5,7 +5,9 @@ RETURNS TABLE(
     "IsUsed" boolean,
     "ExpiresAt" timestamptz,
     "BusinessUserEmail" text
-) LANGUAGE sql STABLE AS $$
+) LANGUAGE sql STABLE
+    SET search_path = public, extensions, pg_catalog
+AS $$
     SELECT
         t."Id" AS "TokenId",
         t."BusinessUserId",

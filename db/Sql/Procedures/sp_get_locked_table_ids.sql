@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_get_locked_table_ids(p_event_id uuid)
-RETURNS TABLE("Id" uuid) LANGUAGE sql STABLE AS $$
+RETURNS TABLE("Id" uuid) LANGUAGE sql STABLE
+    SET search_path = public, extensions, pg_catalog
+AS $$
     SELECT DISTINCT b."TableId" FROM purchases b
     WHERE b."EventId" = p_event_id
       AND b."TableId" IS NOT NULL

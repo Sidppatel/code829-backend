@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_change_event_status(
     p_id uuid, p_status text, p_scheduled_publish_at timestamptz DEFAULT NULL
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE events SET
         "Status" = p_status,

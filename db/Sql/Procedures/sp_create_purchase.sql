@@ -3,7 +3,9 @@ CREATE OR REPLACE FUNCTION sp_create_purchase(
     p_event_ticket_type_id uuid,
     p_subtotal_cents int, p_fee_cents int, p_total_cents int,
     p_purchase_number text, p_status text DEFAULT 'Pending'
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO purchases ("Id", "PurchaseNumber", "Status", "UserId", "EventId", "TableId",

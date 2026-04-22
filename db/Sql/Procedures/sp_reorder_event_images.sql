@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_reorder_event_images(
     p_event_id uuid,
     p_image_ids uuid[]
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     i int;
 BEGIN

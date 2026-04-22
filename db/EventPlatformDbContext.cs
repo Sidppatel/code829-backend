@@ -75,7 +75,7 @@ public class EventPlatformDbContext(
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("extensions", "pg_trgm");
 
         // ─── DB-side defaults for all BaseEntity tables ──────────
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

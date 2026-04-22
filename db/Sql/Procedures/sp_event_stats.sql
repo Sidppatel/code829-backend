@@ -4,7 +4,9 @@ RETURNS TABLE(
     "MaxCapacity" int,
     "FillRatePct" int,
     "GrossRevenueCents" bigint
-) LANGUAGE sql STABLE AS $$
+) LANGUAGE sql STABLE
+    SET search_path = public, extensions, pg_catalog
+AS $$
     SELECT
         COALESCE(v."TotalSold", 0)::int AS "TotalSold",
         COALESCE(v."TotalCapacity", 0)::int AS "MaxCapacity",

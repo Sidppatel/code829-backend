@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_create_business_user(
     p_email text, p_email_hash text, p_first_name text, p_last_name text,
     p_password_hash text, p_role text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO business_users ("Email", "EmailHash", "FirstName", "LastName",

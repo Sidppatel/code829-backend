@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_create_event_table(
     p_event_id uuid, p_label text, p_capacity int, p_shape text, p_color text,
     p_price_cents int, p_platform_fee_cents int, p_template_id uuid
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO event_tables ("Id", "EventId", "Label", "Capacity", "Shape", "Color",

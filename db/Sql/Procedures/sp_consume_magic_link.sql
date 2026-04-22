@@ -1,7 +1,9 @@
 CREATE OR REPLACE FUNCTION sp_consume_magic_link(p_token_hash text)
 RETURNS TABLE (
     "Id" uuid, "Email" text, "ExpiresAt" timestamptz
-) LANGUAGE plpgsql AS $$
+) LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     RETURN QUERY
     UPDATE magic_link_tokens AS t

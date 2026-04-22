@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_upsert_user(
     p_email text, p_email_hash text, p_first_name text, p_last_name text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     SELECT "Id" INTO v_id FROM users WHERE "Email" = p_email;

@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_revoke_invitation(p_id uuid)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     UPDATE invitations
     SET "Status" = 'Revoked',

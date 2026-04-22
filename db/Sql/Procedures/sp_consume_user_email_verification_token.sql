@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_consume_user_email_verification_token(
     p_token_hash text
-) RETURNS SETOF users LANGUAGE plpgsql AS $$
+) RETURNS SETOF users LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_user_id uuid;
 BEGIN

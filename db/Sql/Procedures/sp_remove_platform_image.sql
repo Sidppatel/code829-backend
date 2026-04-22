@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_remove_platform_image(p_image_id uuid)
-RETURNS boolean LANGUAGE plpgsql AS $$
+RETURNS boolean LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_was_primary boolean;
     v_next_image_id uuid;

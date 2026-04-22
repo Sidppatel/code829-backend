@@ -2,7 +2,9 @@ CREATE OR REPLACE FUNCTION sp_update_venue(
     p_id uuid, p_name text, p_description text, p_image_path text,
     p_phone text, p_email text, p_website text, p_is_active bool,
     p_line1 text, p_city text, p_state text, p_zip text
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_addr_id uuid;
 BEGIN
     SELECT "AddressId" INTO v_addr_id FROM venues WHERE "Id" = p_id;

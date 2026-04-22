@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_set_platform_primary_image(p_image_id uuid)
-RETURNS boolean LANGUAGE plpgsql AS $$
+RETURNS boolean LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_exists boolean;
 BEGIN
     SELECT EXISTS(SELECT 1 FROM platform_images WHERE "ImageId" = p_image_id)

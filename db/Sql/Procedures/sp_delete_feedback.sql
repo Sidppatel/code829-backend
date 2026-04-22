@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_delete_feedback(p_id uuid)
-RETURNS boolean LANGUAGE plpgsql AS $$
+RETURNS boolean LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_exists boolean;
 BEGIN
     SELECT EXISTS(SELECT 1 FROM feedbacks WHERE "Id" = p_id) INTO v_exists;

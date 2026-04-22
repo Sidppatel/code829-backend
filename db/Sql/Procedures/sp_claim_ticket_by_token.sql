@@ -2,7 +2,9 @@ CREATE OR REPLACE FUNCTION sp_claim_ticket_by_token(
     p_invite_hash text, p_guest_user_id uuid
 )
 RETURNS TABLE("TicketId" uuid, "Success" boolean, "Message" text, "AlreadyByMe" boolean)
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_id uuid;
     v_status text;

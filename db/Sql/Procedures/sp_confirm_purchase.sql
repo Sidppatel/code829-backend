@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_confirm_purchase(p_purchase_id uuid, p_qr_token text)
-RETURNS void LANGUAGE plpgsql AS $$
+RETURNS void LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_seats int; v_seat int;
 BEGIN
     UPDATE purchases SET "Status" = 'Paid', "QrToken" = p_qr_token, "UpdatedAt" = now()

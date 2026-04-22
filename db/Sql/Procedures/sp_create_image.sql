@@ -7,7 +7,9 @@ CREATE OR REPLACE FUNCTION sp_create_image(
     p_caption text DEFAULT NULL,
     p_content_type text DEFAULT NULL,
     p_checksum text DEFAULT NULL
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO images ("Id", "EntityType", "EntityId", "StorageKey", "OriginalName",

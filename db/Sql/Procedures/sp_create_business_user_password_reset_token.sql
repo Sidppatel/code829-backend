@@ -3,7 +3,9 @@ CREATE OR REPLACE FUNCTION sp_create_business_user_password_reset_token(
     p_token_hash text,
     p_expires_at timestamptz,
     p_email text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE
     v_id uuid;
 BEGIN

@@ -2,7 +2,9 @@ CREATE OR REPLACE FUNCTION sp_create_event_ticket_type(
     p_event_id uuid, p_label text, p_price_cents int,
     p_platform_fee_cents int, p_max_quantity int, p_sort_order int,
     p_description text DEFAULT NULL
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid;
 BEGIN
     INSERT INTO event_ticket_types ("Id", "EventId", "Label", "PriceCents", "PlatformFeeCents",

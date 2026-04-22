@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION fn_audit_trigger() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION fn_audit_trigger() RETURNS trigger LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         INSERT INTO system_logs ("Id", "Timestamp", "Category", "Action", "Source",

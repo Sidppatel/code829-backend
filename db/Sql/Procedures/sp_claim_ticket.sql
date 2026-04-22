@@ -1,5 +1,7 @@
 CREATE OR REPLACE FUNCTION sp_claim_ticket(p_invite_hash text, p_guest_user_id uuid)
-RETURNS TABLE("TicketId" uuid, "PurchaseId" uuid) LANGUAGE plpgsql AS $$
+RETURNS TABLE("TicketId" uuid, "PurchaseId" uuid) LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     RETURN QUERY
     UPDATE purchase_tickets SET

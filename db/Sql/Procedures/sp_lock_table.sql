@@ -1,6 +1,8 @@
 CREATE OR REPLACE FUNCTION sp_lock_table(
     p_user_id uuid, p_event_id uuid, p_table_id uuid, p_hold_minutes int
-) RETURNS TABLE("Id" uuid, "Label" text, "LockExpiresAt" timestamptz) LANGUAGE plpgsql AS $$
+) RETURNS TABLE("Id" uuid, "Label" text, "LockExpiresAt" timestamptz) LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 BEGIN
     RETURN QUERY
     UPDATE tables SET

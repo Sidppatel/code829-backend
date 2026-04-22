@@ -2,7 +2,9 @@ CREATE OR REPLACE FUNCTION sp_create_venue(
     p_name text, p_description text, p_image_path text,
     p_phone text, p_email text, p_website text,
     p_line1 text, p_line2 text, p_city text, p_state text, p_zip text
-) RETURNS uuid LANGUAGE plpgsql AS $$
+) RETURNS uuid LANGUAGE plpgsql
+    SET search_path = public, extensions, pg_catalog
+AS $$
 DECLARE v_id uuid; v_addr_id uuid;
 BEGIN
     INSERT INTO addresses ("Id", "Line1", "Line2", "City", "State", "ZipCode", "CreatedAt", "UpdatedAt")
