@@ -130,7 +130,15 @@ public class AuthController(
 
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var origin = Request.Headers.Origin.FirstOrDefault();
-        await authService.RequestPasswordResetAsync(request.Email, ip, origin);
+        try
+        {
+            await authService.RequestPasswordResetAsync(request.Email, ip, origin);
+        }
+        catch (Exception ex)
+        {
+            // Swallow to preserve account-enumeration protection; log retains detail for ops.
+            Log.Error(ex, "[Auth] forgot-password failed email={Email}", request.Email);
+        }
         return NoContent();
     }
 
