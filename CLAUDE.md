@@ -164,3 +164,18 @@ To work on the backend you need fluency in:
 - **Infisical CLI** — `export`, `secrets set`
 
 Domain-specific knowledge that compounds: Stripe payment lifecycle (intent → charge → webhook → reconciliation), magic-link auth issuance/expiry, S3 presigned URLs, QR-code claim tokens.
+
+See [../SKILLS.md](../SKILLS.md) for the full list of project-specific (non-generic) backend skills.
+
+## Application Map (graphify) — required workflow
+
+The dependency map for this repo lives in `graphify-out/` (and a monorepo-wide one at `..\graphify-out\`). Index: [../APPLICATION_MAP.md](../APPLICATION_MAP.md).
+
+**Before changes:**
+- Read the wiki pages for files you'll touch (`graphify-out/wiki/<Name>.md`).
+- Note god nodes (highest connectivity) in `GRAPH_REPORT.md` — they have non-obvious downstream consumers.
+- Use `graphify explain "<NodeName>"` or `graphify query "<question>"` for targeted lookups.
+
+**After every commit:**
+- `graphify update .` (run automatically by post-commit hook if installed via `graphify hook install`).
+- The map being out of sync = unfinished change.
