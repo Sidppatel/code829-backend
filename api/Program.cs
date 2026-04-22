@@ -54,6 +54,16 @@ if (bootstrapEnv == "Development")
 
 var builder = WebApplication.CreateBuilder(args);
 
+    // Sentry — capture unhandled 5xx exceptions only. Empty-string DSN disables transport
+    // (per Sentry docs) so local dev without a configured DSN boots cleanly.
+    builder.WebHost.UseSentry(o =>
+    {
+        o.Dsn = Environment.GetEnvironmentVariable("SENTRY_DSN") ?? string.Empty;
+        o.Environment = builder.Environment.EnvironmentName;
+        o.TracesSampleRate = 0.1;
+        o.SendDefaultPii = false;
+        o.MaxBreadcrumbs = 50;
+    });
 
     // Serilog — structured logging to console + files with timestamps
     builder.Host.UseSerilog((ctx, lc) =>

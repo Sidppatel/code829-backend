@@ -63,6 +63,9 @@ services:
         sync: false
       - key: CDN_BASE_URL
         sync: false
+      # Sentry DSN — absent disables transport (no-op in local/dev without DSN).
+      - key: SENTRY_DSN
+        sync: false
 
       # ─── Cloudflare / networking ────────────────────────────────
       # Public URL used in magic-link emails and seed data.

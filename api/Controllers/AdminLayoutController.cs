@@ -24,7 +24,8 @@ public class AdminLayoutController(
     ILayoutProcedures layoutProc,
     ITableProcedures tableProc,
     IConnectionMultiplexer redis,
-    ISettingsService settings) : ControllerBase
+    ISettingsService settings,
+    ICacheService cache) : ControllerBase
 {
     // ═══════════════════════════════════════════════════════════
     //  Table Templates (global)
@@ -137,6 +138,8 @@ public class AdminLayoutController(
             eventId, label, capacity, shape.ToString(), color,
             priceCents, defaultGridFee, template?.Id);
 
+        await cache.InvalidateTablesAsync(eventId);
+
         return Created("", new EventTableResponse(
             etId, label, capacity, shape.ToString(), color, priceCents, true,
             eventId, template?.Id, template?.Name, 0));
@@ -174,6 +177,8 @@ public class AdminLayoutController(
             id, request.Label, request.Capacity, shapeOut,
             request.Color, request.PriceCents, request.IsActive);
 
+        await cache.InvalidateTablesAsync(eventId);
+
         var updated = await layoutProc.GetEventTableByIdAsync(id);
         return Ok((await MapEventTables([updated!], eventId)).First());
     }
@@ -193,6 +198,7 @@ public class AdminLayoutController(
             return BadRequest(new ApiError(400, "Cannot delete — tables have active purchases", HttpContext.TraceIdentifier));
 
         await layoutProc.DeleteEventTableAsync(id);
+        await cache.InvalidateTablesAsync(eventId);
         return NoContent();
     }
 
@@ -231,6 +237,8 @@ public class AdminLayoutController(
 
         var tablesJson = SerializeTablesForSave(request.Tables);
         await layoutProc.SaveEventLayoutAsync(eventId, request.GridRows, request.GridCols, tablesJson, [.. locked]);
+
+        await cache.InvalidateTablesAsync(eventId);
 
         var updatedTables = await context_TableViews_ForEvent(eventId);
         var updatedLocked = await layoutProc.GetLockedTableIdsAsync(eventId);
@@ -298,6 +306,8 @@ public class AdminLayoutController(
         var tablesJson = SerializeTablesForSave(request.Tables);
         await layoutProc.SaveEventLayoutAsync(eventId, request.GridRows, request.GridCols, tablesJson, [.. locked]);
 
+        await cache.InvalidateTablesAsync(eventId);
+
         await db.KeyDeleteAsync(DraftKey(eventId));
         return Ok(new { message = "Flushed to DB" });
     }
@@ -318,6 +328,8 @@ public class AdminLayoutController(
         var tableId = await tableProc.CreateTableAsync(
             request.EventTableId, eventId, request.Label,
             request.GridRow, request.GridCol, 0);
+
+        await cache.InvalidateTablesAsync(eventId);
 
         return Created("", new LayoutTableResponse(
             tableId, request.Label, request.GridRow, request.GridCol, true,
@@ -352,6 +364,8 @@ public class AdminLayoutController(
             tableId, request.Label, request.EventTableId,
             request.GridRow, request.GridCol, request.IsActive, request.SortOrder);
 
+        await cache.InvalidateTablesAsync(eventId);
+
         var updated = await layoutProc.GetTableByIdAsync(tableId);
         var eventTable = await layoutProc.GetEventTableByIdAsync(updated!.EventTableId);
 
@@ -378,6 +392,7 @@ public class AdminLayoutController(
             return BadRequest(new ApiError(400, "This table has active purchases and cannot be deleted", HttpContext.TraceIdentifier));
 
         await layoutProc.DeleteTableAsync(tableId);
+        await cache.InvalidateTablesAsync(eventId);
         return NoContent();
     }
 
@@ -488,6 +503,9 @@ public class AdminLayoutController(
                 tt.DefaultColor, tt.DefaultPriceCents, true,
                 eventId, tt.Id, tt.Name, 0));
         }
+
+        if (created.Count > 0)
+            await cache.InvalidateTablesAsync(eventId);
 
         return Ok(new BulkInsertResponse(created.Count, created));
     }
