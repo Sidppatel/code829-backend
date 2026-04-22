@@ -17,4 +17,14 @@ public interface IUserProcedures
     Task<Guid?> ClearUserImageAsync(Guid userId, CancellationToken ct = default);
     Task<bool> SetUserActiveAsync(Guid userId, bool isActive, CancellationToken ct = default);
     Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default);
+
+    // ── Email+password auth (Phase 1 DB foundation) ─────────────
+    Task<User> SignupUserAsync(string email, string emailHash, string firstName, string lastName, string passwordHash, CancellationToken ct = default);
+    Task<User?> GetByEmailForSigninAsync(string emailHash, CancellationToken ct = default);
+    Task UpdateLastLoginAsync(Guid userId, CancellationToken ct = default);
+    Task UpdatePasswordAsync(Guid userId, string passwordHash, CancellationToken ct = default);
+    Task<UserPasswordResetToken> CreatePasswordResetTokenAsync(Guid userId, string tokenHash, DateTime expiresAt, string? ipAddress, CancellationToken ct = default);
+    Task<User> ConsumePasswordResetTokenAsync(string tokenHash, CancellationToken ct = default);
+    Task<UserEmailVerificationToken> CreateEmailVerificationTokenAsync(Guid userId, string tokenHash, DateTime expiresAt, string? ipAddress, CancellationToken ct = default);
+    Task<User> ConsumeEmailVerificationTokenAsync(string tokenHash, CancellationToken ct = default);
 }

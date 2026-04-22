@@ -16,6 +16,8 @@ public class EventPlatformDbContext(
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
     public DbSet<BusinessPasswordResetToken> BusinessPasswordResetTokens => Set<BusinessPasswordResetToken>();
+    public DbSet<UserPasswordResetToken> UserPasswordResetTokens => Set<UserPasswordResetToken>();
+    public DbSet<UserEmailVerificationToken> UserEmailVerificationTokens => Set<UserEmailVerificationToken>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
 
     // Template/parent entities
@@ -112,6 +114,8 @@ public class EventPlatformDbContext(
             entity.Property(e => e.EmailHash).HasMaxLength(128);
             entity.Property(e => e.FirstName).HasMaxLength(128);
             entity.Property(e => e.LastName).HasMaxLength(128);
+            entity.Property(e => e.PasswordHash).HasMaxLength(256);
+            entity.Property(e => e.EmailVerified).HasDefaultValue(false);
             entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId)
@@ -200,6 +204,32 @@ public class EventPlatformDbContext(
             entity.Property(e => e.TokenHash).HasMaxLength(128);
             entity.Property(e => e.Email).HasMaxLength(256);
             entity.HasOne(e => e.BusinessUser).WithMany().HasForeignKey(e => e.BusinessUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserPasswordResetToken>(entity =>
+        {
+            entity.ToTable("user_password_reset_tokens");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserEmailVerificationToken>(entity =>
+        {
+            entity.ToTable("user_email_verification_tokens");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

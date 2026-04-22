@@ -305,6 +305,11 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IValidator<MagicLinkRequest>, MagicLinkRequestValidator>();
     builder.Services.AddScoped<IValidator<CreatePurchaseRequest>, CreatePurchaseRequestValidator>();
     builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
+    builder.Services.AddScoped<IValidator<SignupRequest>, SignupRequestValidator>();
+    builder.Services.AddScoped<IValidator<SigninRequest>, SigninRequestValidator>();
+    builder.Services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
+    builder.Services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
+    builder.Services.AddScoped<IValidator<VerifyEmailRequest>, VerifyEmailRequestValidator>();
 
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();

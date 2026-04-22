@@ -55,6 +55,118 @@ public class AuthController(
         return Ok(response);
     }
 
+    [HttpPost("signup")]
+    public async Task<IActionResult> Signup(
+        [FromBody] SignupRequest request,
+        [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
+    {
+        var rateLimit = await CheckEmailRateLimitAsync(redis, "signup", request.Email, 5, TimeSpan.FromMinutes(1));
+        if (rateLimit is not null) return rateLimit;
+
+        try
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var origin = Request.Headers.Origin.FirstOrDefault();
+            var response = await authService.SignupAsync(request.Email, request.FirstName, request.LastName, request.Password, ip, origin);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
+    [HttpPost("signin")]
+    public async Task<IActionResult> Signin(
+        [FromBody] SigninRequest request,
+        [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
+    {
+        var rateLimit = await CheckEmailRateLimitAsync(redis, "signin", request.Email, 5, TimeSpan.FromMinutes(1));
+        if (rateLimit is not null) return rateLimit;
+
+        try
+        {
+            var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var (user, sessionToken, jwt) = await authService.SigninAsync(request.Email, request.Password, deviceName, ip);
+            SetSessionCookie(sessionToken);
+            return Ok(new AuthResponse(User: user, Token: jwt));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log.Warning(ex, "[Auth] Signin failed: {Message}", ex.Message);
+            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new ApiError(400, "Token is required", HttpContext.TraceIdentifier));
+
+        try
+        {
+            var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var (user, sessionToken, jwt) = await authService.VerifyEmailAsync(request.Token, deviceName, ip);
+            SetSessionCookie(sessionToken);
+            return Ok(new AuthResponse(User: user, Token: jwt));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log.Warning(ex, "[Auth] VerifyEmail failed: {Message}", ex.Message);
+            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
+    {
+        var rateLimit = await CheckEmailRateLimitAsync(redis, "forgot-password", request.Email, 5, TimeSpan.FromMinutes(1));
+        if (rateLimit is not null) return rateLimit;
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var origin = Request.Headers.Origin.FirstOrDefault();
+        await authService.RequestPasswordResetAsync(request.Email, ip, origin);
+        return NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        try
+        {
+            await authService.ResetPasswordAsync(request.Token, request.NewPassword);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
+    private async Task<IActionResult?> CheckEmailRateLimitAsync(
+        StackExchange.Redis.IConnectionMultiplexer redis,
+        string bucket,
+        string email,
+        int limit,
+        TimeSpan window)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        var key = $"ratelimit:{bucket}:{email.Trim().ToLowerInvariant()}";
+        var db = redis.GetDatabase();
+        var count = await db.StringIncrementAsync(key);
+        if (count == 1) await db.KeyExpireAsync(key, window);
+        if (count <= limit) return null;
+
+        var ttl = await db.KeyTimeToLiveAsync(key);
+        var retryAfter = (int)Math.Ceiling((ttl ?? window).TotalSeconds);
+        return StatusCode(429, new { statusCode = 429, message = "Too many requests. Please try again shortly.", retryAfterSeconds = retryAfter });
+    }
+
     [HttpPost("magic-link/verify")]
     public async Task<IActionResult> VerifyMagicLink([FromBody] MagicLinkVerifyRequest request)
     {

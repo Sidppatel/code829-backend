@@ -55,8 +55,9 @@ public class AuthServiceTests : IDisposable
         var jwtService = new Mock<IJwtService>();
         jwtService.Setup(j => j.GenerateUserJwtAsync(It.IsAny<Db.Entities.User>()))
             .ReturnsAsync("test-jwt-token");
+        var userProc = new Mock<IUserProcedures>();
         _service = new AuthService(
-            _context, _userRepoMock.Object, _authProc.Object, _settingsService.Object,
+            _context, _userRepoMock.Object, _authProc.Object, userProc.Object, _settingsService.Object,
             _emailService.Object, _encryptionService.Object, _environment.Object,
             fileStorage.Object, _redis.Object, jwtService.Object);
     }

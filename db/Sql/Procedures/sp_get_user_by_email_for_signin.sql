@@ -1,0 +1,5 @@
+CREATE OR REPLACE FUNCTION sp_get_user_by_email_for_signin(p_email_hash text)
+RETURNS SETOF users
+LANGUAGE sql STABLE AS $$
+    SELECT * FROM users WHERE "EmailHash" = p_email_hash;
+$$;

@@ -15,6 +15,7 @@ public class AuthService(
     EventPlatformDbContext context,
     IUserRepository userRepository,
     IAuthProcedures authProc,
+    IUserProcedures userProc,
     ISettingsService settingsService,
     IEmailService emailService,
     IEncryptionService encryptionService,
@@ -200,5 +201,160 @@ public class AuthService(
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexStringLower(bytes);
+    }
+
+    // ── Email+password auth ───────────────────────────────
+
+    public async Task<SignupResponse> SignupAsync(string email, string firstName, string lastName, string password, string? ip, string? frontendOrigin)
+    {
+        var normalizedEmail = email.ToLowerInvariant().Trim();
+        var emailHash = encryptionService.HashEmail(normalizedEmail);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+
+        Db.Entities.User user;
+        try
+        {
+            user = await userProc.SignupUserAsync(normalizedEmail, emailHash, firstName.Trim(), lastName.Trim(), passwordHash);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.MessageText.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Warning("[Auth] Signup attempted for existing email: {Email}", normalizedEmail);
+            throw new InvalidOperationException("An account with that email already exists");
+        }
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var rawToken = Convert.ToBase64String(tokenBytes);
+        var tokenHash = HashToken(rawToken);
+
+        var expiryMinutes = int.Parse(
+            await settingsService.GetOrDefaultAsync("email_verification_expiry_minutes", "60") ?? "60");
+
+        await userProc.CreateEmailVerificationTokenAsync(user.Id, tokenHash, DateTime.UtcNow.AddMinutes(expiryMinutes), ip);
+
+        var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+        var verifyUrl = $"{frontendUrl}/verify-email?token={Uri.EscapeDataString(rawToken)}";
+
+        await emailService.SendAsync(
+            normalizedEmail,
+            $"Confirm your {appName} email",
+            EmailTemplates.EmailVerification(appName, user.FirstName, verifyUrl, expiryMinutes));
+
+        Log.Information("[Auth] Signup + verification email sent for {Email}", normalizedEmail);
+
+        if (environment.IsDevelopment())
+            return new SignupResponse("Account created. Check your email to verify.", rawToken);
+
+        return new SignupResponse("Account created. Check your email to verify.");
+    }
+
+    public async Task<(UserDto User, string SessionToken, string Jwt)> SigninAsync(string email, string password, string? deviceName, string? ip)
+    {
+        var normalizedEmail = email.ToLowerInvariant().Trim();
+        var emailHash = encryptionService.HashEmail(normalizedEmail);
+
+        var user = await userProc.GetByEmailForSigninAsync(emailHash);
+
+        if (user is null || !user.IsActive || string.IsNullOrEmpty(user.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid email or password");
+
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid email or password");
+
+        if (!user.EmailVerified)
+            throw new UnauthorizedAccessException("Please verify your email before signing in. Check your inbox for the verification link.");
+
+        await userProc.UpdateLastLoginAsync(user.Id);
+
+        var fullUser = await userRepository.GetByIdAsync(user.Id)
+            ?? throw new InvalidOperationException("User lookup failed after signin");
+
+        var (sessionToken, _) = await CreateDeviceSessionAsync(fullUser.Id, deviceName, ip);
+        var userDto = MapUserDto(fullUser);
+        var jwt = await jwtService.GenerateUserJwtAsync(fullUser);
+
+        Log.Information("[Auth] Signin for {Email}", normalizedEmail);
+        return (userDto, sessionToken, jwt);
+    }
+
+    public async Task<(UserDto User, string SessionToken, string Jwt)> VerifyEmailAsync(string token, string? deviceName, string? ip)
+    {
+        var tokenHash = HashToken(token);
+
+        Db.Entities.User user;
+        try
+        {
+            user = await userProc.ConsumeEmailVerificationTokenAsync(tokenHash);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.MessageText.Contains("Invalid or expired", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("Invalid or expired verification token");
+        }
+
+        var fullUser = await userRepository.GetByIdAsync(user.Id)
+            ?? throw new InvalidOperationException("User lookup failed after email verification");
+
+        var (sessionToken, _) = await CreateDeviceSessionAsync(fullUser.Id, deviceName, ip);
+        var userDto = MapUserDto(fullUser);
+        var jwt = await jwtService.GenerateUserJwtAsync(fullUser);
+
+        Log.Information("[Auth] Email verified + auto-signin for {Email}", fullUser.Email);
+        return (userDto, sessionToken, jwt);
+    }
+
+    public async Task RequestPasswordResetAsync(string email, string? ip, string? frontendOrigin)
+    {
+        var normalizedEmail = email.ToLowerInvariant().Trim();
+        var emailHash = encryptionService.HashEmail(normalizedEmail);
+        var user = await userProc.GetByEmailForSigninAsync(emailHash);
+
+        // Silently succeed for unknown/inactive email to avoid leaking account existence.
+        if (user is null || !user.IsActive || string.IsNullOrEmpty(user.PasswordHash))
+        {
+            Log.Warning("[Auth] Password reset requested for unknown/inactive/magic-link-only email: {Email}", normalizedEmail);
+            return;
+        }
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var rawToken = Convert.ToBase64String(tokenBytes);
+        var tokenHash = HashToken(rawToken);
+
+        var expiryMinutes = int.Parse(
+            await settingsService.GetOrDefaultAsync("password_reset_expiry_minutes", "60") ?? "60");
+
+        await userProc.CreatePasswordResetTokenAsync(user.Id, tokenHash, DateTime.UtcNow.AddMinutes(expiryMinutes), ip);
+
+        var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+        var resetUrl = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+
+        await emailService.SendAsync(
+            normalizedEmail,
+            $"{appName} password reset",
+            EmailTemplates.PasswordReset(appName, resetUrl, expiryMinutes));
+
+        Log.Information("[Auth] Password reset link sent to {Email}", normalizedEmail);
+    }
+
+    public async Task ResetPasswordAsync(string token, string newPassword)
+    {
+        var tokenHash = HashToken(token);
+
+        Db.Entities.User user;
+        try
+        {
+            user = await userProc.ConsumePasswordResetTokenAsync(tokenHash);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.MessageText.Contains("Invalid or expired", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("Invalid or expired reset token");
+        }
+
+        var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await userProc.UpdatePasswordAsync(user.Id, newHash);
+
+        await RevokeAllSessionsAsync(user.Id, null);
+
+        Log.Information("[Auth] Password reset successful for {Email}", user.Email);
     }
 }
