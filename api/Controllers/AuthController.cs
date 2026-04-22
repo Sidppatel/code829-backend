@@ -133,13 +133,17 @@ public class AuthController(
         try
         {
             await authService.RequestPasswordResetAsync(request.Email, ip, origin);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
         }
         catch (Exception ex)
         {
-            // Swallow to preserve account-enumeration protection; log retains detail for ops.
             Log.Error(ex, "[Auth] forgot-password failed email={Email}", request.Email);
+            return StatusCode(500, new ApiError(500, "Could not send reset email. Please try again shortly.", HttpContext.TraceIdentifier));
         }
-        return NoContent();
     }
 
     [HttpPost("reset-password")]

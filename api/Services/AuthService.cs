@@ -306,15 +306,17 @@ public class AuthService(
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
         var emailHash = encryptionService.HashEmail(normalizedEmail);
+
+        Log.Debug("[Auth] forgot-password step=lookup email={Email}", normalizedEmail);
         var user = await userProc.GetByEmailForSigninAsync(emailHash);
 
-        // Silently succeed for unknown/inactive email to avoid leaking account existence.
-        if (user is null || !user.IsActive || string.IsNullOrEmpty(user.PasswordHash))
+        if (user is null || !user.IsActive)
         {
-            Log.Warning("[Auth] Password reset requested for unknown/inactive/magic-link-only email: {Email}", normalizedEmail);
-            return;
+            Log.Warning("[Auth] Password reset requested for unknown/inactive email: {Email}", normalizedEmail);
+            throw new KeyNotFoundException("No account found with that email.");
         }
 
+        Log.Debug("[Auth] forgot-password step=create_token userId={UserId}", user.Id);
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var rawToken = Convert.ToBase64String(tokenBytes);
         var tokenHash = HashToken(rawToken);
@@ -324,6 +326,7 @@ public class AuthService(
 
         await userProc.CreatePasswordResetTokenAsync(user.Id, tokenHash, DateTime.UtcNow.AddMinutes(expiryMinutes), ip);
 
+        Log.Debug("[Auth] forgot-password step=send_email userId={UserId}", user.Id);
         var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var resetUrl = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
