@@ -33,7 +33,8 @@ public class AdminEventsController(
     ISettingsService settingsService,
     IEventImageService eventImageService,
     IBusinessUserEventProcedures businessUserEventProc,
-    IBusinessUserProcedures businessUserProc
+    IBusinessUserProcedures businessUserProc,
+    ICacheService cache
 ) : ControllerBase
 {
     // Exposed so derived controllers (e.g. DeveloperEventsController) can reuse these
@@ -198,6 +199,7 @@ public class AdminEventsController(
 
 
         var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == eventId);
+        await cache.InvalidateEventAsync(eventId);
         return CreatedAtAction(nameof(GetById), new { id = eventId }, MapToDto(created));
     }
 
@@ -283,6 +285,8 @@ public class AdminEventsController(
         }
 
         var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == id);
+        await cache.InvalidateEventAsync(id);
+        await cache.InvalidateTablesAsync(id);
         return Ok(MapToDto(updated));
     }
 
@@ -414,6 +418,7 @@ public class AdminEventsController(
             $"Event '{ev.Title}' status changed to {newStatus}");
 
         var updated = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == id);
+        await cache.InvalidateEventAsync(id);
         return Ok(MapToDto(updated));
     }
 
@@ -446,6 +451,8 @@ public class AdminEventsController(
             return BadRequest(new ApiError(400, "Cannot delete an event with purchases", HttpContext.TraceIdentifier));
 
         await eventProc.DeleteEventAsync(id);
+        await cache.InvalidateEventAsync(id);
+        await cache.InvalidateTablesAsync(id);
         return NoContent();
     }
 
@@ -504,6 +511,7 @@ public class AdminEventsController(
             $"Event duplicated from '{original.Title}'");
 
         var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == copyId);
+        await cache.InvalidateEventAsync(copyId);
         return Created("", MapToDto(created));
     }
 

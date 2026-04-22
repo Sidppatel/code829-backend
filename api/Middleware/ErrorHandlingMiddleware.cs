@@ -4,6 +4,7 @@ using Contracts.Enums;
 using Db.Entities;
 using Db.Repositories;
 using Microsoft.Extensions.Hosting;
+using Sentry;
 using Serilog;
 
 namespace Api.Middleware;
@@ -25,6 +26,9 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
             var correlationId = context.TraceIdentifier;
 
             Log.Error(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+
+            // Report unhandled 5xx only. 4xx validation/auth errors are returned earlier and never reach here.
+            SentrySdk.CaptureException(ex);
 
             try
             {

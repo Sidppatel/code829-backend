@@ -49,6 +49,8 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
             InputStream = ms,
             ContentType = contentType,
             DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
+            // Force download disposition so a malicious polyglot can never execute inline.
+            Headers = { ContentDisposition = "attachment" }
         };
 
         await RetryHelper.WithRetryAsync(
@@ -75,7 +77,11 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
             InputStream = ms,
             ContentType = contentType,
             DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
-            Headers = { CacheControl = "public, max-age=31536000, immutable" }
+            Headers =
+            {
+                CacheControl = "public, max-age=31536000, immutable",
+                ContentDisposition = "attachment"
+            }
         };
 
         await RetryHelper.WithRetryAsync(

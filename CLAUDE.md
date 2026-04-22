@@ -17,20 +17,24 @@
 
 ```
 backend.slnx
-├── api/           # ASP.NET Web API — controllers, services, middleware, workers, seeding, validators
-├── contracts/     # Shared DTOs and Enums (no dependencies)
-├── db/            # EF Core DbContext, entities, migrations, views
-└── tests/         # Api.Tests (xUnit + Moq)
+├── api/                # ASP.NET Web API — controllers, services, middleware, workers, seeding, validators
+├── contracts/          # Shared DTOs and Enums (no dependencies)
+├── db/                 # EF Core DbContext, entities, migrations, views, SP wrappers, raw SQL
+├── tests/Api.Tests/    # xUnit + Moq
+└── tools/Analyzers/    # Roslyn analyzers (EP0001 enforces Data Access Rule)
 ```
 
 ## Build & Run
 
 ```bash
-dotnet build                          # Build entire solution
-dotnet test                           # Run tests
+dotnet build                          # Build entire solution (analyzer EP0001 fires here)
+dotnet test                           # Run xUnit tests
 dotnet run --project api              # Run API (listens on http://localhost:8000)
 dotnet ef migrations add <Name> --project db --startup-project api
+dotnet ef database update --project db --startup-project api
 ```
+
+The boot scripts at the monorepo root (`..\start.ps1`, `..\start-backend.ps1`) handle Docker + secrets + migrations + run in one shot. Use them for normal dev — invoke `dotnet run` directly only when you need a debugger or detailed control.
 
 ## Architecture
 
@@ -96,9 +100,11 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 - Seeding in `api/Seeding/` — runs on startup in development
 
 ### Environment
-- Config via `.env` file (see `.env.example`)
+- **Secrets** sourced from Infisical (`infisical export --env=dev --format=dotenv`) — no `.env` files in the repo
+- **Local-only config** (docker creds, localhost URLs) read from monorepo-root `.env.local`
 - Connection strings: `DefaultConnection` (Postgres), `Redis`
-- Docker Compose for local Postgres + Redis
+- Docker Compose for local Postgres + Redis (`docker-compose.yml`)
+- Production: env vars set on Render (backend) + Supabase (DB)
 
 ## Conventions
 
@@ -132,4 +138,29 @@ Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`,
 
 **PR checklist:** reviewer confirms no new `context.<NonViewTable>.<EFMethod>` outside `Seeding/` or `Tests/`.
 
+## Roslyn Analyzers (`tools/Analyzers/`)
 
+Wired into `api.csproj` as `<ProjectReference ... OutputItemType="Analyzer">`. Builds a custom DLL referenced by the API project.
+
+- **EP0001** — enforces the Data Access Rule (above). Severity: Error. Fails `dotnet build` on violation.
+- Add new analyzers in this project; document the rule + escape hatch here when you do.
+
+## Required Skills
+
+To work on the backend you need fluency in:
+
+- **C# 13 / .NET 10** — async/await, nullable reference types, records, pattern matching
+- **ASP.NET Web API** — controllers, model binding, attribute routing, action filters, middleware pipeline
+- **EF Core 10** — code-first migrations, `FromSqlRaw`/`FromSqlInterpolated`, keyless entities for views, `Include`
+- **PostgreSQL 16** — writing stored procedures (PL/pgSQL), functions, views, row-level locking (`FOR UPDATE`), `SETOF` returns
+- **Roslyn analyzers** (only when extending `tools/Analyzers/`) — `DiagnosticAnalyzer`, syntax/symbol walking
+- **xUnit + Moq** — `Theory`, `InlineData`, `Setup(...).Returns(...)`, `Verify(...)`
+- **JWT / OAuth** — bearer tokens, claims, custom auth handlers
+- **Stripe.net** — `PaymentIntentService`, webhook signature verification (`EventUtility.ConstructEvent`)
+- **Serilog** — structured logging, sinks, enrichers
+- **StackExchange.Redis** — `IConnectionMultiplexer`, key conventions, TTLs
+- **FluentValidation** — `AbstractValidator<T>`, rule chains, custom validators
+- **Docker Compose** — for local Postgres + Redis
+- **Infisical CLI** — `export`, `secrets set`
+
+Domain-specific knowledge that compounds: Stripe payment lifecycle (intent → charge → webhook → reconciliation), magic-link auth issuance/expiry, S3 presigned URLs, QR-code claim tokens.

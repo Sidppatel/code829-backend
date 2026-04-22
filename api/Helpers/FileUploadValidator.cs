@@ -1,3 +1,5 @@
+using SixLabors.ImageSharp;
+
 namespace Api.Helpers;
 
 public static class FileUploadValidator
@@ -33,7 +35,27 @@ public static class FileUploadValidator
         if (!HasAllowedImageSignature(file))
             return (false, "File content does not match an allowed image format");
 
+        // Final defense: ImageSharp must be able to fully decode the file as an image.
+        // Polyglots (valid ZIP that also passes magic-byte sniff) fail here because the
+        // payload cannot be parsed as a proper image.
+        if (!TryDecode(file))
+            return (false, "File could not be decoded as a valid image");
+
         return (true, null);
+    }
+
+    private static bool TryDecode(IFormFile file)
+    {
+        try
+        {
+            using var stream = file.OpenReadStream();
+            using var image = Image.Load(stream);
+            return image.Width > 0 && image.Height > 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static bool HasAllowedImageSignature(IFormFile file)

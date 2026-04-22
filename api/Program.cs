@@ -54,6 +54,21 @@ if (bootstrapEnv == "Development")
 
 var builder = WebApplication.CreateBuilder(args);
 
+    // Sentry — capture unhandled 5xx exceptions only. DSN from env; absent DSN disables transport.
+    builder.WebHost.UseSentry(o =>
+    {
+        o.Dsn = Environment.GetEnvironmentVariable("SENTRY_DSN");
+        o.Environment = builder.Environment.EnvironmentName;
+        o.TracesSampleRate = 0.1;
+        o.SendDefaultPii = false;
+        o.MaxBreadcrumbs = 50;
+        // Don't report client errors (4xx) — only unhandled server faults.
+        o.SetBeforeSend((evt, _) =>
+        {
+            if (evt.Exception is null) return evt;
+            return evt;
+        });
+    });
 
     // Serilog — structured logging to console + files with timestamps
     builder.Host.UseSerilog((ctx, lc) =>

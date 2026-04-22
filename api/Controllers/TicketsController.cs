@@ -228,7 +228,7 @@ public class TicketsController(
             ticket.EventStartDate,
             ticket.VenueName,
             tableLabel,
-            $"{ticket.PurchaseUserFirstName} {ticket.PurchaseUserLastName}",
+            ticket.PurchaseUserFirstName,
             ticket.Status == nameof(TicketStatus.Claimed) || ticket.Status == nameof(TicketStatus.CheckedIn)
         ));
     }
