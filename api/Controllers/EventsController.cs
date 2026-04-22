@@ -382,7 +382,7 @@ public class EventsController(
         var eventTableTypes = await context.EventTablesSummaryViews.AsNoTracking()
             .Where(et => et.EventId == id)
             .Select(et => new EventTableTypeInfo(
-                et.EventTableId, et.Label, et.Capacity, et.Shape, et.Color, et.PriceCents,
+                et.EventTableId, et.Label, et.Capacity, et.Shape, et.Color, null,
                 et.PriceCents + (et.PlatformFeeCents ?? 0)))
             .ToListAsync();
 
@@ -416,7 +416,7 @@ public class EventsController(
             }
 
             return new EventTableDto(t.TableId, t.Label, t.Capacity,
-                t.Shape, t.Color, t.PriceCents, t.TotalPriceCents,
+                t.Shape, t.Color, null, t.TotalPriceCents,
                 t.GridRow, t.GridCol, t.SortOrder, status, holdExpiresAt,
                 IsAvailable: status == "Available" || isLockedByYou,
                 IsLockedByYou: isLockedByYou,
@@ -445,7 +445,7 @@ public class EventsController(
             // AvailableCount == -1 means MaxQuantity is NULL (unlimited per type) — cap by event remaining
             var available = tt.AvailableCount == -1 ? eventRemaining : tt.AvailableCount;
             return new EventTicketTypeDto(
-                tt.EventTicketTypeId, tt.Label, tt.PriceCents, null,
+                tt.EventTicketTypeId, tt.Label, null, null,
                 tt.TotalPriceCents,
                 tt.MaxQuantity, tt.SortOrder, tt.IsActive,
                 tt.SoldCount, available,

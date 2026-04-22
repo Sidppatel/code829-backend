@@ -3,7 +3,7 @@ namespace Contracts.DTOs.Events;
 public record EventTicketTypeDto(
     [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTicketTypeId,
     string Label,
-    int PriceCents,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int? PlatformFeeCents,
     int DisplayPriceCents,
     int? MaxQuantity,

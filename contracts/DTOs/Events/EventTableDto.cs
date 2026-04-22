@@ -6,7 +6,7 @@ public record EventTableDto(
     int Capacity,
     string Shape,
     string? Color,
-    int PriceCents,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int DisplayPriceCents,
     int GridRow,
     int GridCol,
@@ -25,7 +25,7 @@ public record EventTableTypeInfo(
     int Capacity,
     string Shape,
     string? Color,
-    int PriceCents,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int DisplayPriceCents,
     int? PlatformFeeCents = null
 );
