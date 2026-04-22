@@ -26,6 +26,7 @@ BenchmarkDotNet.Artifacts/
 !**/.env.example
 appsettings.*.local.json
 secrets.json
+.infisical.json
 
 # IDE
 .vs/
