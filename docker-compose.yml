@@ -9,6 +9,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     ports:
       - "127.0.0.1:5432:5432"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
     volumes:
       - ./docker-data/postgres:/var/lib/postgresql/data
       - ./docker-init:/docker-entrypoint-initdb.d:ro
@@ -30,6 +34,9 @@ services:
       - "yes"
     ports:
       - "127.0.0.1:6379:6379"
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - ./docker-data/redis:/data
     healthcheck:

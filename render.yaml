@@ -66,6 +66,10 @@ services:
       # Sentry DSN — absent disables transport (no-op in local/dev without DSN).
       - key: SENTRY_DSN
         sync: false
+      # Optional override. If absent, Program.cs falls back to RENDER_GIT_COMMIT (Render built-in)
+      # then to the assembly version. Set this manually to pin a specific release tag.
+      - key: SENTRY_RELEASE
+        sync: false
 
       # ─── Cloudflare / networking ────────────────────────────────
       # Public URL used in magic-link emails and seed data.
