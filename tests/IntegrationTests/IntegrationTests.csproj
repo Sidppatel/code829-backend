@@ -8,6 +8,7 @@
     <IsTestProject>true</IsTestProject>
     <!-- xUnit v3 runs tests in-process -->
     <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +25,15 @@
     <!-- Pin EFC to match api/db projects and avoid MSB3277 version conflict -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.6" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.6" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.msbuild" Version="6.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>

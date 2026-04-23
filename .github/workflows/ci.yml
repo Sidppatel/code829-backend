@@ -69,17 +69,57 @@ jobs:
       - name: Build integration tests
         run: dotnet build tests/IntegrationTests/IntegrationTests.csproj --no-restore --configuration Release
 
-      - name: Run integration tests
-        run: dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
+      - name: Run integration tests (with coverage)
+        run: |
+          dotnet test tests/IntegrationTests/IntegrationTests.csproj \
+            --no-build --configuration Release \
+            --logger "console;verbosity=normal" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura \
+               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[api]*" \
+               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[api]Api.Migrations.*,[api]Api.Seeding.*"
         timeout-minutes: 10
         env:
-          # Testcontainers connects to Docker daemon via socket (available on ubuntu-latest)
           DOCKER_HOST: unix:///var/run/docker.sock
-          # Placeholder values — DatabaseFixture overrides these with container URLs at runtime
           DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
           REDIS_URL: "redis://localhost:6379"
           JWT_SECRET: "integration-test-jwt-secret-must-be-32-chars!!"
           STRIPE_SECRET_KEY: "sk_test_integration_placeholder"
+
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            -reports:"coverage/**/coverage.cobertura.xml" \
+            -targetdir:coverage/report \
+            -reporttypes:"Html;Cobertura;TextSummary;MarkdownSummaryGithub"
+
+      - name: Upload coverage HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/report
+
+      - name: Post coverage to PR summary
+        if: always()
+        run: |
+          if [ -f coverage/report/SummaryGithub.md ]; then
+            cat coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Enforce coverage threshold (api project ≥60%)
+        run: |
+          if [ ! -f coverage/report/Summary.txt ]; then
+            echo "::error::Coverage summary missing"
+            exit 1
+          fi
+          LINE_PCT=$(grep -E "^\s*Line coverage:" coverage/report/Summary.txt | head -1 | grep -oE "[0-9.]+%" | head -1 | tr -d '%')
+          echo "Line coverage: $LINE_PCT%"
+          awk -v pct="$LINE_PCT" 'BEGIN { if (pct+0 < 60.0) { print "::error::Coverage " pct "% is below 60% threshold"; exit 1 } else { print "Coverage OK: " pct "%" } }'
 
   # dependency-review:
   #   runs-on: ubuntu-latest
