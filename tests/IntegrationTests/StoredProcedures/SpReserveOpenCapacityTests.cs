@@ -13,7 +13,7 @@ public sealed class SpReserveOpenCapacityTests(DatabaseFixture db)
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
             INSERT INTO events ("Id","Title","Description","StartDate","EndDate",
-                "LayoutMode","MaxCapacity","Status","OrganizerId","CreatedAt","UpdatedAt")
+                "LayoutMode","MaxCapacity","Status","BusinessUserId","CreatedAt","UpdatedAt")
             VALUES (@id, 'Test Event', 'desc', now() + interval '7 days', now() + interval '8 days',
                 'Open', @cap, 'Published', @org, now(), now())
             """,

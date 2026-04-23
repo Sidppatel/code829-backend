@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Contracts.DTOs;
 using IntegrationTests.Fixtures;
 
@@ -40,7 +41,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
         var client = db.Factory.CreateClient();
         var resp = await client.GetAsync($"/events/{Guid.NewGuid()}");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        var err = await resp.Content.ReadFromJsonAsync<ApiError>();
+        var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
         err!.Message.Should().Be("Event not found");
         err.CorrelationId.Should().NotBeNullOrEmpty();

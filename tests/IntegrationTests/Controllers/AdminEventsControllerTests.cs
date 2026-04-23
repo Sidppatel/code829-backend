@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Contracts.DTOs;
 using IntegrationTests.Fixtures;
 
@@ -22,7 +23,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
         var client = db.Factory.CreateClient().WithUser();
         var resp = await client.GetAsync("/admin/events");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        var err = await resp.Content.ReadFromJsonAsync<ApiError>();
+        var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
         err!.StatusCode.Should().Be(403);
     }

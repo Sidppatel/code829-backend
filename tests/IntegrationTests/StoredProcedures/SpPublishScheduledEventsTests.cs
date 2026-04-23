@@ -10,7 +10,7 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
             INSERT INTO events ("Id","Title","Description","StartDate","EndDate",
-                "LayoutMode","MaxCapacity","Status","ScheduledPublishAt","OrganizerId","CreatedAt","UpdatedAt")
+                "LayoutMode","MaxCapacity","Status","ScheduledPublishAt","BusinessUserId","CreatedAt","UpdatedAt")
             VALUES (@id, 'Scheduled Event', 'desc',
                 now() + interval '7 days', now() + interval '8 days',
                 'Open', 100, 'Draft', @sched, gen_random_uuid(), now(), now())
