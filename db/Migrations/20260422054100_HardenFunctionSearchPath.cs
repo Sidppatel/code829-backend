@@ -34,6 +34,10 @@ namespace db.Migrations
                 .Annotation("Npgsql:PostgresExtension:extensions.pg_trgm", ",,")
                 .OldAnnotation("Npgsql:PostgresExtension:pg_trgm", ",,");
 
+            // Final LoadAll for the migration chain — every table referenced by a view or SP
+            // exists by this point, so fresh-DB bootstrap succeeds here after earlier migrations
+            // deliberately skipped LoadAll. Already-applied DBs re-run this idempotently.
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
             MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
         }
 
