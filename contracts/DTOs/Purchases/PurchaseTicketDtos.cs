@@ -32,7 +32,6 @@ public record GuestTicketDto(
     DateTime EventDate,
     string VenueName,
     string? TableLabel,
-    string PurchaseNumber,
     DateTime? ClaimedAt
 );
 
@@ -48,6 +47,5 @@ public record TicketClaimInfoDto(
     DateTime EventDate,
     string VenueName,
     string? TableLabel,
-    string InviterName,
     bool AlreadyClaimed
 );

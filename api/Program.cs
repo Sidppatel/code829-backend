@@ -56,14 +56,18 @@ var builder = WebApplication.CreateBuilder(args);
 
     // Sentry — capture unhandled 5xx exceptions only. Empty-string DSN disables transport
     // (per Sentry docs) so local dev without a configured DSN boots cleanly.
+    var sentryDsn = Environment.GetEnvironmentVariable("SENTRY_DSN") ?? string.Empty;
     builder.WebHost.UseSentry(o =>
     {
-        o.Dsn = Environment.GetEnvironmentVariable("SENTRY_DSN") ?? string.Empty;
+        o.Dsn = sentryDsn;
         o.Environment = builder.Environment.EnvironmentName;
         o.TracesSampleRate = 0.1;
         o.SendDefaultPii = false;
         o.MaxBreadcrumbs = 50;
     });
+
+    if (string.IsNullOrEmpty(sentryDsn) && builder.Environment.IsProduction())
+        Log.Warning("[Sentry] DSN not configured — telemetry disabled");
 
     // Serilog — structured logging to console + files with timestamps
     builder.Host.UseSerilog((ctx, lc) =>
@@ -254,8 +258,8 @@ var builder = WebApplication.CreateBuilder(args);
                 ValidateIssuerSigningKey = true,
                 ValidateIssuer = true,
                 ValidateAudience = true,
-                ValidIssuer = "code829-api",
-                ValidAudience = "code829-client",
+                ValidIssuer = JwtConstants.Issuer,
+                ValidAudience = JwtConstants.Audience,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromMinutes(1)
             };

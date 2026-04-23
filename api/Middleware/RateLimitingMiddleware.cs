@@ -27,9 +27,13 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
     private const int BeaconLimit = 20;
     private static readonly TimeSpan BeaconWindow = TimeSpan.FromMinutes(1);
 
+    private const int CatalogLimit = 60;
+    private static readonly TimeSpan CatalogWindow = TimeSpan.FromMinutes(1);
+
     // magic-link request has its own per-email rate limit in AuthController;
     // verify endpoint gets the stricter auth limit here too
     private static readonly string[] AuthPaths = ["/auth/dev-login", "/auth/magic-link/verify", "/admin/auth/login"];
+    private static readonly string[] CatalogPaths = ["/events", "/admin/events", "/developer/events", "/events/facets", "/events/schema-list"];
     private static readonly string[] SeatHoldPaths = ["/seats/hold", "/seats/hold-table", "/tables/lock"];
     // Purchase-critical mutations — payment integrity endpoints get their own bucket.
     private static readonly string[] PurchasePaths = ["/purchases", "/purchases/quote"];
@@ -108,6 +112,9 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
         if (SeatHoldPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             return (SeatHoldLimit, SeatHoldWindow);
 
+        if (IsCatalogPath(path))
+            return (CatalogLimit, CatalogWindow);
+
         return (DefaultLimit, DefaultWindow);
     }
 
@@ -125,10 +132,16 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
         if (SeatHoldPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             return "seat-hold";
 
+        if (IsCatalogPath(path))
+            return "catalog";
+
         return "general";
     }
 
     private static bool IsPurchasePath(string path) =>
         PurchasePaths.Any(p => path == p || path.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase))
         || ConfirmPathSuffixes.Any(suffix => path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsCatalogPath(string path) =>
+        CatalogPaths.Any(p => path == p || path.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase));
 }

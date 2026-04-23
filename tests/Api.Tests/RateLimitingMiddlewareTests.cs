@@ -104,6 +104,54 @@ public class RateLimitingMiddlewareTests
         counters.Keys.Should().Contain(k => k.Contains("10.0.0.2"));
     }
 
+    [Theory]
+    [InlineData("/events")]
+    [InlineData("/events/some-slug")]
+    [InlineData("/admin/events")]
+    [InlineData("/developer/events")]
+    [InlineData("/events/facets")]
+    [InlineData("/events/schema-list")]
+    public async Task CatalogPath_AboveCatalogLimit_Returns429(string catalogPath)
+    {
+        // CatalogLimit = 60; simulate count of 61
+        _redisDb.Setup(d => d.StringIncrementAsync(It.IsAny<RedisKey>(), It.IsAny<long>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(61);
+        _redisDb.Setup(d => d.KeyTimeToLiveAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(TimeSpan.FromSeconds(30));
+
+        var nextCalled = false;
+        RequestDelegate next = _ => { nextCalled = true; return Task.CompletedTask; };
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
+        var context = CreateHttpContext("10.1.2.3", catalogPath);
+
+        await middleware.InvokeAsync(context, _settings.Object);
+
+        nextCalled.Should().BeFalse();
+        context.Response.StatusCode.Should().Be(429);
+    }
+
+    [Theory]
+    [InlineData("/events")]
+    [InlineData("/admin/events")]
+    [InlineData("/developer/events")]
+    public async Task CatalogPath_UsesCatalogBucket_NotGeneralBucket(string catalogPath)
+    {
+        RedisKey? capturedKey = null;
+        _redisDb.Setup(d => d.StringIncrementAsync(It.IsAny<RedisKey>(), It.IsAny<long>(), It.IsAny<CommandFlags>()))
+            .Callback((RedisKey k, long _, CommandFlags _) => capturedKey = k)
+            .ReturnsAsync(1);
+        _redisDb.Setup(d => d.KeyExpireAsync(It.IsAny<RedisKey>(), It.IsAny<TimeSpan?>(), It.IsAny<ExpireWhen>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(true);
+
+        RequestDelegate next = _ => Task.CompletedTask;
+        var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
+        await middleware.InvokeAsync(CreateHttpContext("10.0.0.1", catalogPath), _settings.Object);
+
+        capturedKey.Should().NotBeNull();
+        capturedKey!.Value.ToString().Should().Contain("catalog");
+        capturedKey.Value.ToString().Should().NotContain("general");
+    }
+
     private static HttpContext CreateHttpContext(string ip, string path)
     {
         var context = new DefaultHttpContext();

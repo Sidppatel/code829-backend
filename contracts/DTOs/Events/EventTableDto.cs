@@ -27,7 +27,7 @@ public record EventTableTypeInfo(
     string? Color,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int DisplayPriceCents,
-    int? PlatformFeeCents = null
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PlatformFeeCents = null
 );
 
 public record EventTablesResponse(

@@ -56,6 +56,14 @@ public class AdminEventsController(
 
         var query = context.EventViews.AsNoTracking().AsQueryable();
 
+        // Non-developer admins (organizers) may only see their own events.
+        // Developer role has cross-organizer visibility.
+        if (!User.IsInRole(UserRole.Developer.ToString()))
+        {
+            var businessUserId = GetCurrentUserId();
+            query = query.Where(e => e.BusinessUserId == businessUserId);
+        }
+
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(e => e.Status == status);
 
@@ -528,7 +536,7 @@ public class AdminEventsController(
             .OrderBy(tt => tt.SortOrder)
             .ToListAsync();
 
-        var types = rawTypes.Select(tt => new EventTicketTypeDto(
+        var types = rawTypes.Select(tt => new AdminEventTicketTypeDto(
             tt.EventTicketTypeId, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
             tt.TotalPriceCents,
             tt.MaxQuantity, tt.SortOrder, tt.IsActive,
@@ -536,7 +544,7 @@ public class AdminEventsController(
             IsSoldOut: tt.AvailableCount <= 0,
             Description: tt.Description)).ToList();
 
-        return Ok(new EventTicketTypesResponse(id, types));
+        return Ok(new AdminEventTicketTypesResponse(id, types));
     }
 
     [HttpPost("{id:guid}/ticket-types")]
@@ -561,7 +569,7 @@ public class AdminEventsController(
         var created = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstAsync(tt => tt.EventTicketTypeId == typeId);
 
-        return Created("", new EventTicketTypeDto(
+        return Created("", new AdminEventTicketTypeDto(
             created.EventTicketTypeId, created.Label, created.PriceCents, created.PlatformFeeCents,
             created.TotalPriceCents,
             created.MaxQuantity, created.SortOrder, created.IsActive,
@@ -598,7 +606,7 @@ public class AdminEventsController(
         var updated = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .FirstAsync(tt => tt.EventTicketTypeId == typeId);
 
-        return Ok(new EventTicketTypeDto(
+        return Ok(new AdminEventTicketTypeDto(
             updated.EventTicketTypeId, updated.Label, updated.PriceCents, updated.PlatformFeeCents,
             updated.TotalPriceCents,
             updated.MaxQuantity, updated.SortOrder, updated.IsActive,

@@ -228,7 +228,6 @@ public class TicketsController(
             ticket.EventStartDate,
             ticket.VenueName,
             tableLabel,
-            ticket.PurchaseUserFirstName,
             ticket.Status == nameof(TicketStatus.Claimed) || ticket.Status == nameof(TicketStatus.CheckedIn)
         ));
     }
@@ -297,7 +296,6 @@ public class TicketsController(
             t.EventStartDate,
             t.VenueName,
             purchaseTableLabels.TryGetValue(t.PurchaseId, out var label) ? label : null,
-            t.PurchaseNumber,
             t.ClaimedAt
         ));
 
