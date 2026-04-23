@@ -4,6 +4,22 @@ public record EventTicketTypeDto(
     [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTicketTypeId,
     string Label,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PlatformFeeCents,
+    int DisplayPriceCents,
+    int? MaxQuantity,
+    int SortOrder,
+    bool IsActive,
+    int SoldCount,
+    int AvailableCount,
+    bool IsSoldOut,
+    string? Description = null
+);
+
+/// <summary>Admin/developer variant — identical shape; use this type explicitly on admin endpoints.</summary>
+public record AdminEventTicketTypeDto(
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTicketTypeId,
+    string Label,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int? PlatformFeeCents,
     int DisplayPriceCents,
     int? MaxQuantity,
@@ -37,4 +53,9 @@ public record UpdateEventTicketTypeRequest(
 public record EventTicketTypesResponse(
     Guid EventId,
     List<EventTicketTypeDto> TicketTypes
+);
+
+public record AdminEventTicketTypesResponse(
+    Guid EventId,
+    List<AdminEventTicketTypeDto> TicketTypes
 );

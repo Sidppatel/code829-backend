@@ -7,6 +7,21 @@ public record EventTableTypeSummaryDto(
     string Shape,
     string? Color,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PlatformFeeCents,
+    int DisplayPriceCents,
+    int TotalTables,
+    int AvailableTables,
+    int BookedTables
+);
+
+/// <summary>Admin/developer variant — identical shape; use this type explicitly on admin endpoints.</summary>
+public record AdminEventTableTypeSummaryDto(
+    [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTableId,
+    string Label,
+    int Capacity,
+    string Shape,
+    string? Color,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int? PlatformFeeCents,
     int DisplayPriceCents,
     int TotalTables,
