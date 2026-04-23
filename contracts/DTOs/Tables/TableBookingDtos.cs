@@ -12,17 +12,13 @@ public record ReleaseTableRequest(
 
 public record ReleaseBeaconRequest(
     Guid EventId,
-    Guid TableId,
-    string Token
+    Guid TableId
 )
 {
     public Guid EventTableId => TableId;
 };
 
-public record CancelBeaconRequest(
-    Guid PurchaseId,
-    string Token
-);
+public record CancelBeaconRequest(Guid PurchaseId);
 
 public record TableLockDto(
     Guid TableId,
