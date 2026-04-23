@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Api.Services;
 
 /// <summary>
@@ -6,8 +8,17 @@ namespace Api.Services;
 /// </summary>
 public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
 {
-    public string JwtSecret => configuration["JWT_SECRET"]
-        ?? throw new InvalidOperationException("JWT_SECRET environment variable is required");
+    public string JwtSecret
+    {
+        get
+        {
+            var value = configuration["JWT_SECRET"]
+                ?? throw new InvalidOperationException("JWT_SECRET environment variable is required");
+            if (Encoding.UTF8.GetBytes(value).Length < 32)
+                throw new InvalidOperationException("JWT_SECRET must be at least 32 bytes");
+            return value;
+        }
+    }
 
     public string StripeSecretKey => configuration["STRIPE_SECRET_KEY"] ?? "";
     public string StripePublishableKey => configuration["STRIPE_PUBLISHABLE_KEY"] ?? "";
