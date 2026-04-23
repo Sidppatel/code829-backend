@@ -51,6 +51,36 @@ jobs:
             exit 1
           fi
 
+  integration-tests:
+    needs: [build-and-scan]
+    runs-on: ubuntu-latest
+    # Testcontainers needs Docker — ubuntu-latest runners include Docker Engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Build integration tests
+        run: dotnet build tests/IntegrationTests/IntegrationTests.csproj --no-restore --configuration Release
+
+      - name: Run integration tests
+        run: dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
+        timeout-minutes: 10
+        env:
+          # Testcontainers connects to Docker daemon via socket (available on ubuntu-latest)
+          DOCKER_HOST: unix:///var/run/docker.sock
+          # Placeholder values — DatabaseFixture overrides these with container URLs at runtime
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          REDIS_URL: "redis://localhost:6379"
+          JWT_SECRET: "integration-test-jwt-secret-must-be-32-chars!!"
+          STRIPE_SECRET_KEY: "sk_test_integration_placeholder"
+
   # dependency-review:
   #   runs-on: ubuntu-latest
   #   if: github.event_name == 'pull_request'

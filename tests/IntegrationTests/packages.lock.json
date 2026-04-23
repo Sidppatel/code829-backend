@@ -19,13 +19,14 @@
           "Microsoft.Extensions.Hosting": "10.0.7"
         }
       },
-      "Microsoft.EntityFrameworkCore.InMemory": {
+      "Microsoft.EntityFrameworkCore": {
         "type": "Direct",
         "requested": "[10.0.6, )",
         "resolved": "10.0.6",
-        "contentHash": "yQQLR6s0NOBJvg/du/w/mJn9ESlQ0XkAQ0zJEPhtlS/Vsnay6LRSdh39Sxy9/SkpYLoNoI9c6FUyP+UIE+BWdg==",
+        "contentHash": "eDy7bu3G+51FRC0cPtXTqUI9iAdDYl/XBQ5UguN8NFOA7QNmFvUEf36wA7PZ4ctsnxRN4t3dIvs2VKVE5H+EQQ==",
         "dependencies": {
-          "Microsoft.EntityFrameworkCore": "10.0.6",
+          "Microsoft.EntityFrameworkCore.Abstractions": "10.0.6",
+          "Microsoft.EntityFrameworkCore.Analyzers": "10.0.6",
           "Microsoft.Extensions.Caching.Memory": "10.0.6",
           "Microsoft.Extensions.Logging": "10.0.6"
         }
@@ -50,15 +51,6 @@
         "dependencies": {
           "Microsoft.CodeCoverage": "18.4.0",
           "Microsoft.TestPlatform.TestHost": "18.4.0"
-        }
-      },
-      "Moq": {
-        "type": "Direct",
-        "requested": "[4.20.72, )",
-        "resolved": "4.20.72",
-        "contentHash": "EA55cjyNn8eTNWrgrdZJH5QLFp2L43oxl1tlkoYUKIE9pRwL784OWiTXeCV5ApS+AMYEAlt7Fo03A2XfouvHmQ==",
-        "dependencies": {
-          "Castle.Core": "5.1.1"
         }
       },
       "Testcontainers.PostgreSql": {
@@ -158,14 +150,6 @@
         "type": "Transitive",
         "resolved": "2.6.2",
         "contentHash": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w=="
-      },
-      "Castle.Core": {
-        "type": "Transitive",
-        "resolved": "5.1.1",
-        "contentHash": "rpYtIczkzGpf+EkZgDr9CClTdemhsrwA/W5hMoPjLkRFnXzH44zDLoovXeKtmxb1ykXK9aJVODSpiJml8CTw2g==",
-        "dependencies": {
-          "System.Diagnostics.EventLog": "6.0.0"
-        }
       },
       "ClosedXML": {
         "type": "Transitive",
@@ -274,17 +258,6 @@
         "type": "Transitive",
         "resolved": "18.4.0",
         "contentHash": "9O0BtCfzCWrkAmK187ugKdq72HHOXoOUjuWFDVc2LsZZ0pOnA9bTt+Sg9q4cF+MoAaUU+MuWtvBuFsnduviJow=="
-      },
-      "Microsoft.EntityFrameworkCore": {
-        "type": "Transitive",
-        "resolved": "10.0.6",
-        "contentHash": "eDy7bu3G+51FRC0cPtXTqUI9iAdDYl/XBQ5UguN8NFOA7QNmFvUEf36wA7PZ4ctsnxRN4t3dIvs2VKVE5H+EQQ==",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore.Abstractions": "10.0.6",
-          "Microsoft.EntityFrameworkCore.Analyzers": "10.0.6",
-          "Microsoft.Extensions.Caching.Memory": "10.0.6",
-          "Microsoft.Extensions.Logging": "10.0.6"
-        }
       },
       "Microsoft.EntityFrameworkCore.Abstractions": {
         "type": "Transitive",
