@@ -67,11 +67,13 @@ public class AdminAuthController(
         }
         catch (UnauthorizedAccessException ex)
         {
-            return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[AdminAuth] Signup failed: {Message}", ex.Message);
+            return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier));
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[AdminAuth] Signup conflict: {Message}", ex.Message);
+            return Conflict(new ApiError(409, "Operation not allowed", HttpContext.TraceIdentifier));
         }
     }
 
@@ -152,7 +154,8 @@ public class AdminAuthController(
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[AdminAuth] ResetPassword failed: {Message}", ex.Message);
+            return Unauthorized(new ApiError(401, "Invalid or expired credentials", HttpContext.TraceIdentifier));
         }
     }
 
