@@ -11,6 +11,7 @@ BEGIN
 
     UPDATE users
     SET "PasswordHash" = p_password_hash,
+        "EmailVerified" = true,
         "UpdatedAt" = now()
     WHERE "Id" = p_user_id;
 END;

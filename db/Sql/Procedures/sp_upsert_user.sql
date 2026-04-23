@@ -8,13 +8,13 @@ BEGIN
     SELECT "Id" INTO v_id FROM users WHERE "Email" = p_email;
     IF v_id IS NULL THEN
         INSERT INTO users ("Id", "Email", "EmailHash", "FirstName", "LastName",
-            "IsActive", "LastLoginAt", "OptInLocationEmail", "HasCompletedOnboarding",
+            "IsActive", "EmailVerified", "LastLoginAt", "OptInLocationEmail", "HasCompletedOnboarding",
             "CreatedAt", "UpdatedAt")
         VALUES (gen_random_uuid(), p_email, p_email_hash, p_first_name, p_last_name,
-            true, now(), false, false, now(), now())
+            true, true, now(), false, false, now(), now())
         RETURNING "Id" INTO v_id;
     ELSE
-        UPDATE users SET "LastLoginAt" = now(), "UpdatedAt" = now() WHERE "Id" = v_id;
+        UPDATE users SET "LastLoginAt" = now(), "EmailVerified" = true, "UpdatedAt" = now() WHERE "Id" = v_id;
     END IF;
     RETURN v_id;
 END; $$;
