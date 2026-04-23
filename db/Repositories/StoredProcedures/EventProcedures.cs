@@ -49,13 +49,11 @@ public class EventProcedures(EventPlatformDbContext context) : IEventProcedures
             id, status!, scheduledPublishAt!);
     }
 
-    public async Task<int> PublishScheduledEventsAsync()
+    public async Task<IReadOnlyList<Guid>> PublishScheduledEventsAsync()
     {
-        var result = await context.Database
-            .SqlQueryRaw<int>("SELECT sp_publish_scheduled_events() AS \"Value\"")
-            .FirstAsync();
-
-        return result;
+        return await context.Database
+            .SqlQueryRaw<Guid>("SELECT sp_publish_scheduled_events() AS \"Value\"")
+            .ToListAsync();
     }
 
     public async Task DeleteEventAsync(Guid id, CancellationToken ct = default)

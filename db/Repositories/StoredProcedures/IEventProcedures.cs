@@ -21,7 +21,7 @@ public interface IEventProcedures
 
     Task ChangeEventStatusAsync(Guid id, string? status, DateTime? scheduledPublishAt);
 
-    Task<int> PublishScheduledEventsAsync();
+    Task<IReadOnlyList<Guid>> PublishScheduledEventsAsync();
 
     Task DeleteEventAsync(Guid id, CancellationToken ct = default);
 
