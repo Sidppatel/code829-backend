@@ -39,8 +39,10 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test --no-build --configuration Release
+      - name: Test (unit — Api.Tests only)
+        # IntegrationTests runs in its own job with Docker/Testcontainers.
+        # Keep this step scoped to the fast unit suite so build-and-scan stays hermetic.
+        run: dotnet test tests/Api.Tests/Api.Tests.csproj --no-build --configuration Release
 
       - name: Scan for vulnerable NuGet packages
         run: |
