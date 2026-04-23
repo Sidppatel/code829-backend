@@ -72,7 +72,8 @@ public class AuthController(
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Auth] Signup conflict: {Message}", ex.Message);
+            return Conflict(new ApiError(409, "Operation not allowed", HttpContext.TraceIdentifier));
         }
     }
 
@@ -95,7 +96,7 @@ public class AuthController(
         catch (UnauthorizedAccessException ex)
         {
             Log.Warning(ex, "[Auth] Signin failed: {Message}", ex.Message);
-            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+            return Unauthorized(new ApiError(401, "Invalid or expired credentials", HttpContext.TraceIdentifier));
         }
     }
 
@@ -116,7 +117,7 @@ public class AuthController(
         catch (UnauthorizedAccessException ex)
         {
             Log.Warning(ex, "[Auth] VerifyEmail failed: {Message}", ex.Message);
-            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+            return Unauthorized(new ApiError(401, "Invalid or expired credentials", HttpContext.TraceIdentifier));
         }
     }
 
@@ -137,7 +138,8 @@ public class AuthController(
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Auth] ForgotPassword user not found: {Message}", ex.Message);
+            return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier));
         }
         catch (Exception ex)
         {
@@ -156,7 +158,8 @@ public class AuthController(
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Auth] ResetPassword failed: {Message}", ex.Message);
+            return Unauthorized(new ApiError(401, "Invalid or expired credentials", HttpContext.TraceIdentifier));
         }
     }
 
@@ -198,7 +201,7 @@ public class AuthController(
         catch (UnauthorizedAccessException ex)
         {
             Log.Warning(ex, "[Auth] VerifyMagicLink failed: {Message}", ex.Message);
-            return Unauthorized(new ApiError(401, ex.Message, HttpContext.TraceIdentifier));
+            return Unauthorized(new ApiError(401, "Invalid or expired credentials", HttpContext.TraceIdentifier));
         }
     }
 
@@ -224,7 +227,7 @@ public class AuthController(
         catch (KeyNotFoundException ex)
         {
             Log.Warning(ex, "[Auth] DevLogin failed: {Message}", ex.Message);
-            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
+            return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier));
         }
     }
 
