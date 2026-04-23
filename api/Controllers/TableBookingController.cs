@@ -61,22 +61,18 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
     }
 
     /// <summary>
-    /// Fire-and-forget table release via navigator.sendBeacon (no auth header possible).
-    /// JWT is passed as a query parameter instead.
+    /// Fire-and-forget table release via navigator.sendBeacon.
+    /// sendBeacon sends cookies automatically; session cookie authenticates the request.
     /// </summary>
     [HttpPost("release-beacon")]
-    [AllowAnonymous]
+    [Authorize]
+    [RequireRole(UserRole.User)]
     public async Task<IActionResult> ReleaseTableBeacon(
         [FromBody] ReleaseBeaconRequest request)
     {
         try
         {
-            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-            var jwtOptions = HttpContext.RequestServices
-                .GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>()
-                .Get(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
-            var principal = handler.ValidateToken(request.Token, jwtOptions.TokenValidationParameters, out _);
-            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
 

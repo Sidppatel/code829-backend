@@ -107,21 +107,17 @@ public class PurchasesController(
     }
 
     /// <summary>
-    /// Fire-and-forget purchase cancellation via navigator.sendBeacon (no auth header possible).
-    /// JWT is passed in the request body. Also releases the table lock via sp_cancel_purchase.
+    /// Fire-and-forget purchase cancellation via navigator.sendBeacon.
+    /// sendBeacon sends cookies automatically; session cookie authenticates the request.
     /// </summary>
     [HttpPost("cancel-beacon")]
-    [AllowAnonymous]
+    [Authorize]
+    [RequireRole(UserRole.User)]
     public async Task<IActionResult> CancelBeacon([FromBody] CancelBeaconRequest request)
     {
         try
         {
-            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-            var jwtOptions = HttpContext.RequestServices
-                .GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>()
-                .Get(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
-            var principal = handler.ValidateToken(request.Token, jwtOptions.TokenValidationParameters, out _);
-            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
 

@@ -56,15 +56,18 @@ The boot scripts at the monorepo root (`..\start.ps1`, `..\start-backend.ps1`) h
 - JWT secret loaded from `JWT_SECRET` environment variable via `ISecretsProvider`
 
 ### CSRF posture
-- All authenticated requests use `Authorization: Bearer <jwt>` headers — **no auth cookies**.
-  Beacon endpoints pass the JWT in the request body (unavoidable: `navigator.sendBeacon` can't set headers) and each beacon delegates to a service that re-validates ownership.
-- Because the API doesn't accept session cookies, classic CSRF (cookie auto-attach) is not applicable and anti-forgery tokens are not required.
-- If a cookie-based auth path is ever added (e.g., admin SSR), add anti-forgery then.
+- All authenticated requests use **session cookies** (HttpOnly, set at login by `SetSessionCookie`). No JWT is emitted in the response body; no `Authorization: Bearer` header is read by the server for normal requests.
+- **CSRF mitigation:** Every frontend request sends `X-Portal: admin|staff|developer|user` (set at app boot via `configureApiClient`). This custom header makes every request non-simple under CORS, triggering a preflight. CORS is locked to `CORS_ORIGINS` env var — unknown origins fail preflight and never reach the server. Anti-forgery tokens are therefore not required.
+- Admin/staff/developer cookies use `SameSite=Strict` — cross-site requests never attach these cookies at all.
+- User cookie uses `SameSite=Lax` — attaches on top-level navigations (safe) but not on cross-origin fetch/XHR/sendBeacon POST. All state-mutating endpoints are POST/PUT/PATCH/DELETE, so a cross-site GET cannot trigger mutations.
+- **Beacon endpoints** (`POST /purchases/cancel-beacon`, `POST /tables/release-beacon`) authenticate via session cookie. `navigator.sendBeacon` sends cookies automatically (browser-managed). Both endpoints use `[Authorize]` + `[RequireRole(UserRole.User)]` and read `userId` from `User.FindFirst(ClaimTypes.NameIdentifier)`.
+
+### [AllowAnonymous] endpoint audit
 
 ### [AllowAnonymous] endpoint audit
 Every endpoint without `[RequireRole]` has been reviewed and is intentionally public:
 - `GET /events`, `GET /events/{id}`, `GET /events/{id}/tables`, `GET /events/{id}/ticket-types`, `GET /events/facets`, `GET /events/schema-list` — public catalog; no PII, aggregate/display pricing only.
-- `POST /bookings/cancel-beacon`, `POST /tables/release-beacon` — JWT in body, explicit ownership re-check at controller boundary, rate-limited (20/min), log `AUDIT beacon_*_ownership_mismatch` if misused.
+- (Beacons are now `[Authorize]` — removed from this list in Session 9.)
 - `GET /bookings/stripe-config` — publishable key only; env-gated (503 if unconfigured; live keys blocked outside production).
 - `GET /developer/logo` — public branding asset.
 - `POST /feedback` — public form, rate-limited via default bucket.

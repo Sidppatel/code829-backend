@@ -7,7 +7,7 @@ public record BusinessUserDto(
     string Role, bool IsActive, DateTime CreatedAt, DateTime? LastLoginAt,
     string? Phone, string? ImageUrl);
 
-public record AdminAuthResponse(BusinessUserDto User, string? Token = null);
+public record AdminAuthResponse(BusinessUserDto User);
 
 public record CreateBusinessUserRequest(
     string Email, string FirstName, string LastName,

@@ -58,12 +58,12 @@ public class AdminAuthController(
             var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            var (user, sessionToken, jwt) = await invitationService.AcceptAsync(
+            var (user, sessionToken, _) = await invitationService.AcceptAsync(
                 request.Token, request.Password, request.FirstName, request.LastName,
                 deviceName, ip);
 
             SetSessionCookie(sessionToken);
-            return Ok(new AdminAuthResponse(user, jwt));
+            return Ok(new AdminAuthResponse(user));
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -88,7 +88,7 @@ public class AdminAuthController(
             var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            var (user, sessionToken, jwt) = await adminAuthService.LoginAsync(
+            var (user, sessionToken, _) = await adminAuthService.LoginAsync(
                 request.Email, request.Password, deviceName, ip);
 
             // Role-vs-portal gate: a Staff account cannot obtain a session_developer cookie
@@ -108,7 +108,7 @@ public class AdminAuthController(
 
             SetSessionCookie(sessionToken);
 
-            return Ok(new AdminAuthResponse(user, jwt));
+            return Ok(new AdminAuthResponse(user));
         }
         catch (UnauthorizedAccessException)
         {
