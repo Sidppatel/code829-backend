@@ -214,12 +214,12 @@ public class PurchasesController(
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
-            b.TotalCents, null,
+            null, b.TotalCents, null,
             b.TableId, b.TableLabel, b.SeatsReserved, b.EventTicketTypeId, b.EventTicketTypeLabel, b.TicketCount,
             b.StripeTransactionId.HasValue ? new StripeTransactionDto(
                 b.StripeTransactionId.Value, b.PaymentIntentId!, b.PaymentStatus!,
                 b.PaymentAmountCents ?? 0, b.TotalChargedCents, b.TaxAmountCents,
-                b.StripeFeesCents, b.PaidAt, b.RefundedAt
+                b.StripeFeesCents, null, b.PaidAt, b.RefundedAt
             ) : null,
             b.CreatedAt
         )).ToList();
