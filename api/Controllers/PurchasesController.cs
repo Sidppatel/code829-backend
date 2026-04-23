@@ -32,8 +32,8 @@ public class PurchasesController(
             var purchase = await purchaseService.CreateAsync(userId, request);
             return CreatedAtAction(nameof(GetById), new { id = purchase.PurchaseId }, purchase);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("quote")]
@@ -45,8 +45,8 @@ public class PurchasesController(
             var quote = await pricingService.CalculateQuoteAsync(request);
             return Ok(quote);
         }
-        catch (KeyNotFoundException ex) { return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Quote failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Quote failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/confirm")]
@@ -59,9 +59,9 @@ public class PurchasesController(
             var purchase = await purchaseService.ConfirmPaymentAsync(id, userId);
             return Ok(purchase);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] ConfirmPayment failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] ConfirmPayment failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] ConfirmPayment forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] ConfirmPayment failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] ConfirmPayment failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] ConfirmPayment forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("confirm-by-intent")]
@@ -86,9 +86,9 @@ public class PurchasesController(
             var result = await purchaseService.ConfirmPaymentAsync(purchase.PurchaseId, userId);
             return Ok(result);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] ConfirmByIntent forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/cancel")]
@@ -101,9 +101,9 @@ public class PurchasesController(
             var purchase = await purchaseService.CancelAsync(id, userId);
             return Ok(purchase);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Cancel failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Cancel failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] Cancel forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Cancel failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Cancel failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] Cancel forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier)); }
     }
 
     /// <summary>
@@ -164,8 +164,8 @@ public class PurchasesController(
             var result = await purchaseService.RefundAsync(id);
             return Ok(result);
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 
     [HttpGet("{id:guid}")]
@@ -259,8 +259,8 @@ public class PurchasesController(
             var png = await purchaseService.GetQrImageAsync(id, userId);
             return File(png, "image/png");
         }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] GetQrCode failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] GetQrCode failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] GetQrCode forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] GetQrCode failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] GetQrCode failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
+        catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] GetQrCode forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier)); }
     }
 }

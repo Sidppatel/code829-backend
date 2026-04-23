@@ -127,8 +127,8 @@ public class AdminPurchasesController(
 
         await InvalidatePurchaseCaches();
         try { return Ok(await purchaseService.RefundAsync(id)); }
-        catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminPurchases] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier)); }
-        catch (InvalidOperationException ex) { Log.Warning(ex, "[AdminPurchases] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier)); }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminPurchases] Refund failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[AdminPurchases] Refund failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 
     [HttpGet("export/csv")]

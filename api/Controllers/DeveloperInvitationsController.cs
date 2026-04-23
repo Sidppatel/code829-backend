@@ -6,6 +6,7 @@ using Contracts.DTOs.Auth;
 using Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace Api.Controllers;
 
@@ -34,7 +35,8 @@ public class DeveloperInvitationsController(
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[DeveloperInvitations] Create conflict: {Message}", ex.Message);
+            return Conflict(new ApiError(409, "Operation not allowed", HttpContext.TraceIdentifier));
         }
     }
 
