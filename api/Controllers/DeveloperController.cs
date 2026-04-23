@@ -234,8 +234,9 @@ public class DeveloperController(
             catch (StripeException ex)
             {
                 verified = false;
-                verificationError = ex.StripeError?.Message ?? ex.Message;
-                Log.Warning("[StripeStatus] Verification failed: {Error}", verificationError);
+                var stripeErrorDetail = ex.StripeError?.Message ?? ex.Message;
+                Log.Warning("[StripeStatus] Verification failed: {Error}", stripeErrorDetail);
+                verificationError = "Payment processing failed";
             }
         }
         else

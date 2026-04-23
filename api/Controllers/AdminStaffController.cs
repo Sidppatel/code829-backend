@@ -3,6 +3,7 @@ using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
 using Contracts.DTOs.Auth;
+using Serilog;
 using Contracts.Enums;
 using Db;
 using Db.Repositories.StoredProcedures;
@@ -151,7 +152,8 @@ public class AdminStaffController(
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[AdminStaff] Invite conflict: {Message}", ex.Message);
+            return Conflict(new ApiError(409, "Operation not allowed", HttpContext.TraceIdentifier));
         }
     }
 

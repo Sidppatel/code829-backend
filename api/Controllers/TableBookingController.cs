@@ -27,11 +27,13 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Tables] LockTable not found: {Message}", ex.Message);
+            return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier));
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Tables] LockTable conflict: {Message}", ex.Message);
+            return Conflict(new ApiError(409, "Operation not allowed", HttpContext.TraceIdentifier));
         }
     }
 
@@ -48,11 +50,13 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Tables] ReleaseTable not found: {Message}", ex.Message);
+            return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier));
+            Log.Warning(ex, "[Tables] ReleaseTable failed: {Message}", ex.Message);
+            return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier));
         }
     }
 
