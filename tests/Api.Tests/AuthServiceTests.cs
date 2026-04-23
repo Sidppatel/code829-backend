@@ -138,6 +138,43 @@ public class AuthServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyMagicLinkAsync_DoubleConsumption_ReturnsNull()
+    {
+        // SP UPDATE WHERE IsUsed=false returns 0 rows on second call → ConsumeMagicLinkAsync returns null → service throws.
+        var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var userId = Guid.NewGuid();
+
+        var callCount = 0;
+        _authProc.Setup(a => a.ConsumeMagicLinkAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                callCount++;
+                return callCount == 1
+                    ? new MagicLinkResult(Guid.NewGuid(), "user@example.com", DateTime.UtcNow.AddMinutes(15))
+                    : null;
+            });
+
+        _authProc.Setup(a => a.UpsertUserAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(userId);
+
+        _authProc.Setup(a => a.CreateDeviceSessionAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
+
+        _userRepoMock.Setup(r => r.GetByIdAsync(userId))
+            .ReturnsAsync(new User { Id = userId, Email = "user@example.com", EmailHash = "h", FirstName = "u", LastName = "" });
+
+        await _service.VerifyMagicLinkAsync(rawToken, "Chrome", "127.0.0.1");
+
+        var secondCall = () => _service.VerifyMagicLinkAsync(rawToken, "Chrome", "127.0.0.1");
+        await secondCall.Should().ThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Fact]
     public async Task DevLoginAsync_InProduction_ThrowsInvalidOperationException()
     {
         _environment.Setup(e => e.EnvironmentName).Returns("Production");

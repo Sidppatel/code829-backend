@@ -8,6 +8,7 @@ using Contracts.DTOs.Auth;
 using Contracts.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace Api.Controllers;
 
@@ -123,13 +124,14 @@ public class AdminAuthController(
         try
         {
             await adminAuthService.RequestPasswordResetAsync(request.Email, Request.Headers.Origin);
-            return Ok(new { message = "If the account exists, a reset link has been sent." });
         }
         catch (UnauthorizedAccessException)
         {
-            // Security requirement: show error when not authorized (email not found in admin table)
-            return Unauthorized(new ApiError(401, "Not authorized", HttpContext.TraceIdentifier));
+            // Response is uniform to prevent user enumeration.
+            Log.Information("[AdminAuth] ForgotPassword: no admin account found for {Email}", request.Email);
         }
+
+        return Ok(new { message = "If the account exists, a reset link has been sent." });
     }
 
     [HttpPost("reset-password")]
@@ -304,7 +306,7 @@ public class AdminAuthController(
         {
             HttpOnly = true,
             Secure = !environment.IsDevelopment(),
-            SameSite = SameSiteMode.Lax,
+            SameSite = SameSiteMode.Strict,
             MaxAge = TimeSpan.FromDays(SessionMaxAgeDays),
             Path = "/"
         });
