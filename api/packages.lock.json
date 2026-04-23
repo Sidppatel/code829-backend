@@ -11,6 +11,24 @@
           "Asp.Versioning.Http": "8.1.1"
         }
       },
+      "AspNetCore.HealthChecks.NpgSql": {
+        "type": "Direct",
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "npc58/AD5zuVxERdhCl2Kb7WnL37mwX42SJcXIwvmEig0/dugOLg3SIwtfvvh3TnvTwR/sk5LYNkkPaBdks61A==",
+        "dependencies": {
+          "Npgsql": "8.0.3"
+        }
+      },
+      "AspNetCore.HealthChecks.Redis": {
+        "type": "Direct",
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "yNH0h8GLRbAf+PU5HNVLZ5hNeyq9mDVmRKO9xuZsme/znUYoBJlQvI0gq45gaZNlLncCHkMhR4o90MuT+gxxPw==",
+        "dependencies": {
+          "StackExchange.Redis": "2.7.4"
+        }
+      },
       "AWSSDK.S3": {
         "type": "Direct",
         "requested": "[4.0.21.2, )",

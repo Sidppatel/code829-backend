@@ -61,6 +61,10 @@ var builder = WebApplication.CreateBuilder(args);
     {
         o.Dsn = sentryDsn;
         o.Environment = builder.Environment.EnvironmentName;
+        o.Release = Environment.GetEnvironmentVariable("SENTRY_RELEASE")
+            ?? Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT")
+            ?? typeof(Program).Assembly.GetName().Version?.ToString()
+            ?? "unknown";
         o.TracesSampleRate = 0.1;
         o.SendDefaultPii = false;
         o.MaxBreadcrumbs = 50;
@@ -131,6 +135,12 @@ var builder = WebApplication.CreateBuilder(args);
     var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL") ?? "redis://localhost:6379";
     var redisConfig = ConvertRedisUrl(redisUrl);
     builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConfig));
+
+    // Health checks — /health/ready (deep), /health/live stays in HealthController
+    builder.Services.AddHealthChecks()
+        .AddNpgSql(connStr, name: "postgres")
+        .AddRedis(redisConfig, name: "redis")
+        .AddCheck<Api.HealthChecks.S3HealthCheck>("s3");
 
     // Encryption (HashEmail only — secrets now come from env vars)
     builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
@@ -448,6 +458,25 @@ var builder = WebApplication.CreateBuilder(args);
     app.UseMiddleware<RoleAuthorizationMiddleware>();
 
     app.MapControllers();
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        ResponseWriter = async (ctx, report) =>
+        {
+            ctx.Response.ContentType = "application/json";
+            var result = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                status = report.Status.ToString(),
+                timestamp = DateTime.UtcNow,
+                checks = report.Entries.Select(e => new
+                {
+                    name = e.Key,
+                    status = e.Value.Status.ToString(),
+                    description = e.Value.Description,
+                }),
+            });
+            await ctx.Response.WriteAsync(result);
+        },
+    });
 
     // OpenAPI + Scalar: only available in development
     if (app.Environment.IsDevelopment())
