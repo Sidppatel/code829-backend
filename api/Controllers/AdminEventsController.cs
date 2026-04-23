@@ -56,6 +56,14 @@ public class AdminEventsController(
 
         var query = context.EventViews.AsNoTracking().AsQueryable();
 
+        // Non-developer admins (organizers) may only see their own events.
+        // Developer role has cross-organizer visibility.
+        if (!User.IsInRole(UserRole.Developer.ToString()))
+        {
+            var businessUserId = GetCurrentUserId();
+            query = query.Where(e => e.BusinessUserId == businessUserId);
+        }
+
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(e => e.Status == status);
 
