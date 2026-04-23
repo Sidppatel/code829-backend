@@ -14,7 +14,6 @@ public record PurchaseDto(
     string? EventImagePath,
     string? VenueName,
     string? VenueAddress,
-    int SubtotalCents,
     int TotalCents,
     string? QrToken,
     Guid? TableId,
@@ -37,7 +36,6 @@ public record StripeTransactionDto(
     int? TotalChargedCents,
     int? TaxAmountCents,
     int? StripeFeesCents,
-    int? TransferAmountCents,
     DateTime? PaidAt,
     DateTime? RefundedAt
 );

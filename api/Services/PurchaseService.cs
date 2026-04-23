@@ -358,14 +358,14 @@ public class PurchaseService(
             b.UserId, $"{b.UserFirstName} {b.UserLastName}", b.EventId, b.EventTitle,
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, venueAddress,
-            b.SubtotalCents, b.TotalCents, b.QrToken,
+            b.TotalCents, b.QrToken,
             b.TableId, b.TableLabel, b.SeatsReserved,
             b.EventTicketTypeId, b.EventTicketTypeLabel,
             b.TicketCount,
             b.StripeTransactionId.HasValue ? new StripeTransactionDto(
                 b.StripeTransactionId.Value, b.PaymentIntentId!, b.PaymentStatus!,
                 b.PaymentAmountCents ?? 0, b.TotalChargedCents, b.TaxAmountCents,
-                b.StripeFeesCents, b.TransferAmountCents, b.PaidAt, b.RefundedAt
+                b.StripeFeesCents, b.PaidAt, b.RefundedAt
             ) : null,
             b.CreatedAt
         );
