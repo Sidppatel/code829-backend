@@ -254,8 +254,8 @@ var builder = WebApplication.CreateBuilder(args);
                 ValidateIssuerSigningKey = true,
                 ValidateIssuer = true,
                 ValidateAudience = true,
-                ValidIssuer = "code829-api",
-                ValidAudience = "code829-client",
+                ValidIssuer = JwtConstants.Issuer,
+                ValidAudience = JwtConstants.Audience,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromMinutes(1)
             };

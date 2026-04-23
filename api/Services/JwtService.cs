@@ -42,10 +42,10 @@ public class JwtService(ISecretsProvider secrets) : IJwtService
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: "code829-api",
-            audience: "code829-client",
+            issuer: JwtConstants.Issuer,
+            audience: JwtConstants.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(15),
+            expires: DateTime.UtcNow.Add(JwtConstants.TokenLifetime),
             signingCredentials: credentials);
 
         return Task.FromResult(new JwtSecurityTokenHandler().WriteToken(token));
