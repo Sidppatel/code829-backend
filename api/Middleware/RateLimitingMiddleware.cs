@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Api.Services;
 using StackExchange.Redis;
@@ -29,6 +31,14 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
 
     private const int CatalogLimit = 60;
     private static readonly TimeSpan CatalogWindow = TimeSpan.FromMinutes(1);
+
+    // BE #68 — Per-token magic-link verify counter. Prevents replay / brute-force on a
+    // single token. Window covers magic-link expiry + retry grace. Limit = 1: one
+    // attempt per token; anything after either a success (AuthService deletes the key)
+    // or a failure (key lingers to block retries) is rejected.
+    private const int MagicLinkVerifyLimit = 1;
+    private static readonly TimeSpan MagicLinkVerifyWindow = TimeSpan.FromMinutes(30);
+    private const string MagicLinkVerifyPath = "/auth/magic-link/verify";
 
     // magic-link request has its own per-email rate limit in AuthController;
     // verify endpoint gets the stricter auth limit here too
@@ -85,22 +95,73 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
             var ttl = await db.KeyTimeToLiveAsync(key);
             var retryAfterSeconds = (int)Math.Ceiling((ttl ?? window).TotalSeconds);
 
-            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
-            context.Response.ContentType = "application/json";
-
-            var response = JsonSerializer.Serialize(new
-            {
-                statusCode = 429,
-                message = "Too many requests. Please try again later.",
-                correlationId = context.TraceIdentifier
-            });
-
-            await context.Response.WriteAsync(response);
+            await WriteTooManyRequestsAsync(context, retryAfterSeconds);
             return;
         }
 
+        // BE #68 — per-token rate limit for magic-link verify. Runs after the per-IP
+        // check so IP-wide abuse still short-circuits first. Reads the token from the
+        // JSON body, hashes it, and increments a counter keyed by hash. Single use:
+        // AuthService.VerifyMagicLinkAsync deletes the key on successful consume.
+        if (string.Equals(path, MagicLinkVerifyPath, StringComparison.OrdinalIgnoreCase))
+        {
+            var token = await TryReadTokenFromBodyAsync(context);
+            if (!string.IsNullOrEmpty(token))
+            {
+                var tokenHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+                var mlvKey = $"ratelimit:mlv:{tokenHash}";
+                var mlvCount = await db.StringIncrementAsync(mlvKey);
+                if (mlvCount == 1)
+                    await db.KeyExpireAsync(mlvKey, MagicLinkVerifyWindow);
+
+                if (mlvCount > MagicLinkVerifyLimit)
+                {
+                    var mlvTtl = await db.KeyTimeToLiveAsync(mlvKey);
+                    var retryAfterSeconds = (int)Math.Ceiling((mlvTtl ?? MagicLinkVerifyWindow).TotalSeconds);
+                    await WriteTooManyRequestsAsync(context, retryAfterSeconds);
+                    return;
+                }
+            }
+        }
+
         await next(context);
+    }
+
+    private static async Task WriteTooManyRequestsAsync(HttpContext context, int retryAfterSeconds)
+    {
+        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
+        context.Response.ContentType = "application/json";
+
+        var response = JsonSerializer.Serialize(new
+        {
+            statusCode = 429,
+            message = "Too many requests. Please try again later.",
+            correlationId = context.TraceIdentifier
+        });
+
+        await context.Response.WriteAsync(response);
+    }
+
+    private static async Task<string?> TryReadTokenFromBodyAsync(HttpContext context)
+    {
+        if (context.Request.ContentLength is null or 0) return null;
+        try
+        {
+            context.Request.EnableBuffering();
+            context.Request.Body.Position = 0;
+            using var reader = new StreamReader(
+                context.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+            var json = await reader.ReadToEndAsync();
+            context.Request.Body.Position = 0;
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+            if (doc.RootElement.TryGetProperty("token", out var el) && el.ValueKind == JsonValueKind.String)
+                return el.GetString();
+            return null;
+        }
+        catch (JsonException) { return null; }
     }
 
     private static (int limit, TimeSpan window) GetLimitForPath(string path)

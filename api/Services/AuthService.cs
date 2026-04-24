@@ -6,6 +6,7 @@ using Db.Entities;
 using Db.Repositories;
 using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
+using Sentry;
 using Serilog;
 using StackExchange.Redis;
 
@@ -50,7 +51,7 @@ public class AuthService(
             EmailTemplates.MagicLink(appName, verifyUrl, expiryMinutes)
         );
 
-        Log.Information("[Auth] Magic link sent to {Email}", normalizedEmail);
+        Log.Information("[Auth] Magic link sent to {EmailHash}", HashEmailForLog(normalizedEmail));
 
         if (environment.IsDevelopment())
             return new MagicLinkResponse("Magic link sent. Check your email.", rawToken);
@@ -79,7 +80,12 @@ public class AuthService(
         var userDto = MapUserDto(user);
         var jwt = await jwtService.GenerateUserJwtAsync(user);
 
-        Log.Information("[Auth] Magic link verified for {Email}", result.Email);
+        // BE #68: successful verify clears per-token rate-limit counter. Subsequent replay
+        // attempts hit the SP, fail ConsumeMagicLinkAsync, and the counter re-creates.
+        var rldb = redis.GetDatabase();
+        await rldb.KeyDeleteAsync($"ratelimit:mlv:{tokenHash}");
+
+        Log.Information("[Auth] Magic link verified for {EmailHash}", HashEmailForLog(result.Email));
         return (userDto, sessionToken, jwt);
     }
 
@@ -98,7 +104,7 @@ public class AuthService(
         var userDto = MapUserDto(user);
         var jwt = await jwtService.GenerateUserJwtAsync(user);
 
-        Log.Information("[Auth] Dev login for {Email}", user.Email);
+        Log.Information("[Auth] Dev login for {EmailHash}", HashEmailForLog(user.Email));
         return (userDto, sessionToken, jwt);
     }
 
@@ -203,6 +209,14 @@ public class AuthService(
         return Convert.ToHexStringLower(bytes);
     }
 
+    // 12-char SHA-256 prefix for Serilog — enough to correlate log lines across a session
+    // without leaking the plaintext address. Plaintext still lands in audit_logs rows.
+    private static string HashEmailForLog(string email)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(email));
+        return Convert.ToHexStringLower(bytes)[..12];
+    }
+
     // ── Email+password auth ───────────────────────────────
 
     public async Task<SignupResponse> SignupAsync(string email, string firstName, string lastName, string password, string? ip, string? frontendOrigin)
@@ -218,7 +232,7 @@ public class AuthService(
         }
         catch (Npgsql.PostgresException ex) when (ex.MessageText.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            Log.Warning("[Auth] Signup attempted for existing email: {Email}", normalizedEmail);
+            Log.Warning("[Auth] Signup attempted for existing email: {EmailHash}", HashEmailForLog(normalizedEmail));
             throw new InvalidOperationException("An account with that email already exists");
         }
 
@@ -240,7 +254,7 @@ public class AuthService(
             $"Confirm your {appName} email",
             EmailTemplates.EmailVerification(appName, user.FirstName, verifyUrl, expiryMinutes));
 
-        Log.Information("[Auth] Signup + verification email sent for {Email}", normalizedEmail);
+        Log.Information("[Auth] Signup + verification email sent for {EmailHash}", HashEmailForLog(normalizedEmail));
 
         if (environment.IsDevelopment())
             return new SignupResponse("Account created. Check your email to verify.", rawToken);
@@ -273,7 +287,7 @@ public class AuthService(
         var userDto = MapUserDto(fullUser);
         var jwt = await jwtService.GenerateUserJwtAsync(fullUser);
 
-        Log.Information("[Auth] Signin for {Email}", normalizedEmail);
+        Log.Information("[Auth] Signin for {EmailHash}", HashEmailForLog(normalizedEmail));
         return (userDto, sessionToken, jwt);
     }
 
@@ -298,45 +312,66 @@ public class AuthService(
         var userDto = MapUserDto(fullUser);
         var jwt = await jwtService.GenerateUserJwtAsync(fullUser);
 
-        Log.Information("[Auth] Email verified + auto-signin for {Email}", fullUser.Email);
+        Log.Information("[Auth] Email verified + auto-signin for {EmailHash}", HashEmailForLog(fullUser.Email));
         return (userDto, sessionToken, jwt);
     }
 
     public async Task RequestPasswordResetAsync(string email, string? ip, string? frontendOrigin)
     {
+        // BE #71 + #84: always succeed from the caller's perspective. No user-existence signal,
+        // no email-delivery signal. Failures here are captured via Sentry and logged but never
+        // surfaced to the client — the endpoint returns 204 unconditionally.
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        var emailHash = encryptionService.HashEmail(normalizedEmail);
+        var emailHashLog = HashEmailForLog(normalizedEmail);
 
-        Log.Debug("[Auth] forgot-password step=lookup email={Email}", normalizedEmail);
-        var user = await userProc.GetByEmailForSigninAsync(emailHash);
-
-        if (user is null || !user.IsActive)
+        try
         {
-            Log.Warning("[Auth] Password reset requested for unknown/inactive email: {Email}", normalizedEmail);
-            throw new KeyNotFoundException("No account found with that email.");
+            var emailHash = encryptionService.HashEmail(normalizedEmail);
+
+            Log.Debug("[Auth] forgot-password step=lookup emailHash={EmailHash}", emailHashLog);
+            var user = await userProc.GetByEmailForSigninAsync(emailHash);
+
+            if (user is null || !user.IsActive)
+            {
+                Log.Warning("[Auth] Password reset requested for unknown/inactive emailHash={EmailHash}", emailHashLog);
+                return;
+            }
+
+            Log.Debug("[Auth] forgot-password step=create_token userId={UserId}", user.Id);
+            var tokenBytes = RandomNumberGenerator.GetBytes(32);
+            var rawToken = Convert.ToBase64String(tokenBytes);
+            var tokenHash = HashToken(rawToken);
+
+            var expiryMinutes = int.Parse(
+                await settingsService.GetOrDefaultAsync("password_reset_expiry_minutes", "60") ?? "60");
+
+            await userProc.CreatePasswordResetTokenAsync(user.Id, tokenHash, DateTime.UtcNow.AddMinutes(expiryMinutes), ip);
+
+            Log.Debug("[Auth] forgot-password step=send_email userId={UserId}", user.Id);
+            var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+            var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+            var resetUrl = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+
+            try
+            {
+                await emailService.SendAsync(
+                    normalizedEmail,
+                    $"{appName} password reset",
+                    EmailTemplates.PasswordReset(appName, resetUrl, expiryMinutes));
+
+                Log.Information("[Auth] Password reset link sent to {EmailHash}", emailHashLog);
+            }
+            catch (Exception emailEx)
+            {
+                SentrySdk.CaptureException(emailEx);
+                Log.Error(emailEx, "[Auth] forgot-password email send failed emailHash={EmailHash}", emailHashLog);
+            }
         }
-
-        Log.Debug("[Auth] forgot-password step=create_token userId={UserId}", user.Id);
-        var tokenBytes = RandomNumberGenerator.GetBytes(32);
-        var rawToken = Convert.ToBase64String(tokenBytes);
-        var tokenHash = HashToken(rawToken);
-
-        var expiryMinutes = int.Parse(
-            await settingsService.GetOrDefaultAsync("password_reset_expiry_minutes", "60") ?? "60");
-
-        await userProc.CreatePasswordResetTokenAsync(user.Id, tokenHash, DateTime.UtcNow.AddMinutes(expiryMinutes), ip);
-
-        Log.Debug("[Auth] forgot-password step=send_email userId={UserId}", user.Id);
-        var frontendUrl = frontendOrigin ?? await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
-        var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
-        var resetUrl = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
-
-        await emailService.SendAsync(
-            normalizedEmail,
-            $"{appName} password reset",
-            EmailTemplates.PasswordReset(appName, resetUrl, expiryMinutes));
-
-        Log.Information("[Auth] Password reset link sent to {Email}", normalizedEmail);
+        catch (Exception ex)
+        {
+            SentrySdk.CaptureException(ex);
+            Log.Error(ex, "[Auth] forgot-password internal failure emailHash={EmailHash}", emailHashLog);
+        }
     }
 
     public async Task ResetPasswordAsync(string token, string newPassword)
@@ -358,6 +393,6 @@ public class AuthService(
 
         await RevokeAllSessionsAsync(user.Id, null);
 
-        Log.Information("[Auth] Password reset successful for {Email}", user.Email);
+        Log.Information("[Auth] Password reset successful for {EmailHash}", HashEmailForLog(user.Email));
     }
 }
