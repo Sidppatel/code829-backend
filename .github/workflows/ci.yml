@@ -11,6 +11,38 @@ permissions:
   pull-requests: read
 
 jobs:
+  preflight-branch-protection:
+    # Verifies that master branch protection is still configured with required
+    # status checks. Catches the failure mode where a well-meaning admin turns
+    # protection off and CI silently keeps passing. Skipped on private repos
+    # without GitHub Pro (the Branch Protection API 403s with a plan message);
+    # once the repo goes public this step starts enforcing automatically.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check required status checks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          response=$(gh api "repos/${{ github.repository }}/branches/master/protection" 2>&1 || true)
+          if echo "$response" | grep -q "Upgrade to GitHub Pro"; then
+            echo "::warning::Branch protection API unavailable on current plan — preflight deferred"
+            exit 0
+          fi
+          if echo "$response" | grep -q '"message":"Branch not protected"'; then
+            echo "::error::master branch has no protection rule"
+            exit 1
+          fi
+          required=$(echo "$response" | jq -r '.required_status_checks.contexts // empty')
+          if [ -z "$required" ]; then
+            echo "::error::master branch protection is missing required_status_checks"
+            echo "$response" | jq .
+            exit 1
+          fi
+          echo "Branch protection OK — required checks: $required"
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:
@@ -23,7 +55,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-scan:
-    needs: [gitleaks]
+    needs: [gitleaks, preflight-branch-protection]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
