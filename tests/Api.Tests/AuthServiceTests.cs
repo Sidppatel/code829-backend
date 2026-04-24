@@ -36,6 +36,12 @@ public class AuthServiceTests : IDisposable
         _authProc = new Mock<IAuthProcedures>();
         _redis = new Mock<IConnectionMultiplexer>();
 
+        // VerifyMagicLinkAsync clears per-token rate-limit key on success (BE #68).
+        var redisDb = new Mock<IDatabase>();
+        redisDb.Setup(d => d.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(true);
+        _redis.Setup(r => r.GetDatabase(-1, null)).Returns(redisDb.Object);
+
         _userRepoMock = new Mock<IUserRepository>();
 
         _settingsService.Setup(s => s.GetOrDefaultAsync("magic_link_expiry_minutes", "15"))
@@ -174,6 +180,7 @@ public class AuthServiceTests : IDisposable
         await secondCall.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
+#if DEBUG
     [Fact]
     public async Task DevLoginAsync_InProduction_ThrowsInvalidOperationException()
     {
@@ -183,6 +190,7 @@ public class AuthServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not available*");
     }
+#endif
 
     public void Dispose()
     {

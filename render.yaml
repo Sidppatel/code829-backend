@@ -20,7 +20,9 @@ services:
     plan: starter
     region: oregon
     branch: master
-    autoDeploy: true
+    # autoDeploy must stay off: pushes to master should NOT ship code unreviewed.
+    # Deploys are triggered manually in the Render dashboard after CI + review.
+    autoDeploy: false
     healthCheckPath: /health/live
     envVars:
       # ─── Runtime (non-secret) ───────────────────────────────────
