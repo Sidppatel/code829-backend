@@ -193,11 +193,20 @@ var builder = WebApplication.CreateBuilder(args);
     // Forwarded headers — rewrite Connection.RemoteIpAddress from X-Forwarded-For so
     // rate limiting and audit logs see the real client IP when deployed behind a LB/CDN.
     // Trusted proxy CIDRs come from the TRUSTED_PROXIES env var.
+    var trustedProxies = Environment.GetEnvironmentVariable("TRUSTED_PROXIES");
+
+    // BE #102 — refuse to start outside Development without TRUSTED_PROXIES set. Without
+    // it, ForwardedHeadersConfig trusts nothing and every client appears to come from the
+    // platform load balancer, breaking per-IP rate limits and audit attribution.
+    if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(trustedProxies))
+        throw new InvalidOperationException(
+            "TRUSTED_PROXIES must be set in non-Development environments");
+
     builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
         ForwardedHeadersConfig.Configure(
             options,
             builder.Environment.IsDevelopment(),
-            Environment.GetEnvironmentVariable("TRUSTED_PROXIES")));
+            trustedProxies));
 
     // Fail-fast: Stripe is mandatory in every environment. No mock payment path exists.
     // Read directly from Environment to honor .env files loaded above after CreateBuilder.
