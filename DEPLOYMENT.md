@@ -303,7 +303,7 @@ Optional (set as needed):
 
 | Variable | Example | Notes |
 |---|---|---|
-| `VITE_API_URL` | `https://code829-backend.onrender.com` | No trailing slash. Injected into the Worker at deploy via `wrangler deploy --var` |
+| `VITE_API_URL` | `https://code829-backend.onrender.com` | No trailing slash. Baked into the JS bundle at build time via `env.VITE_API_URL` in `.github/workflows/deploy.yml`; **never** passed as a Worker runtime var (`wrangler --var` values are readable from the Cloudflare dashboard and must not carry secrets). |
 | `VITE_APP_NAME` | `Code829` | |
 | `VITE_DEFAULT_THEME` | `system` | |
 | `CLOUDFLARE_API_TOKEN` | (secret) | Needs `Workers Scripts: Edit`, `Account: Read`, `Zone: Read` |

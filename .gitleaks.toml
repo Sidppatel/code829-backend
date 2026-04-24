@@ -1,0 +1,17 @@
+# Gitleaks configuration — extends built-in rules.
+# https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths allowlisted from gitleaks scan — reviewed false positives only"
+paths = [
+    # detect-secrets baseline stores SHA-1 hashes of strings it has classified.
+    # Gitleaks treats the hashes as high-entropy secrets, which they are not.
+    '''\.secrets\.baseline$''',
+    # Lockfiles ship SRI integrity hashes that trip the generic-secret rule.
+    '''packages\.lock\.json$''',
+    # EF Core migration snapshot files encode schema as long data strings.
+    '''db/Migrations/.*\.cs$''',
+]
