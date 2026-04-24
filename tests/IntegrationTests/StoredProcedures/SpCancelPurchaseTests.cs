@@ -13,9 +13,9 @@ public sealed class SpCancelPurchaseTests(DatabaseFixture db)
         var tableId = Guid.NewGuid();
 
         await db.ExecuteSqlAsync("""
-            INSERT INTO events ("Id","Title","Description","StartDate","EndDate",
+            INSERT INTO events ("Id","Title","Slug","Description","StartDate","EndDate",
                 "LayoutMode","MaxCapacity","Status","BusinessUserId","CreatedAt","UpdatedAt")
-            VALUES (@ev, 'Cancel Event', 'desc', now() + interval '7 days', now() + interval '8 days',
+            VALUES (@ev, 'Cancel Event', 'cancel-' || @ev::text, 'desc', now() + interval '7 days', now() + interval '8 days',
                 'Seated', 200, 'Published', gen_random_uuid(), now(), now())
             """, ("ev", eventId));
 

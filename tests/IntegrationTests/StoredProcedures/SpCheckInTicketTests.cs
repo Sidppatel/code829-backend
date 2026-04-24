@@ -15,9 +15,9 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
         var qrToken = $"test-qr-{Guid.NewGuid():N}";
 
         await db.ExecuteSqlAsync("""
-            INSERT INTO events ("Id","Title","Description","StartDate","EndDate",
+            INSERT INTO events ("Id","Title","Slug","Description","StartDate","EndDate",
                 "LayoutMode","MaxCapacity","Status","BusinessUserId","CreatedAt","UpdatedAt")
-            VALUES (@ev, 'CheckIn Event', 'desc', now() - interval '1 hour', now() + interval '3 hours',
+            VALUES (@ev, 'CheckIn Event', 'checkin-' || @ev::text, 'desc', now() - interval '1 hour', now() + interval '3 hours',
                 'Open', 100, 'Published', gen_random_uuid(), now(), now())
             """, ("ev", eventId));
 
