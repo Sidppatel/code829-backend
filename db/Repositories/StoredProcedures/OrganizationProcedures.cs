@@ -95,4 +95,25 @@ public class OrganizationProcedures(EventPlatformDbContext context) : IOrganizat
                 "SELECT sp_archive_organization(@p0)",
                 [id], ct);
     }
+
+    public async Task<List<OrganizationListRow>> ListAsync(string? search, bool includeArchived,
+        int offset, int limit, CancellationToken ct = default)
+    {
+        var searchParam = (object?)search ?? DBNull.Value;
+        return await context.Database
+            .SqlQueryRaw<OrganizationListRow>(
+                "SELECT * FROM sp_list_organizations({0}, {1}, {2}, {3})",
+                searchParam, includeArchived, offset, limit)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> CountAsync(string? search, bool includeArchived, CancellationToken ct = default)
+    {
+        var searchParam = (object?)search ?? DBNull.Value;
+        return await context.Database
+            .SqlQueryRaw<int>(
+                "SELECT sp_count_organizations({0}, {1}) AS \"Value\"",
+                searchParam, includeArchived)
+            .FirstAsync(ct);
+    }
 }
