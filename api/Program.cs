@@ -248,6 +248,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessPasswordResetTokenProcedures, Db.Repositories.StoredProcedures.BusinessPasswordResetTokenProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ICheckInProcedures, Db.Repositories.StoredProcedures.CheckInProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserEventProcedures, Db.Repositories.StoredProcedures.BusinessUserEventProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IOrganizationProcedures, Db.Repositories.StoredProcedures.OrganizationProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();

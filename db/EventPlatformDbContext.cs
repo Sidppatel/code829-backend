@@ -11,6 +11,7 @@ public class EventPlatformDbContext(
     // Core entities
     public DbSet<User> Users => Set<User>();
     public DbSet<BusinessUser> BusinessUsers => Set<BusinessUser>();
+    public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
@@ -133,6 +134,7 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.EmailHash).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.OrganizationId);
             entity.Property(e => e.Email).HasMaxLength(256);
             entity.Property(e => e.EmailHash).HasMaxLength(128);
             entity.Property(e => e.FirstName).HasMaxLength(128);
@@ -142,6 +144,28 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Phone).HasMaxLength(20);
             entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Organization>(entity =>
+        {
+            entity.ToTable("organizations");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StripeConnectedAccountId)
+                .IsUnique()
+                .HasFilter("\"StripeConnectedAccountId\" IS NOT NULL")
+                .HasDatabaseName("IX_organizations_StripeConnectedAccountId");
+            entity.HasIndex(e => e.ArchivedAt)
+                .HasDatabaseName("IX_organizations_ArchivedAt");
+            entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.LegalName).HasMaxLength(256);
+            entity.Property(e => e.CountryCode).HasMaxLength(2).HasDefaultValue("US");
+            entity.Property(e => e.StripeConnectedAccountId).HasMaxLength(128);
+            entity.Property(e => e.StripeChargesEnabled).HasDefaultValue(false);
+            entity.Property(e => e.StripePayoutsEnabled).HasDefaultValue(false);
+            entity.Property(e => e.StripeDetailsSubmitted).HasDefaultValue(false);
+            entity.Property(e => e.StripeRequirementsDue).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<Invitation>(entity =>
