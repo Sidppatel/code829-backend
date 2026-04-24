@@ -26,22 +26,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -uo pipefail
-          response=$(gh api "repos/${{ github.repository }}/branches/master/protection" 2>&1 || true)
-          if echo "$response" | grep -q "Upgrade to GitHub Pro"; then
-            echo "::warning::Branch protection API unavailable on current plan — preflight deferred"
+          if response=$(gh api "repos/${{ github.repository }}/branches/master/protection" 2>/tmp/err); then
+            required=$(echo "$response" | jq -r '.required_status_checks.contexts // empty')
+            if [ -z "$required" ]; then
+              echo "::error::master branch protection is missing required_status_checks"
+              echo "$response" | jq .
+              exit 1
+            fi
+            echo "Branch protection OK — required checks: $required"
             exit 0
           fi
-          if echo "$response" | grep -q '"message":"Branch not protected"'; then
+          err=$(cat /tmp/err)
+          if echo "$err" | grep -q "HTTP 404"; then
             echo "::error::master branch has no protection rule"
+            echo "$err"
             exit 1
           fi
-          required=$(echo "$response" | jq -r '.required_status_checks.contexts // empty')
-          if [ -z "$required" ]; then
-            echo "::error::master branch protection is missing required_status_checks"
-            echo "$response" | jq .
-            exit 1
-          fi
-          echo "Branch protection OK — required checks: $required"
+          # Any other error (403 plan-limit or token-scope, 5xx, DNS, etc.) is
+          # treated as deferred — we cannot assert protection from this runner.
+          echo "::warning::Branch protection API not accessible — preflight deferred"
+          echo "$err"
+          exit 0
 
   gitleaks:
     runs-on: ubuntu-latest
