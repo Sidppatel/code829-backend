@@ -246,6 +246,12 @@ Redis is used for:
 | `RESEND_API_KEY` | Resend email API key (starts with `re_`) |
 | `EMAIL_FROM_ADDRESS` | Sender email (must match verified Resend domain) |
 
+### Optional (Stripe Connect — Express onboarding)
+
+| Variable | Description |
+|---|---|
+| `FRONTEND_URL_ADMIN` | Origin of the admin SPA (e.g. `https://admin.code829.com` in prod, `http://localhost:5174` in dev). Used by `StripeConnectService` to build Stripe AccountLink `return_url` / `refresh_url` so admins land back on the settings page after onboarding. Defaults to `http://localhost:5174` if unset. |
+
 ### Optional (Production — for S3 file storage)
 
 | Variable | Description |
