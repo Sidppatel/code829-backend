@@ -3,6 +3,9 @@ services:
     image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
     container_name: event-platform-db
     restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-event_platform}
       POSTGRES_USER: ${POSTGRES_USER:-ep_dev}
@@ -26,6 +29,9 @@ services:
     image: redis:7-alpine@sha256:119c9edaa6389b4c141f7faa74dae3f3b91ac50c3376d39596044ef07c2592e2
     container_name: event-platform-redis
     restart: unless-stopped
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.5
     command:
       - "redis-server"
       - "--requirepass"
