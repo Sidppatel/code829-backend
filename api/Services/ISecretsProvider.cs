@@ -7,6 +7,7 @@ namespace Api.Services;
 public interface ISecretsProvider
 {
     string JwtSecret { get; }
+    string? JwtSecretPrevious { get; }
     string StripeSecretKey { get; }
     string StripePublishableKey { get; }
     string StripeWebhookSecret { get; }

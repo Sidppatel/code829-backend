@@ -20,6 +20,23 @@ public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
         }
     }
 
+    /// <summary>
+    /// Optional previous JWT secret kept for rotation grace window.
+    /// When set, tokens signed with the previous key still validate; new tokens always sign with JwtSecret.
+    /// Must meet the same 32-byte minimum length as JwtSecret.
+    /// </summary>
+    public string? JwtSecretPrevious
+    {
+        get
+        {
+            var value = configuration["JWT_SECRET_PREVIOUS"];
+            if (string.IsNullOrEmpty(value)) return null;
+            if (Encoding.UTF8.GetBytes(value).Length < 32)
+                throw new InvalidOperationException("JWT_SECRET_PREVIOUS must be at least 32 bytes when set");
+            return value;
+        }
+    }
+
     public string StripeSecretKey => configuration["STRIPE_SECRET_KEY"] ?? "";
     public string StripePublishableKey => configuration["STRIPE_PUBLISHABLE_KEY"] ?? "";
     public string StripeWebhookSecret => configuration["STRIPE_WEBHOOK_SECRET"] ?? "";

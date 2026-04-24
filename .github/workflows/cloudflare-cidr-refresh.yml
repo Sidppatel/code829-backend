@@ -1,0 +1,65 @@
+name: Cloudflare CIDR refresh
+
+# Weekly check for Cloudflare IP changes. Diffs the published IP lists against
+# the TRUSTED_PROXIES value in render.yaml and opens a PR if they differ.
+# Manual trigger via workflow_dispatch is supported for ad-hoc runs.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Cloudflare IPv4 + IPv6
+        id: fetch
+        run: |
+          set -euo pipefail
+          v4=$(curl -fsSL https://www.cloudflare.com/ips-v4/ | tr '\n' ',' | sed 's/,$//')
+          v6=$(curl -fsSL https://www.cloudflare.com/ips-v6/ | tr '\n' ',' | sed 's/,$//')
+          echo "ips=${v4},${v6}" >> "$GITHUB_OUTPUT"
+
+      - name: Diff render.yaml TRUSTED_PROXIES
+        id: diff
+        run: |
+          set -euo pipefail
+          current=$(awk '/- key: TRUSTED_PROXIES/{flag=1; next} flag && /value:/{sub(/^[[:space:]]*value:[[:space:]]*/, ""); print; exit}' render.yaml)
+          new="${{ steps.fetch.outputs.ips }}"
+          if [ "$current" = "$new" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            python3 - <<EOF
+          import re, pathlib
+          p = pathlib.Path("render.yaml")
+          text = p.read_text()
+          new = "${{ steps.fetch.outputs.ips }}"
+          text = re.sub(
+              r"(- key: TRUSTED_PROXIES\n[ \t]*value:[ \t]*).*",
+              r"\g<1>" + new,
+              text,
+              count=1,
+          )
+          p.write_text(text)
+          EOF
+          fi
+
+      - name: Open PR if changed
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/cloudflare-cidr-refresh
+          commit-message: 'chore: refresh Cloudflare TRUSTED_PROXIES CIDRs'
+          title: 'chore: refresh Cloudflare TRUSTED_PROXIES CIDRs'
+          body: |
+            Automated weekly refresh from https://www.cloudflare.com/ips-v4 + ips-v6.
+            Review the diff against render.yaml and merge if the change is expected.
+          labels: automated, security

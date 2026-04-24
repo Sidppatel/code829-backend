@@ -29,6 +29,7 @@
     <PackageReference Include="StackExchange.Redis" Version="2.12.14" />
     <PackageReference Include="Stripe.net" Version="51.0.0" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.21.2" />
+    <PackageReference Include="nClam" Version="8.0.0" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />

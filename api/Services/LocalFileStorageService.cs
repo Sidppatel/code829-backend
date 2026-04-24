@@ -1,3 +1,4 @@
+using Api.Exceptions;
 using Serilog;
 
 namespace Api.Services;
@@ -6,7 +7,7 @@ namespace Api.Services;
 /// Development file storage that saves files to ./uploads/{entity}/{guid}.{ext}.
 /// Files are served via static file middleware.
 /// </summary>
-public class LocalFileStorageService : IFileStorageService
+public class LocalFileStorageService(IMalwareScanner scanner) : IFileStorageService
 {
     private const string UploadsDir = "uploads";
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
@@ -39,8 +40,16 @@ public class LocalFileStorageService : IFileStorageService
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
+        var ms = new MemoryStream();
+        await fileStream.CopyToAsync(ms);
+        ms.Position = 0;
+        var scan = await scanner.ScanAsync(ms);
+        if (!scan.IsClean)
+            throw new MalwareDetectedException(scan.Threat);
+        ms.Position = 0;
+
         await using var fs = File.Create(fullPath);
-        await fileStream.CopyToAsync(fs);
+        await ms.CopyToAsync(fs);
 
         Log.Information("[LocalStorage] Saved {Path}", relativePath);
         return relativePath;
@@ -51,8 +60,16 @@ public class LocalFileStorageService : IFileStorageService
         var fullPath = Path.Combine(UploadsDir, key);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
+        var ms = new MemoryStream();
+        await fileStream.CopyToAsync(ms);
+        ms.Position = 0;
+        var scan = await scanner.ScanAsync(ms);
+        if (!scan.IsClean)
+            throw new MalwareDetectedException(scan.Threat);
+        ms.Position = 0;
+
         await using var fs = File.Create(fullPath);
-        await fileStream.CopyToAsync(fs);
+        await ms.CopyToAsync(fs);
 
         Log.Information("[LocalStorage] Saved {Key}", key);
     }

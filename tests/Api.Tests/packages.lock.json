@@ -755,6 +755,11 @@
           "System.Security.Cryptography.Pkcs": "10.0.0"
         }
       },
+      "nClam": {
+        "type": "Transitive",
+        "resolved": "8.0.0",
+        "contentHash": "XZdQ43CefOSryaZ0mwJ61saPoV+NZtGkUfuBhGyHYLR6uIuUVBl5I/DUInq5nefJQBWkl5Z3eSKO7s/cfTLpaQ=="
+      },
       "Newtonsoft.Json": {
         "type": "Transitive",
         "resolved": "13.0.3",
@@ -1116,7 +1121,8 @@
           "StackExchange.Redis": "[2.12.14, )",
           "Stripe.net": "[51.0.0, )",
           "contracts": "[1.0.0, )",
-          "db": "[1.0.0, )"
+          "db": "[1.0.0, )",
+          "nClam": "[8.0.0, )"
         }
       },
       "contracts": {
