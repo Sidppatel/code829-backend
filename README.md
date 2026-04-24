@@ -313,3 +313,10 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) or the root-level [DEPLOYMENT_GUIDE.md](../
 - **Interactive docs**: Available at `/scalar` when running the API
 - **Full endpoint reference**: See [docs/API_REFERENCE.md](../docs/API_REFERENCE.md)
 - **Database schema**: See [docs/DATABASE.md](../docs/DATABASE.md)
+
+## Architecture & Operations
+
+- **ADRs**: [docs/adr/](./docs/adr/) — architectural decisions (stored-procedure data access, user/admin split, multi-vendor stack, magic-link auth, multi-app frontend, pnpm workspaces, no-FE-calculation rule).
+- **HA strategy**: [docs/ha-strategy.md](./docs/ha-strategy.md)
+- **Runbooks**: [docs/runbooks/](./docs/runbooks/) — prod bootstrap, staging reset, disaster recovery, secret rotation.
+- **Observability**: [docs/observability.md](./docs/observability.md)
