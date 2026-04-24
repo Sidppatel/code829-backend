@@ -34,11 +34,13 @@ namespace db.Migrations
                 .Annotation("Npgsql:PostgresExtension:extensions.pg_trgm", ",,")
                 .OldAnnotation("Npgsql:PostgresExtension:pg_trgm", ",,");
 
-            // Final LoadAll for the migration chain — every table referenced by a view or SP
-            // exists by this point, so fresh-DB bootstrap succeeds here after earlier migrations
-            // deliberately skipped LoadAll. Already-applied DBs re-run this idempotently.
-            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
-            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
+            // NOTE: LoadAll("Sql.Views" + "Sql.Procedures") was originally placed here as the
+            // "final" loader for the migration chain. It was moved to DropLegacyLogTables
+            // (20260424035219) because this migration runs BEFORE AddAuditLogsTable, and
+            // the views/SPs embedded at build time now reference audit_logs — which only
+            // exists after AddAuditLogsTable runs. DropLegacyLogTables is the first point
+            // in the chain where every table referenced by a view or SP is guaranteed
+            // to exist.
         }
 
         /// <inheritdoc />

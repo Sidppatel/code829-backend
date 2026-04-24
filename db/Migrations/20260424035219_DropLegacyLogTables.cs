@@ -41,10 +41,13 @@ namespace db.Migrations
             migrationBuilder.DropTable(name: "developer_logs");
             migrationBuilder.DropTable(name: "system_logs");
 
-            // The SP bootstrapper (invoked on app startup after migrations complete)
-            // re-applies every *.sql file in db/Sql/Procedures/ + db/Sql/Views/. The
-            // rewritten v_business_logs / v_system_logs / v_developer_logs views now
-            // project over audit_logs, and the rewritten sp_*_logs SPs query those.
+            // Final LoadAll for the migration chain. Every table referenced by a view
+            // or SP (including audit_logs, which AddAuditLogsTable created in the
+            // preceding migration) is now guaranteed to exist. HardenFunctionSearchPath
+            // (20260422054100) originally owned this step but ran before audit_logs
+            // was introduced, so the loader was moved here.
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
         }
 
         /// <inheritdoc />
