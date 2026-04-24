@@ -22,6 +22,7 @@ for tool in docker dotnet pnpm; do require_tool "$tool"; done
 
 log_step "Starting Docker containers..."
 docker rm -f event-platform-db event-platform-redis >/dev/null 2>&1 || true
+write_redis_secret "$BACKEND"
 docker compose -f "$BACKEND/docker-compose.yml" up -d
 
 log_step "Waiting for database and Redis..."
