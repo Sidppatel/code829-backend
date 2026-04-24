@@ -483,14 +483,19 @@ var builder = WebApplication.CreateBuilder(args);
     }
 
     // Seed data — only in Development. The historical SEED_DATA override is
-    // refused in non-Development environments because the admin seeders plant
-    // accounts with well-known default passwords. Use ProdBootstrap for real deploys.
+    // IGNORED in non-Development environments because the admin seeders plant
+    // accounts with well-known default passwords. Use ProdBootstrap for real
+    // deploys. Log the misconfiguration loudly but do not crash — the seeding
+    // branch below is independently gated by IsDevelopment(), so no unsafe
+    // seed can occur regardless of this flag's value in prod.
     if (Environment.GetEnvironmentVariable("SEED_DATA")?.ToLower() == "true"
         && !app.Environment.IsDevelopment())
     {
-        throw new InvalidOperationException(
-            "SEED_DATA=true is only permitted when ASPNETCORE_ENVIRONMENT=Development. " +
-            "Refusing to seed: default accounts contain known credentials.");
+        Log.Warning(
+            "SEED_DATA=true set in non-Development environment (ASPNETCORE_ENVIRONMENT={Env}). " +
+            "Ignoring — default-password seeding is never executed outside Development. " +
+            "Unset SEED_DATA in your deploy environment to silence this warning.",
+            app.Environment.EnvironmentName);
     }
 
     if (app.Environment.IsDevelopment())
