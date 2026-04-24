@@ -80,7 +80,7 @@
       },
       "MailKit": {
         "type": "Direct",
-        "requested": "[4.*, )",
+        "requested": "[4.16.0, )",
         "resolved": "4.16.0",
         "contentHash": "trJ82DOpAmo8i1jO1vNE+dGn4mPRyeYfy4swRcAGgMJhPoI1Kohf4OFJJf0+YIj4iUxgxPn8W+ht7e7KiYzSjg==",
         "dependencies": {
@@ -227,7 +227,7 @@
       },
       "Sentry.AspNetCore": {
         "type": "Direct",
-        "requested": "[5.*, )",
+        "requested": "[5.16.3, )",
         "resolved": "5.16.3",
         "contentHash": "JKd24NXG5ycQT8GJyBiYJFxDXvSd9a9MMb6cmnfD2J3Yy9h6C/snBm0dA+mqZXdj1V0751A5ulartultZx6DCA==",
         "dependencies": {
