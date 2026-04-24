@@ -1,3 +1,4 @@
+using Api.Helpers;
 using Api.Services;
 using Contracts.Enums;
 using Db;
@@ -89,8 +90,9 @@ public static class ProdBootstrap
         var firstName = Environment.GetEnvironmentVariable("BOOTSTRAP_DEVELOPER_FIRST_NAME") ?? "Platform";
         var lastName = Environment.GetEnvironmentVariable("BOOTSTRAP_DEVELOPER_LAST_NAME") ?? "Owner";
 
-        if (password.Length < 12)
-            throw new InvalidOperationException("BOOTSTRAP_DEVELOPER_PASSWORD must be at least 12 characters");
+        var (pwValid, pwError) = PasswordValidator.Validate(password);
+        if (!pwValid)
+            throw new InvalidOperationException($"BOOTSTRAP_DEVELOPER_PASSWORD rejected: {pwError}");
 
         var hash = BCrypt.Net.BCrypt.HashPassword(password);
         await businessUserProc.CreateAsync(

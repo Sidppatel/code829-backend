@@ -130,23 +130,12 @@ public class AuthController(
         var rateLimit = await CheckEmailRateLimitAsync(redis, "forgot-password", request.Email, 5, TimeSpan.FromMinutes(1));
         if (rateLimit is not null) return rateLimit;
 
+        // BE #71 + #84: response is 204 regardless of whether the email exists or the
+        // delivery pipeline errors. The service swallows + Sentry-captures its own failures.
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var origin = Request.Headers.Origin.FirstOrDefault();
-        try
-        {
-            await authService.RequestPasswordResetAsync(request.Email, ip, origin);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            Log.Warning(ex, "[Auth] ForgotPassword user not found: {Message}", ex.Message);
-            return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier));
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "[Auth] forgot-password failed email={Email}", request.Email);
-            return StatusCode(500, new ApiError(500, "Could not send reset email. Please try again shortly.", HttpContext.TraceIdentifier));
-        }
+        await authService.RequestPasswordResetAsync(request.Email, ip, origin);
+        return NoContent();
     }
 
     [HttpPost("reset-password")]
