@@ -79,6 +79,25 @@ load_env_local() {
     fi
 }
 
+# Write the Redis password into the docker-compose secret file. The docker
+# compose `redis_password` secret mounts this file at /run/secrets/redis_password
+# so the container never sees REDIS_PASSWORD in its env (invisible to
+# `docker inspect`). Call after env is loaded but before `docker compose up`.
+# Expects BACKEND to point at code829-backend/.
+write_redis_secret() {
+    local backend="$1"
+    local secrets_dir="$backend/docker-secrets"
+    local secret_file="$secrets_dir/redis_password"
+    if [ -z "${REDIS_PASSWORD:-}" ]; then
+        log_err "ERROR: REDIS_PASSWORD not set — cannot write $secret_file"
+        exit 1
+    fi
+    mkdir -p "$secrets_dir"
+    printf '%s' "$REDIS_PASSWORD" > "$secret_file"
+    chmod 600 "$secret_file" 2>/dev/null || true
+    log_gray "Wrote Redis password to docker-secrets/redis_password (gitignored)"
+}
+
 # Wait for a TCP port to accept connections. Uses bash /dev/tcp.
 wait_for_port() {
     local host="$1" port="$2" timeout="${3:-30}" i
@@ -97,7 +116,7 @@ check_docker_ready() {
     local max_wait="${1:-30}" i db_ready redis_ready
     for ((i=1; i<=max_wait; i++)); do
         db_ready=$(docker exec event-platform-db pg_isready -U "${POSTGRES_USER:-ep_dev}" 2>/dev/null || true)
-        redis_ready=$(docker exec event-platform-redis sh -c "redis-cli -a \"\$REDIS_PASSWORD\" ping 2>/dev/null" 2>/dev/null || true)
+        redis_ready=$(docker exec event-platform-redis sh -c 'redis-cli -a "$(cat /run/secrets/redis_password)" ping 2>/dev/null' 2>/dev/null || true)
         if [[ "$db_ready" == *"accepting connections"* ]] && [[ "$redis_ready" == *"PONG"* ]]; then
             log_ok "Database and Redis are ready!"
             return 0

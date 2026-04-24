@@ -48,6 +48,7 @@ cd "$ROOT"
 load_env_local "$ROOT"
 
 log_step "Starting Docker containers..."
+write_redis_secret "$BACKEND"
 docker compose -f "$BACKEND/docker-compose.yml" up -d
 
 log_step "Waiting for database and Redis..."

@@ -17,7 +17,11 @@ services:
       - /tmp
       - /var/run/postgresql
     volumes:
-      - ./docker-data/postgres:/var/lib/postgresql/data
+      # Named volume so lifecycle is managed by Docker (`docker volume ls`) and
+      # the host working tree is never polluted with a postgres data directory.
+      # The old `./docker-data/postgres` bind mount is obsolete — delete that
+      # folder locally after switching.
+      - postgres_data:/var/lib/postgresql/data
       - ./docker-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ep_dev} -d ${POSTGRES_DB:-event_platform}"]
@@ -32,12 +36,15 @@ services:
     mem_limit: 128m
     memswap_limit: 128m
     cpus: 0.5
-    command:
-      - "redis-server"
-      - "--requirepass"
-      - "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"
-      - "--protected-mode"
-      - "yes"
+    # Password is mounted as a Docker secret at /run/secrets/redis_password so
+    # it does NOT appear in `docker inspect` env or in this compose file.
+    # redis-server reads the file via --requirepass-file (Redis 7+).
+    command: >
+      sh -c "exec redis-server
+      --requirepass $$(cat /run/secrets/redis_password)
+      --protected-mode yes"
+    secrets:
+      - redis_password
     ports:
       - "127.0.0.1:6379:6379"
     read_only: true
@@ -46,12 +53,10 @@ services:
     volumes:
       - ./docker-data/redis:/data
     healthcheck:
-      test: ["CMD", "sh", "-c", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      test: ["CMD", "sh", "-c", "redis-cli -a \"$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 5
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
   clamav:
     image: clamav/clamav:stable
@@ -69,4 +74,15 @@ services:
       start_period: 120s
 
 volumes:
+  # Postgres data — named volume. `docker compose down -v` wipes it; otherwise
+  # persists across restarts and survives container recreation.
+  postgres_data:
   clamav-defs:
+
+secrets:
+  redis_password:
+    # File is generated from the REDIS_PASSWORD env var by the start scripts
+    # before compose up (see ../start-backend.ps1 + scripts/write-redis-secret.sh).
+    # The file is gitignored. The env var itself is NOT mounted into the
+    # container, so `docker inspect` shows no plaintext password.
+    file: ./docker-secrets/redis_password

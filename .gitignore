@@ -44,6 +44,10 @@ docker-data/
 postgres-data/
 redis-data/
 
+# Docker Compose secrets — generated from env vars at boot, never committed.
+docker-secrets/*
+!docker-secrets/README.md
+
 # OS
 .DS_Store
 Thumbs.db
