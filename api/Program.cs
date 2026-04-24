@@ -575,14 +575,20 @@ var builder = WebApplication.CreateBuilder(args);
         app.UseHttpsRedirection();
     }
 
-    // Static files for uploads
-    var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
-    Directory.CreateDirectory(uploadsPath);
-    app.UseStaticFiles(new StaticFileOptions
+    // Static files for uploads — Development only. Prod uses S3FileStorageService
+    // exclusively and does not write a writable `uploads/` dir to the filesystem
+    // (see Dockerfile runtime-stage comment). Attempting Directory.CreateDirectory
+    // against the read-only prod image crashes startup.
+    if (app.Environment.IsDevelopment())
     {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
-        RequestPath = "/uploads"
-    });
+        var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+        Directory.CreateDirectory(uploadsPath);
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
+            RequestPath = "/uploads"
+        });
+    }
 
     app.UseMiddleware<DeviceSessionMiddleware>();
     app.UseAuthentication();
