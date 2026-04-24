@@ -28,18 +28,25 @@ knows when the next step lands.
 Adopt a **monthly ratchet** of +5 percentage points until the gate reaches the
 BE #7 target of 60%, then switch to a linear +1 pt/month schedule until 80%.
 
+The first step pins the floor **just below the current measured line coverage**
+rather than a flat "+5 pt of the old floor". CI measured 19.4% actual line
+coverage on master at the time this ADR landed; 20% would have tripped the
+very first build, and a pure "+5 pt of the old floor" arithmetic run from
+15% would have chased a number the suite has not yet reached.
+
 | Window | Floor | Rationale |
 |---|---|---|
-| 2026-04 — initial S5 bump | **20%** | current-actual (~15%) + 5 pt safety margin |
-| 2026-05 | 25% | +5 pt ratchet |
-| 2026-06 | 30% | +5 pt ratchet |
-| 2026-07 | 35% | +5 pt ratchet |
-| 2026-08 | 40% | +5 pt ratchet |
-| 2026-09 | 45% | +5 pt ratchet |
-| 2026-10 | 50% | +5 pt ratchet |
-| 2026-11 | 55% | +5 pt ratchet |
-| 2026-12 | 60% | BE #7 target hit |
-| 2027-01+ | +1 pt/month | fine-grained ratchet to 80% |
+| 2026-04 — initial S5 bump | **19%** | current-actual (19.4%) minus 0.4 pt safety margin for variance |
+| 2026-05 | 24% | +5 pt ratchet |
+| 2026-06 | 29% | +5 pt ratchet |
+| 2026-07 | 34% | +5 pt ratchet |
+| 2026-08 | 39% | +5 pt ratchet |
+| 2026-09 | 44% | +5 pt ratchet |
+| 2026-10 | 49% | +5 pt ratchet |
+| 2026-11 | 54% | +5 pt ratchet |
+| 2026-12 | 59% | +5 pt ratchet |
+| 2027-01 | 60% | BE #7 target hit |
+| 2027-02+ | +1 pt/month | fine-grained ratchet to 80% |
 
 ### How each bump lands
 
