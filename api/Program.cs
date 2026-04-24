@@ -328,26 +328,28 @@ var builder = WebApplication.CreateBuilder(args);
     // OpenTelemetry — traces + metrics via OTLP. Endpoint defaults to local Jaeger
     // (docker-compose.observability.yml). Prod points at Grafana Cloud OTLP endpoint
     // via OTEL_EXPORTER_OTLP_ENDPOINT + OTEL_EXPORTER_OTLP_HEADERS (basic auth token).
-    var otlpEndpoint = otlpLogsEndpoint;
+    var otlpBase = otlpLogsEndpoint.TrimEnd('/');
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("code829-api", serviceVersion: otelServiceVersion))
         .WithTracing(t => t
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddEntityFrameworkCoreInstrumentation(o => o.SetDbStatementForText = true)
+            .AddEntityFrameworkCoreInstrumentation()
             .AddRedisInstrumentation()
             .AddOtlpExporter(o =>
             {
-                o.Endpoint = new Uri(otlpEndpoint);
+                o.Endpoint = new Uri($"{otlpBase}/v1/traces");
                 o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
             }))
         .WithMetrics(m => m
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddOtlpExporter(o =>
             {
-                o.Endpoint = new Uri(otlpEndpoint);
+                o.Endpoint = new Uri($"{otlpBase}/v1/metrics");
                 o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
             }));
 
     // Controllers + OpenAPI + Validation
