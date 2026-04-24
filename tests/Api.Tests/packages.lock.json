@@ -22,7 +22,7 @@
       },
       "Microsoft.AspNetCore.Mvc.Testing": {
         "type": "Direct",
-        "requested": "[10.0.*, )",
+        "requested": "[10.0.7, )",
         "resolved": "10.0.7",
         "contentHash": "lWyzApi1g8/r0eXqZBbl5bA8zewS8koxOir83/+OvJcyn2HazdUzPFd4MWc9uMdVzCRX6Z5aY4tNK+N0pWXMLg==",
         "dependencies": {
@@ -75,7 +75,7 @@
       },
       "Testcontainers.PostgreSql": {
         "type": "Direct",
-        "requested": "[4.*, )",
+        "requested": "[4.11.0, )",
         "resolved": "4.11.0",
         "contentHash": "OWGi0Og+qFpr2OPDignA74aJSfUd0nvZOaXNGWXwMJR1BvpdzhCNHQB2h7yLSTb0a8JVmmQQ4mUpHAC9q27NLw==",
         "dependencies": {
@@ -84,7 +84,7 @@
       },
       "Testcontainers.Redis": {
         "type": "Direct",
-        "requested": "[4.*, )",
+        "requested": "[4.11.0, )",
         "resolved": "4.11.0",
         "contentHash": "nw7no/3yfjRZFdYju9Wa5TMWlbnXNUVq5qfePrLjaWMYbcXGkT88ZPw82v4HLGSQPGPug24OlC1IT6Kf+4j//Q==",
         "dependencies": {
@@ -1231,7 +1231,7 @@
           "ClosedXML": "[0.105.0, )",
           "CsvHelper": "[33.1.0, )",
           "FluentValidation": "[12.1.1, )",
-          "MailKit": "[4.*, )",
+          "MailKit": "[4.16.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.7, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.7, )",
           "Microsoft.EntityFrameworkCore": "[10.0.6, )",
@@ -1245,7 +1245,7 @@
           "OpenTelemetry.Instrumentation.StackExchangeRedis": "[1.15.1-beta.1, )",
           "QRCoder": "[1.8.0, )",
           "Scalar.AspNetCore": "[2.14.0, )",
-          "Sentry.AspNetCore": "[5.*, )",
+          "Sentry.AspNetCore": "[5.16.3, )",
           "Serilog.AspNetCore": "[10.0.0, )",
           "Serilog.Enrichers.Environment": "[3.0.1, )",
           "Serilog.Sinks.Console": "[6.1.1, )",
