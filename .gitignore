@@ -70,6 +70,10 @@ scratch/
 # Graphify analysis output (generated)
 graphify-out/
 
+# Deployment internals — concrete hostnames, project refs, IaC secrets.
+# Keep untracked; the public DEPLOYMENT.md is the only shipped deploy doc.
+docs/deployment-internal.md
+
 # graphify local interpreter pointer
 .graphify_python
 .claude/**
