@@ -11,7 +11,7 @@
 
 services:
   jaeger:
-    image: jaegertracing/all-in-one:1.63.0
+    image: jaegertracing/all-in-one:1.63.0@sha256:fd5697c37ba041a91cfca1d62621d32cdeb2041c0febc2f1579e5bac6f21e34b
     container_name: event-platform-jaeger
     restart: unless-stopped
     environment:
