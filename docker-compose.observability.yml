@@ -1,0 +1,27 @@
+# Local observability stack — Jaeger all-in-one receives OTLP traces + logs
+# emitted by the API when OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#   # then run the API (start-backend.ps1 or dotnet run --project api)
+#   # then open http://localhost:16686 for Jaeger UI
+#
+# Jaeger all-in-one stores traces in memory only — restart wipes history.
+# This file is Development-only; staging/prod ships to Grafana Cloud (see docs/observability.md).
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.63.0
+    container_name: event-platform-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"   # Jaeger UI
+      - "127.0.0.1:4318:4318"     # OTLP HTTP (traces + logs)
+      - "127.0.0.1:4317:4317"     # OTLP gRPC
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:14269/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

@@ -17,6 +17,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
@@ -73,42 +76,75 @@ var builder = WebApplication.CreateBuilder(args);
     if (string.IsNullOrEmpty(sentryDsn) && builder.Environment.IsProduction())
         Log.Warning("[Sentry] DSN not configured — telemetry disabled");
 
-    // Serilog — structured logging to console + files with timestamps
+    // Serilog — structured logging. Development: console + rolling files for offline triage.
+    // Production: console + OTLP sink (logs shipped to Grafana Cloud, unified with OTEL traces
+    // via TraceId enricher). Render's filesystem is ephemeral, so file sinks are Development-only
+    // (BE #12).
+    var otlpLogsEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
+        ?? "http://localhost:4318";
+    var otlpHeadersRaw = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_HEADERS");
+    var otelServiceVersion = Environment.GetEnvironmentVariable("SENTRY_RELEASE")
+        ?? Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT")
+        ?? "unknown";
+    var isDevEnv = builder.Environment.IsDevelopment();
+
     builder.Host.UseSerilog((ctx, lc) =>
     {
         lc.ReadFrom.Configuration(ctx.Configuration)
           .Enrich.WithMachineName()
           .Enrich.FromLogContext()
+          .Enrich.With<Api.Middleware.OpenTelemetryTraceEnricher>()
           .MinimumLevel.Information()
           .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
           .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning);
 
-        // Console: include CorrelationId so a payment issue in logs can be traced back to the
-        // request. UserId comes from CorrelationIdMiddleware too.
         lc.WriteTo.Console(
-            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}");
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [trace={TraceId}] {Message:lj}{NewLine}{Exception}");
 
-        // Main API log file
-        lc.WriteTo.File("logs/api-.log",
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 30,
-            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}");
+        lc.WriteTo.OpenTelemetry(o =>
+        {
+            o.Endpoint = $"{otlpLogsEndpoint.TrimEnd('/')}/v1/logs";
+            o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf;
+            o.ResourceAttributes = new Dictionary<string, object>
+            {
+                ["service.name"] = "code829-api",
+                ["service.version"] = otelServiceVersion,
+                ["deployment.environment"] = ctx.HostingEnvironment.EnvironmentName,
+            };
+            if (!string.IsNullOrWhiteSpace(otlpHeadersRaw))
+            {
+                var headers = new Dictionary<string, string>();
+                foreach (var pair in otlpHeadersRaw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var eq = pair.IndexOf('=');
+                    if (eq <= 0) continue;
+                    headers[pair[..eq].Trim()] = pair[(eq + 1)..].Trim();
+                }
+                o.Headers = headers;
+            }
+        });
 
-        // Error-only log file for quick triage
-        lc.WriteTo.Logger(lc2 => lc2
-            .Filter.ByIncludingOnly(le => le.Level >= Serilog.Events.LogEventLevel.Error)
-            .WriteTo.File("logs/errors-.log",
+        if (isDevEnv)
+        {
+            lc.WriteTo.File("logs/api-.log",
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 30,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] [trace={TraceId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}");
 
-        // Separate file for seeding operations
-        lc.WriteTo.Logger(lc2 => lc2
-            .Filter.ByIncludingOnly(le => le.MessageTemplate.Text.Contains("[Seed]"))
-            .WriteTo.File("logs/seeding-.log",
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 30,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
+            lc.WriteTo.Logger(lc2 => lc2
+                .Filter.ByIncludingOnly(le => le.Level >= Serilog.Events.LogEventLevel.Error)
+                .WriteTo.File("logs/errors-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 30,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] [trace={TraceId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
+
+            lc.WriteTo.Logger(lc2 => lc2
+                .Filter.ByIncludingOnly(le => le.MessageTemplate.Text.Contains("[Seed]"))
+                .WriteTo.File("logs/seeding-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 30,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
+        }
     });
 
     // Kestrel on configurable port with request size limits
@@ -288,6 +324,33 @@ var builder = WebApplication.CreateBuilder(args);
             };
         });
     builder.Services.AddAuthorization();
+
+    // OpenTelemetry — traces + metrics via OTLP. Endpoint defaults to local Jaeger
+    // (docker-compose.observability.yml). Prod points at Grafana Cloud OTLP endpoint
+    // via OTEL_EXPORTER_OTLP_ENDPOINT + OTEL_EXPORTER_OTLP_HEADERS (basic auth token).
+    var otlpBase = otlpLogsEndpoint.TrimEnd('/');
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("code829-api", serviceVersion: otelServiceVersion))
+        .WithTracing(t => t
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddEntityFrameworkCoreInstrumentation()
+            .AddRedisInstrumentation()
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri($"{otlpBase}/v1/traces");
+                o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
+            }))
+        .WithMetrics(m => m
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri($"{otlpBase}/v1/metrics");
+                o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
+            }));
 
     // Controllers + OpenAPI + Validation
     // CSRF note: Antiforgery tokens are designed for server-rendered forms, not SPA + JWT APIs.
