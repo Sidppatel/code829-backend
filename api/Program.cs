@@ -147,8 +147,10 @@ var builder = WebApplication.CreateBuilder(args);
         }
     });
 
-    // Kestrel on configurable port with request size limits
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
+    // Kestrel on configurable port with request size limits.
+    // Default 10000 matches the Dockerfile + render.yaml contract. Local dev
+    // scripts set PORT=8000 in .env.local to override.
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
     builder.WebHost.ConfigureKestrel(options =>
     {
@@ -511,6 +513,11 @@ var builder = WebApplication.CreateBuilder(args);
     }
 
     // Middleware pipeline
+    // CloudflareIpAllowlistMiddleware runs before UseForwardedHeaders so it
+    // inspects the raw TCP peer, not the X-Forwarded-For client IP. Gated
+    // behind CF_IP_ALLOWLIST_ENFORCE to avoid rejecting Render's internal LB
+    // until the service is fully fronted by Cloudflare.
+    app.UseMiddleware<CloudflareIpAllowlistMiddleware>();
     // Must run before any middleware that reads RemoteIpAddress (rate limiting, audit logs).
     app.UseForwardedHeaders();
 
