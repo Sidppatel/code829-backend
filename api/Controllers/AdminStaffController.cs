@@ -13,8 +13,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/staff")]
+[Route("v{version:apiVersion}/admin/staff")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminStaffController(

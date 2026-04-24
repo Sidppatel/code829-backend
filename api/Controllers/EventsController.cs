@@ -13,8 +13,9 @@ using StackExchange.Redis;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("events")]
+[Route("v{version:apiVersion}/events")]
 public class EventsController(
     EventPlatformDbContext context,
     IEventProcedures eventProc,

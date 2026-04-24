@@ -10,8 +10,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("tables")]
+[Route("v{version:apiVersion}/tables")]
 public class TableBookingController(ITableBookingService tableBookingService, Db.EventPlatformDbContext context) : ControllerBase
 {
     [HttpPost("lock")]

@@ -12,7 +12,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task Create_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.PostAsJsonAsync("/purchases", new { eventId = Guid.NewGuid(), seats = 1 });
+        var resp = await client.PostAsJsonAsync("/v1/purchases", new { eventId = Guid.NewGuid(), seats = 1 });
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -20,7 +20,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task Quote_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.PostAsJsonAsync("/purchases/quote", new { eventId = Guid.NewGuid(), seats = 1 });
+        var resp = await client.PostAsJsonAsync("/v1/purchases/quote", new { eventId = Guid.NewGuid(), seats = 1 });
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -28,7 +28,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task Mine_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync("/purchases/mine");
+        var resp = await client.GetAsync("/v1/purchases/mine");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -36,7 +36,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task GetById_UnknownAsUser_Returns404()
     {
         var client = db.Factory.CreateClient().WithUser();
-        var resp = await client.GetAsync($"/purchases/{Guid.NewGuid()}");
+        var resp = await client.GetAsync($"/v1/purchases/{Guid.NewGuid()}");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.Forbidden);
     }
 
@@ -44,7 +44,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task Refund_UserRole_Returns403()
     {
         var client = db.Factory.CreateClient().WithUser();
-        var resp = await client.PostAsync($"/purchases/{Guid.NewGuid()}/refund", null);
+        var resp = await client.PostAsync($"/v1/purchases/{Guid.NewGuid()}/refund", null);
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -52,7 +52,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task StripeConfig_Anonymous_ReturnsOkOr503()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/purchases/stripe-config");
+        var resp = await client.GetAsync("/v1/purchases/stripe-config");
         // Stripe test key may not be fully wired in test env; both OK and 503 are acceptable
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
     }
@@ -61,7 +61,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     public async Task CancelBeacon_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.PostAsJsonAsync("/purchases/cancel-beacon", new { purchaseId = Guid.NewGuid() });
+        var resp = await client.PostAsJsonAsync("/v1/purchases/cancel-beacon", new { purchaseId = Guid.NewGuid() });
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

@@ -11,6 +11,15 @@
           "Asp.Versioning.Http": "10.0.0"
         }
       },
+      "Asp.Versioning.Mvc.ApiExplorer": {
+        "type": "Direct",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "H54UOpRoc4RmhQ4RA2lzDz43a/hAu/JN19Yyy/DNmH4XlRxhemfhifJyh9BaXNJOtGa2Dnu2xEeP4VSiTdUdAg==",
+        "dependencies": {
+          "Asp.Versioning.Mvc": "10.0.0"
+        }
+      },
       "AspNetCore.HealthChecks.NpgSql": {
         "type": "Direct",
         "requested": "[9.0.0, )",

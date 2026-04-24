@@ -11,8 +11,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/images")]
+[Route("v{version:apiVersion}/admin/images")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminImagesController(

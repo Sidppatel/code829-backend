@@ -12,8 +12,9 @@ namespace Api.Controllers;
 /// Developer purchases routes inherit all admin purchase actions.
 /// Developers access purchases via role hierarchy (Developer > Admin).
 /// </summary>
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("developer/purchases")]
+[Route("v{version:apiVersion}/developer/purchases")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
 public class DeveloperPurchasesController(

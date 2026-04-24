@@ -9,8 +9,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("developer")]
+[Route("v{version:apiVersion}/developer")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
 public class DeveloperDashboardController(

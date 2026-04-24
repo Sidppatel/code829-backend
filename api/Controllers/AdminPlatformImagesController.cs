@@ -9,8 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/platform-images")]
+[Route("v{version:apiVersion}/admin/platform-images")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminPlatformImagesController(

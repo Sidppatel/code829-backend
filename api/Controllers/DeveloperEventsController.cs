@@ -11,8 +11,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("developer/events")]
+[Route("v{version:apiVersion}/developer/events")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
 public class DeveloperEventsController(

@@ -12,8 +12,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/auth")]
+[Route("v{version:apiVersion}/admin/auth")]
 public class AdminAuthController(
     IAdminAuthService adminAuthService,
     IInvitationService invitationService,
