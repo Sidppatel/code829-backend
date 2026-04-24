@@ -49,6 +49,7 @@ public class EventPlatformDbContext(
     public DbSet<BusinessLog> BusinessLogs => Set<BusinessLog>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // Read-only views
     public DbSet<EventView> EventViews => Set<EventView>();
@@ -673,6 +674,28 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Recipient).HasMaxLength(256);
             entity.Property(e => e.Subject).HasMaxLength(512);
             entity.Property(e => e.Status).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("audit_logs", t =>
+            {
+                t.HasCheckConstraint("CK_audit_logs_ActorType",
+                    "\"ActorType\" IN ('User','Admin','Developer','System')");
+            });
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+            entity.Property(e => e.ActorType).HasConversion<string>().HasMaxLength(16);
+            entity.Property(e => e.EventType).HasMaxLength(128);
+            entity.Property(e => e.Action).HasMaxLength(128);
+            entity.Property(e => e.SubjectType).HasMaxLength(64);
+            entity.Property(e => e.MetadataJson).HasColumnType("jsonb");
+            entity.Property(e => e.Ip).HasMaxLength(45);
+            entity.HasIndex(e => new { e.ActorType, e.ActorId, e.CreatedAt })
+                .HasDatabaseName("idx_audit_logs_actor");
+            entity.HasIndex(e => new { e.SubjectType, e.SubjectId, e.CreatedAt })
+                .HasDatabaseName("idx_audit_logs_subject");
         });
 
         modelBuilder.Entity<Feedback>(entity =>

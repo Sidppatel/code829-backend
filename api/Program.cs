@@ -246,6 +246,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IInvitationService, InvitationService>();
     builder.Services.AddScoped<ITableBookingService, TableBookingService>();
     builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+    builder.Services.AddScoped<IAuditLogService, AuditLogService>();
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
     builder.Services.AddScoped<IImageRepository, ImageRepository>();
     builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
