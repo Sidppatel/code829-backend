@@ -427,6 +427,29 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
+    // One-shot prod bootstrap: RUN_PROD_BOOTSTRAP=true + Production environment.
+    // Runs migrations + seeds default AppSettings + initial developer user, logs result,
+    // then exits 0 so the server never starts on a bootstrap boot. See docs/runbooks/prod-bootstrap.md.
+    if (app.Environment.IsProduction()
+        && string.Equals(Environment.GetEnvironmentVariable("RUN_PROD_BOOTSTRAP"), "true", StringComparison.OrdinalIgnoreCase))
+    {
+        try
+        {
+            await Api.Seeding.ProdBootstrap.RunAsync(app.Services);
+            Log.Information("[ProdBootstrap] Exiting 0 — unset RUN_PROD_BOOTSTRAP and redeploy to start server");
+            await Log.CloseAndFlushAsync();
+            Environment.Exit(0);
+            return;
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[ProdBootstrap] Failed");
+            await Log.CloseAndFlushAsync();
+            Environment.Exit(1);
+            return;
+        }
+    }
+
     // Apply pending migrations on every startup — with retry for slow DB startup
     const int maxRetries = 5;
     for (var attempt = 1; attempt <= maxRetries; attempt++)

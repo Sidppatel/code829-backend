@@ -170,6 +170,11 @@ Domain-specific knowledge that compounds: Stripe payment lifecycle (intent → c
 
 See [../SKILLS.md](../SKILLS.md) for the full list of project-specific (non-generic) backend skills.
 
+## Architecture Decisions
+
+- [docs/adr/](./docs/adr/) — ADRs (MADR format). Read the relevant ADR before changing the subsystem it covers; add a new ADR when making a decision that a future maintainer would want the reasoning for.
+- [docs/ha-strategy.md](./docs/ha-strategy.md), [docs/runbooks/](./docs/runbooks/) — production ops references.
+
 ## Application Map (graphify) — required workflow
 
 The dependency map for this repo lives in `graphify-out/` (and a monorepo-wide one at `..\graphify-out\`). Index: [../APPLICATION_MAP.md](../APPLICATION_MAP.md).
