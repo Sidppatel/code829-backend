@@ -2,13 +2,12 @@ using Db.Entities;
 
 namespace Db.Repositories;
 
+/// <summary>
+/// Email-log persistence only. Admin/developer/system audit trails go through
+/// IAuditLogService → audit_logs. Legacy methods were removed in the
+/// DropLegacyLogTables migration.
+/// </summary>
 public interface ILogRepository
 {
-    Task AddDeveloperLogAsync(DeveloperLog log);
-    Task AddAdminLogAsync(BusinessLog log);
-    Task AddSystemLogAsync(SystemLog log);
     Task AddEmailLogAsync(EmailLog log);
-    Task<int> CleanupDeveloperLogsAsync(int retentionDays);
-    Task<int> CleanupAdminLogsAsync(int retentionDays);
-    Task<int> CleanupSystemLogsAsync(int retentionDays);
 }

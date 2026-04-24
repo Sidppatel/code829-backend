@@ -14,7 +14,7 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
         // Anonymous hits JwtBearer challenge before RoleAuthorizationMiddleware runs,
         // so the body is empty. ApiError-shape assertions live on 403 instead (see below).
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync("/admin/auth/me");
+        var resp = await client.GetAsync("/v1/admin/auth/me");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -22,7 +22,7 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
     public async Task Me_UserRoleOnly_Returns403()
     {
         var client = db.Factory.CreateClient().WithUser();
-        var resp = await client.GetAsync("/admin/auth/me");
+        var resp = await client.GetAsync("/v1/admin/auth/me");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var err = await resp.Content.ReadFromJsonAsync<ApiError>();
         err.Should().NotBeNull();
@@ -33,7 +33,7 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
     public async Task Login_EmptyBody_Returns400()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.PostAsJsonAsync("/admin/auth/login", new { email = "", password = "" });
+        var resp = await client.PostAsJsonAsync("/v1/admin/auth/login", new { email = "", password = "" });
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
     }
 
@@ -42,7 +42,7 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
     {
         // Often 200 for enumeration-resistance; either is acceptable
         var client = db.Factory.CreateClient();
-        var resp = await client.PostAsJsonAsync("/admin/auth/forgot-password", new { email = "nope@example.com" });
+        var resp = await client.PostAsJsonAsync("/v1/admin/auth/forgot-password", new { email = "nope@example.com" });
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
     }
 
@@ -50,7 +50,7 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
     public async Task Invitation_InvalidToken_Returns404()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/admin/auth/invitation/bogus-token");
+        var resp = await client.GetAsync("/v1/admin/auth/invitation/bogus-token");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
     }
 
@@ -58,7 +58,7 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
     public async Task Sessions_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync("/admin/auth/sessions");
+        var resp = await client.GetAsync("/v1/admin/auth/sessions");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

@@ -11,8 +11,9 @@ using Contracts.Enums;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("feedback")]
+[Route("v{version:apiVersion}/feedback")]
 public class FeedbackController(
     EventPlatformDbContext context,
     IFeedbackProcedures feedbackProc

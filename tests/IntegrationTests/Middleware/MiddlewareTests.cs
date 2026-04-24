@@ -64,7 +64,7 @@ public sealed class MiddlewareTests(DatabaseFixture db)
         // Use User JWT against an admin-only endpoint — RoleAuthorizationMiddleware
         // runs on a path that is past the JwtBearer challenge, so it can write ApiError JSON.
         var client = db.Factory.CreateClient().WithUser();
-        var resp = await client.GetAsync("/admin/auth/me");
+        var resp = await client.GetAsync("/v1/admin/auth/me");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
@@ -81,7 +81,7 @@ public sealed class MiddlewareTests(DatabaseFixture db)
         HttpStatusCode? lastCode = null;
         for (var i = 0; i < 6; i++)
         {
-            var resp = await client.PostAsJsonAsync("/auth/magic-link", new { email });
+            var resp = await client.PostAsJsonAsync("/v1/auth/magic-link", new { email });
             lastCode = resp.StatusCode;
         }
         lastCode.Should().Be(HttpStatusCode.TooManyRequests);

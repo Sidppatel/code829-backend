@@ -71,6 +71,18 @@ cd code829-backend
 docker compose up -d
 ```
 
+### Boot scripts (monorepo-wide)
+
+Run from the **monorepo root** (`event-platform/`):
+
+| OS            | Full stack              | Backend only                  | Stop                  | Full reset                       |
+|---------------|-------------------------|-------------------------------|-----------------------|----------------------------------|
+| Windows       | `.\start.ps1`           | `.\start-backend.ps1`         | `.\stop.ps1`          | `.\stop-clear-start.ps1`         |
+| Linux / macOS | `./code829-backend/scripts/start.sh` | `./code829-backend/scripts/start-backend.sh` | `./code829-backend/scripts/stop.sh` | `./code829-backend/scripts/stop-clear-start.sh` |
+
+The bash scripts at `code829-backend/scripts/` are feature-equivalent to the PowerShell siblings at the monorepo root. Both read secrets via `infisical export --env=dev` and local-only config from `.env.local`.
+
+
 Docker Compose provisions:
 - **PostgreSQL 16** on port `5432` (user: `ep_dev`, password: `ep_dev_password`, db: `event_platform`)
 - **Redis 7** on port `6379`
@@ -313,3 +325,10 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) or the root-level [DEPLOYMENT_GUIDE.md](../
 - **Interactive docs**: Available at `/scalar` when running the API
 - **Full endpoint reference**: See [docs/API_REFERENCE.md](../docs/API_REFERENCE.md)
 - **Database schema**: See [docs/DATABASE.md](../docs/DATABASE.md)
+
+## Architecture & Operations
+
+- **ADRs**: [docs/adr/](./docs/adr/) — architectural decisions (stored-procedure data access, user/admin split, multi-vendor stack, magic-link auth, multi-app frontend, pnpm workspaces, no-FE-calculation rule).
+- **HA strategy**: [docs/ha-strategy.md](./docs/ha-strategy.md)
+- **Runbooks**: [docs/runbooks/](./docs/runbooks/) — prod bootstrap, staging reset, disaster recovery, secret rotation.
+- **Observability**: [docs/observability.md](./docs/observability.md)

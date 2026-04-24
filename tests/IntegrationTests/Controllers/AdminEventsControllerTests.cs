@@ -13,7 +13,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
     public async Task List_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync("/admin/events");
+        var resp = await client.GetAsync("/v1/admin/events");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -21,7 +21,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
     public async Task List_UserRole_Returns403()
     {
         var client = db.Factory.CreateClient().WithUser();
-        var resp = await client.GetAsync("/admin/events");
+        var resp = await client.GetAsync("/v1/admin/events");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
@@ -32,7 +32,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
     public async Task List_AsAdmin_Returns200()
     {
         var client = db.Factory.CreateClient().WithAdmin();
-        var resp = await client.GetAsync("/admin/events");
+        var resp = await client.GetAsync("/v1/admin/events");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
     }
 
@@ -40,7 +40,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
     public async Task GetById_Unknown_AsAdmin_Returns404()
     {
         var client = db.Factory.CreateClient().WithAdmin();
-        var resp = await client.GetAsync($"/admin/events/{Guid.NewGuid()}");
+        var resp = await client.GetAsync($"/v1/admin/events/{Guid.NewGuid()}");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.Forbidden);
     }
 
@@ -48,7 +48,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
     public async Task Create_NoBody_AsAdmin_Returns400()
     {
         var client = db.Factory.CreateClient().WithAdmin();
-        var resp = await client.PostAsJsonAsync("/admin/events", new { });
+        var resp = await client.PostAsJsonAsync("/v1/admin/events", new { });
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.UnprocessableEntity);
     }
 
@@ -56,7 +56,7 @@ public sealed class AdminEventsControllerTests(DatabaseFixture db)
     public async Task Update_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.PutAsJsonAsync($"/admin/events/{Guid.NewGuid()}", new { });
+        var resp = await client.PutAsJsonAsync($"/v1/admin/events/{Guid.NewGuid()}", new { });
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

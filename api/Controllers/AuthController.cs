@@ -13,8 +13,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("auth")]
+[Route("v{version:apiVersion}/auth")]
 public class AuthController(
     IAuthService authService,
     IWebHostEnvironment environment,

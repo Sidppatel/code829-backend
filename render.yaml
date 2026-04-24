@@ -71,6 +71,16 @@ services:
       - key: SENTRY_RELEASE
         sync: false
 
+      # ─── OpenTelemetry (BE #8, BE #12) ──────────────────────────
+      # Grafana Cloud OTLP gateway — receives traces + metrics + logs.
+      # Endpoint form: https://otlp-gateway-prod-<region>.grafana.net/otlp
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      # Format: Authorization=Basic <base64(instance_id:api_token)>
+      # Generate in Grafana Cloud → Connections → OpenTelemetry (OTLP).
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false
+
       # ─── Cloudflare / networking ────────────────────────────────
       # Public URL used in magic-link emails and seed data.
       - key: FRONTEND_URL

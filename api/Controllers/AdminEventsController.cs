@@ -18,8 +18,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/events")]
+[Route("v{version:apiVersion}/admin/events")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminEventsController(

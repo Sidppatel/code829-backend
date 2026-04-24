@@ -1,0 +1,12 @@
+* text=auto
+
+# Always LF for shell scripts (required for bash interpreters).
+*.sh text eol=lf
+
+# Binary file types — never munge.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

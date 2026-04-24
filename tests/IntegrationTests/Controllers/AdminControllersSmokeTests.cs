@@ -12,20 +12,20 @@ namespace IntegrationTests.Controllers;
 public sealed class AdminControllersSmokeTests(DatabaseFixture db)
 {
     [Theory]
-    [InlineData("GET", "/admin/dashboard")]
-    [InlineData("GET", "/admin/images")]
-    [InlineData("GET", "/admin/logs")]
-    [InlineData("GET", "/admin/platform-images")]
-    [InlineData("GET", "/admin/purchases")]
-    [InlineData("GET", "/admin/staff")]
-    [InlineData("GET", "/admin/venues")]
-    [InlineData("GET", "/admin/table-templates")]
-    [InlineData("GET", "/developer/dashboard")]
-    [InlineData("GET", "/developer/logs")]
-    [InlineData("GET", "/developer/admin-logs")]
-    [InlineData("GET", "/developer/invitations")]
-    [InlineData("GET", "/developer/purchases")]
-    [InlineData("GET", "/checkin/events")]
+    [InlineData("GET", "/v1/admin/dashboard")]
+    [InlineData("GET", "/v1/admin/images")]
+    [InlineData("GET", "/v1/admin/logs")]
+    [InlineData("GET", "/v1/admin/platform-images")]
+    [InlineData("GET", "/v1/admin/purchases")]
+    [InlineData("GET", "/v1/admin/staff")]
+    [InlineData("GET", "/v1/admin/venues")]
+    [InlineData("GET", "/v1/admin/table-templates")]
+    [InlineData("GET", "/v1/developer/dashboard")]
+    [InlineData("GET", "/v1/developer/logs")]
+    [InlineData("GET", "/v1/developer/admin-logs")]
+    [InlineData("GET", "/v1/developer/invitations")]
+    [InlineData("GET", "/v1/developer/purchases")]
+    [InlineData("GET", "/v1/checkin/events")]
     public async Task Endpoint_NoAuth_Returns401(string method, string url)
     {
         var client = db.Factory.CreateClient().WithoutAuth();
@@ -35,10 +35,10 @@ public sealed class AdminControllersSmokeTests(DatabaseFixture db)
     }
 
     [Theory]
-    [InlineData("/admin/dashboard")]
-    [InlineData("/admin/venues")]
-    [InlineData("/admin/purchases")]
-    [InlineData("/admin/staff")]
+    [InlineData("/v1/admin/dashboard")]
+    [InlineData("/v1/admin/venues")]
+    [InlineData("/v1/admin/purchases")]
+    [InlineData("/v1/admin/staff")]
     public async Task AdminEndpoint_UserRole_Returns403(string url)
     {
         var client = db.Factory.CreateClient().WithUser();
@@ -47,9 +47,9 @@ public sealed class AdminControllersSmokeTests(DatabaseFixture db)
     }
 
     [Theory]
-    [InlineData("/developer/dashboard")]
-    [InlineData("/developer/logs")]
-    [InlineData("/developer/invitations")]
+    [InlineData("/v1/developer/dashboard")]
+    [InlineData("/v1/developer/logs")]
+    [InlineData("/v1/developer/invitations")]
     public async Task DeveloperEndpoint_AdminRole_Returns403(string url)
     {
         var client = db.Factory.CreateClient().WithAdmin();
@@ -61,7 +61,7 @@ public sealed class AdminControllersSmokeTests(DatabaseFixture db)
     public async Task CheckIn_UserRole_Returns403()
     {
         var client = db.Factory.CreateClient().WithUser();
-        var resp = await client.GetAsync("/checkin/events");
+        var resp = await client.GetAsync("/v1/checkin/events");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

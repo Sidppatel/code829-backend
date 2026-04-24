@@ -17,8 +17,9 @@ using StackExchange.Redis;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/purchases")]
+[Route("v{version:apiVersion}/admin/purchases")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminPurchasesController(

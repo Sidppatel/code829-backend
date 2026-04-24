@@ -10,7 +10,7 @@ public sealed class TicketsControllerTests(DatabaseFixture db)
     public async Task GetPurchaseTickets_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync($"/purchases/{Guid.NewGuid()}/tickets");
+        var resp = await client.GetAsync($"/v1/purchases/{Guid.NewGuid()}/tickets");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -18,7 +18,7 @@ public sealed class TicketsControllerTests(DatabaseFixture db)
     public async Task ClaimGet_NoToken_Returns400Or404()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/tickets/claim");
+        var resp = await client.GetAsync("/v1/tickets/claim");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
     }
 
@@ -26,7 +26,7 @@ public sealed class TicketsControllerTests(DatabaseFixture db)
     public async Task ClaimGet_InvalidToken_Returns400Or404()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/tickets/claim?token=bogus");
+        var resp = await client.GetAsync("/v1/tickets/claim?token=bogus");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.Gone);
     }
 
@@ -34,7 +34,7 @@ public sealed class TicketsControllerTests(DatabaseFixture db)
     public async Task Mine_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync("/tickets/mine");
+        var resp = await client.GetAsync("/v1/tickets/mine");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -42,7 +42,7 @@ public sealed class TicketsControllerTests(DatabaseFixture db)
     public async Task TicketQr_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync($"/tickets/{Guid.NewGuid()}/qr");
+        var resp = await client.GetAsync($"/v1/tickets/{Guid.NewGuid()}/qr");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

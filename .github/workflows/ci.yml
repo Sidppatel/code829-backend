@@ -126,6 +126,21 @@ jobs:
           echo "Line coverage: $LINE_PCT%"
           awk -v pct="$LINE_PCT" 'BEGIN { if (pct+0 < 15.0) { print "::error::Coverage " pct "% is below 15% threshold"; exit 1 } else { print "Coverage OK: " pct "%" } }'
 
+  arch-exception-count:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Count ARCH-EXCEPTION markers
+        run: |
+          COUNT=$(grep -rn "ARCH-EXCEPTION\|AllowDirectDbAccess" api/ db/ contracts/ | wc -l)
+          BASELINE=$(grep -oE '[0-9]+' docs/arch-exception-inventory.md | head -1)
+          echo "Current: $COUNT  Baseline: $BASELINE"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::ARCH-EXCEPTION count rose ($COUNT > $BASELINE). Fix the violation, or bump the baseline in docs/arch-exception-inventory.md with a category-(c) justification row."
+            grep -rn "ARCH-EXCEPTION\|AllowDirectDbAccess" api/ db/ contracts/ || true
+            exit 1
+          fi
+
   # dependency-review:
   #   runs-on: ubuntu-latest
   #   if: github.event_name == 'pull_request'
