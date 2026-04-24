@@ -39,19 +39,23 @@ RUN dotnet publish api/api.csproj \
 # =========================
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:1201dde897ab436b7c6b386f6dbd4f9a3ca0245f9c5a8aac8f8bcdccb4c7d484 AS runtime
 
-RUN apk add --no-cache krb5-libs
+# Pin krb5-libs to a concrete Alpine package version so the runtime image is
+# reproducible. Refresh this version together with the aspnet digest above.
+RUN apk add --no-cache krb5-libs=1.22.1-r0
 
 WORKDIR /app
 
-# Ensure the app user has permission to write to /app and its subdirectories
-# for local file storage (uploads) and logging.
-RUN mkdir -p uploads logs && chown -R app:app /app
+# Runtime image ships prod only. Prod uses S3FileStorageService (see Program.cs
+# DI wiring) and logs stream to OTLP + stdout — no `logs/` or `uploads/` dirs
+# are written to the filesystem. Keeping these directories here would imply a
+# writable volume contract we no longer honor.
 
 # .NET 10 Alpine images ship with a non-root `app` user (UID/GID 10001) pre-created.
 COPY --from=build --chown=app:app /app/publish .
 USER app
 
-# Render provides PORT at runtime (typically 10000); fallback to 8000 for local Docker
+# Render supplies PORT at runtime (set to 10000 in render.yaml). The Dockerfile
+# and Program.cs fallback both use 10000 so local docker-run parity matches prod.
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV PORT=10000
 EXPOSE 10000
