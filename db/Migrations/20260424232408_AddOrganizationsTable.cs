@@ -64,6 +64,15 @@ namespace db.Migrations
                 principalTable: "organizations",
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
+
+            // Load the organization-scoped procedures from the dedicated
+            // Sql.ProceduresOrg folder. Kept separate from Sql.Procedures so
+            // the LoadAll("Sql.Procedures") at the end of DropLegacyLogTables
+            // (which runs BEFORE this migration in the chain) doesn't try to
+            // CREATE FUNCTION bodies that reference the organizations table
+            // before the table exists. CREATE OR REPLACE FUNCTION is
+            // idempotent, so subsequent loads remain safe.
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.ProceduresOrg");
         }
 
         /// <inheritdoc />
