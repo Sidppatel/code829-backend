@@ -18,7 +18,7 @@ CREATE OR REPLACE FUNCTION sp_count_admin_logs(
 ) RETURNS int LANGUAGE sql STABLE
     SET search_path = public, extensions, pg_catalog
 AS $$
-    SELECT COUNT(*)::int FROM business_logs
+    SELECT COUNT(*)::int FROM v_business_logs
     WHERE (p_action IS NULL OR "Action" ILIKE '%' || p_action || '%')
       AND (p_entity_type IS NULL OR "EntityType" = p_entity_type)
       AND (p_from IS NULL OR "Timestamp" >= p_from)

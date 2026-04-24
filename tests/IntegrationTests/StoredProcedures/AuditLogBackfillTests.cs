@@ -3,96 +3,16 @@ using IntegrationTests.Fixtures;
 
 namespace IntegrationTests.StoredProcedures;
 
+/// <summary>
+/// Tests for sp_create_audit_log. The S7 backfill test was removed after BE #62
+/// dropped the legacy business_logs / developer_logs / system_logs tables — backfill
+/// is a historical one-shot migration and its fixtures would no longer compile.
+/// Read-path coverage now lives in v_business_logs / v_developer_logs / v_system_logs
+/// projections against audit_logs (exercised via controller integration tests).
+/// </summary>
 [Collection("Database")]
 public sealed class AuditLogBackfillTests(DatabaseFixture db)
 {
-    private const string BackfillSql = """
-        INSERT INTO audit_logs (
-            "Id", "CreatedAt", "EventType", "ActorType", "ActorId",
-            "SubjectType", "SubjectId", "Action", "MetadataJson", "Ip", "CorrelationId"
-        )
-        SELECT gen_random_uuid(), "Timestamp", "Action", 'Admin', "BusinessUserId",
-               "EntityType", "EntityId", "Action",
-               CASE WHEN "MetadataJson" IS NULL THEN NULL
-                    WHEN "MetadataJson" ~ '^\s*[{\[]' THEN "MetadataJson"::jsonb
-                    ELSE jsonb_build_object('raw', "MetadataJson") END,
-               NULLIF("IpAddress", ''), NULL::uuid
-        FROM business_logs
-        UNION ALL
-        SELECT gen_random_uuid(), "Timestamp", COALESCE("ExceptionType", 'developer.log'),
-               'Developer', "BusinessUserId", NULL, NULL, "Message",
-               CASE WHEN "MetadataJson" IS NULL THEN NULL
-                    WHEN "MetadataJson" ~ '^\s*[{\[]' THEN "MetadataJson"::jsonb
-                    ELSE jsonb_build_object('raw', "MetadataJson") END,
-               NULLIF("IpAddress", ''), NULL::uuid
-        FROM developer_logs
-        UNION ALL
-        SELECT gen_random_uuid(), "Timestamp", "Category"::text, 'System', "UserId",
-               "EntityType", "EntityId", "Action",
-               CASE WHEN "MetadataJson" IS NULL THEN NULL
-                    WHEN "MetadataJson" ~ '^\s*[{\[]' THEN "MetadataJson"::jsonb
-                    ELSE jsonb_build_object('raw', "MetadataJson") END,
-               NULL, NULL::uuid
-        FROM system_logs;
-        """;
-
-    private async Task TruncateAllAsync()
-    {
-        await db.ExecuteSqlAsync(
-            "TRUNCATE audit_logs, business_logs, developer_logs, system_logs RESTART IDENTITY");
-    }
-
-    [Fact]
-    public async Task Backfill_MergesAllThreeLegacyTables_IntoAuditLogs()
-    {
-        await TruncateAllAsync();
-
-        for (var i = 0; i < 5; i++)
-        {
-            await db.ExecuteSqlAsync("""
-                INSERT INTO business_logs ("Id","Timestamp","Action","EntityType")
-                VALUES (gen_random_uuid(), now(), @a, 'Event')
-                """, ("a", $"admin.action.{i}"));
-        }
-        for (var i = 0; i < 3; i++)
-        {
-            await db.ExecuteSqlAsync("""
-                INSERT INTO developer_logs ("Id","Timestamp","Severity","Message")
-                VALUES (gen_random_uuid(), now(), 'Error', @m)
-                """, ("m", $"boom-{i}"));
-        }
-        for (var i = 0; i < 2; i++)
-        {
-            await db.ExecuteSqlAsync("""
-                INSERT INTO system_logs ("Id","Timestamp","Category","Action")
-                VALUES (gen_random_uuid(), now(), 'BackgroundWorker', @a)
-                """, ("a", $"worker.{i}"));
-        }
-
-        await db.ExecuteSqlAsync(BackfillSql);
-
-        await using var conn = await db.OpenConnectionAsync();
-        await using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = "SELECT COUNT(*)::int FROM audit_logs";
-            var total = (int)(await cmd.ExecuteScalarAsync())!;
-            total.Should().Be(10);
-        }
-
-        var counts = new Dictionary<string, int>();
-        await using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = "SELECT \"ActorType\", COUNT(*)::int FROM audit_logs GROUP BY \"ActorType\"";
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                counts[(string)reader[0]] = (int)reader[1];
-        }
-
-        counts["Admin"].Should().Be(5);
-        counts["Developer"].Should().Be(3);
-        counts["System"].Should().Be(2);
-    }
-
     [Fact]
     public async Task SpCreateAuditLog_InsertsRow_WithActorType()
     {
@@ -128,5 +48,36 @@ public sealed class AuditLogBackfillTests(DatabaseFixture db)
         cmd.CommandText = "SELECT sp_create_audit_log('x','Invalid',NULL,NULL,NULL,'x',NULL,NULL,NULL)";
         var act = () => cmd.ExecuteScalarAsync();
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
+    }
+
+    [Fact]
+    public async Task VBusinessLogs_Projects_AdminActorRows()
+    {
+        await db.ExecuteSqlAsync("TRUNCATE audit_logs");
+
+        await db.ExecuteSqlAsync(
+            "SELECT sp_create_audit_log(@et,@at,NULL,@st,NULL,@a,@m,NULL,NULL)",
+            ("et", "event.created"),
+            ("at", "Admin"),
+            ("st", "Event"),
+            ("a", "event.created"),
+            ("m", """{"description":"organizer published event"}"""));
+
+        await db.ExecuteSqlAsync(
+            "SELECT sp_create_audit_log(@et,@at,NULL,NULL,NULL,@a,NULL,NULL,NULL)",
+            ("et", "Exception"),
+            ("at", "System"),
+            ("a", "InvalidOperationException"));
+
+        await using var conn = await db.OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*)::int FROM v_business_logs";
+        var adminCount = (int)(await cmd.ExecuteScalarAsync())!;
+        adminCount.Should().Be(1); // only Admin rows project into v_business_logs.
+
+        await using var cmd2 = conn.CreateCommand();
+        cmd2.CommandText = "SELECT \"Description\" FROM v_business_logs LIMIT 1";
+        var desc = (string?)await cmd2.ExecuteScalarAsync();
+        desc.Should().Be("organizer published event");
     }
 }

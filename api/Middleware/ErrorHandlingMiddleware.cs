@@ -1,9 +1,10 @@
+using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Api.Exceptions;
+using Api.Services;
 using Contracts.DTOs;
 using Contracts.Enums;
-using Db.Entities;
-using Db.Repositories;
 using Microsoft.Extensions.Hosting;
 using Sentry;
 using Serilog;
@@ -11,12 +12,15 @@ using Serilog;
 namespace Api.Middleware;
 
 /// <summary>
-/// Global exception handler. Catches unhandled exceptions, logs them to developer_logs,
-/// and returns a structured ApiError response.
+/// Global exception handler. Catches unhandled exceptions, records them in audit_logs
+/// via IAuditLogService (actor_type='System', event_type='Exception'), and returns a
+/// structured ApiError response. Exception metadata (severity, message, stack, path,
+/// method, status) is packed into the metadata JSON so the v_developer_logs view can
+/// project it back to the legacy DeveloperLogDto shape.
 /// </summary>
 public class ErrorHandlingMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, ILogRepository logRepository)
+    public async Task InvokeAsync(HttpContext context, IAuditLogService auditLog)
     {
         try
         {
@@ -49,23 +53,38 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
 
             try
             {
-                await logRepository.AddDeveloperLogAsync(new DeveloperLog
+                var metadata = new JsonObject
                 {
-                    Id = Guid.NewGuid(),
-                    Severity = LogSeverity.Error,
-                    Message = ex.Message,
-                    ExceptionType = ex.GetType().FullName,
-                    StackTrace = ex.StackTrace,
-                    RequestPath = context.Request.Path,
-                    RequestMethod = context.Request.Method,
-                    StatusCode = 500,
-                    IpAddress = context.Connection.RemoteIpAddress?.ToString(),
-                    CorrelationId = correlationId
-                });
+                    ["severity"] = LogSeverity.Error.ToString(),
+                    ["message"] = ex.Message,
+                    ["exception_type"] = ex.GetType().FullName,
+                    ["stack_trace"] = ex.StackTrace,
+                    ["request_path"] = context.Request.Path.ToString(),
+                    ["request_method"] = context.Request.Method,
+                    ["status_code"] = 500,
+                };
+
+                Guid? actorId = null;
+                var actorClaim = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(actorClaim, out var parsedActorId)) actorId = parsedActorId;
+
+                Guid? correlationGuid = null;
+                if (Guid.TryParse(correlationId, out var parsedCorrelation)) correlationGuid = parsedCorrelation;
+
+                await auditLog.LogAsync(
+                    eventType: "Exception",
+                    actorType: AuditActorType.System,
+                    actorId: actorId,
+                    subjectType: null,
+                    subjectId: null,
+                    action: ex.GetType().Name,
+                    metadataJson: metadata.ToJsonString(),
+                    ip: context.Connection.RemoteIpAddress?.ToString(),
+                    correlationId: correlationGuid);
             }
             catch (Exception logEx)
             {
-                Log.Error(logEx, "Failed to write developer log");
+                Log.Error(logEx, "Failed to write exception audit log");
             }
 
             context.Response.StatusCode = 500;

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text.Json;
 using Api.Middleware;
+using Api.Services;
 using Contracts.DTOs;
-using Db.Entities;
-using Db.Repositories;
+using Contracts.Enums;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +12,8 @@ namespace IntegrationTests.Middleware;
 
 /// <summary>
 /// Unit tests for ErrorHandlingMiddleware — assert no stack traces leak outside Development
-/// and ProblemDetails/ApiError shape is correct.
+/// and ProblemDetails/ApiError shape is correct. Writes go through IAuditLogService
+/// now (audit_logs) rather than the removed ILogRepository log-table path.
 /// </summary>
 public sealed class ErrorHandlingMiddlewareUnitTests
 {
@@ -20,7 +21,7 @@ public sealed class ErrorHandlingMiddlewareUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(env);
-        services.AddSingleton<ILogRepository, StubLogRepository>();
+        services.AddSingleton<IAuditLogService, StubAuditLogService>();
         var provider = services.BuildServiceProvider();
 
         var ctx = new DefaultHttpContext
@@ -41,7 +42,7 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         RequestDelegate next = _ => throw new InvalidOperationException("Secret internal error with SQL hints");
 
         var mw = new ErrorHandlingMiddleware(next);
-        await mw.InvokeAsync(ctx, new StubLogRepository());
+        await mw.InvokeAsync(ctx, new StubAuditLogService());
 
         ctx.Response.StatusCode.Should().Be(500);
         ctx.Response.Body.Position = 0;
@@ -62,7 +63,7 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         RequestDelegate next = _ => throw new InvalidOperationException("detail-for-dev");
 
         var mw = new ErrorHandlingMiddleware(next);
-        await mw.InvokeAsync(ctx, new StubLogRepository());
+        await mw.InvokeAsync(ctx, new StubAuditLogService());
 
         ctx.Response.StatusCode.Should().Be(500);
         ctx.Response.Body.Position = 0;
@@ -80,14 +81,18 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
     }
 
-    private sealed class StubLogRepository : ILogRepository
+    private sealed class StubAuditLogService : IAuditLogService
     {
-        public Task AddDeveloperLogAsync(DeveloperLog log) => Task.CompletedTask;
-        public Task AddAdminLogAsync(BusinessLog log) => Task.CompletedTask;
-        public Task AddSystemLogAsync(SystemLog log) => Task.CompletedTask;
-        public Task AddEmailLogAsync(EmailLog log) => Task.CompletedTask;
-        public Task<int> CleanupDeveloperLogsAsync(int retentionDays) => Task.FromResult(0);
-        public Task<int> CleanupAdminLogsAsync(int retentionDays) => Task.FromResult(0);
-        public Task<int> CleanupSystemLogsAsync(int retentionDays) => Task.FromResult(0);
+        public Task<Guid> LogAsync(
+            string eventType,
+            AuditActorType actorType,
+            Guid? actorId = null,
+            string? subjectType = null,
+            Guid? subjectId = null,
+            string? action = null,
+            string? metadataJson = null,
+            string? ip = null,
+            Guid? correlationId = null,
+            CancellationToken ct = default) => Task.FromResult(Guid.NewGuid());
     }
 }

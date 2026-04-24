@@ -85,12 +85,12 @@ public class DeveloperController(
                 severityParam, pathParam, fromParam, toParam)
             .FirstAsync();
 
-        var items = await context.DeveloperLogs
+        var items = await context.DeveloperLogViews
             .FromSqlRaw("SELECT * FROM sp_get_developer_logs({0}, {1}, {2}, {3}, {4}, {5})",
                 severityParam, pathParam, fromParam, toParam, (page - 1) * pageSize, pageSize)
             .AsNoTracking()
             .Select(l => new DeveloperLogDto(
-                l.Id, l.Timestamp, l.Severity.ToString(), l.Message, l.ExceptionType,
+                l.Id, l.Timestamp, l.Severity, l.Message, l.ExceptionType,
                 l.StackTrace, l.RequestPath, l.RequestMethod, l.StatusCode,
                 l.BusinessUserId, l.IpAddress, l.CorrelationId, l.MetadataJson))
             .ToListAsync();

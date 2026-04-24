@@ -1,25 +1,45 @@
+-- Row-level audit trigger emitting entity-change events into the unified audit_logs
+-- table (actor_type = 'System'). Not currently bound to any table; kept available
+-- for opt-in wiring via CREATE TRIGGER ... EXECUTE FUNCTION fn_audit_trigger() on
+-- mutation-heavy tables where row-level provenance is required.
 CREATE OR REPLACE FUNCTION fn_audit_trigger() RETURNS trigger LANGUAGE plpgsql
     SET search_path = public, extensions, pg_catalog
 AS $$
+DECLARE
+    v_action text;
+    v_subject_id uuid;
+    v_before jsonb;
+    v_after  jsonb;
 BEGIN
     IF TG_OP = 'DELETE' THEN
-        INSERT INTO system_logs ("Id", "Timestamp", "Category", "Action", "Source",
-            "EntityType", "EntityId", "BeforeJson", "AfterJson")
-        VALUES (gen_random_uuid(), now(), 'EntityChange', 'Delete', TG_TABLE_NAME,
-            TG_TABLE_NAME, (OLD."Id")::uuid, row_to_json(OLD)::text, NULL);
-        RETURN OLD;
+        v_action := 'Delete';
+        v_subject_id := (OLD."Id")::uuid;
+        v_before := to_jsonb(OLD);
+        v_after  := NULL;
     ELSIF TG_OP = 'UPDATE' THEN
-        INSERT INTO system_logs ("Id", "Timestamp", "Category", "Action", "Source",
-            "EntityType", "EntityId", "BeforeJson", "AfterJson")
-        VALUES (gen_random_uuid(), now(), 'EntityChange', 'Update', TG_TABLE_NAME,
-            TG_TABLE_NAME, (NEW."Id")::uuid, row_to_json(OLD)::text, row_to_json(NEW)::text);
-        RETURN NEW;
+        v_action := 'Update';
+        v_subject_id := (NEW."Id")::uuid;
+        v_before := to_jsonb(OLD);
+        v_after  := to_jsonb(NEW);
     ELSIF TG_OP = 'INSERT' THEN
-        INSERT INTO system_logs ("Id", "Timestamp", "Category", "Action", "Source",
-            "EntityType", "EntityId", "BeforeJson", "AfterJson")
-        VALUES (gen_random_uuid(), now(), 'EntityChange', 'Insert', TG_TABLE_NAME,
-            TG_TABLE_NAME, (NEW."Id")::uuid, NULL, row_to_json(NEW)::text);
-        RETURN NEW;
+        v_action := 'Insert';
+        v_subject_id := (NEW."Id")::uuid;
+        v_before := NULL;
+        v_after  := to_jsonb(NEW);
+    ELSE
+        RETURN NULL;
     END IF;
-    RETURN NULL;
+
+    INSERT INTO audit_logs (
+        "Id", "CreatedAt", "EventType", "ActorType", "ActorId",
+        "SubjectType", "SubjectId", "Action", "MetadataJson", "Ip", "CorrelationId"
+    )
+    VALUES (
+        gen_random_uuid(), now(), 'EntityChange', 'System', NULL,
+        TG_TABLE_NAME, v_subject_id, v_action,
+        jsonb_build_object('before', v_before, 'after', v_after, 'source', TG_TABLE_NAME),
+        NULL, NULL
+    );
+
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END; $$;
