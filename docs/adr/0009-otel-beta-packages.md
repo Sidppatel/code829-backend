@@ -1,4 +1,4 @@
-# ADR-0008: Accept OpenTelemetry beta instrumentation packages
+# ADR-0009: Accept OpenTelemetry beta instrumentation packages
 
 - **Status:** Accepted
 - **Date:** 2026-04-24
