@@ -22,6 +22,7 @@ public class WebhooksController(
 ) : ControllerBase
 {
     private static readonly TimeSpan DedupeTtl = TimeSpan.FromDays(7);
+    private static readonly TimeSpan InflightTtl = TimeSpan.FromSeconds(60);
     [HttpPost("stripe")]
     public async Task<IActionResult> HandleStripeWebhook()
     {
@@ -53,12 +54,27 @@ public class WebhooksController(
         // can arrive multiple times. Idempotent handlers guard downstream work, but processing
         // the same event twice still burns DB + Stripe API calls.
         var dedupeKey = $"stripe-webhook:{stripeEvent.Id}";
+        var inflightKey = $"stripe-webhook:inflight:{stripeEvent.Id}";
         var db = redis.GetDatabase();
         var firstSeen = await db.StringSetAsync(dedupeKey, "1", DedupeTtl, When.NotExists);
         if (!firstSeen)
         {
             Log.Information("[Webhook] Duplicate event {EventId} ({EventType}) — skipping", stripeEvent.Id, stripeEvent.Type);
             return Ok();
+        }
+
+        // Short-lived in-flight lock guards against two workers racing the same event id.
+        // The 7-day dedupe is cleared on handler failure (below) to allow Stripe retries;
+        // without the 60s inflight lock, concurrent retries after a crash could double-process.
+        var gotInflight = await db.StringSetAsync(inflightKey, "1", InflightTtl, When.NotExists);
+        if (!gotInflight)
+        {
+            Log.Warning("[Webhook] Event {EventId} already in-flight — returning 409 so Stripe retries", stripeEvent.Id);
+            // Release the dedupe key we just set so a fresh retry can enter after the
+            // current in-flight attempt either succeeds (and the dedupe stays) or crashes
+            // (which also deletes the dedupe in its catch block).
+            await db.KeyDeleteAsync(dedupeKey);
+            return StatusCode(409);
         }
 
         try
@@ -84,6 +100,10 @@ public class WebhooksController(
             Log.Error(ex, "[Webhook] Error processing {EventType} {EventId}", stripeEvent.Type, stripeEvent.Id);
             // Clear the dedupe key so Stripe's retry has a chance
             await db.KeyDeleteAsync(dedupeKey);
+        }
+        finally
+        {
+            await db.KeyDeleteAsync(inflightKey);
         }
 
         return Ok();

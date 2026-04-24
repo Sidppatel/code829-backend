@@ -89,12 +89,17 @@ Docker Compose provisions:
 
 ### 2. Configure Environment
 
-Create a `.env` file in the repo root (see `.env.example`):
+Local dev sources secrets from Infisical (`infisical export --env=dev`) and non-secret docker creds from a gitignored `.env.local` at the monorepo root. Required keys:
 
-```env
-DATABASE_URL=Host=localhost;Port=5432;Database=event_platform;Username=ep_dev;Password=ep_dev_password
-REDIS_URL=localhost:6379
-```
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Superuser role for the dev container |
+| `REDIS_PASSWORD` | Dev Redis auth |
+| `EP_APP_PASSWORD` | Password for the runtime `ep_app` role provisioned by `docker-init/01-extensions-and-roles.sql` |
+| `EP_READONLY_PASSWORD` | Password for the reporting `ep_readonly` role |
+| `DATABASE_URL`, `REDIS_URL` | Connection strings consumed by the API |
+
+`EP_APP_PASSWORD` and `EP_READONLY_PASSWORD` are read by the Postgres container on first boot via `psql \getenv` — the init SQL never hardcodes values. They must be present before `docker compose up` or init aborts. Rotate by resetting the volume (`stop-clear-start.ps1`) after updating `.env.local`.
 
 ### 3. Run Migrations and Start
 
@@ -123,6 +128,22 @@ On first startup, `DataSeeder` creates:
 | `organizer@code829.local` | Admin | Secondary organizer |
 
 Plus default app settings (JWT secret, Stripe mock keys, etc.) and 4 table templates.
+
+### 5. Install Git Hooks (recommended)
+
+Install the pre-commit hooks so gitleaks + detect-secrets run on every commit:
+
+```powershell
+# Windows
+pwsh ./scripts/setup-hooks.ps1
+```
+
+```bash
+# Linux / macOS
+./scripts/setup-hooks.sh
+```
+
+Both scripts require `pre-commit` on PATH (`pip install pre-commit detect-secrets`).
 
 ---
 

@@ -55,25 +55,28 @@ You need **two** connection strings:
 | EF Core Migrations | Session | 5432 | Running `dotnet ef` locally |
 | API at runtime | Transaction (Pooler) | 6543 | Render env var |
 
-Copy both. They look like:
+Obtain both strings from the Supabase dashboard — never paste them into this document, a chat log, or a commit. The shapes are:
+
 ```
 # Session (migrations)
-postgresql://postgres.[ref]:[password]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+postgresql://<user>:<password>@<host>.pooler.supabase.com:5432/postgres
 
 # Transaction Pooler (API runtime)
-postgresql://postgres.[ref]:[password]@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+postgresql://<user>:<password>@<host>.pooler.supabase.com:6543/postgres?pgbouncer=true
 ```
+
+Concrete values (project ref, password, regional host) live only in Supabase + the Render env-var settings + the runbook at `docs/deployment-internal.md` (untracked).
 
 ### 2.3 Run EF Core Migrations
 
-Run this **locally**, pointed at your Supabase **Session** connection string (port 5432):
+Run this **locally**, pointed at your Supabase **Session** connection string (port 5432). Obtain the string from the Supabase dashboard; never paste credentials into source control or chat:
 
 ```bash
 # From the repo root
 cd code829-backend
 
-# Set the connection string temporarily
-export DATABASE_URL="postgresql://postgres.[ref]:[password]@...supabase.com:5432/postgres"
+# Source the string from Supabase (dashboard → Project Settings → Database)
+export DATABASE_URL="<supabase-session-connection-string>"
 
 # Run migrations
 dotnet ef database update --project db --startup-project api
@@ -133,14 +136,15 @@ Your API uses Redis (see `docker-compose.yml`). Upstash provides a **free server
 
 1. Go to [upstash.com](https://upstash.com) → **Create Database**
 2. Choose **Redis** → Region closest to your Render deployment
-3. Copy the **Redis URL** — it looks like:
+3. Obtain the **Redis URL** from the Upstash dashboard. The shape is:
    ```
-   redis://default:[password]@[host].upstash.io:6379
+   redis://default:<password>@<host>.upstash.io:6379
    ```
    Or for TLS (recommended):
    ```
-   rediss://default:[password]@[host].upstash.io:6380
+   rediss://default:<password>@<host>.upstash.io:6380
    ```
+   Concrete host + password values live in Upstash + the Render env-var settings — never in this repo.
 
 > Free tier: 10,000 commands/day, 256MB storage — sufficient for session/cache usage.
 

@@ -14,7 +14,18 @@ public class SecurityHeadersOptions
     public string[] ScriptSrc { get; set; } = ["'self'", "https://js.stripe.com"];
     public string[] StyleSrc { get; set; } = ["'self'", "https://fonts.googleapis.com"];
     public string[] FontSrc { get; set; } = ["'self'", "https://fonts.gstatic.com"];
-    public string[] ImgSrc { get; set; } = ["'self'", "data:", "blob:", "https:"];
+    // Narrow to only the origins the app actually loads images from:
+    //   - 'self' + data: + blob: for inline/generated previews (QR codes, upload previews)
+    //   - R2 public bucket for user-uploaded event art
+    //   - Cloudflare Images delivery for resized variants
+    // Override via appsettings "Security:Csp:ImgSrc" if a new CDN is introduced.
+    public string[] ImgSrc { get; set; } = [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://*.r2.cloudflarestorage.com",
+        "https://imagedelivery.net",
+    ];
     public string[] ConnectSrc { get; set; } = ["'self'", "https://api.stripe.com", "https://r.stripe.com"];
     public string[] FrameSrc { get; set; } = ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"];
 }

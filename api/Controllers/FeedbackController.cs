@@ -73,6 +73,10 @@ public class FeedbackController(
 
     /// <summary>
     /// Admin: list all feedback with pagination.
+    /// Sets <c>X-Feedback-Storage-Format: raw-json</c> so the admin UI knows the
+    /// <c>diagnostics</c> field on each row is attacker-controlled raw JSON and
+    /// must be rendered as plain text (never as HTML or as a serialized JSON
+    /// string pasted into the DOM without escaping).
     /// </summary>
     [HttpGet]
     [Authorize]
@@ -102,6 +106,7 @@ public class FeedbackController(
             ))
             .ToListAsync();
 
+        Response.Headers["X-Feedback-Storage-Format"] = "raw-json";
         return Ok(new PagedResponse<FeedbackDto>(items, total, page, pageSize));
     }
 

@@ -45,14 +45,8 @@ public class InvitationService(
             normalizedEmail, tokenHash, role.ToString(), invitedByBusinessUserId, expiresAt);
 
         var frontendUrl = await settingsService.GetOrDefaultAsync("frontend_url", "http://localhost:5173") ?? "http://localhost:5173";
-        var subdomain = role switch
-        {
-            AdminRole.Staff => frontendUrl.Replace("://", "://staff.").Replace("localhost:5173", "localhost:5175"),
-            AdminRole.Admin => frontendUrl.Replace("://", "://admin.").Replace("localhost:5173", "localhost:5174"),
-            AdminRole.Developer => frontendUrl.Replace("://", "://developer.").Replace("localhost:5173", "localhost:5176"),
-            _ => frontendUrl
-        };
-        var signupUrl = $"{subdomain}/signup?token={Uri.EscapeDataString(rawToken)}";
+        var portalBase = BuildPortalUrl(frontendUrl, role);
+        var signupUrl = $"{portalBase}/signup?token={Uri.EscapeDataString(rawToken)}";
 
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var inviterName = $"{inviter.FirstName} {inviter.LastName}".Trim();
@@ -171,5 +165,46 @@ public class InvitationService(
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexStringLower(bytes);
+    }
+
+    // Constructs the portal URL for the invited role. Production subdomains the
+    // base host (admin.code829.com etc.); local dev swaps the port because apps
+    // run as separate Vite servers on 5173–5176 rather than real subdomains.
+    // UriBuilder handles scheme/port/path safely — string.Replace on "://" or
+    // "localhost:5173" would mishandle IPv6 hosts, ports embedded in paths, or
+    // any future change to the base URL format.
+    private static string BuildPortalUrl(string frontendUrl, AdminRole role)
+    {
+        if (!Uri.TryCreate(frontendUrl, UriKind.Absolute, out var baseUri))
+            return frontendUrl;
+
+        var builder = new UriBuilder(baseUri);
+        var isLocalhost = baseUri.IsLoopback
+            || baseUri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase);
+
+        if (isLocalhost)
+        {
+            builder.Port = role switch
+            {
+                AdminRole.Staff => 5175,
+                AdminRole.Admin => 5174,
+                AdminRole.Developer => 5176,
+                _ => baseUri.IsDefaultPort ? -1 : baseUri.Port,
+            };
+        }
+        else
+        {
+            var subdomain = role switch
+            {
+                AdminRole.Staff => "staff",
+                AdminRole.Admin => "admin",
+                AdminRole.Developer => "developer",
+                _ => null,
+            };
+            if (subdomain is not null)
+                builder.Host = $"{subdomain}.{baseUri.Host}";
+        }
+
+        return builder.Uri.GetLeftPart(UriPartial.Authority);
     }
 }
