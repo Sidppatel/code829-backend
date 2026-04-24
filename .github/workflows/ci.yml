@@ -114,9 +114,10 @@ jobs:
           fi
 
       - name: Enforce coverage threshold (api project)
-        # Threshold starts at 15% — baseline after S2's smoke tests landed.
-        # BE #7 target is 60%. Raise this gate as controller happy-path tests
-        # (currently smoke-only for 19 of 26 controllers) land in follow-up work.
+        # Ratcheting threshold — see docs/adr/0010-coverage-ratchet.md for the
+        # schedule. Raised from 15% to 20% in security session S5 (2026-04-24).
+        # BE #7 target is 60%. Bump +5% each month (or each time a tranche of
+        # controller happy-path tests lands) until we cross that target.
         run: |
           if [ ! -f coverage/report/Summary.txt ]; then
             echo "::error::Coverage summary missing"
@@ -124,7 +125,7 @@ jobs:
           fi
           LINE_PCT=$(grep -E "^\s*Line coverage:" coverage/report/Summary.txt | head -1 | grep -oE "[0-9.]+%" | head -1 | tr -d '%')
           echo "Line coverage: $LINE_PCT%"
-          awk -v pct="$LINE_PCT" 'BEGIN { if (pct+0 < 15.0) { print "::error::Coverage " pct "% is below 15% threshold"; exit 1 } else { print "Coverage OK: " pct "%" } }'
+          awk -v pct="$LINE_PCT" 'BEGIN { if (pct+0 < 20.0) { print "::error::Coverage " pct "% is below 20% threshold"; exit 1 } else { print "Coverage OK: " pct "%" } }'
 
   arch-exception-count:
     runs-on: ubuntu-latest
