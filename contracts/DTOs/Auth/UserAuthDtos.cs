@@ -10,5 +10,5 @@ public record SigninRequest(string Email, string Password);
 
 public record VerifyEmailRequest(string Token);
 
-public record SignupResponse(string Message, string? DevVerificationToken = null);
+public record SignupResponse(string Message);
 

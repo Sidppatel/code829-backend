@@ -52,8 +52,11 @@ public class AuthService(
 
         Log.Information("[Auth] Magic link sent to {Email}", normalizedEmail);
 
+        // Dev-only: surface the verify URL in logs so local QA can copy it without
+        // waiting for email delivery. Never return the raw token in the HTTP response —
+        // that turned the magic-link scheme into a direct-auth bypass if Dev mode leaked.
         if (environment.IsDevelopment())
-            return new MagicLinkResponse("Magic link sent. Check your email.", rawToken);
+            Log.Debug("[Auth] Magic link verify URL (dev only): {Url}", verifyUrl);
 
         return new MagicLinkResponse("Magic link sent. Check your email.");
     }
@@ -83,6 +86,7 @@ public class AuthService(
         return (userDto, sessionToken, jwt);
     }
 
+#if DEBUG
     public async Task<(UserDto User, string SessionToken, string Jwt)> DevLoginAsync(string email, string? deviceName, string? ip)
     {
         if (!environment.IsDevelopment())
@@ -101,6 +105,7 @@ public class AuthService(
         Log.Information("[Auth] Dev login for {Email}", user.Email);
         return (userDto, sessionToken, jwt);
     }
+#endif
 
     public async Task<UserDto?> GetCurrentUserAsync(Guid userId)
     {
@@ -243,7 +248,7 @@ public class AuthService(
         Log.Information("[Auth] Signup + verification email sent for {Email}", normalizedEmail);
 
         if (environment.IsDevelopment())
-            return new SignupResponse("Account created. Check your email to verify.", rawToken);
+            Log.Debug("[Auth] Email verification URL (dev only): {Url}", verifyUrl);
 
         return new SignupResponse("Account created. Check your email to verify.");
     }
