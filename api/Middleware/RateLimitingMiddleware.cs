@@ -62,6 +62,11 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
 
         var ip = remoteIp?.ToString() ?? "unknown";
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "/";
+        // Strip API version segment (/v1, /v2, …) so bucket matching stays stable
+        // across versions. BE #16 introduced URL-segment versioning; bucket keys
+        // below are defined without the version prefix.
+        path = System.Text.RegularExpressions.Regex.Replace(path, @"^/v\d+(?=/|$)", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (string.IsNullOrEmpty(path)) path = "/";
 
         var (limit, window) = GetLimitForPath(path);
         var bucket = GetBucketName(path);

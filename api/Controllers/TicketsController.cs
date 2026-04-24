@@ -16,8 +16,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("")]
+[Route("v{version:apiVersion}")]
 public class TicketsController(
     EventPlatformDbContext context,
     ITicketProcedures ticketProc,

@@ -8,8 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin")]
+[Route("v{version:apiVersion}/admin")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminDashboardController(

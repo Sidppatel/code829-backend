@@ -13,7 +13,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetEvents_ReturnsOk_WithPagedResponse()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/events");
+        var resp = await client.GetAsync("/v1/events");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await resp.Content.ReadAsStringAsync();
         json.Should().Contain("items");
@@ -23,7 +23,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetFacets_ReturnsOk()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/events/facets");
+        var resp = await client.GetAsync("/v1/events/facets");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -31,7 +31,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetSchemaList_ReturnsOk()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/events/schema-list");
+        var resp = await client.GetAsync("/v1/events/schema-list");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -39,7 +39,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetById_UnknownId_Returns404WithApiErrorShape()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync($"/events/{Guid.NewGuid()}");
+        var resp = await client.GetAsync($"/v1/events/{Guid.NewGuid()}");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
         var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
@@ -55,7 +55,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetBySlug_Unknown_Returns404()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync("/events/by-slug/nonexistent-slug");
+        var resp = await client.GetAsync("/v1/events/by-slug/nonexistent-slug");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -63,7 +63,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetTables_Unknown_Returns404()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync($"/events/{Guid.NewGuid()}/tables");
+        var resp = await client.GetAsync($"/v1/events/{Guid.NewGuid()}/tables");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -71,7 +71,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
     public async Task GetTicketTypes_Unknown_Returns404()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.GetAsync($"/events/{Guid.NewGuid()}/ticket-types");
+        var resp = await client.GetAsync($"/v1/events/{Guid.NewGuid()}/ticket-types");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

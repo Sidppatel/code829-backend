@@ -15,10 +15,11 @@ using StackExchange.Redis;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
 [Authorize]
 [RequireRole(UserRole.Admin)]
-[Route("")]
+[Route("v{version:apiVersion}")]
 public class AdminLayoutController(
     EventPlatformDbContext context,
     ILayoutProcedures layoutProc,

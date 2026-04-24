@@ -372,9 +372,15 @@ var builder = WebApplication.CreateBuilder(args);
         options.DefaultApiVersion = new Asp.Versioning.ApiVersion(1, 0);
         options.AssumeDefaultVersionWhenUnspecified = true;
         options.ReportApiVersions = true;
-        options.ApiVersionReader = Asp.Versioning.ApiVersionReader.Combine(
-            new Asp.Versioning.HeaderApiVersionReader("X-Api-Version"),
-            new Asp.Versioning.QueryStringApiVersionReader("api-version"));
+        // URL-segment reader: clients call /v1/events. Header/query readers
+        // are intentionally omitted — we want one canonical shape.
+        options.ApiVersionReader = new Asp.Versioning.UrlSegmentApiVersionReader();
+    })
+    .AddMvc()
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
     });
     builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
     {
@@ -503,6 +509,10 @@ var builder = WebApplication.CreateBuilder(args);
     });
 
     app.UseMiddleware<CorrelationIdMiddleware>();
+    // Redirect legacy unversioned /foo → /v1/foo (301). 90-day grace window
+    // from 2026-04-23; remove after 2026-07-22 once FE baseURL + any remaining
+    // clients are confirmed updated. See api/Middleware/LegacyApiRedirectMiddleware.cs.
+    app.UseMiddleware<LegacyApiRedirectMiddleware>();
     app.UseMiddleware<RateLimitingMiddleware>();
     app.UseMiddleware<IdempotencyMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();

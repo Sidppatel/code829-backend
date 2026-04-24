@@ -10,8 +10,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("developer/invitations")]
+[Route("v{version:apiVersion}/developer/invitations")]
 [Authorize]
 [RequireRole(UserRole.Developer)]
 public class DeveloperInvitationsController(

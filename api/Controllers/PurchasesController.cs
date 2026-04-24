@@ -13,8 +13,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("purchases")]
+[Route("v{version:apiVersion}/purchases")]
 public class PurchasesController(
     IPurchaseService purchaseService,
     IPricingService pricingService,

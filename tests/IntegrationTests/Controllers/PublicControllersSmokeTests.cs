@@ -27,7 +27,7 @@ public sealed class PublicControllersSmokeTests(DatabaseFixture db)
     public async Task Feedback_Post_EmptyBody_Returns400()
     {
         var client = db.Factory.CreateClient();
-        var resp = await client.PostAsJsonAsync("/feedback", new { });
+        var resp = await client.PostAsJsonAsync("/v1/feedback", new { });
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.UnprocessableEntity);
     }
 
@@ -35,7 +35,7 @@ public sealed class PublicControllersSmokeTests(DatabaseFixture db)
     public async Task Feedback_List_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.GetAsync("/feedback");
+        var resp = await client.GetAsync("/v1/feedback");
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
@@ -43,7 +43,7 @@ public sealed class PublicControllersSmokeTests(DatabaseFixture db)
     public async Task TableBooking_Lock_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.PostAsJsonAsync("/tables/lock", new { eventId = Guid.NewGuid(), tableId = Guid.NewGuid() });
+        var resp = await client.PostAsJsonAsync("/v1/tables/lock", new { eventId = Guid.NewGuid(), tableId = Guid.NewGuid() });
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.BadRequest);
     }
 
@@ -51,7 +51,7 @@ public sealed class PublicControllersSmokeTests(DatabaseFixture db)
     public async Task TableBooking_ReleaseBeacon_NoAuth_Returns401()
     {
         var client = db.Factory.CreateClient().WithoutAuth();
-        var resp = await client.PostAsJsonAsync("/tables/release-beacon", new { eventId = Guid.NewGuid(), tableId = Guid.NewGuid() });
+        var resp = await client.PostAsJsonAsync("/v1/tables/release-beacon", new { eventId = Guid.NewGuid(), tableId = Guid.NewGuid() });
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.BadRequest);
     }
 }

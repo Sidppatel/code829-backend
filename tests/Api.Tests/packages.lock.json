@@ -130,6 +130,14 @@
           "Asp.Versioning.Http": "10.0.0"
         }
       },
+      "Asp.Versioning.Mvc.ApiExplorer": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "H54UOpRoc4RmhQ4RA2lzDz43a/hAu/JN19Yyy/DNmH4XlRxhemfhifJyh9BaXNJOtGa2Dnu2xEeP4VSiTdUdAg==",
+        "dependencies": {
+          "Asp.Versioning.Mvc": "10.0.0"
+        }
+      },
       "AspNetCore.HealthChecks.NpgSql": {
         "type": "Transitive",
         "resolved": "9.0.0",
@@ -1216,6 +1224,7 @@
         "dependencies": {
           "AWSSDK.S3": "[4.0.21.2, )",
           "Asp.Versioning.Mvc": "[10.0.0, )",
+          "Asp.Versioning.Mvc.ApiExplorer": "[10.0.0, )",
           "AspNetCore.HealthChecks.NpgSql": "[9.0.0, )",
           "AspNetCore.HealthChecks.Redis": "[9.0.0, )",
           "BCrypt.Net-Next": "[4.1.0, )",

@@ -14,8 +14,9 @@ using Serilog;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("checkin")]
+[Route("v{version:apiVersion}/checkin")]
 [Authorize]
 [RequireRole(UserRole.Staff)]
 public class CheckInController(

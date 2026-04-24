@@ -9,8 +9,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
+[Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
-[Route("admin/logs")]
+[Route("v{version:apiVersion}/admin/logs")]
 [Authorize]
 [RequireRole(UserRole.Admin)]
 public class AdminLogsController(EventPlatformDbContext context) : ControllerBase
