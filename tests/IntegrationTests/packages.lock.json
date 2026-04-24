@@ -260,8 +260,8 @@
       },
       "Microsoft.AspNetCore.OpenApi": {
         "type": "Transitive",
-        "resolved": "10.0.6",
-        "contentHash": "WTAQe7MAbbKztRyeCRGZOqqlIqpMHDBz+jKo7LLY6hp4qRqn7iucR24u32KJVxV7mF3tSEfwXH96NgGSiDBw7A==",
+        "resolved": "10.0.7",
+        "contentHash": "vKiAcGXG0BwNVw3bOjjWRLnp9tR18dR7MiwpvC94h0yFS+zfnzGHzS/JmmgwUdRixrGxrlIMRAWrVc+2DfAGlg==",
         "dependencies": {
           "Microsoft.OpenApi": "2.0.0"
         }
@@ -1082,7 +1082,7 @@
           "FluentValidation": "[12.1.1, )",
           "MailKit": "[4.*, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.6, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.6, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.7, )",
           "Microsoft.EntityFrameworkCore": "[10.0.6, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.1, )",
           "QRCoder": "[1.8.0, )",
