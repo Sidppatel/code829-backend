@@ -22,5 +22,21 @@ public class BusinessUser : BaseEntity
     /// Stripe Connect account ID for organizers (e.g., "acct_xxx").
     /// Required for organizers to receive payouts via destination charges.
     /// </summary>
+    /// <remarks>
+    /// DEPRECATED — superseded by Organization.StripeConnectedAccountId.
+    /// Kept temporarily so the BackfillOrganizationsFromBusinessUsers migration
+    /// can copy the value over; the column is dropped by
+    /// DropLegacyStripeOnBusinessUser (Migration 3) once the backfill runs.
+    /// </remarks>
     public string? StripeConnectedAccountId { get; set; }
+
+    /// <summary>
+    /// FK to Organization this BusinessUser belongs to. Permanently nullable —
+    /// new BusinessUsers may exist without being attached to any organization
+    /// until a developer assigns them via the members UI.
+    /// </summary>
+    public Guid? OrganizationId { get; set; }
+
+    /// <summary>Navigation property to the owning Organization.</summary>
+    public Organization? Organization { get; set; }
 }
