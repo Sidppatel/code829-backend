@@ -89,24 +89,20 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
 
             context.Response.StatusCode = 500;
             context.Response.ContentType = "application/json";
-            var env = context.RequestServices.GetService<IWebHostEnvironment>();
-            if (env?.IsDevelopment() == true)
+#if DEBUG
+            var innerMsg = ex.InnerException?.Message;
+            await context.Response.WriteAsJsonAsync(new
             {
-                var innerMsg = ex.InnerException?.Message;
-                await context.Response.WriteAsJsonAsync(new
-                {
-                    statusCode = 500,
-                    message = ex.Message,
-                    innerMessage = innerMsg,
-                    exceptionType = ex.GetType().FullName,
-                    correlationId
-                });
-            }
-            else
-            {
-                var error = new ApiError(500, "An internal error occurred", CorrelationId: correlationId);
-                await context.Response.WriteAsJsonAsync(error);
-            }
+                statusCode = 500,
+                message = ex.Message,
+                innerMessage = innerMsg,
+                exceptionType = ex.GetType().FullName,
+                correlationId
+            });
+#else
+            var error = new ApiError(500, "An internal error occurred", CorrelationId: correlationId);
+            await context.Response.WriteAsJsonAsync(error);
+#endif
         }
     }
 }

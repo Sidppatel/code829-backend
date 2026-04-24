@@ -55,8 +55,15 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         cid.GetString().Should().NotBeNullOrEmpty();
     }
 
+    // Exception detail is now gated on the DEBUG compile symbol rather than the
+    // runtime Development environment (security session S5, BE #81). The detail
+    // never reaches a Release binary, so a runtime Development env does not
+    // unlock the verbose branch in a CI/Release build. Tests follow the same
+    // conditional so the suite mirrors the production build.
+
+#if DEBUG
     [Fact]
-    public async Task Development_IncludesExceptionDetail()
+    public async Task Debug_IncludesExceptionDetail()
     {
         var env = new StubEnvironment("Development");
         var ctx = BuildContext(env);
@@ -70,6 +77,26 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         var body = await new StreamReader(ctx.Response.Body).ReadToEndAsync();
         body.Should().Contain("detail-for-dev");
     }
+#else
+    [Fact]
+    public async Task Release_OmitsExceptionDetailEvenInDevelopmentEnv()
+    {
+        var env = new StubEnvironment("Development");
+        var ctx = BuildContext(env);
+        RequestDelegate next = _ => throw new InvalidOperationException("Secret internal error with SQL hints");
+
+        var mw = new ErrorHandlingMiddleware(next);
+        await mw.InvokeAsync(ctx, new StubAuditLogService());
+
+        ctx.Response.StatusCode.Should().Be(500);
+        ctx.Response.Body.Position = 0;
+        var body = await new StreamReader(ctx.Response.Body).ReadToEndAsync();
+        body.Should().NotContain("Secret internal error");
+        body.Should().NotContain("SQL");
+        var doc = JsonDocument.Parse(body);
+        doc.RootElement.GetProperty("message").GetString().Should().Be("An internal error occurred");
+    }
+#endif
 
     private sealed class StubEnvironment(string name) : IWebHostEnvironment
     {
