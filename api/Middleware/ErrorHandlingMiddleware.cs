@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Api.Exceptions;
 using Contracts.DTOs;
 using Contracts.Enums;
 using Db.Entities;
@@ -20,6 +21,22 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
         try
         {
             await next(context);
+        }
+        catch (MalwareDetectedException ex)
+        {
+            var correlationId = context.TraceIdentifier;
+            Log.Warning("Malware detected on {Method} {Path}: {Threat}", context.Request.Method, context.Request.Path, ex.Threat);
+            context.Response.StatusCode = 422;
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                type = "https://datatracker.ietf.org/doc/html/rfc4918#section-11.2",
+                title = "File rejected",
+                status = 422,
+                detail = "File rejected",
+                correlationId
+            });
+            return;
         }
         catch (Exception ex)
         {

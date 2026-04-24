@@ -219,6 +219,13 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IPlatformImageService, PlatformImageService>();
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
+    // Malware scanner: ClamAV when CLAMAV_HOST is set, no-op otherwise (local dev convenience).
+    // Production must set CLAMAV_HOST — see docs/runbooks/secret-rotation.md is not the place; deployment env config is.
+    if (!string.IsNullOrEmpty(builder.Configuration["CLAMAV_HOST"]))
+        builder.Services.AddSingleton<IMalwareScanner, ClamAvScanner>();
+    else
+        builder.Services.AddSingleton<IMalwareScanner, NoopMalwareScanner>();
+
     // Conditional service registration: mock in dev, real in prod
     // Payment service uses real Stripe when a valid key is configured, even in dev
     if (builder.Environment.IsDevelopment())
@@ -524,6 +531,8 @@ static string ConvertPostgresUrl(string url)
     // Otherwise parse as a postgres:// URI
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
+    if (userInfo.Length < 2)
+        throw new InvalidOperationException("DATABASE_URL missing user:password");
     var host = ResolveToIPv4(uri.Host);
     return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=300;Command Timeout=30;Timeout=15";
 }
@@ -572,8 +581,17 @@ static Task ConfigureJwtSigningKey(WebApplication app)
 
     var jwtOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<JwtBearerOptions>>();
     var bearerOptions = jwtOptions.Get(JwtBearerDefaults.AuthenticationScheme);
-    bearerOptions.TokenValidationParameters.IssuerSigningKey =
-        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secrets.JwtSecret));
+
+    var keys = new List<SecurityKey>
+    {
+        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secrets.JwtSecret))
+    };
+    var previous = secrets.JwtSecretPrevious;
+    if (!string.IsNullOrEmpty(previous))
+        keys.Add(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(previous)));
+
+    bearerOptions.TokenValidationParameters.IssuerSigningKey = keys[0];
+    bearerOptions.TokenValidationParameters.IssuerSigningKeys = keys;
 
     return Task.CompletedTask;
 }

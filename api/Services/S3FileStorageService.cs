@@ -1,6 +1,7 @@
 using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Api.Exceptions;
 using Api.Helpers;
 using Serilog;
 
@@ -10,7 +11,7 @@ namespace Api.Services;
 /// Production file storage using S3-compatible object storage (AWS S3, Cloudflare R2, etc.).
 /// Reads configuration from ISettingsService.
 /// </summary>
-public class S3FileStorageService(ISecretsProvider secrets, ISettingsService settings) : IFileStorageService
+public class S3FileStorageService(ISecretsProvider secrets, ISettingsService settings, IMalwareScanner scanner) : IFileStorageService
 {
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
@@ -42,6 +43,11 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
         await fileStream.CopyToAsync(ms);
         ms.Position = 0;
 
+        var scan = await scanner.ScanAsync(ms);
+        if (!scan.IsClean)
+            throw new MalwareDetectedException(scan.Threat);
+        ms.Position = 0;
+
         var request = new PutObjectRequest
         {
             BucketName = bucket,
@@ -68,6 +74,11 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
         // Buffer into MemoryStream so the SDK knows Content-Length upfront.
         var ms = new MemoryStream();
         await fileStream.CopyToAsync(ms);
+        ms.Position = 0;
+
+        var scan = await scanner.ScanAsync(ms);
+        if (!scan.IsClean)
+            throw new MalwareDetectedException(scan.Threat);
         ms.Position = 0;
 
         var request = new PutObjectRequest

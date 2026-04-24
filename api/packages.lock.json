@@ -123,6 +123,12 @@
           "Newtonsoft.Json": "13.0.3"
         }
       },
+      "nClam": {
+        "type": "Direct",
+        "requested": "[8.0.0, )",
+        "resolved": "8.0.0",
+        "contentHash": "XZdQ43CefOSryaZ0mwJ61saPoV+NZtGkUfuBhGyHYLR6uIuUVBl5I/DUInq5nefJQBWkl5Z3eSKO7s/cfTLpaQ=="
+      },
       "Npgsql.EntityFrameworkCore.PostgreSQL": {
         "type": "Direct",
         "requested": "[10.0.1, )",
