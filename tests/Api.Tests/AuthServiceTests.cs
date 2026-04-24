@@ -174,6 +174,7 @@ public class AuthServiceTests : IDisposable
         await secondCall.Should().ThrowAsync<UnauthorizedAccessException>();
     }
 
+#if DEBUG
     [Fact]
     public async Task DevLoginAsync_InProduction_ThrowsInvalidOperationException()
     {
@@ -183,6 +184,7 @@ public class AuthServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not available*");
     }
+#endif
 
     public void Dispose()
     {

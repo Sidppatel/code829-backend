@@ -6,7 +6,9 @@ public interface IAuthService
 {
     Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? frontendOrigin = null);
     Task<(UserDto User, string SessionToken, string Jwt)> VerifyMagicLinkAsync(string token, string? deviceName, string? ip);
+#if DEBUG
     Task<(UserDto User, string SessionToken, string Jwt)> DevLoginAsync(string email, string? deviceName, string? ip);
+#endif
     Task<UserDto?> GetCurrentUserAsync(Guid userId);
     Task LogoutAsync(string sessionHash);
     Task<List<DeviceSessionDto>> GetSessionsAsync(Guid userId, string? currentSessionHash);

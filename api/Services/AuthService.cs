@@ -83,6 +83,7 @@ public class AuthService(
         return (userDto, sessionToken, jwt);
     }
 
+#if DEBUG
     public async Task<(UserDto User, string SessionToken, string Jwt)> DevLoginAsync(string email, string? deviceName, string? ip)
     {
         if (!environment.IsDevelopment())
@@ -101,6 +102,7 @@ public class AuthService(
         Log.Information("[Auth] Dev login for {Email}", user.Email);
         return (userDto, sessionToken, jwt);
     }
+#endif
 
     public async Task<UserDto?> GetCurrentUserAsync(Guid userId)
     {

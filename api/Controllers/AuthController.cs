@@ -206,6 +206,9 @@ public class AuthController(
         }
     }
 
+#if DEBUG
+    // Dev-only bypass — compiled out of Release builds. Release deploys must
+    // never expose this endpoint because it skips credential verification.
     [HttpPost("dev-login")]
     public async Task<IActionResult> DevLogin([FromBody] DevLoginRequest request)
     {
@@ -231,6 +234,7 @@ public class AuthController(
             return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier));
         }
     }
+#endif
 
     [HttpPost("logout")]
     [Authorize]
