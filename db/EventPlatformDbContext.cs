@@ -44,10 +44,9 @@ public class EventPlatformDbContext(
     // User-facing
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
-    // Logging
-    public DbSet<DeveloperLog> DeveloperLogs => Set<DeveloperLog>();
-    public DbSet<BusinessLog> BusinessLogs => Set<BusinessLog>();
-    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
+    // Logging — admin/developer/system actors go through audit_logs only.
+    // Legacy write tables were dropped in the DropLegacyLogTables migration; reads
+    // continue via the BusinessLogView / DeveloperLogView / SystemLogView projections.
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
@@ -71,6 +70,7 @@ public class EventPlatformDbContext(
     public DbSet<PlatformImageView> PlatformImageViews => Set<PlatformImageView>();
     public DbSet<BusinessLogView> BusinessLogViews => Set<BusinessLogView>();
     public DbSet<SystemLogView> SystemLogViews => Set<SystemLogView>();
+    public DbSet<DeveloperLogView> DeveloperLogViews => Set<DeveloperLogView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -608,61 +608,10 @@ public class EventPlatformDbContext(
 
         // ─── Logging ─────────────────────────────────────────────
 
-        modelBuilder.Entity<DeveloperLog>(entity =>
-        {
-            entity.ToTable("developer_logs", t =>
-            {
-                t.HasCheckConstraint("CK_developer_logs_Severity",
-                    "\"Severity\" IN ('Warning','Error','Critical')");
-            });
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.Timestamp).HasDefaultValueSql("now()");
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => e.Severity);
-            entity.Property(e => e.Severity).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Message).HasMaxLength(4096);
-            entity.Property(e => e.ExceptionType).HasMaxLength(512);
-            entity.Property(e => e.RequestPath).HasMaxLength(512);
-            entity.Property(e => e.RequestMethod).HasMaxLength(10);
-            entity.Property(e => e.IpAddress).HasMaxLength(45);
-            entity.Property(e => e.CorrelationId).HasMaxLength(64);
-        });
-
-        modelBuilder.Entity<BusinessLog>(entity =>
-        {
-            entity.ToTable("business_logs");
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.Timestamp).HasDefaultValueSql("now()");
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => e.Action);
-            entity.Property(e => e.Action).HasMaxLength(128);
-            entity.Property(e => e.EntityType).HasMaxLength(64);
-            entity.Property(e => e.Description).HasMaxLength(2048);
-            entity.Property(e => e.IpAddress).HasMaxLength(45);
-        });
-
-        modelBuilder.Entity<SystemLog>(entity =>
-        {
-            entity.ToTable("system_logs", t =>
-            {
-                t.HasCheckConstraint("CK_system_logs_Category",
-                    "\"Category\" IN ('EntityChange','BackgroundWorker','Cache','MockService','Migration')");
-                t.HasCheckConstraint("CK_system_logs_DurationMs",
-                    "\"DurationMs\" IS NULL OR \"DurationMs\" >= 0");
-            });
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.Timestamp).HasDefaultValueSql("now()");
-            entity.HasIndex(e => e.Timestamp);
-            entity.HasIndex(e => e.Category);
-            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(30);
-            entity.Property(e => e.Action).HasMaxLength(64);
-            entity.Property(e => e.Source).HasMaxLength(256);
-            entity.Property(e => e.EntityType).HasMaxLength(64);
-            entity.Property(e => e.CorrelationId).HasMaxLength(64);
-        });
+        // DeveloperLog / BusinessLog / SystemLog write entities removed in the
+        // DropLegacyLogTables migration — all actor activity writes go to audit_logs.
+        // Read paths continue via the v_business_logs / v_developer_logs / v_system_logs
+        // view projections mapped further down.
 
         modelBuilder.Entity<EmailLog>(entity =>
         {
@@ -831,6 +780,13 @@ public class EventPlatformDbContext(
             entity.ToView("v_system_logs");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Category).HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<DeveloperLogView>(entity =>
+        {
+            entity.ToView("v_developer_logs");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Severity).HasMaxLength(20);
         });
     }
 }
