@@ -471,11 +471,18 @@ var builder = WebApplication.CreateBuilder(args);
         }
     }
 
-    // Seed data — only in development to prevent test data in production
-    // Allow override via SEED_DATA environment variable for initialization in other environments
-    var shouldSeed = app.Environment.IsDevelopment() || 
-                    Environment.GetEnvironmentVariable("SEED_DATA")?.ToLower() == "true";
-    if (shouldSeed)
+    // Seed data — only in Development. The historical SEED_DATA override is
+    // refused in non-Development environments because the admin seeders plant
+    // accounts with well-known default passwords. Use ProdBootstrap for real deploys.
+    if (Environment.GetEnvironmentVariable("SEED_DATA")?.ToLower() == "true"
+        && !app.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException(
+            "SEED_DATA=true is only permitted when ASPNETCORE_ENVIRONMENT=Development. " +
+            "Refusing to seed: default accounts contain known credentials.");
+    }
+
+    if (app.Environment.IsDevelopment())
     {
         await DataSeeder.SeedAsync(app.Services);
         await VenueEventSeeder.SeedAsync(app.Services);

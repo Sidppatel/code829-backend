@@ -32,15 +32,24 @@ public static class DataSeeder
         var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
         var authProc = scope.ServiceProvider.GetRequiredService<IAuthProcedures>();
         var businessUserProc = scope.ServiceProvider.GetRequiredService<IBusinessUserProcedures>();
+        var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
 
-        await SeedAdminUsersAsync(context, encryption, businessUserProc);
+        await SeedAdminUsersAsync(context, encryption, businessUserProc, env);
         await SeedUsersAsync(context, encryption, authProc);
         await SeedSettingsAsync(settingsService);
         await SeedTableTemplatesAsync(context);
     }
 
-    private static async Task SeedAdminUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IBusinessUserProcedures businessUserProc)
+    private static async Task SeedAdminUsersAsync(EventPlatformDbContext context, IEncryptionService encryption, IBusinessUserProcedures businessUserProc, IWebHostEnvironment env)
     {
+        // Defense-in-depth: seeded admin accounts carry known default passwords
+        // ("Dev@12345", "Admin@12345", "Staff@12345"). Refuse to run anywhere but
+        // Development so a misconfigured SEED_DATA flag cannot plant them in prod.
+        if (!env.IsDevelopment())
+            throw new InvalidOperationException(
+                "SeedAdminUsersAsync refuses to run outside Development. " +
+                "Default admin accounts contain known passwords — use ProdBootstrap for real deployments.");
+
         if (await context.BusinessUsers.AnyAsync())
             return;
 
