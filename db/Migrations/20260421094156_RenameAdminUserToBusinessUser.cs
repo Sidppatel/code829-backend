@@ -207,9 +207,14 @@ namespace db.Migrations
                 name: "IX_admin_user_events_EventId",
                 newName: "IX_business_user_events_EventId");
 
-            // 11. Reinstall views and stored procedures with business_* bodies.
-            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Views");
-            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.Procedures");
+            // 11. Views + SPs are intentionally NOT reloaded here. Both folders now contain
+            // files that reference tables created in LATER migrations (e.g. v_feedbacks,
+            // v_platform_images, v_venue_images, v_event_images — added after this rename —
+            // plus sp_create_user_email_verification_token → user_email_verification_tokens
+            // from AddUserPasswordAuth). A LoadAll at this point breaks fresh-DB bootstrap.
+            // HardenFunctionSearchPath (20260422054100) performs the final LoadAll for both
+            // Views and Procedures after every table schema is in place. Prod + already-applied
+            // DBs are unaffected — this migration is forward-only and marked complete on those.
         }
 
         /// <inheritdoc />

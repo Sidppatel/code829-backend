@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Contracts.DTOs;
 using IntegrationTests.Fixtures;
 
@@ -58,12 +59,14 @@ public sealed class MiddlewareTests(DatabaseFixture db)
     }
 
     [Fact]
-    public async Task ApiError_ShapeIncludesTraceId_On401()
+    public async Task ApiError_ShapeIncludesTraceId_On403()
     {
-        var client = db.Factory.CreateClient().WithoutAuth();
+        // Use User JWT against an admin-only endpoint — RoleAuthorizationMiddleware
+        // runs on a path that is past the JwtBearer challenge, so it can write ApiError JSON.
+        var client = db.Factory.CreateClient().WithUser();
         var resp = await client.GetAsync("/admin/auth/me");
-        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        var err = await resp.Content.ReadFromJsonAsync<ApiError>();
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
         err!.Message.Should().NotBeNullOrEmpty();
         err.CorrelationId.Should().NotBeNullOrEmpty();
