@@ -4,6 +4,7 @@ using Contracts.DTOs;
 using Contracts.DTOs.Admin;
 using Contracts.DTOs.Auth;
 using Contracts.DTOs.Logs;
+using Contracts.DTOs.Organizations;
 using Contracts.Enums;
 using Db;
 using Serilog;
@@ -29,7 +30,10 @@ public class DeveloperController(
     IImageService imageService,
     IBusinessUserProcedures businessUserProc,
     IUserProcedures userProc,
-    IEncryptionService encryptionService
+    IEncryptionService encryptionService,
+    IOrganizationService organizationService,
+    IOrganizationProcedures organizationProc,
+    IStripeConnectService stripeConnect
 ) : ControllerBase
 {
     /// <summary>
@@ -532,5 +536,237 @@ public class DeveloperController(
         var logo = images.FirstOrDefault();
         if (logo is null) return NotFound(new ApiError(404, "No logo uploaded", HttpContext.TraceIdentifier));
         return Ok(logo);
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    // Organizations + Stripe Connect (developer-scoped)
+    //
+    // Per the Stripe Connect plan, every connected-account flow is owned by
+    // an Organization (one acct_... per org), not by a BusinessUser. Members
+    // of the org share the payout destination.
+    // ───────────────────────────────────────────────────────────────────
+
+    /// <summary>List organizations with pagination + search.</summary>
+    [HttpGet("organizations")]
+    public async Task<IActionResult> ListOrganizations(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        [FromQuery] bool includeArchived = false)
+    {
+        var result = await organizationService.ListAsync(search, page, pageSize, includeArchived);
+        return Ok(result);
+    }
+
+    /// <summary>Create a blank organization. Optional initial member attaches an existing admin in one shot.</summary>
+    [HttpPost("organizations")]
+    public async Task<IActionResult> CreateOrganization([FromBody] OrganizationCreateRequest request)
+    {
+        var countryCode = string.IsNullOrEmpty(request.CountryCode) ? "US" : request.CountryCode.ToUpperInvariant();
+
+        if (request.InitialMemberBusinessUserId is { } memberId)
+        {
+            var member = await businessUserProc.GetByIdAsync(memberId);
+            if (member is null)
+                return BadRequest(new ApiError(400,
+                    $"BusinessUser {memberId} not found — cannot attach as initial member",
+                    HttpContext.TraceIdentifier));
+        }
+
+        var id = await organizationService.CreateAsync(
+            request.Name.Trim(), request.LegalName?.Trim(), countryCode,
+            request.InitialMemberBusinessUserId);
+
+        var dto = await organizationService.GetAsync(id);
+        return Created($"/v1/developer/organizations/{id}", dto);
+    }
+
+    /// <summary>Get a single organization (active or archived).</summary>
+    [HttpGet("organizations/{id:guid}")]
+    public async Task<IActionResult> GetOrganization(Guid id)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+        return Ok(org);
+    }
+
+    /// <summary>Rename / update contact fields. Stripe-related fields are read-only.</summary>
+    [HttpPut("organizations/{id:guid}")]
+    public async Task<IActionResult> UpdateOrganization(Guid id, [FromBody] OrganizationUpdateRequest request)
+    {
+        var existing = await organizationService.GetAsync(id);
+        if (existing is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        var normalized = request with
+        {
+            Name = request.Name?.Trim(),
+            LegalName = request.LegalName?.Trim(),
+            CountryCode = request.CountryCode?.ToUpperInvariant()
+        };
+
+        await organizationService.UpdateAsync(id, normalized);
+        var updated = await organizationService.GetAsync(id);
+        return Ok(updated);
+    }
+
+    /// <summary>Attach an existing BusinessUser to the organization.</summary>
+    [HttpPost("organizations/{id:guid}/members")]
+    public async Task<IActionResult> AddOrganizationMember(Guid id, [FromBody] OrganizationMemberRequest request)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        var member = await businessUserProc.GetByIdAsync(request.BusinessUserId);
+        if (member is null)
+            return NotFound(new ApiError(404, $"BusinessUser {request.BusinessUserId} not found", HttpContext.TraceIdentifier));
+
+        try
+        {
+            await organizationService.AddMemberAsync(id, request.BusinessUserId);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "22023" /* invalid_parameter_value */ )
+        {
+            return BadRequest(new ApiError(400, ex.MessageText, HttpContext.TraceIdentifier));
+        }
+
+        return Ok(new { message = "Member added", organizationId = id, businessUserId = request.BusinessUserId });
+    }
+
+    /// <summary>Detach a BusinessUser from the organization. Refuses to remove the last member of an org with a Stripe account.</summary>
+    [HttpDelete("organizations/{id:guid}/members/{businessUserId:guid}")]
+    public async Task<IActionResult> RemoveOrganizationMember(Guid id, Guid businessUserId)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        try
+        {
+            await organizationService.RemoveMemberAsync(id, businessUserId);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "23503" /* foreign_key_violation — last-member guard */ )
+        {
+            return Conflict(new ApiError(409, ex.MessageText, HttpContext.TraceIdentifier));
+        }
+
+        return Ok(new { message = "Member removed", organizationId = id, businessUserId });
+    }
+
+    /// <summary>
+    /// Idempotent: creates a Stripe Express account for the organization (if it
+    /// doesn't already have one) and returns a fresh identity-scope onboarding
+    /// link. Re-calling on an org that already has an account just returns a
+    /// new link.
+    /// </summary>
+    [HttpPost("organizations/{id:guid}/stripe-account")]
+    public async Task<IActionResult> CreateStripeAccount(Guid id)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        var stripeAccountId = org.StripeConnectedAccountId;
+
+        if (string.IsNullOrEmpty(stripeAccountId))
+        {
+            // Use the developer's email as the contact for Stripe — once members
+            // exist a future endpoint can let dev pick one of them. For an org
+            // with no Stripe account yet there's no pre-existing contact source.
+            var devEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                ?? "platform@code829.com";
+
+            try
+            {
+                stripeAccountId = await stripeConnect.CreateExpressAccountAsync(id, devEmail, org.CountryCode);
+                await organizationProc.UpdateStripeAccountAsync(id, stripeAccountId);
+            }
+            catch (StripeException ex)
+            {
+                Log.Error(ex, "[Developer] Stripe Connect account creation failed for org {OrganizationId}", id);
+                return StatusCode(502, new ApiError(502,
+                    "Failed to create Stripe Connect account — see server logs", HttpContext.TraceIdentifier));
+            }
+        }
+
+        try
+        {
+            var url = await stripeConnect.CreateOnboardingLinkAsync(stripeAccountId, OnboardingLinkScope.Identity);
+            // Stripe AccountLink URLs expire ~5 minutes after creation; surface
+            // the conservative figure to the FE so it can prompt the user to
+            // refresh if they wait too long.
+            var expiresAt = DateTime.UtcNow.AddMinutes(5);
+            return Created($"/v1/developer/organizations/{id}/stripe-account",
+                new StripeOnboardingLinkResponse(url, expiresAt));
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Developer] Stripe onboarding link creation failed for org {OrganizationId}", id);
+            return StatusCode(502, new ApiError(502,
+                "Failed to create Stripe onboarding link", HttpContext.TraceIdentifier));
+        }
+    }
+
+    /// <summary>Generate a new onboarding link (identity or bank scope) for an org with an existing Stripe account.</summary>
+    [HttpPost("organizations/{id:guid}/stripe-onboarding-link")]
+    public async Task<IActionResult> CreateStripeOnboardingLink(Guid id, [FromBody] StripeOnboardingLinkRequest request)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        if (string.IsNullOrEmpty(org.StripeConnectedAccountId))
+            return BadRequest(new ApiError(400,
+                "Organization has no Stripe account yet — call POST /stripe-account first",
+                HttpContext.TraceIdentifier));
+
+        var scope = string.Equals(request.Scope, "bank", StringComparison.OrdinalIgnoreCase)
+            ? OnboardingLinkScope.BankOnly
+            : OnboardingLinkScope.Identity;
+
+        try
+        {
+            var url = await stripeConnect.CreateOnboardingLinkAsync(org.StripeConnectedAccountId, scope);
+            return Ok(new StripeOnboardingLinkResponse(url, DateTime.UtcNow.AddMinutes(5)));
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Developer] Stripe onboarding link creation failed for org {OrganizationId}", id);
+            return StatusCode(502, new ApiError(502, "Failed to create Stripe onboarding link", HttpContext.TraceIdentifier));
+        }
+    }
+
+    /// <summary>
+    /// Live-fetches the Stripe account status (charges_enabled, payouts_enabled,
+    /// details_submitted, requirements.currently_due) AND persists the snapshot
+    /// to organizations.* so subsequent reads can come from DB.
+    /// </summary>
+    [HttpGet("organizations/{id:guid}/stripe-status")]
+    public async Task<IActionResult> GetStripeStatus(Guid id)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        if (string.IsNullOrEmpty(org.StripeConnectedAccountId))
+            return BadRequest(new ApiError(400, "Organization has no Stripe account", HttpContext.TraceIdentifier));
+
+        try
+        {
+            var status = await stripeConnect.FetchAccountStatusAsync(org.StripeConnectedAccountId);
+
+            // Persist the snapshot so other readers don't have to round-trip Stripe.
+            // requirements_due is jsonb; serialize as a JSON array.
+            var requirementsJson = System.Text.Json.JsonSerializer.Serialize(status.RequirementsCurrentlyDue);
+            await organizationProc.UpdateStripeStatusAsync(
+                status.AccountId,
+                status.ChargesEnabled, status.PayoutsEnabled,
+                status.DetailsSubmitted, requirementsJson);
+
+            return Ok(new StripeAccountStatusDto(
+                status.AccountId,
+                status.ChargesEnabled, status.PayoutsEnabled, status.DetailsSubmitted,
+                status.RequirementsCurrentlyDue));
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Developer] Stripe status fetch failed for org {OrganizationId}", id);
+            return StatusCode(502, new ApiError(502, "Failed to fetch Stripe account status", HttpContext.TraceIdentifier));
+        }
     }
 }
