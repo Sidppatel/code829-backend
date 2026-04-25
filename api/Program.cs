@@ -33,14 +33,27 @@ try
 var bootstrapEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 if (bootstrapEnv == "Development")
 {
-    var envCandidates = new[]
+    // Bootstrap precedence (LATER overrides EARLIER):
+    //   1. Process env (from Infisical via start-backend.ps1, or whatever
+    //      the parent shell injected when running `dotnet run` manually).
+    //   2. .env (Infisical-style snapshot, optional fallback for IDE runs
+    //      that bypass the start script).
+    //   3. .env.local (committed-grade, monorepo-root, gitignored — local
+    //      dev overrides like docker creds, dev URLs, and a stable
+    //      STRIPE_WEBHOOK_SECRET pinned to a `stripe listen` session).
+    // .env.local is loaded LAST so dev overrides win over Infisical
+    // snapshots, matching the order in start-backend.ps1.
+    var envFiles = new[]
     {
         Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
         Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+        Path.Combine(Directory.GetCurrentDirectory(), "..", ".env.local"),
+        Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env.local"),
+        Path.Combine(Directory.GetCurrentDirectory(), ".env.local"),
     };
-    var envPath = envCandidates.FirstOrDefault(File.Exists);
-    if (envPath is not null)
+    foreach (var envPath in envFiles)
     {
+        if (!File.Exists(envPath)) continue;
         Console.WriteLine($"[Bootstrap] Loading environment from {envPath}");
         foreach (var line in File.ReadAllLines(envPath))
         {
@@ -48,8 +61,15 @@ if (bootstrapEnv == "Development")
             if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
             var eqIndex = trimmed.IndexOf('=');
             if (eqIndex <= 0) continue;
-            var key = trimmed[..eqIndex];
-            var value = trimmed[(eqIndex + 1)..];
+            var key = trimmed[..eqIndex].Trim();
+            var value = trimmed[(eqIndex + 1)..].Trim();
+            // Strip surrounding single or double quotes — Infisical exports
+            // some secret values quoted; raw values from .env.local are not.
+            if (value.Length >= 2 &&
+                ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
+            {
+                value = value[1..^1];
+            }
             Environment.SetEnvironmentVariable(key, value);
         }
     }

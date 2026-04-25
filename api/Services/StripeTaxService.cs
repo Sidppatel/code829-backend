@@ -84,9 +84,37 @@ public class StripeTaxService(ISecretsProvider secrets) : ITaxService
         }
         catch (StripeException ex)
         {
+            // Stripe rejects a second create-from-calculation with an explicit
+            // error of the form: "You already created tax transaction
+            // tax_xxx from tax calculation taxcalc_xxx." Both the FE-driven
+            // confirm path AND the payment_intent.succeeded webhook race to
+            // call this — so the loser would otherwise log an Error stack.
+            // Parse the existing id out of the message and return it as if
+            // we had created it ourselves; both paths get the right id, only
+            // one create actually fires at Stripe.
+            var existingId = TryExtractAlreadyCreatedTransactionId(ex);
+            if (existingId is not null)
+            {
+                Log.Information(
+                    "[StripeTax] Tax transaction {TxnId} already created from calculation {CalcId} — reusing",
+                    existingId, calculationId);
+                return existingId;
+            }
+
             Log.Error(ex, "[StripeTax] Failed to create tax transaction from calculation {CalcId}", calculationId);
             throw new InvalidOperationException($"Tax transaction creation failed: {ex.StripeError?.Message ?? ex.Message}", ex);
         }
+    }
+
+    private static string? TryExtractAlreadyCreatedTransactionId(StripeException ex)
+    {
+        var msg = ex.StripeError?.Message ?? ex.Message ?? string.Empty;
+        if (!msg.Contains("already created tax transaction", StringComparison.OrdinalIgnoreCase)) return null;
+        // Match a tax_… token in the message. Stripe ids are alphanumeric
+        // with underscores; anchor on the prefix to avoid collisions with
+        // taxcalc_… (also present in the message).
+        var match = System.Text.RegularExpressions.Regex.Match(msg, @"\btax_[A-Za-z0-9]+\b");
+        return match.Success ? match.Value : null;
     }
 
     public async Task CreateReversalAsync(string taxTransactionId, string reference, CancellationToken ct = default)

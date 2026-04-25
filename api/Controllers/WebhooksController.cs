@@ -289,6 +289,7 @@ public class WebhooksController(
         // have a stripe key. Best-effort: a transfer without a resolvable PI is
         // still recorded with PurchaseId=null.
         string? paymentIntentId = null;
+        PaymentIntent? sourcePi = null;
         if (!string.IsNullOrEmpty(transfer.SourceTransactionId) && !string.IsNullOrEmpty(secrets.StripeSecretKey))
         {
             try
@@ -296,11 +297,46 @@ public class WebhooksController(
                 var client = new StripeClient(secrets.StripeSecretKey);
                 var charge = await new ChargeService(client).GetAsync(transfer.SourceTransactionId);
                 paymentIntentId = charge.PaymentIntentId;
+                if (!string.IsNullOrEmpty(paymentIntentId))
+                    sourcePi = await new PaymentIntentService(client).GetAsync(paymentIntentId);
             }
             catch (StripeException ex)
             {
                 Log.Warning(ex, "[Webhook] transfer.created {TransferId} — failed to resolve source charge {ChargeId}",
                     transfer.Id, transfer.SourceTransactionId);
+            }
+        }
+
+        // Enrich the destination CHARGE (the one visible in the organizer's
+        // Stripe Express dashboard). Destination charges create a separate
+        // charge under the connected account whose metadata + description
+        // default to empty — set them by calling Charge.update under the
+        // Stripe-Account header so the organizer sees the purchase context.
+        if (sourcePi is not null
+            && !string.IsNullOrEmpty(transfer.DestinationPaymentId)
+            && !string.IsNullOrEmpty(secrets.StripeSecretKey))
+        {
+            try
+            {
+                var client = new StripeClient(secrets.StripeSecretKey);
+                var chargeOpts = new ChargeUpdateOptions
+                {
+                    Description = sourcePi.Description,
+                    Metadata = sourcePi.Metadata is { Count: > 0 }
+                        ? new Dictionary<string, string>(sourcePi.Metadata)
+                        : null
+                };
+                var requestOpts = new RequestOptions { StripeAccount = transfer.DestinationId };
+                await new ChargeService(client).UpdateAsync(transfer.DestinationPaymentId, chargeOpts, requestOpts);
+                Log.Information(
+                    "[Webhook] transfer.created enriched destination charge {ChargeId} on {Account} with desc + metadata",
+                    transfer.DestinationPaymentId, transfer.DestinationId);
+            }
+            catch (StripeException ex)
+            {
+                Log.Warning(ex,
+                    "[Webhook] transfer.created — failed to enrich destination charge {ChargeId} on {Account}",
+                    transfer.DestinationPaymentId, transfer.DestinationId);
             }
         }
 
