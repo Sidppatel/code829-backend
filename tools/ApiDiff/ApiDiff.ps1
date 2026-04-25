@@ -289,8 +289,10 @@ function Run-Compare {
         $row.result = 'PASS'; $pass++
       }
     } else {
-      if ($base.itemCount -ne $cur.itemCount) {
-        $row.result = 'COUNT_MISMATCH'; $row.detail = "items $($base.itemCount) -> $($cur.itemCount)"; $fail++
+      $bCount = if ($base.ContainsKey('itemCount')) { $base.itemCount } else { $null }
+      $cCount = if ($cur.ContainsKey('itemCount'))  { $cur.itemCount }  else { $null }
+      if ($bCount -ne $cCount) {
+        $row.result = 'COUNT_MISMATCH'; $row.detail = "items $bCount -> $cCount"; $fail++
       } else {
         $row.result = 'PASS'; $pass++
       }
@@ -308,7 +310,9 @@ function Run-Compare {
   [void]$sb.AppendLine("| id | tier | baseline | current | result | detail |")
   [void]$sb.AppendLine("|---|---|---|---|---|---|")
   foreach ($r in $rows) {
-    [void]$sb.AppendLine(("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $r.id, $r.tier, $r.baselineStatus, ($r.currentStatus ?? '-'), $r.result, ($r.detail ?? '')))
+    $cs = if ($r.ContainsKey('currentStatus')) { $r.currentStatus } else { '-' }
+    $de = if ($r.ContainsKey('detail')) { $r.detail } else { '' }
+    [void]$sb.AppendLine(("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $r.id, $r.tier, $r.baselineStatus, $cs, $r.result, $de))
   }
   Set-Content -Path $ReportPath -Value $sb.ToString() -Encoding utf8
   Write-Host "report -> $ReportPath  (pass=$pass fail=$fail)"
