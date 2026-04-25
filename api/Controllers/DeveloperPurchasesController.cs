@@ -2,6 +2,7 @@ using Api.Middleware;
 using Api.Services;
 using Contracts.Enums;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StackExchange.Redis;
@@ -20,5 +21,6 @@ namespace Api.Controllers;
 public class DeveloperPurchasesController(
     EventPlatformDbContext context,
     IPurchaseService purchaseService,
+    IOrganizationProcedures organizationProc,
     IConnectionMultiplexer redis
-) : AdminPurchasesController(context, purchaseService, redis);
+) : AdminPurchasesController(context, purchaseService, organizationProc, redis);

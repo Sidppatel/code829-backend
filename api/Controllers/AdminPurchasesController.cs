@@ -9,6 +9,7 @@ using Contracts.DTOs.Purchases;
 using Contracts.Enums;
 using CsvHelper;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,9 +26,29 @@ namespace Api.Controllers;
 public class AdminPurchasesController(
     EventPlatformDbContext context,
     IPurchaseService purchaseService,
+    IOrganizationProcedures organizationProc,
     IConnectionMultiplexer redis
 ) : ControllerBase
 {
+    private Guid GetCurrentUserId() =>
+        Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    // Returns the BusinessUserIds whose events the caller can view, or null
+    // for Developer (platform-wide visibility). Admins see their own events
+    // plus those of every co-admin in the same Organization. Unattached
+    // admins fall back to their own events only.
+    private async Task<List<Guid>?> GetCallerScopeAsync()
+    {
+        if (User.IsInRole(UserRole.Developer.ToString())) return null;
+        var currentUserId = GetCurrentUserId();
+        var callerOrg = await organizationProc.GetByBusinessUserAsync(currentUserId);
+        if (callerOrg is null) return new List<Guid> { currentUserId };
+        var members = await organizationProc.GetMembersAsync(callerOrg.Id);
+        var ids = members.Select(m => m.BusinessUserId).ToList();
+        if (!ids.Contains(currentUserId)) ids.Add(currentUserId);
+        return ids;
+    }
+
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -42,13 +63,18 @@ public class AdminPurchasesController(
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var cacheKey = $"purchases:list:{eventId}:{status}:{search}:{page}:{pageSize}";
+        var coAdminIds = await GetCallerScopeAsync();
+        var scopeKey = coAdminIds is null ? "dev" : string.Join(",", coAdminIds.OrderBy(g => g));
+        var cacheKey = $"purchases:list:{scopeKey}:{eventId}:{status}:{search}:{page}:{pageSize}";
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(cacheKey);
         if (cached.HasValue)
             return Content(cached.ToString(), "application/json");
 
         var query = context.PurchaseViews.AsNoTracking().AsQueryable();
+
+        if (coAdminIds is not null)
+            query = query.Where(b => coAdminIds.Contains(b.BusinessUserId));
 
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(b => b.Status == status);
@@ -91,13 +117,17 @@ public class AdminPurchasesController(
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats([FromQuery] Guid? eventId = null)
     {
-        var cacheKey = $"purchases:stats:{eventId}";
+        var coAdminIds = await GetCallerScopeAsync();
+        var scopeKey = coAdminIds is null ? "dev" : string.Join(",", coAdminIds.OrderBy(g => g));
+        var cacheKey = $"purchases:stats:{scopeKey}:{eventId}";
         var db = redis.GetDatabase();
         var cached = await db.StringGetAsync(cacheKey);
         if (cached.HasValue)
             return Content(cached.ToString(), "application/json");
 
         var query = context.PurchaseViews.AsNoTracking().AsQueryable();
+        if (coAdminIds is not null)
+            query = query.Where(b => coAdminIds.Contains(b.BusinessUserId));
         if (eventId.HasValue)
             query = query.Where(b => b.EventId == eventId.Value);
 
@@ -121,9 +151,9 @@ public class AdminPurchasesController(
         var purchase = await context.PurchaseViews.AsNoTracking().FirstOrDefaultAsync(b => b.PurchaseId == id);
         if (purchase is null) return NotFound(new ApiError(404, "Purchase not found", HttpContext.TraceIdentifier));
 
-        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var coAdminIds = await GetCallerScopeAsync();
         var ev = await context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == purchase.EventId);
-        if (ev is not null && ev.BusinessUserId != adminId && !User.IsInRole(UserRole.Developer.ToString()))
+        if (ev is not null && coAdminIds is not null && !coAdminIds.Contains(ev.BusinessUserId))
             return StatusCode(403, new ApiError(403, "Not your event", HttpContext.TraceIdentifier));
 
         await InvalidatePurchaseCaches();
@@ -185,6 +215,10 @@ public class AdminPurchasesController(
     private async Task<List<PurchaseExportRow>> GetExportRows(Guid? eventId)
     {
         var query = context.PurchaseViews.AsNoTracking().AsQueryable();
+
+        var coAdminIds = await GetCallerScopeAsync();
+        if (coAdminIds is not null)
+            query = query.Where(b => coAdminIds.Contains(b.BusinessUserId));
 
         if (eventId.HasValue)
             query = query.Where(b => b.EventId == eventId.Value);
