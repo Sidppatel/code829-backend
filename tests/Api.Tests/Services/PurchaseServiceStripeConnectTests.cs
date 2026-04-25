@@ -258,9 +258,9 @@ public class PurchaseServiceStripeConnectTests : IDisposable
         IDictionary<string, string>? capturedMetadata = null;
         _paymentService.Setup(p => p.CreatePaymentIntentAsync(
                 It.IsAny<int>(), It.IsAny<int>(), "acct_active", It.IsAny<string>(),
-                It.IsAny<IDictionary<string, string>>()))
-            .Callback<int, int, string?, string, IDictionary<string, string>?>(
-                (_, _, _, _, metadata) => capturedMetadata = metadata)
+                It.IsAny<IDictionary<string, string>>(), It.IsAny<string?>(), It.IsAny<string?>()))
+            .Callback<int, int, string?, string, IDictionary<string, string>?, string?, string?>(
+                (_, _, _, _, metadata, _, _) => capturedMetadata = metadata)
             .ReturnsAsync(("pi_meta_test", "pi_meta_test_secret", "requires_payment_method"));
 
         _purchaseProc.Setup(p => p.ReserveOpenCapacityAsync(
