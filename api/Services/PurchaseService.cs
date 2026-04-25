@@ -86,9 +86,12 @@ public class PurchaseService(
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
             purchaseNumber, ev, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
+        var piDescription = BuildPaymentIntentDescription(purchaseNumber, ev, tableCount: tables.Count);
+        var piStatementSuffix = BuildStatementDescriptorSuffix(ev);
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata);
+            piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata,
+            description: piDescription, statementDescriptorSuffix: piStatementSuffix);
 
         // Create purchase with the first table as primary (for backward compat)
         var purchaseId = await purchaseProc.CreatePurchaseAsync(
@@ -182,9 +185,12 @@ public class PurchaseService(
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
             purchaseNumber, ev, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, seats: seatsRequested);
+        var piDescription = BuildPaymentIntentDescription(purchaseNumber, ev, seats: seatsRequested);
+        var piStatementSuffix = BuildStatementDescriptorSuffix(ev);
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata);
+            piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata,
+            description: piDescription, statementDescriptorSuffix: piStatementSuffix);
 
         // sp_reserve_open_capacity serializes capacity + ticket-type quota checks via row-level
         // locks on events/event_ticket_types rows. Replaces the previous Redis-lock + SELECT +
@@ -475,6 +481,42 @@ public class PurchaseService(
 
     private static string Truncate(string value, int max) =>
         string.IsNullOrEmpty(value) || value.Length <= max ? value : value[..max];
+
+    /// <summary>
+    /// Human-readable PaymentIntent description. Propagates to the Charge and
+    /// (for destination charges) to the Transfer to the connected account, so
+    /// the organizer's Stripe Express dashboard line item reads
+    /// <c>"BK-260425-126825 — Test Event (2 tables)"</c> instead of a bare
+    /// dollar amount.
+    /// </summary>
+    private static string BuildPaymentIntentDescription(
+        string purchaseNumber, EventView ev, int? tableCount = null, int? seats = null)
+    {
+        var qty = tableCount is int tc
+            ? $" ({tc} {(tc == 1 ? "table" : "tables")})"
+            : seats is int s
+                ? $" ({s} {(s == 1 ? "seat" : "seats")})"
+                : string.Empty;
+        var raw = $"{purchaseNumber} - {ev.Title}{qty}";
+        return raw.Length > 1000 ? raw[..1000] : raw;
+    }
+
+    /// <summary>
+    /// 22-char-max statement-descriptor suffix shown on the customer's bank
+    /// statement after the platform's prefix. Built from the event title so
+    /// the customer recognises the charge.
+    /// </summary>
+    private static string BuildStatementDescriptorSuffix(EventView ev)
+    {
+        var title = ev.Title ?? string.Empty;
+        // Stripe disallows < > " ' * and limits to 22 chars. Bank statement
+        // also strips most non-ASCII; collapse whitespace.
+        var ascii = new string(title
+            .Where(c => c >= ' ' && c <= '~' && c is not ('<' or '>' or '"' or '\'' or '*'))
+            .ToArray()).Trim();
+        if (string.IsNullOrEmpty(ascii)) ascii = "Event";
+        return ascii.Length > 22 ? ascii[..22] : ascii;
+    }
 
     private static string GenerateQrToken()
     {

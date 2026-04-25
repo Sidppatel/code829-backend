@@ -16,7 +16,9 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
         int transferAmountCents,
         string? connectedAccountId,
         string currency = "usd",
-        IDictionary<string, string>? metadata = null)
+        IDictionary<string, string>? metadata = null,
+        string? description = null,
+        string? statementDescriptorSuffix = null)
     {
         var client = await GetClientAsync();
 
@@ -32,6 +34,20 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
             // Stripe caps metadata keys at 50 and values at 500 chars; short keys/values below are well within limits.
             options.Metadata = new Dictionary<string, string>(metadata);
         }
+
+        // Description propagates to the underlying Charge and (for destination
+        // charges) to the auto-created Transfer to the connected account, so
+        // the organizer's Stripe Express dashboard shows a human-readable
+        // line item (e.g. "BK-260425-126825 - Test Event"). Stripe truncates
+        // descriptions at 1000 chars; we cap defensively.
+        if (!string.IsNullOrEmpty(description))
+            options.Description = description.Length > 1000 ? description[..1000] : description;
+
+        // statement_descriptor_suffix is what shows on the customer's bank
+        // statement after the platform's prefix. Stripe limits to 22 chars
+        // and disallows <>"' characters.
+        if (!string.IsNullOrEmpty(statementDescriptorSuffix))
+            options.StatementDescriptorSuffix = SanitizeStatementDescriptor(statementDescriptorSuffix);
 
         if (!string.IsNullOrEmpty(connectedAccountId))
         {
@@ -157,5 +173,16 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
             "invalid_request_error" => new ArgumentException($"Invalid payment request: {ex.StripeError.Message}", ex),
             _ => new InvalidOperationException($"Payment processing error: {ex.Message}", ex)
         };
+    }
+
+    /// <summary>
+    /// Strips characters Stripe rejects in <c>statement_descriptor_suffix</c>
+    /// (&lt;, &gt;, ", ', and *) and trims to the 22-char maximum. Letters,
+    /// digits, spaces, and most punctuation pass through.
+    /// </summary>
+    private static string SanitizeStatementDescriptor(string value)
+    {
+        var cleaned = new string(value.Where(c => c is not ('<' or '>' or '"' or '\'' or '*')).ToArray()).Trim();
+        return cleaned.Length > 22 ? cleaned[..22] : cleaned;
     }
 }

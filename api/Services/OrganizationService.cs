@@ -118,7 +118,8 @@ public class OrganizationService(
                 r.StripeDetailsSubmitted,
                 r.StripeChargesEnabled,
                 r.StripePayoutsEnabled,
-                disabledReason: null)
+                disabledReason: null),
+            HasStripeAccount: !string.IsNullOrEmpty(r.StripeConnectedAccountId)
         )).ToList();
 
         return new PagedResponse<OrganizationListItemDto>(items, totalCount, page, pageSize);

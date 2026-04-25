@@ -17,8 +17,6 @@ public class WebhooksController(
     ISecretsProvider secrets,
     IStripeTransactionProcedures stripeTransactionProc,
     IPurchaseProcedures purchaseProc,
-    ITaxService taxService,
-    IPaymentService paymentService,
     IOrganizationProcedures organizationProc,
     IStripeEventProcedures stripeEventProc,
     IConnectionMultiplexer redis,

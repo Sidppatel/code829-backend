@@ -25,5 +25,13 @@ public record OrganizationListItemDto(
     /// list + detail endpoints stay in lock-step and the FE never has to
     /// re-implement the booleans-to-state machine.
     /// </summary>
-    string StripeState
+    string StripeState,
+    /// <summary>
+    /// True iff <c>StripeConnectedAccountId</c> is non-empty. Surfaced as a
+    /// dedicated boolean because the FE list type
+    /// (<c>OrganizationListItem.hasStripeAccount</c>) reads it directly —
+    /// without this field the "Account" column would render "Not Connected"
+    /// even after onboarding completes.
+    /// </summary>
+    bool HasStripeAccount
 );
