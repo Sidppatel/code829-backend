@@ -80,6 +80,8 @@ public class EventPlatformDbContext(
     public DbSet<TopEventRevenueView> TopEventRevenueViews => Set<TopEventRevenueView>();
     public DbSet<PurchasesByStatusView> PurchasesByStatusViews => Set<PurchasesByStatusView>();
     public DbSet<EventsByCategoryView> EventsByCategoryViews => Set<EventsByCategoryView>();
+    public DbSet<EventTableStatsView> EventTableStatsViews => Set<EventTableStatsView>();
+    public DbSet<EventFacetsView> EventFacetsViews => Set<EventFacetsView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -881,6 +883,18 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_events_by_category");
             entity.HasKey(e => e.Category);
+        });
+
+        modelBuilder.Entity<EventTableStatsView>(entity =>
+        {
+            entity.ToView("v_event_table_stats");
+            entity.HasKey(e => e.EventId);
+        });
+
+        modelBuilder.Entity<EventFacetsView>(entity =>
+        {
+            entity.ToView("v_event_facets");
+            entity.HasNoKey();
         });
     }
 }

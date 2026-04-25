@@ -45,4 +45,30 @@ public class DashboardProcedures(EventPlatformDbContext context) : IDashboardPro
                 new NpgsqlParameter("p1", month))
             .ToListAsync(ct);
     }
+
+    public async Task<List<PurchaseInfoForEventRow>> GetPurchaseInfoForEventAsync(Guid eventId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<PurchaseInfoForEventRow>(
+                "SELECT * FROM sp_get_purchase_info_for_event(@p0)",
+                new NpgsqlParameter("p0", eventId))
+            .ToListAsync(ct);
+    }
+
+    public async Task<PurchaseStatsRow> GetPurchaseStatsAsync(Guid[]? coAdminIds, Guid? eventId, CancellationToken ct = default)
+    {
+        var idsParam = new NpgsqlParameter("p0", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
+        {
+            Value = (object?)coAdminIds ?? DBNull.Value
+        };
+        var eventParam = new NpgsqlParameter("p1", NpgsqlDbType.Uuid)
+        {
+            Value = (object?)eventId ?? DBNull.Value
+        };
+        return await context.Database
+            .SqlQueryRaw<PurchaseStatsRow>(
+                "SELECT * FROM sp_get_purchase_stats(@p0, @p1)",
+                idsParam, eventParam)
+            .FirstAsync(ct);
+    }
 }

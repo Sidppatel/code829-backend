@@ -6,7 +6,24 @@ public interface IDashboardProcedures
     Task<List<EventRecentPurchaseRow>> GetEventRecentPurchasesAsync(Guid eventId, int limit, CancellationToken ct = default);
     Task<MonthlyReportSummaryRow> GetMonthlyReportSummaryAsync(int year, int month, CancellationToken ct = default);
     Task<List<MonthlyReportByEventRow>> GetMonthlyReportByEventAsync(int year, int month, CancellationToken ct = default);
+
+    Task<List<PurchaseInfoForEventRow>> GetPurchaseInfoForEventAsync(Guid eventId, CancellationToken ct = default);
+    Task<PurchaseStatsRow> GetPurchaseStatsAsync(Guid[]? coAdminIds, Guid? eventId, CancellationToken ct = default);
 }
+
+public record PurchaseInfoForEventRow(
+    Guid TableId,
+    int PurchaseCount,
+    int SeatsBooked,
+    long SubtotalCents
+);
+
+public record PurchaseStatsRow(
+    int Total,
+    int Paid,
+    int CheckedIn,
+    long Revenue
+);
 
 public record NextEventDashboardRow(
     Guid EventId,

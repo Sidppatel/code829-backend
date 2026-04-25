@@ -108,16 +108,10 @@ public class AdminEventsController(
         var tableStats = new Dictionary<Guid, (int total, int booked)>();
         if (gridEventIds.Any())
         {
-            var stats = await context.EventTablesSummaryViews.AsNoTracking()
-                .Where(t => gridEventIds.Contains(t.EventId) && t.IsActive)
-                .GroupBy(t => t.EventId)
-                .Select(g => new { 
-                    EventId = g.Key, 
-                    TotalTables = g.Sum(x => x.TotalTables),
-                    BookedTables = g.Sum(x => x.BookedTables) 
-                })
+            var stats = await context.EventTableStatsViews.AsNoTracking()
+                .Where(s => gridEventIds.Contains(s.EventId))
                 .ToListAsync();
-                
+
             foreach (var stat in stats)
                 tableStats[stat.EventId] = (stat.TotalTables, stat.BookedTables);
         }

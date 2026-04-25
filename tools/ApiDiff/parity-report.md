@@ -41,7 +41,7 @@
 | admin_platform_images | smoke | 200 | 200 | PASS |  |
 | admin_logs | smoke | 200 | 200 | PASS |  |
 | admin_auth_me | smoke | 200 | 200 | PASS |  |
-| admin_auth_sessions | smoke | 200 | 200 | COUNT_MISMATCH | items 1 -> 5 |
+| admin_auth_sessions | smoke | 200 | 200 | COUNT_MISMATCH | items 1 -> 6 |
 | admin_stripe_status | smoke | 409 | 409 | PASS |  |
 | checkin_events | smoke | 200 | 200 | PASS |  |
 | developer_email_log | smoke | 200 | 200 | PASS |  |
@@ -58,7 +58,7 @@
 | feedback_list | smoke | 200 | 200 | PASS |  |
 | tickets_mine | smoke | 200 | 200 | PASS |  |
 | auth_me | smoke | 200 | 200 | PASS |  |
-| auth_sessions | smoke | 200 | 200 | COUNT_MISMATCH | items 1 -> 5 |
+| auth_sessions | smoke | 200 | 200 | COUNT_MISMATCH | items 1 -> 6 |
 | purchases_mine | smoke | 200 | 200 | PASS |  |
 | purchases_stripe_config | smoke | 200 | 200 | PASS |  |
 | health | smoke | 404 | 404 | PASS |  |

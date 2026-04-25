@@ -27,6 +27,7 @@ public class AdminPurchasesController(
     EventPlatformDbContext context,
     IPurchaseService purchaseService,
     IOrganizationProcedures organizationProc,
+    IDashboardProcedures dashboardProc,
     IConnectionMultiplexer redis
 ) : ControllerBase
 {
@@ -125,20 +126,8 @@ public class AdminPurchasesController(
         if (cached.HasValue)
             return Content(cached.ToString(), "application/json");
 
-        var query = context.PurchaseViews.AsNoTracking().AsQueryable();
-        if (coAdminIds is not null)
-            query = query.Where(b => coAdminIds.Contains(b.BusinessUserId));
-        if (eventId.HasValue)
-            query = query.Where(b => b.EventId == eventId.Value);
-
-        var total = await query.CountAsync();
-        var paid = await query.CountAsync(b => b.Status == "Paid" || b.Status == "CheckedIn");
-        var checkedIn = await query.CountAsync(b => b.Status == "CheckedIn");
-        var revenue = await query
-            .Where(b => b.Status == "Paid" || b.Status == "CheckedIn")
-            .SumAsync(b => (long)b.TotalCents);
-
-        var result = new { total, paid, checkedIn, revenue };
+        var stats = await dashboardProc.GetPurchaseStatsAsync(coAdminIds?.ToArray(), eventId, default);
+        var result = new { total = stats.Total, paid = stats.Paid, checkedIn = stats.CheckedIn, revenue = stats.Revenue };
         var json = JsonSerializer.Serialize(result, JsonOpts);
         await db.StringSetAsync(cacheKey, json, CacheTtl);
 
