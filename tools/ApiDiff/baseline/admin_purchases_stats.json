@@ -1,0 +1,15 @@
+{
+  "body": {
+    "checkedIn": 20,
+    "paid": 104,
+    "revenue": 6231700,
+    "total": 135
+  },
+  "path": "/v1/admin/purchases/stats",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "admin_purchases_stats"
+}

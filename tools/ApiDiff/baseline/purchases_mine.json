@@ -1,0 +1,10 @@
+{
+  "path": "/v1/purchases/mine",
+  "method": "GET",
+  "auth": "user",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 17,
+  "status": 200,
+  "tier": "smoke",
+  "id": "purchases_mine"
+}

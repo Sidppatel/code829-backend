@@ -1,0 +1,15 @@
+{
+  "body": {
+    "totalBookedRevenueCents": 14500,
+    "totalCapacity": 40,
+    "totalPotentialRevenueCents": 36000,
+    "totalTables": 12
+  },
+  "path": "/v1/admin/events/ab242739-4983-4eb0-b8a5-ddc1cd4ca416/layout/stats",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "admin_layout_stats"
+}

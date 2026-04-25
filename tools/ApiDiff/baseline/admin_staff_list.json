@@ -1,0 +1,10 @@
+{
+  "path": "/v1/admin/staff",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 1,
+  "status": 200,
+  "tier": "smoke",
+  "id": "admin_staff_list"
+}

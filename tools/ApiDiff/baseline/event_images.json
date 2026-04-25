@@ -1,0 +1,9 @@
+{
+  "id": "event_images",
+  "tier": "smoke",
+  "method": "GET",
+  "contentType": "application/json; charset=utf-8",
+  "path": "/v1/events/ab242739-4983-4eb0-b8a5-ddc1cd4ca416/images",
+  "status": 200,
+  "auth": null
+}

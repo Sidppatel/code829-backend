@@ -1,0 +1,93 @@
+{
+  "body": {
+    "data": {
+      "cancelledPurchases": 1,
+      "category": "Social",
+      "checkedInPurchases": 0,
+      "daysUntil": 14,
+      "endDate": "2026-05-09T22:00:00Z",
+      "eventId": "ab242739-4983-4eb0-b8a5-ddc1cd4ca416",
+      "layoutMode": "Grid",
+      "paidPurchases": 4,
+      "pendingPurchases": 1,
+      "potentialRevenueCents": 36000,
+      "recentPurchases": [
+        {
+          "createdAt": "<<VOLATILE>>",
+          "purchaseId": "de994447-839c-4255-b948-927393e68a6f",
+          "purchaseNumber": "BK-SEED-0006",
+          "status": "Paid",
+          "totalCents": 2000,
+          "userEmail": "local.foodie@code829.local",
+          "userName": "Carla Sanchez"
+        },
+        {
+          "createdAt": "<<VOLATILE>>",
+          "purchaseId": "2338f6ba-5424-4169-8386-6d8ae65b6a13",
+          "purchaseNumber": "BK-SEED-0005",
+          "status": "Cancelled",
+          "totalCents": 2000,
+          "userEmail": "user2@code829.local",
+          "userName": "Taylor Brooks"
+        },
+        {
+          "createdAt": "<<VOLATILE>>",
+          "purchaseId": "33082f60-c5b4-4240-be4c-ccf6e5b3904b",
+          "purchaseNumber": "BK-SEED-0004",
+          "status": "Paid",
+          "totalCents": 4000,
+          "userEmail": "tech.enthusiast@code829.local",
+          "userName": "Jordan Lee"
+        },
+        {
+          "createdAt": "<<VOLATILE>>",
+          "purchaseId": "416726b5-f0f1-4d45-bc34-f5551c72cd91",
+          "purchaseNumber": "BK-SEED-0003",
+          "status": "Pending",
+          "totalCents": 4000,
+          "userEmail": "local.foodie@code829.local",
+          "userName": "Carla Sanchez"
+        },
+        {
+          "createdAt": "<<VOLATILE>>",
+          "purchaseId": "0cdb1634-8cb3-471a-a00e-7ee2fa3531c8",
+          "purchaseNumber": "BK-SEED-0002",
+          "status": "Paid",
+          "totalCents": 6500,
+          "userEmail": "music.lover@code829.local",
+          "userName": "Miles Davis"
+        },
+        {
+          "createdAt": "<<VOLATILE>>",
+          "purchaseId": "5117d750-2ada-42d3-98b7-126189ec734a",
+          "purchaseNumber": "BK-SEED-0001",
+          "status": "Paid",
+          "totalCents": 6500,
+          "userEmail": "user3@code829.local",
+          "userName": "Alex Chen"
+        }
+      ],
+      "refundedPurchases": 0,
+      "revenueCents": 19000,
+      "slug": "blind-mule-comedy-showcase",
+      "soldCount": 4,
+      "startDate": "2026-05-09T18:00:00Z",
+      "status": "Published",
+      "title": "Blind Mule Comedy Showcase",
+      "totalCapacity": 40,
+      "totalPurchases": 6,
+      "venueAddress": "57 N Claiborne St",
+      "venueCity": "Mobile",
+      "venueName": "The Blind Mule",
+      "venueState": "AL"
+    },
+    "hasUpcoming": true
+  },
+  "path": "/v1/admin/dashboard/next-event",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "admin_dashboard_next_event"
+}

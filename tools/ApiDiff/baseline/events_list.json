@@ -1,0 +1,10 @@
+{
+  "path": "/v1/events",
+  "method": "GET",
+  "auth": null,
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 9,
+  "status": 200,
+  "tier": "smoke",
+  "id": "events_list"
+}

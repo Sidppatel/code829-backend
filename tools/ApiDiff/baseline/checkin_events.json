@@ -1,0 +1,10 @@
+{
+  "path": "/v1/checkin/events",
+  "method": "GET",
+  "auth": "staff",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 0,
+  "status": 200,
+  "tier": "smoke",
+  "id": "checkin_events"
+}

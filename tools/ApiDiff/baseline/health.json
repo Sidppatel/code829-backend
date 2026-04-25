@@ -1,0 +1,10 @@
+{
+  "path": "/health",
+  "method": "GET",
+  "auth": null,
+  "contentType": "",
+  "itemCount": 0,
+  "status": 404,
+  "tier": "smoke",
+  "id": "health"
+}

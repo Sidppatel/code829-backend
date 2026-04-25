@@ -1,0 +1,9 @@
+{
+  "id": "robots",
+  "tier": "smoke",
+  "method": "GET",
+  "contentType": "text/plain",
+  "path": "/robots.txt",
+  "status": 200,
+  "auth": null
+}

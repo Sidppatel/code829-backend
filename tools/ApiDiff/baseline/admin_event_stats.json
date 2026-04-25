@@ -1,0 +1,15 @@
+{
+  "body": {
+    "fillRatePct": 10,
+    "grossRevenueCents": 14500,
+    "maxCapacity": 40,
+    "totalSold": 4
+  },
+  "path": "/v1/admin/events/ab242739-4983-4eb0-b8a5-ddc1cd4ca416/stats",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "admin_event_stats"
+}

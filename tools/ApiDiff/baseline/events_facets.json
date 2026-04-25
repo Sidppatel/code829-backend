@@ -1,0 +1,54 @@
+{
+  "body": {
+    "categories": [
+      "Business",
+      "Dining",
+      "Music",
+      "Social",
+      "Tech"
+    ],
+    "cities": [
+      "Fairhope",
+      "Mobile",
+      "Orange Beach",
+      "Theodore"
+    ],
+    "priceRange": {
+      "max": 45000,
+      "min": 1000
+    },
+    "venues": [
+      {
+        "name": "Mobile Convention Center",
+        "venueId": "41ea6400-4772-4219-a7e5-b9b97b26f446"
+      },
+      {
+        "name": "The Saenger Theatre",
+        "venueId": "775879fe-b49c-4b70-a561-6c4efb108314"
+      },
+      {
+        "name": "The Wharf Amphitheatre",
+        "venueId": "78b12d59-0f19-41e3-af4d-a060e78938a4"
+      },
+      {
+        "name": "Fairhope Civic Center",
+        "venueId": "948a8d67-e02c-49b2-accb-a54b4ea9eaa1"
+      },
+      {
+        "name": "The Blind Mule",
+        "venueId": "c69f69e6-a37e-4d2b-bce9-85017dd5626a"
+      },
+      {
+        "name": "Bellingrath Gardens",
+        "venueId": "d345fcd5-522e-4786-a299-bfb1db1cc90b"
+      }
+    ]
+  },
+  "path": "/v1/events/facets",
+  "method": "GET",
+  "auth": null,
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "events_facets"
+}

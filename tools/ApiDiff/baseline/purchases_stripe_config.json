@@ -1,0 +1,10 @@
+{
+  "path": "/v1/purchases/stripe-config",
+  "method": "GET",
+  "auth": null,
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 1,
+  "status": 200,
+  "tier": "smoke",
+  "id": "purchases_stripe_config"
+}

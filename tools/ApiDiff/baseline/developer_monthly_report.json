@@ -1,0 +1,112 @@
+{
+  "body": {
+    "byEvent": [
+      {
+        "adminPayoutCents": 3900000,
+        "chargedCents": 4132500,
+        "eventId": "003fbc0c-d11b-4b7d-99f7-f9d794d0bb43",
+        "eventTitle": "Gulf Coast Coding Bootcamp",
+        "platformFeeCents": 232500,
+        "purchaseCount": 15,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 1205000,
+        "chargedCents": 1446000,
+        "eventId": "48ebfb1d-0832-4baf-8caa-dc421836e648",
+        "eventTitle": "Mardi Gras Coronation Ball",
+        "platformFeeCents": 241000,
+        "purchaseCount": 33,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 360000,
+        "chargedCents": 430500,
+        "eventId": "4b68877b-92c5-487d-9a63-6ab5e2128aad",
+        "eventTitle": "Sunset Rhythm & Blues Festival",
+        "platformFeeCents": 70500,
+        "purchaseCount": 20,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 53000,
+        "chargedCents": 68500,
+        "eventId": "ad97f2e2-20f2-4805-b8ae-2de65a4b635b",
+        "eventTitle": "Bellingrath Gardens Spring Gala",
+        "platformFeeCents": 15500,
+        "purchaseCount": 7,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 35000,
+        "chargedCents": 45000,
+        "eventId": "15126c29-e35d-483a-82dd-cd52a2c4001e",
+        "eventTitle": "Fairhope Lakeside Jazz Festival",
+        "platformFeeCents": 10000,
+        "purchaseCount": 6,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 28000,
+        "chargedCents": 36700,
+        "eventId": "a20a40a5-0ab1-460f-8dae-68e2183de5bd",
+        "eventTitle": "Mobile Arts & Crafts Fair",
+        "platformFeeCents": 8700,
+        "purchaseCount": 12,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 26000,
+        "chargedCents": 34000,
+        "eventId": "7622c116-ebdf-4929-a757-e10040473cdf",
+        "eventTitle": "Farm-to-Table Dinner: Coastal Harvest",
+        "platformFeeCents": 8000,
+        "purchaseCount": 4,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 15000,
+        "chargedCents": 19500,
+        "eventId": "1720b13d-853d-4014-a4e1-0f9604eda7be",
+        "eventTitle": "Mobile Tech Leadership Summit",
+        "platformFeeCents": 4500,
+        "purchaseCount": 3,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      },
+      {
+        "adminPayoutCents": 14500,
+        "chargedCents": 19000,
+        "eventId": "ab242739-4983-4eb0-b8a5-ddc1cd4ca416",
+        "eventTitle": "Blind Mule Comedy Showcase",
+        "platformFeeCents": 4500,
+        "purchaseCount": 4,
+        "stripeFeesCents": 0,
+        "taxCollectedCents": 0
+      }
+    ],
+    "month": 4,
+    "netPlatformRevenueCents": 595200,
+    "totalAdminPayoutsCents": 5636500,
+    "totalChargedCents": 6231700,
+    "totalPlatformFeesCents": 595200,
+    "totalPurchases": 104,
+    "totalStripeFeesCents": 0,
+    "totalTaxCollectedCents": 0,
+    "year": 2026
+  },
+  "path": "/v1/developer/reports/monthly?year=2026&month=4",
+  "method": "GET",
+  "auth": "developer",
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "developer_monthly_report"
+}
