@@ -134,9 +134,9 @@
       },
       "nClam": {
         "type": "Direct",
-        "requested": "[8.0.0, )",
-        "resolved": "8.0.0",
-        "contentHash": "XZdQ43CefOSryaZ0mwJ61saPoV+NZtGkUfuBhGyHYLR6uIuUVBl5I/DUInq5nefJQBWkl5Z3eSKO7s/cfTLpaQ=="
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "kjJ9W3TJOl0VIS2lCpblfDHDZTUG7oejwx2PkjKxu6r+XSmcgBGJUMsrx2c8Utm4EfNDhjtKbJqwIzDpgog0Bw=="
       },
       "Npgsql.EntityFrameworkCore.PostgreSQL": {
         "type": "Direct",
