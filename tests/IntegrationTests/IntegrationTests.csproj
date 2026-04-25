@@ -47,4 +47,10 @@
     <Using Include="FluentAssertions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\StripeWebhookFixtures\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
