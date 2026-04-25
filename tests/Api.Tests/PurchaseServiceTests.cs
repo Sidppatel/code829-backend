@@ -46,9 +46,11 @@ public class PurchaseServiceTests : IDisposable
         _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync("10");
 
+        var enrichmentMock = new Mock<IPaymentEnrichmentService>();
         _service = new PurchaseService(_context, _purchaseProc.Object, _stripeTransactionProc.Object,
             _paymentService.Object, _taxService.Object, _pricingService.Object,
-            _emailService.Object, _settingsService.Object, orgProcMock.Object);
+            _emailService.Object, _settingsService.Object, orgProcMock.Object,
+            enrichmentMock.Object);
 
         _userId = Guid.NewGuid();
         _eventId = Guid.NewGuid();

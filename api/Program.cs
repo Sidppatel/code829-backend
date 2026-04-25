@@ -310,12 +310,20 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IPaymentService, StripePaymentService>();
     builder.Services.AddScoped<ITaxService, StripeTaxService>();
     builder.Services.AddScoped<IPricingService, PricingService>();
+    // Shared post-confirmation enrich + tax-record path. Used by both the
+    // Stripe webhook handler AND PurchaseService.ConfirmAsync so dev (no
+    // public webhook URL) and prod (webhook fires) both land the data.
+    builder.Services.AddScoped<IPaymentEnrichmentService, PaymentEnrichmentService>();
 
     // Stripe Connect — Express account creation, onboarding-link generation,
     // status fetch. Singleton because it depends on ISecretsProvider (also
     // singleton); the Stripe key is read on every call so env-var rotation
     // takes effect on the next request without restart of this service.
     builder.Services.AddSingleton<IStripeConnectService, StripeConnectService>();
+
+    // Alert fan-out abstraction. NoOp impl logs at Error severity via Serilog;
+    // production swaps in Sentry / Resend / PagerDuty without callers changing.
+    builder.Services.AddSingleton<IAlertService, NoOpAlertService>();
 
     // Organization CRUD + membership service. Scoped because it consumes the
     // scoped IOrganizationProcedures (which holds the EF DbContext).
@@ -438,6 +446,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationUpdateRequest>, OrganizationUpdateRequestValidator>();
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationMemberRequest>, OrganizationMemberRequestValidator>();
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.StripeOnboardingLinkRequest>, StripeOnboardingLinkRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.StartStripeOnboardingRequest>, StartStripeOnboardingRequestValidator>();
 
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();
@@ -516,10 +525,26 @@ var builder = WebApplication.CreateBuilder(args);
 
     if (app.Environment.IsDevelopment())
     {
-        await DataSeeder.SeedAsync(app.Services);
+        // Opt-out via SEED_USERS_AND_PURCHASES=false: skips the regular-user
+        // seed (8 default ticket buyers) and the synthetic purchase seed
+        // (~135 rows). Useful when you want a clean stage with only events
+        // and your custom business_users (e.g. for manual onboarding tests).
+        // Defaults to true — preserves the standard dev experience.
+        var seedUsersAndPurchases =
+            (Environment.GetEnvironmentVariable("SEED_USERS_AND_PURCHASES") ?? "true")
+            .Equals("true", StringComparison.OrdinalIgnoreCase);
+
+        await DataSeeder.SeedAsync(app.Services, seedUsers: seedUsersAndPurchases);
         await VenueEventSeeder.SeedAsync(app.Services);
         await LayoutSeeder.SeedAsync(app.Services);
-        await PurchaseSeeder.SeedAsync(app.Services);
+        if (seedUsersAndPurchases)
+        {
+            await PurchaseSeeder.SeedAsync(app.Services);
+        }
+        else
+        {
+            Log.Information("[Seed] SEED_USERS_AND_PURCHASES=false — skipped user + purchase seeding");
+        }
     }
 
     // Configure JWT signing key from DB settings

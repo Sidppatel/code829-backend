@@ -18,5 +18,12 @@ public record OrganizationListItemDto(
     DateTime? ArchivedAt,
     int MemberCount,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    /// <summary>
+    /// Coarse render state derived server-side via
+    /// <c>OrganizationStripeStateMapper.Derive</c>. Single source of truth so
+    /// list + detail endpoints stay in lock-step and the FE never has to
+    /// re-implement the booleans-to-state machine.
+    /// </summary>
+    string StripeState
 );

@@ -581,11 +581,11 @@ public class DeveloperController(
         return Created($"/v1/developer/organizations/{id}", dto);
     }
 
-    /// <summary>Get a single organization (active or archived).</summary>
+    /// <summary>Get a single organization (active or archived). Returns <see cref="OrganizationDetailDto"/> with the live BusinessUser roster.</summary>
     [HttpGet("organizations/{id:guid}")]
     public async Task<IActionResult> GetOrganization(Guid id)
     {
-        var org = await organizationService.GetAsync(id);
+        var org = await organizationService.GetDetailAsync(id);
         if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
         return Ok(org);
     }
@@ -605,7 +605,7 @@ public class DeveloperController(
         };
 
         await organizationService.UpdateAsync(id, normalized);
-        var updated = await organizationService.GetAsync(id);
+        var updated = await organizationService.GetDetailAsync(id);
         return Ok(updated);
     }
 
@@ -629,7 +629,8 @@ public class DeveloperController(
             return BadRequest(new ApiError(400, ex.MessageText, HttpContext.TraceIdentifier));
         }
 
-        return Ok(new { message = "Member added", organizationId = id, businessUserId = request.BusinessUserId });
+        var updated = await organizationService.GetDetailAsync(id);
+        return Ok(updated);
     }
 
     /// <summary>Detach a BusinessUser from the organization. Refuses to remove the last member of an org with a Stripe account.</summary>
@@ -648,7 +649,8 @@ public class DeveloperController(
             return Conflict(new ApiError(409, ex.MessageText, HttpContext.TraceIdentifier));
         }
 
-        return Ok(new { message = "Member removed", organizationId = id, businessUserId });
+        var updated = await organizationService.GetDetailAsync(id);
+        return Ok(updated);
     }
 
     /// <summary>
@@ -658,7 +660,7 @@ public class DeveloperController(
     /// new link.
     /// </summary>
     [HttpPost("organizations/{id:guid}/stripe-account")]
-    public async Task<IActionResult> CreateStripeAccount(Guid id)
+    public async Task<IActionResult> CreateStripeAccount(Guid id, [FromBody] StartStripeOnboardingRequest? request = null)
     {
         var org = await organizationService.GetAsync(id);
         if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
@@ -673,9 +675,31 @@ public class DeveloperController(
             var devEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
                 ?? "platform@code829.com";
 
+            // Defaults: business_type defaults to "individual" (sole-organizer
+            // case dominates); legal name + product description fall back to
+            // org row + auto-template; MCC pinned to 7922 (Theatrical
+            // Producers / Ticket Agencies) — exact fit for event ticketing.
+            var businessType = string.IsNullOrWhiteSpace(request?.BusinessType)
+                ? "individual"
+                : request.BusinessType;
+            var legalName = string.IsNullOrWhiteSpace(request?.LegalName)
+                ? (org.LegalName ?? org.Name)
+                : request.LegalName;
+            var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+            var productDescription = string.IsNullOrWhiteSpace(request?.ProductDescription)
+                ? $"Event tickets and admissions sold via the {appName} platform on behalf of {legalName}."
+                : request.ProductDescription;
+            var mcc = string.IsNullOrWhiteSpace(request?.Mcc) ? "7922" : request.Mcc;
+
+            var prefill = new StripeBusinessProfilePrefill(
+                LegalName: legalName,
+                ProductDescription: productDescription,
+                Mcc: mcc,
+                BusinessType: businessType);
+
             try
             {
-                stripeAccountId = await stripeConnect.CreateExpressAccountAsync(id, devEmail, org.CountryCode);
+                stripeAccountId = await stripeConnect.CreateExpressAccountAsync(id, devEmail, org.CountryCode, prefill);
                 await organizationProc.UpdateStripeAccountAsync(id, stripeAccountId);
             }
             catch (StripeException ex)
@@ -705,6 +729,37 @@ public class DeveloperController(
     }
 
     /// <summary>
+    /// Clean restart: delete the org's connected account at Stripe + null the
+    /// Stripe-related columns on the org row so a fresh
+    /// <see cref="CreateStripeAccount"/> call begins from zero. Idempotent —
+    /// safe to call on an org that has no connected account (just clears DB
+    /// columns; no-op at Stripe).
+    ///
+    /// <para>Test-mode accounts can always be deleted. Live-mode accounts
+    /// require zero balances; Stripe rejects with 502 otherwise (see
+    /// <see cref="IStripeConnectService.DeleteAccountAsync"/>).</para>
+    /// </summary>
+    [HttpDelete("organizations/{id:guid}/stripe-account")]
+    public async Task<IActionResult> ClearStripeAccount(Guid id)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        try
+        {
+            var detail = await organizationService.ClearStripeAccountAsync(id);
+            if (detail is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+            return Ok(detail);
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Developer] Stripe account delete failed for org {OrganizationId}", id);
+            return StatusCode(502, new ApiError(502,
+                "Failed to delete Stripe Connect account — see server logs", HttpContext.TraceIdentifier));
+        }
+    }
+
+    /// <summary>
     /// Email a fresh Stripe onboarding link to a BusinessUser member of the
     /// given organization. Useful when the developer creates the Connect
     /// account on behalf of the organizer and wants them to finish KYC
@@ -724,8 +779,8 @@ public class DeveloperController(
 
         try
         {
-            await organizationService.SendOnboardingLinkEmailAsync(request.BusinessUserId);
-            return Ok(new { message = "Onboarding link emailed", businessUserId = request.BusinessUserId, organizationId = id });
+            var response = await organizationService.SendOnboardingLinkEmailAsync(request.BusinessUserId);
+            return Ok(response);
         }
         catch (KeyNotFoundException ex)
         {
@@ -782,7 +837,26 @@ public class DeveloperController(
         if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
 
         if (string.IsNullOrEmpty(org.StripeConnectedAccountId))
-            return BadRequest(new ApiError(400, "Organization has no Stripe account", HttpContext.TraceIdentifier));
+        {
+            // Org exists but has no connected Stripe account yet. Mirror the admin
+            // shape so the FE can render the "no Stripe account yet" empty state
+            // off the same DTO it uses elsewhere.
+            return Ok(new OrganizationStripeStatusDto(
+                OrganizationId: org.Id,
+                OrganizationName: org.Name,
+                StripeAccount: null,
+                State: OrganizationStripeStateMapper.Derive(
+                    stripeAccountId: null,
+                    detailsSubmitted: false,
+                    chargesEnabled: false,
+                    payoutsEnabled: false,
+                    disabledReason: null),
+                BankAccountLast4: null,
+                // TODO: populate members once sp_get_organization_members exists
+                Members: new List<OrganizationMemberDto>(),
+                ExpressDashboardUrl: null,
+                FetchedAt: DateTime.UtcNow));
+        }
 
         try
         {
@@ -796,10 +870,36 @@ public class DeveloperController(
                 status.ChargesEnabled, status.PayoutsEnabled,
                 status.DetailsSubmitted, requirementsJson);
 
-            return Ok(new StripeAccountStatusDto(
-                status.AccountId,
-                status.ChargesEnabled, status.PayoutsEnabled, status.DetailsSubmitted,
-                status.RequirementsCurrentlyDue));
+            var state = OrganizationStripeStateMapper.Derive(
+                stripeAccountId: status.AccountId,
+                detailsSubmitted: status.DetailsSubmitted,
+                chargesEnabled: status.ChargesEnabled,
+                payoutsEnabled: status.PayoutsEnabled,
+                disabledReason: status.DisabledReason);
+
+            // LoginLinks expire ~5 minutes after creation — only mint when the
+            // account is actually payouts-ready, otherwise Stripe rejects the call.
+            var expressDashboardUrl = status.PayoutsEnabled
+                ? await stripeConnect.CreateLoginLinkAsync(org.StripeConnectedAccountId)
+                : null;
+
+            var stripeAccountDto = new StripeAccountStatusDto(
+                AccountId: status.AccountId,
+                ChargesEnabled: status.ChargesEnabled,
+                PayoutsEnabled: status.PayoutsEnabled,
+                DetailsSubmitted: status.DetailsSubmitted,
+                RequirementsCurrentlyDue: status.RequirementsCurrentlyDue);
+
+            return Ok(new OrganizationStripeStatusDto(
+                OrganizationId: org.Id,
+                OrganizationName: org.Name,
+                StripeAccount: stripeAccountDto,
+                State: state,
+                BankAccountLast4: status.BankAccountLast4,
+                // TODO: populate members once sp_get_organization_members exists
+                Members: new List<OrganizationMemberDto>(),
+                ExpressDashboardUrl: expressDashboardUrl,
+                FetchedAt: DateTime.UtcNow));
         }
         catch (StripeException ex)
         {

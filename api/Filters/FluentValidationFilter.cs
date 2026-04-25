@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Serilog;
 
 namespace Api.Filters;
 
@@ -37,6 +38,18 @@ public class FluentValidationFilter : IAsyncActionFilter
 
         if (errors is not null)
         {
+            // Log a single Warning line per failed request so the dev box has
+            // an audit trail when a client reports a 400 — FluentValidation
+            // short-circuits before any controller code runs, so without this
+            // there is no log entry pinning down which field rejected.
+            var path = context.HttpContext.Request.Path.ToString();
+            var method = context.HttpContext.Request.Method;
+            var summary = string.Join("; ",
+                errors.Select(kv => $"{kv.Key}: {string.Join(", ", kv.Value)}"));
+            Log.Warning(
+                "[Validation] 400 on {Method} {Path} — {Summary}",
+                method, path, summary);
+
             context.Result = new BadRequestObjectResult(new
             {
                 statusCode = 400,

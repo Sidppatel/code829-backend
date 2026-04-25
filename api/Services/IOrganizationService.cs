@@ -23,6 +23,14 @@ public interface IOrganizationService
     Task<OrganizationDto?> GetAsync(Guid id);
 
     /// <summary>
+    /// Returns the org row plus its BusinessUser roster as a single payload,
+    /// or null when the org id is unknown. Used by the developer detail and
+    /// add/remove-member endpoints so the FE sees the live roster on the same
+    /// response as the mutation.
+    /// </summary>
+    Task<OrganizationDetailDto?> GetDetailAsync(Guid id);
+
+    /// <summary>
     /// Lookup helper used by both the admin "what's my org?" endpoint and the
     /// pre-PaymentIntent guard in PurchaseService. Returns null when the
     /// BusinessUser has no Organization attached.
@@ -50,5 +58,18 @@ public interface IOrganizationService
     /// Stripe account yet (the developer must call POST /stripe-account
     /// before this endpoint can fire).
     /// </summary>
-    Task SendOnboardingLinkEmailAsync(Guid businessUserId);
+    Task<StripeOnboardingEmailResponse> SendOnboardingLinkEmailAsync(Guid businessUserId);
+
+    /// <summary>
+    /// Clean-restart hook: deletes the organization's connected account at
+    /// Stripe (via <see cref="IStripeConnectService.DeleteAccountAsync"/>) and
+    /// then nulls every Stripe-related column on the org row so a fresh
+    /// onboarding can begin from zero. Idempotent — calling on an org with no
+    /// connected account just clears the columns (no-op at Stripe).
+    ///
+    /// <para>Returns the post-clear org detail so the caller can return it
+    /// directly. Throws via Stripe exception mapping when live-mode balance
+    /// constraints prevent deletion.</para>
+    /// </summary>
+    Task<OrganizationDetailDto?> ClearStripeAccountAsync(Guid organizationId);
 }

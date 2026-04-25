@@ -53,16 +53,21 @@ public class AdminStripeController(
             // The org exists but has no Stripe account yet. Return the org
             // shell so the FE can render the "ask developer to enable payouts"
             // empty state without a separate request.
-            return Ok(new
-            {
-                organizationId = orgDto.Id,
-                organizationName = orgDto.Name,
-                stripeAccountId = (string?)null,
-                chargesEnabled = false,
-                payoutsEnabled = false,
-                detailsSubmitted = false,
-                requirementsCurrentlyDue = Array.Empty<string>()
-            });
+            return Ok(new OrganizationStripeStatusDto(
+                OrganizationId: orgDto.Id,
+                OrganizationName: orgDto.Name,
+                StripeAccount: null,
+                State: OrganizationStripeStateMapper.Derive(
+                    stripeAccountId: null,
+                    detailsSubmitted: false,
+                    chargesEnabled: false,
+                    payoutsEnabled: false,
+                    disabledReason: null),
+                BankAccountLast4: null,
+                // TODO: populate members once sp_get_organization_members exists
+                Members: new List<OrganizationMemberDto>(),
+                ExpressDashboardUrl: null,
+                FetchedAt: DateTime.UtcNow));
         }
 
         try
@@ -75,16 +80,34 @@ public class AdminStripeController(
                 status.ChargesEnabled, status.PayoutsEnabled, status.DetailsSubmitted,
                 requirementsJson);
 
-            return Ok(new
-            {
-                organizationId = orgDto.Id,
-                organizationName = orgDto.Name,
-                stripeAccountId = status.AccountId,
-                chargesEnabled = status.ChargesEnabled,
-                payoutsEnabled = status.PayoutsEnabled,
-                detailsSubmitted = status.DetailsSubmitted,
-                requirementsCurrentlyDue = status.RequirementsCurrentlyDue
-            });
+            var state = OrganizationStripeStateMapper.Derive(
+                stripeAccountId: status.AccountId,
+                detailsSubmitted: status.DetailsSubmitted,
+                chargesEnabled: status.ChargesEnabled,
+                payoutsEnabled: status.PayoutsEnabled,
+                disabledReason: status.DisabledReason);
+
+            var expressDashboardUrl = status.PayoutsEnabled
+                ? await stripeConnect.CreateLoginLinkAsync(orgDto.StripeConnectedAccountId)
+                : null;
+
+            var stripeAccountDto = new StripeAccountStatusDto(
+                AccountId: status.AccountId,
+                ChargesEnabled: status.ChargesEnabled,
+                PayoutsEnabled: status.PayoutsEnabled,
+                DetailsSubmitted: status.DetailsSubmitted,
+                RequirementsCurrentlyDue: status.RequirementsCurrentlyDue);
+
+            return Ok(new OrganizationStripeStatusDto(
+                OrganizationId: orgDto.Id,
+                OrganizationName: orgDto.Name,
+                StripeAccount: stripeAccountDto,
+                State: state,
+                BankAccountLast4: status.BankAccountLast4,
+                // TODO: populate members once sp_get_organization_members exists
+                Members: new List<OrganizationMemberDto>(),
+                ExpressDashboardUrl: expressDashboardUrl,
+                FetchedAt: DateTime.UtcNow));
         }
         catch (StripeException ex)
         {

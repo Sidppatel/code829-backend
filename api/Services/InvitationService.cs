@@ -53,13 +53,25 @@ public class InvitationService(
 
         Log.Information("[Invitation] Sending invitation to {Email}. Signup URL: {Url}", normalizedEmail, signupUrl);
 
-        await emailService.SendAsync(
-            normalizedEmail,
-            $"You're invited to join {appName}",
-            EmailTemplates.Invitation(appName, inviterName, role.ToString(), signupUrl, (int)InvitationExpiryMinutes)
-        );
-
-        Log.Information("[Invitation] {Inviter} invited {Email} as {Role}", inviterName, normalizedEmail, role);
+        // Email failures (Resend 403, transient SMTP) MUST NOT propagate — the
+        // invitation row is already persisted, the developer can re-send via
+        // the existing flow + the signup URL is in the log for fallback. A
+        // 5xx here would roll back the UX and force the developer to manually
+        // chase delivery. Sentry captures so ops still sees the failure.
+        try
+        {
+            await emailService.SendAsync(
+                normalizedEmail,
+                $"You're invited to join {appName}",
+                EmailTemplates.Invitation(appName, inviterName, role.ToString(), signupUrl, (int)InvitationExpiryMinutes)
+            );
+            Log.Information("[Invitation] {Inviter} invited {Email} as {Role}", inviterName, normalizedEmail, role);
+        }
+        catch (Exception emailEx)
+        {
+            Log.Error(emailEx, "[Invitation] Email send failed for {Email}; invitation row {InvitationId} persisted, signup URL available in logs", normalizedEmail, invitationId);
+            Sentry.SentrySdk.CaptureException(emailEx);
+        }
 
         return new InvitationDto(
             invitationId, normalizedEmail, role.ToString(), InvitationStatus.Pending.ToString(),

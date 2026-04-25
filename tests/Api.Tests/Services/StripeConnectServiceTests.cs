@@ -26,6 +26,12 @@ public class StripeConnectServiceTests
     private readonly Mock<ISecretsProvider> _secrets;
     private readonly StripeConnectService _service;
 
+    private static readonly StripeBusinessProfilePrefill TestPrefill = new(
+        LegalName: "Test Org LLC",
+        ProductDescription: "Event tickets and admissions sold via the Test platform.",
+        Mcc: "7922",
+        BusinessType: "individual");
+
     public StripeConnectServiceTests()
     {
         _secrets = new Mock<ISecretsProvider>();
@@ -38,7 +44,7 @@ public class StripeConnectServiceTests
     {
         _secrets.Setup(s => s.StripeSecretKey).Returns("");
 
-        var act = () => _service.CreateExpressAccountAsync(Guid.NewGuid(), "test@example.com", "US");
+        var act = () => _service.CreateExpressAccountAsync(Guid.NewGuid(), "test@example.com", "US", TestPrefill);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not configured*");
@@ -91,7 +97,7 @@ public class StripeConnectServiceTests
     {
         _secrets.Setup(s => s.StripeSecretKey).Returns("sk_test_invalid_key_for_unit_test_only");
 
-        var act = () => _service.CreateExpressAccountAsync(Guid.NewGuid(), "test@example.com", "US");
+        var act = () => _service.CreateExpressAccountAsync(Guid.NewGuid(), "test@example.com", "US", TestPrefill);
 
         await act.Should().ThrowAsync<ArgumentException>()
             .WithMessage("*Invalid Stripe Connect request*");
@@ -103,6 +109,54 @@ public class StripeConnectServiceTests
         _secrets.Setup(s => s.StripeSecretKey).Returns("sk_test_invalid_key_for_unit_test_only");
 
         var act = () => _service.FetchAccountStatusAsync("acct_test_404");
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*Invalid Stripe Connect request*");
+    }
+
+    [Fact]
+    public async Task CreateLoginLinkAsync_WithEmptyKey_ThrowsInvalidOperationException()
+    {
+        _secrets.Setup(s => s.StripeSecretKey).Returns("");
+
+        var act = () => _service.CreateLoginLinkAsync("acct_test_123");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not configured*");
+    }
+
+    [Fact]
+    public async Task CreateLoginLinkAsync_WithBogusKey_TranslatesStripeAuthErrorToTypedException()
+    {
+        _secrets.Setup(s => s.StripeSecretKey).Returns("sk_test_invalid_key_for_unit_test_only");
+        var act = () => _service.CreateLoginLinkAsync("acct_test_404");
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*Invalid Stripe Connect request*");
+    }
+
+    [Fact]
+    public async Task DeleteAccountAsync_WithEmptyKey_ThrowsInvalidOperationException()
+    {
+        _secrets.Setup(s => s.StripeSecretKey).Returns("");
+
+        var act = () => _service.DeleteAccountAsync("acct_test_123");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not configured*");
+    }
+
+    [Fact]
+    public async Task DeleteAccountAsync_WithBogusKey_TranslatesStripeAuthErrorToTypedException()
+    {
+        // Bogus key triggers Stripe's invalid_request_error (key auth fail) —
+        // mapped to ArgumentException by MapStripeException. The service's
+        // "already deleted = success" branch keys on the account_invalid code
+        // which only fires when the key is valid but the account id is gone;
+        // we cover that path in integration tests against the real Stripe
+        // sandbox, not here.
+        _secrets.Setup(s => s.StripeSecretKey).Returns("sk_test_invalid_key_for_unit_test_only");
+
+        var act = () => _service.DeleteAccountAsync("acct_test_404");
 
         await act.Should().ThrowAsync<ArgumentException>()
             .WithMessage("*Invalid Stripe Connect request*");

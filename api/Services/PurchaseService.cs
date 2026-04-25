@@ -20,7 +20,8 @@ public class PurchaseService(
     IPricingService pricingService,
     IEmailService emailService,
     ISettingsService settings,
-    IOrganizationProcedures organizationProc
+    IOrganizationProcedures organizationProc,
+    IPaymentEnrichmentService paymentEnrichment
 ) : IPurchaseService
 {
     public async Task<PurchaseDto> CreateAsync(Guid userId, CreatePurchaseRequest request)
@@ -267,6 +268,12 @@ public class PurchaseService(
 
         var qrToken = GenerateQrToken();
         await purchaseProc.ConfirmPurchaseAsync(purchaseId, qrToken);
+
+        // Enrich + record tax — same call the webhook makes. Idempotent; if
+        // the webhook also fires (e.g. with `stripe listen` forwarding) the
+        // upserts are no-ops. Without this, the FE-driven confirm path leaves
+        // tax/fee fields null in dev where no public webhook URL is wired.
+        await paymentEnrichment.EnrichAndRecordAsync(purchase.PaymentIntentId, purchase.TaxCalculationId);
 
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";

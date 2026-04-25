@@ -38,12 +38,13 @@ public sealed class AdminAuthControllerTests(DatabaseFixture db)
     }
 
     [Fact]
-    public async Task ForgotPassword_InvalidEmail_Returns400Or200()
+    public async Task ForgotPassword_InvalidEmail_ReturnsNoContent()
     {
-        // Often 200 for enumeration-resistance; either is acceptable
+        // Uniform 204 regardless of account existence or email-pipeline failure
+        // (BE #71 + #84 — security session S2). Mirrors user-side /auth/forgot-password.
         var client = db.Factory.CreateClient();
         var resp = await client.PostAsJsonAsync("/v1/admin/auth/forgot-password", new { email = "nope@example.com" });
-        resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]

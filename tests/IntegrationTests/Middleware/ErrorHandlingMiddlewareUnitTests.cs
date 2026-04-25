@@ -34,6 +34,15 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         return ctx;
     }
 
+    // Exception detail is now gated on the DEBUG compile symbol rather than the
+    // runtime Development environment (security session S5, BE #81). The detail
+    // never reaches a Release binary, so a runtime Production env does not
+    // suppress the verbose branch in a DEBUG-built test binary. Production-leak
+    // assertion therefore lives behind the same #if !DEBUG gate as the symmetric
+    // Release_OmitsExceptionDetailEvenInDevelopmentEnv test below — running it
+    // in DEBUG would assert behaviour the middleware (correctly) doesn't have.
+
+#if !DEBUG
     [Fact]
     public async Task Production_DoesNotLeakExceptionMessage()
     {
@@ -54,12 +63,7 @@ public sealed class ErrorHandlingMiddlewareUnitTests
         doc.RootElement.TryGetProperty("correlationId", out var cid).Should().BeTrue();
         cid.GetString().Should().NotBeNullOrEmpty();
     }
-
-    // Exception detail is now gated on the DEBUG compile symbol rather than the
-    // runtime Development environment (security session S5, BE #81). The detail
-    // never reaches a Release binary, so a runtime Development env does not
-    // unlock the verbose branch in a CI/Release build. Tests follow the same
-    // conditional so the suite mirrors the production build.
+#endif
 
 #if DEBUG
     [Fact]

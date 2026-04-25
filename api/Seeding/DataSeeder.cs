@@ -24,7 +24,7 @@ namespace Api.Seeding;
 /// </summary>
 public static class DataSeeder
 {
-    public static async Task SeedAsync(IServiceProvider services)
+    public static async Task SeedAsync(IServiceProvider services, bool seedUsers = true)
     {
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
@@ -35,7 +35,10 @@ public static class DataSeeder
         var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
 
         await SeedAdminUsersAsync(context, encryption, businessUserProc, env);
-        await SeedUsersAsync(context, encryption, authProc);
+        if (seedUsers)
+        {
+            await SeedUsersAsync(context, encryption, authProc);
+        }
         await SeedSettingsAsync(settingsService);
         await SeedTableTemplatesAsync(context);
     }

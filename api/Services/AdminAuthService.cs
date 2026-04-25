@@ -165,13 +165,25 @@ public class AdminAuthService(
         var appName = await settingsService.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var resetUrl = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
 
-        await emailService.SendAsync(
-            normalizedEmail,
-            $"{appName} Password Reset",
-            EmailTemplates.PasswordReset(appName, resetUrl, expiryMinutes)
-        );
-
-        Log.Information("[AdminAuth] Password reset link sent to {Email}", normalizedEmail);
+        // Email failures (Resend 403, transient SMTP) MUST NOT propagate — the
+        // forgot-password endpoint is uniform-response (204) and a 5xx here
+        // would leak email-existence and break the UX. Sentry captures the
+        // error so ops still see it. Mirrors the user-side AuthService pattern
+        // (BE #71 + #84 — security session S2).
+        try
+        {
+            await emailService.SendAsync(
+                normalizedEmail,
+                $"{appName} Password Reset",
+                EmailTemplates.PasswordReset(appName, resetUrl, expiryMinutes)
+            );
+            Log.Information("[AdminAuth] Password reset link sent to {Email}", normalizedEmail);
+        }
+        catch (Exception emailEx)
+        {
+            Log.Error(emailEx, "[AdminAuth] Password reset email send failed for {Email}", normalizedEmail);
+            Sentry.SentrySdk.CaptureException(emailEx);
+        }
     }
 
     public async Task ResetPasswordAsync(string token, string newPassword)

@@ -42,6 +42,26 @@ public class OrganizationService(
         return org is null ? null : MapToDto(org);
     }
 
+    public async Task<OrganizationDetailDto?> GetDetailAsync(Guid id)
+    {
+        var org = await orgProc.GetByIdAsync(id);
+        if (org is null) return null;
+
+        var memberRows = await orgProc.GetMembersAsync(id);
+        var members = memberRows
+            .Select(m => new OrganizationMemberDto(m.BusinessUserId, m.Email, m.DisplayName))
+            .ToList();
+
+        return new OrganizationDetailDto(
+            org.Id, org.Name, org.LegalName, org.CountryCode,
+            org.StripeConnectedAccountId,
+            org.StripeChargesEnabled, org.StripePayoutsEnabled, org.StripeDetailsSubmitted,
+            org.StripeOnboardedAt, org.StripeRequirementsDue,
+            org.ArchivedAt, org.CreatedAt, org.UpdatedAt,
+            members
+        );
+    }
+
     public async Task<OrganizationDto?> GetByBusinessUserIdAsync(Guid businessUserId)
     {
         var org = await orgProc.GetByBusinessUserAsync(businessUserId);
@@ -87,13 +107,24 @@ public class OrganizationService(
             r.StripeConnectedAccountId,
             r.StripeChargesEnabled, r.StripePayoutsEnabled, r.StripeDetailsSubmitted,
             r.StripeOnboardedAt, r.ArchivedAt, r.MemberCount,
-            r.CreatedAt, r.UpdatedAt
+            r.CreatedAt, r.UpdatedAt,
+            // disabledReason not surfaced on the list endpoint (no Stripe call
+            // here — would be a per-row roundtrip). Webhook-driven snapshot
+            // only includes the booleans + currently_due array; rejected state
+            // therefore doesn't show in the list until the detail endpoint
+            // refreshes it (acceptable trade-off — rejected accts are rare).
+            OrganizationStripeStateMapper.Derive(
+                r.StripeConnectedAccountId,
+                r.StripeDetailsSubmitted,
+                r.StripeChargesEnabled,
+                r.StripePayoutsEnabled,
+                disabledReason: null)
         )).ToList();
 
         return new PagedResponse<OrganizationListItemDto>(items, totalCount, page, pageSize);
     }
 
-    public async Task SendOnboardingLinkEmailAsync(Guid businessUserId)
+    public async Task<StripeOnboardingEmailResponse> SendOnboardingLinkEmailAsync(Guid businessUserId)
     {
         var member = await businessUserProc.GetByIdAsync(businessUserId)
             ?? throw new KeyNotFoundException($"BusinessUser {businessUserId} not found");
@@ -124,6 +155,11 @@ public class OrganizationService(
         Log.Information(
             "[Organization] Sent onboarding link to BusinessUser {BusinessUserId} for org {OrganizationId}",
             businessUserId, organization.Id);
+
+        // TODO: surface email_log id from sp_insert_email_log — IEmailService.SendAsync
+        // currently discards the row id returned by sp_create_email_log; when that
+        // signature is widened to surface it, plumb it through here.
+        return new StripeOnboardingEmailResponse(Guid.Empty, member.Email);
     }
 
     private static OrganizationDto MapToDto(Organization o) => new(
@@ -133,4 +169,28 @@ public class OrganizationService(
         o.StripeOnboardedAt, o.StripeRequirementsDue,
         o.ArchivedAt, o.CreatedAt, o.UpdatedAt
     );
+
+    public async Task<OrganizationDetailDto?> ClearStripeAccountAsync(Guid organizationId)
+    {
+        var org = await orgProc.GetByIdAsync(organizationId);
+        if (org is null) return null;
+
+        // Stripe-side delete first. If Stripe rejects (live-mode non-zero
+        // balance) we surface the exception and leave the DB row untouched
+        // so the admin can re-try or escalate without losing the acct id.
+        if (!string.IsNullOrEmpty(org.StripeConnectedAccountId))
+        {
+            await stripeConnect.DeleteAccountAsync(org.StripeConnectedAccountId);
+            Log.Information("[Organization] Deleted Stripe connected account {AccountId} for org {OrganizationId}",
+                org.StripeConnectedAccountId, organizationId);
+        }
+
+        // DB-side clear runs unconditionally so partial state (e.g. acct id
+        // present but charges/payouts stuck false) gets normalized.
+        var rows = await orgProc.ClearStripeAccountAsync(organizationId);
+        Log.Information("[Organization] Cleared Stripe columns on org {OrganizationId} (rows={Rows})",
+            organizationId, rows);
+
+        return await GetDetailAsync(organizationId);
+    }
 }

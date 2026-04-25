@@ -73,10 +73,11 @@ public sealed class AdminStripeControllerTests(DatabaseFixture db)
 
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("organizationId").GetGuid().Should().Be(orgId);
-        // stripeAccountId is null and elided by JsonIgnoreCondition.WhenWritingNull;
-        // verify by absence rather than null kind.
-        body.TryGetProperty("stripeAccountId", out _).Should().BeFalse();
-        body.GetProperty("chargesEnabled").GetBoolean().Should().BeFalse();
+        // Rich DTO: stripeAccount is null (elided by WhenWritingNull); state
+        // derived as "not_started" via OrganizationStripeStateMapper.
+        body.TryGetProperty("stripeAccount", out _).Should().BeFalse();
+        body.GetProperty("state").GetString().Should().Be("not_started");
+        body.GetProperty("members").GetArrayLength().Should().Be(0);
     }
 
     // ─── Resume link ────────────────────────────────────────────────────────

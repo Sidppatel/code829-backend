@@ -21,7 +21,9 @@ public class WebhooksController(
     IPaymentService paymentService,
     IOrganizationProcedures organizationProc,
     IStripeEventProcedures stripeEventProc,
-    IConnectionMultiplexer redis
+    IConnectionMultiplexer redis,
+    IAlertService alertService,
+    IPaymentEnrichmentService paymentEnrichment
 ) : ControllerBase
 {
     private static readonly TimeSpan DedupeTtl = TimeSpan.FromDays(7);
@@ -149,6 +151,16 @@ public class WebhooksController(
             Log.Error(
                 "[Webhook] PAYMENT_AMOUNT_MISMATCH intent={IntentId} purchase={PurchaseId} expected={Expected} received={Received}",
                 paymentIntent.Id, txn.PurchaseId, expectedAmount, paymentIntent.AmountReceived);
+            await alertService.RaiseAsync(
+                "PAYMENT_AMOUNT_MISMATCH",
+                "Stripe payment_intent.succeeded amount did not match expected; purchase auto-cancelled.",
+                new Dictionary<string, string>
+                {
+                    ["purchaseId"] = txn.PurchaseId.ToString(),
+                    ["paymentIntentId"] = paymentIntent.Id,
+                    ["expectedCents"] = expectedAmount.ToString(),
+                    ["receivedCents"] = paymentIntent.AmountReceived.ToString(),
+                });
             await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Failed");
             await purchaseProc.CancelPurchaseAsync(txn.PurchaseId);
             return;
@@ -158,68 +170,10 @@ public class WebhooksController(
         await purchaseProc.ConfirmPurchaseAsync(txn.PurchaseId, "");
         Log.Information("[Webhook] Payment confirmed for purchase {PurchaseId}", txn.PurchaseId);
 
-        // Enrich with Stripe fee data
-        await EnrichTransactionAsync(paymentIntent.Id, txn.TaxCalculationId);
-
-        // Record tax transaction for Stripe Tax reporting
-        await RecordTaxTransactionAsync(paymentIntent.Id, txn.TaxCalculationId);
-    }
-
-    private async Task EnrichTransactionAsync(string paymentIntentId, string? taxCalculationId)
-    {
-        try
-        {
-            var stripeKey = secrets.StripeSecretKey;
-            if (string.IsNullOrEmpty(stripeKey)) return;
-
-            var client = new StripeClient(stripeKey);
-            var piService = new PaymentIntentService(client);
-            var expanded = await piService.GetAsync(paymentIntentId, new PaymentIntentGetOptions
-            {
-                Expand = ["latest_charge.balance_transaction"]
-            });
-
-            var stripeFees = (int)(expanded.LatestCharge?.BalanceTransaction?.Fee ?? 0);
-            var totalCharged = (int)expanded.AmountReceived;
-
-            // Get tax amount from the tax calculation if one exists
-            var taxAmount = 0;
-            if (!string.IsNullOrEmpty(taxCalculationId))
-            {
-                var calcService = new Stripe.Tax.CalculationService(client);
-                var calculation = await calcService.GetAsync(taxCalculationId);
-                taxAmount = (int)calculation.TaxAmountExclusive;
-            }
-
-            await stripeTransactionProc.EnrichAsync(paymentIntentId, totalCharged, taxAmount, stripeFees);
-            Log.Information("[Webhook] Enriched transaction {IntentId}: charged={Charged}, tax={Tax}, fees={Fees}",
-                paymentIntentId, totalCharged, taxAmount, stripeFees);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "[Webhook] Failed to enrich transaction {IntentId} — non-critical", paymentIntentId);
-        }
-    }
-
-    private async Task RecordTaxTransactionAsync(string paymentIntentId, string? taxCalculationId)
-    {
-        if (string.IsNullOrEmpty(taxCalculationId)) return;
-
-        try
-        {
-            var taxTxnId = await taxService.CreateTransactionAsync(taxCalculationId, paymentIntentId);
-            await stripeTransactionProc.SetTaxTransactionIdAsync(paymentIntentId, taxTxnId);
-            // Mirror the tax transaction id back onto the PaymentIntent metadata so refund
-            // paths can reverse the transaction without another DB lookup (Stripe pattern).
-            await paymentService.UpdateMetadataAsync(paymentIntentId,
-                new Dictionary<string, string> { ["tax_transaction"] = taxTxnId });
-            Log.Information("[Webhook] Recorded tax transaction {TaxTxnId} for intent {IntentId}",
-                taxTxnId, paymentIntentId);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "[Webhook] Failed to record tax transaction for intent {IntentId} — non-critical", paymentIntentId);
-        }
+        // Enrich + record tax — shared with PurchaseService.ConfirmAsync so the
+        // FE-driven confirm path also lands the tax data in dev (no public
+        // webhook URL there). See IPaymentEnrichmentService for idempotency.
+        await paymentEnrichment.EnrichAndRecordAsync(paymentIntent.Id, txn.TaxCalculationId);
     }
 
     private async Task HandlePaymentIntentFailed(Event stripeEvent)

@@ -116,4 +116,20 @@ public class OrganizationProcedures(EventPlatformDbContext context) : IOrganizat
                 searchParam, includeArchived)
             .FirstAsync(ct);
     }
+
+    public async Task<List<OrganizationMemberRow>> GetMembersAsync(Guid organizationId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<OrganizationMemberRow>(
+                "SELECT * FROM sp_get_organization_members({0})", organizationId)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> ClearStripeAccountAsync(Guid organizationId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<int>(
+                "SELECT sp_clear_organization_stripe_account({0}) AS \"Value\"", organizationId)
+            .FirstAsync(ct);
+    }
 }

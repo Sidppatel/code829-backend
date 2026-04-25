@@ -57,10 +57,12 @@ public class PurchaseServiceStripeConnectTests : IDisposable
         _eventId = Guid.NewGuid();
         _businessUserId = Guid.NewGuid();
 
+        var enrichmentMock = new Mock<IPaymentEnrichmentService>();
         _service = new PurchaseService(_context,
             _purchaseProc.Object, _stripeTransactionProc.Object,
             _paymentService.Object, _taxService.Object, _pricingService.Object,
-            _emailService.Object, _settingsService.Object, _organizationProc.Object);
+            _emailService.Object, _settingsService.Object, _organizationProc.Object,
+            enrichmentMock.Object);
 
         SeedEvent();
     }

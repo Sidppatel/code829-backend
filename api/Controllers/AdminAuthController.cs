@@ -124,17 +124,20 @@ public class AdminAuthController(
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
 
+        // Uniform 204 regardless of: account exists or not, email pipeline
+        // success or transient failure. Service swallows email errors +
+        // captures to Sentry (BE #71 + #84 — security session S2). Mirrors
+        // user-side /auth/forgot-password.
         try
         {
             await adminAuthService.RequestPasswordResetAsync(request.Email, Request.Headers.Origin);
         }
         catch (UnauthorizedAccessException)
         {
-            // Response is uniform to prevent user enumeration.
             Log.Information("[AdminAuth] ForgotPassword: no admin account found for {Email}", request.Email);
         }
 
-        return Ok(new { message = "If the account exists, a reset link has been sent." });
+        return NoContent();
     }
 
     [HttpPost("reset-password")]

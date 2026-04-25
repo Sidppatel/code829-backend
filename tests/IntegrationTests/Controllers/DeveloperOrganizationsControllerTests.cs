@@ -252,8 +252,13 @@ public sealed class DeveloperOrganizationsControllerTests(DatabaseFixture db)
     }
 
     [Fact]
-    public async Task GetStripeStatus_NoStripeAccount_Returns400()
+    public async Task GetStripeStatus_NoStripeAccount_Returns200WithEmptyShell()
     {
+        // Org exists but has no Stripe account yet — controller returns 200 with
+        // an OrganizationStripeStatusDto whose StripeAccount is null and State
+        // is "not_started" so the FE can render the "ask developer to enable
+        // payouts" empty state without a separate request. Mirrors the admin
+        // /v1/admin/organization/stripe-status shape.
         var orgId = await TestSeed.SeedOrganizationAsync(db);
 
         var client = db.Factory.CreateClient();
@@ -262,7 +267,16 @@ public sealed class DeveloperOrganizationsControllerTests(DatabaseFixture db)
 
         var resp = await client.GetAsync(
             $"/v1/developer/organizations/{orgId}/stripe-status");
-        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("organizationId").GetGuid().Should().Be(orgId);
+        body.GetProperty("state").GetString().Should().Be("not_started");
+        // stripeAccount is null and elided by JsonIgnoreCondition.WhenWritingNull;
+        // verify by absence rather than null kind.
+        var stripeAccountPresent = body.TryGetProperty("stripeAccount", out var sa)
+            && sa.ValueKind != JsonValueKind.Null;
+        stripeAccountPresent.Should().BeFalse();
     }
 
     [Fact]
