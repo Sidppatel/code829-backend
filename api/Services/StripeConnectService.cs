@@ -85,18 +85,15 @@ public class StripeConnectService(ISecretsProvider secrets) : IStripeConnectServ
             }
         };
 
-        if (scope == OnboardingLinkScope.BankOnly)
-        {
-            // Restricts collection to just external_account (bank). The
-            // Stripe API supports collection_options[requirements][only][]
-            // but Stripe.net 51 doesn't surface it as a typed property, so
-            // we pass it via ExtraParams using the dotted-key form the SDK
-            // serializes to form-encoded body params.
-            options.ExtraParams = new Dictionary<string, object>
-            {
-                ["collection_options[requirements][only][]"] = "external_account"
-            };
-        }
+        // NOTE: `collection_options.requirements.only` (e.g. ["external_account"])
+        // is only supported by the Account Sessions / embedded-onboarding flow —
+        // hosted AccountLinks reject it with "Received unknown parameter:
+        // collection_options[requirements]". When `scope == BankOnly` we instead
+        // rely on `fields = currently_due`: once identity is submitted the only
+        // outstanding requirement is the external_account, so Stripe's hosted
+        // onboarding naturally collects bank-only without an explicit filter.
+        // To force bank-only before identity completion we'd have to migrate to
+        // embedded onboarding components — tracked as future work.
 
         try
         {
