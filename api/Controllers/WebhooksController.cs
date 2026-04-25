@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Api.Services;
 using Contracts.Enums;
 using Db;
@@ -18,6 +19,8 @@ public class WebhooksController(
     IPurchaseProcedures purchaseProc,
     ITaxService taxService,
     IPaymentService paymentService,
+    IOrganizationProcedures organizationProc,
+    IStripeEventProcedures stripeEventProc,
     IConnectionMultiplexer redis
 ) : ControllerBase
 {
@@ -89,6 +92,18 @@ public class WebhooksController(
                     break;
                 case EventTypes.ChargeRefundUpdated:
                     await HandleRefundUpdated(stripeEvent);
+                    break;
+                case EventTypes.AccountUpdated:
+                    await HandleAccountUpdated(stripeEvent);
+                    break;
+                case EventTypes.TransferCreated:
+                    await HandleTransferCreated(stripeEvent);
+                    break;
+                case EventTypes.PayoutCreated:
+                    await HandlePayoutCreated(stripeEvent);
+                    break;
+                case EventTypes.PayoutPaid:
+                    await HandlePayoutPaid(stripeEvent);
                     break;
                 default:
                     Log.Information("[Webhook] Unhandled event type: {Type}", stripeEvent.Type);
@@ -240,6 +255,178 @@ public class WebhooksController(
             await stripeTransactionProc.UpdateStatusAsync(refund.PaymentIntentId, "Refunded");
             await purchaseProc.RefundPurchaseAsync(txn.PurchaseId);
             Log.Information("[Webhook] Refund synced for purchase {PurchaseId}", txn.PurchaseId);
+        }
+    }
+
+    // ───────────────────────────────────────────────────────────────────
+    // Connect events: account.updated, transfer.created, payout.{created,paid}
+    //
+    // The platform receives these on the same /webhooks/stripe endpoint as the
+    // PaymentIntent flow, distinguished by event type. The Redis dedupe + inflight
+    // lock above protects every event id equally — no Connect-specific guard
+    // needed. Each handler is idempotent: account.updated UPDATEs; transfer.created
+    // INSERT ... ON CONFLICT DO NOTHING; payout.* upserts.
+    // ───────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Mirror Stripe's account.charges_enabled / payouts_enabled / details_submitted
+    /// flags onto the corresponding Organization row. Also persists the
+    /// requirements.currently_due array so the admin dashboard can show "still
+    /// need: tax_id, ssn_last_4" without round-tripping Stripe on every render.
+    ///
+    /// First-time-completed onboarding (DetailsSubmitted flips to true) sets
+    /// Organization.StripeOnboardedAt — the SP guards the timestamp so subsequent
+    /// account.updated events can never overwrite it.
+    /// </summary>
+    private async Task HandleAccountUpdated(Event stripeEvent)
+    {
+        var account = stripeEvent.Data.Object as Account;
+        if (account is null)
+        {
+            Log.Warning("[Webhook] account.updated payload not parseable as Account");
+            return;
+        }
+
+        var requirementsJson = JsonSerializer.Serialize(
+            account.Requirements?.CurrentlyDue?.ToList() ?? new List<string>());
+
+        try
+        {
+            await organizationProc.UpdateStripeStatusAsync(
+                account.Id,
+                account.ChargesEnabled, account.PayoutsEnabled, account.DetailsSubmitted,
+                requirementsJson);
+
+            Log.Information(
+                "[Webhook] account.updated processed for {AccountId}: charges={Charges} payouts={Payouts} details={Details}",
+                account.Id, account.ChargesEnabled, account.PayoutsEnabled, account.DetailsSubmitted);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002" /* no_data_found from RAISE */ )
+        {
+            // The org wasn't found — likely an account created outside our system, or a
+            // race where the org row hasn't landed yet. Log + swallow rather than 500;
+            // letting Stripe retry in this case won't help.
+            Log.Warning(
+                "[Webhook] account.updated for unknown account {AccountId} — no organization linked",
+                account.Id);
+        }
+    }
+
+    /// <summary>
+    /// Append-only audit of platform → connected-account transfers. We resolve
+    /// the originating Purchase via the source charge's PaymentIntent (best-effort —
+    /// the row is still useful for the org dashboard even if PurchaseId is null).
+    /// </summary>
+    private async Task HandleTransferCreated(Event stripeEvent)
+    {
+        var transfer = stripeEvent.Data.Object as Transfer;
+        if (transfer is null)
+        {
+            Log.Warning("[Webhook] transfer.created payload not parseable as Transfer");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(transfer.DestinationId))
+        {
+            Log.Warning("[Webhook] transfer.created {TransferId} has no destination — skipping", transfer.Id);
+            return;
+        }
+
+        // Resolve the platform PaymentIntent from the source charge. Stripe.net
+        // exposes SourceTransactionId as the charge id; we expand only when we
+        // have a stripe key. Best-effort: a transfer without a resolvable PI is
+        // still recorded with PurchaseId=null.
+        string? paymentIntentId = null;
+        if (!string.IsNullOrEmpty(transfer.SourceTransactionId) && !string.IsNullOrEmpty(secrets.StripeSecretKey))
+        {
+            try
+            {
+                var client = new StripeClient(secrets.StripeSecretKey);
+                var charge = await new ChargeService(client).GetAsync(transfer.SourceTransactionId);
+                paymentIntentId = charge.PaymentIntentId;
+            }
+            catch (StripeException ex)
+            {
+                Log.Warning(ex, "[Webhook] transfer.created {TransferId} — failed to resolve source charge {ChargeId}",
+                    transfer.Id, transfer.SourceTransactionId);
+            }
+        }
+
+        // ToJson lives on StripeEntity — Data.Object is typed as IHasObject so we
+        // cast through to get the SDK's serialized payload (omits undocumented
+        // properties; that's fine for our forensic store).
+        var rawJson = (stripeEvent.Data.Object as StripeEntity)?.ToJson() ?? "{}";
+
+        try
+        {
+            var rowId = await stripeEventProc.InsertTransferAsync(
+                transfer.Id, transfer.DestinationId, paymentIntentId,
+                (int)transfer.Amount, transfer.Currency, rawJson);
+
+            Log.Information(
+                "[Webhook] transfer.created recorded {RowId} for {TransferId} ({Amount} {Currency} → {Destination})",
+                rowId, transfer.Id, transfer.Amount, transfer.Currency, transfer.DestinationId);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002")
+        {
+            Log.Warning(
+                "[Webhook] transfer.created {TransferId} — destination {Destination} not linked to any organization",
+                transfer.Id, transfer.DestinationId);
+        }
+    }
+
+    private async Task HandlePayoutCreated(Event stripeEvent)
+    {
+        await UpsertPayoutAsync(stripeEvent, paidEvent: false);
+    }
+
+    private async Task HandlePayoutPaid(Event stripeEvent)
+    {
+        await UpsertPayoutAsync(stripeEvent, paidEvent: true);
+    }
+
+    /// <summary>
+    /// Common path for payout.created + payout.paid. The Stripe Event's <c>Account</c>
+    /// property identifies the connected account that issued the payout — this is the
+    /// only canonical place to find it, since the Payout object itself doesn't carry
+    /// the parent account id. <paramref name="paidEvent"/> distinguishes which
+    /// timestamp to populate.
+    /// </summary>
+    private async Task UpsertPayoutAsync(Event stripeEvent, bool paidEvent)
+    {
+        var payout = stripeEvent.Data.Object as Payout;
+        if (payout is null)
+        {
+            Log.Warning("[Webhook] payout payload not parseable as Payout");
+            return;
+        }
+
+        var connectedAccountId = stripeEvent.Account;
+        if (string.IsNullOrEmpty(connectedAccountId))
+        {
+            Log.Warning("[Webhook] payout {PayoutId} arrived without an originating account id — skipping", payout.Id);
+            return;
+        }
+
+        var rawJson = (stripeEvent.Data.Object as StripeEntity)?.ToJson() ?? "{}";
+        var paidAt = paidEvent ? (DateTime?)DateTime.UtcNow : null;
+
+        try
+        {
+            var rowId = await stripeEventProc.UpsertPayoutAsync(
+                payout.Id, connectedAccountId,
+                (int)payout.Amount, payout.Currency, payout.Status,
+                payout.ArrivalDate, paidAt, rawJson);
+
+            Log.Information(
+                "[Webhook] payout.{Kind} recorded {RowId} for {PayoutId} ({Amount} {Currency}, status={Status})",
+                paidEvent ? "paid" : "created", rowId, payout.Id, payout.Amount, payout.Currency, payout.Status);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002")
+        {
+            Log.Warning(
+                "[Webhook] payout {PayoutId} — account {AccountId} not linked to any organization",
+                payout.Id, connectedAccountId);
         }
     }
 }

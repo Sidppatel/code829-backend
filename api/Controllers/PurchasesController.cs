@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Api.Exceptions;
 using Api.Middleware;
 using Api.Services;
 using Contracts.DTOs;
@@ -34,6 +35,11 @@ public class PurchasesController(
             return CreatedAtAction(nameof(GetById), new { id = purchase.PurchaseId }, purchase);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        // OrganizationNotPayoutReadyException is a 409 distinct from the generic 400 below
+        // so the FE can render a "ask the organizer to finish onboarding" empty state instead
+        // of treating it like a malformed request. We surface the raw message because it's
+        // already user-safe (defined in PurchaseService — no PII, no internal IDs).
+        catch (OrganizationNotPayoutReadyException ex) { Log.Warning("[Purchases] Create blocked by Connect enforcement: {Message}", ex.Message); return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 

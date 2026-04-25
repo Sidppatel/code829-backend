@@ -248,6 +248,8 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessPasswordResetTokenProcedures, Db.Repositories.StoredProcedures.BusinessPasswordResetTokenProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ICheckInProcedures, Db.Repositories.StoredProcedures.CheckInProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserEventProcedures, Db.Repositories.StoredProcedures.BusinessUserEventProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IOrganizationProcedures, Db.Repositories.StoredProcedures.OrganizationProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeEventProcedures, Db.Repositories.StoredProcedures.StripeEventProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
@@ -308,6 +310,16 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IPaymentService, StripePaymentService>();
     builder.Services.AddScoped<ITaxService, StripeTaxService>();
     builder.Services.AddScoped<IPricingService, PricingService>();
+
+    // Stripe Connect — Express account creation, onboarding-link generation,
+    // status fetch. Singleton because it depends on ISecretsProvider (also
+    // singleton); the Stripe key is read on every call so env-var rotation
+    // takes effect on the next request without restart of this service.
+    builder.Services.AddSingleton<IStripeConnectService, StripeConnectService>();
+
+    // Organization CRUD + membership service. Scoped because it consumes the
+    // scoped IOrganizationProcedures (which holds the EF DbContext).
+    builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 
     // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
@@ -422,6 +434,10 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
     builder.Services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
     builder.Services.AddScoped<IValidator<VerifyEmailRequest>, VerifyEmailRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationCreateRequest>, OrganizationCreateRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationUpdateRequest>, OrganizationUpdateRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationMemberRequest>, OrganizationMemberRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.StripeOnboardingLinkRequest>, StripeOnboardingLinkRequestValidator>();
 
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();

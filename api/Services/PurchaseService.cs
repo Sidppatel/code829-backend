@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Api.Exceptions;
 using Contracts.DTOs.Purchases;
 using Contracts.Enums;
 using Db;
@@ -19,7 +20,7 @@ public class PurchaseService(
     IPricingService pricingService,
     IEmailService emailService,
     ISettingsService settings,
-    IBusinessUserProcedures businessUserProc
+    IOrganizationProcedures organizationProc
 ) : IPurchaseService
 {
     public async Task<PurchaseDto> CreateAsync(Guid userId, CreatePurchaseRequest request)
@@ -77,15 +78,16 @@ public class PurchaseService(
         var estimatedTaxCents = pricing.TaxCents;
         var totalSeats = tables.Sum(t => t.Capacity);
 
-        var organizer = await businessUserProc.GetByIdAsync(ev.BusinessUserId);
+        var organization = await organizationProc.GetByBusinessUserAsync(ev.BusinessUserId);
+        await EnsurePayoutReadyIfEnforcedAsync(organization);
 
         // Generate purchase number up-front so we can attach it to the PaymentIntent metadata.
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
-            purchaseNumber, ev.EventId, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
+            purchaseNumber, ev, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            piAmount, subtotal, organizer?.StripeConnectedAccountId, "usd", piMetadata);
+            piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata);
 
         // Create purchase with the first table as primary (for backward compat)
         var purchaseId = await purchaseProc.CreatePurchaseAsync(
@@ -173,14 +175,15 @@ public class PurchaseService(
         var taxCalculationId = pricing.TaxCalculationId;
         var estimatedTaxCents = pricing.TaxCents;
 
-        var organizer = await businessUserProc.GetByIdAsync(ev.BusinessUserId);
+        var organization = await organizationProc.GetByBusinessUserAsync(ev.BusinessUserId);
+        await EnsurePayoutReadyIfEnforcedAsync(organization);
 
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
-            purchaseNumber, ev.EventId, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, seats: seatsRequested);
+            purchaseNumber, ev, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, seats: seatsRequested);
 
         var (intentId, clientSecret, _) = await paymentService.CreatePaymentIntentAsync(
-            piAmount, subtotal, organizer?.StripeConnectedAccountId, "usd", piMetadata);
+            piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata);
 
         // sp_reserve_open_capacity serializes capacity + ticket-type quota checks via row-level
         // locks on events/event_ticket_types rows. Replaces the previous Redis-lock + SELECT +
@@ -396,15 +399,42 @@ public class PurchaseService(
         return $"BK-{timestamp}-{random}";
     }
 
+    /// <summary>
+    /// Guard for Stripe Connect destination charges. When the
+    /// <c>connect_enforcement_enabled</c> setting is on, every paid purchase
+    /// must route through the organizer's onboarded Connect account; if the
+    /// org is missing or unverified we throw a typed exception that the
+    /// controller maps to 409 (so the FE can render a "ask the organizer to
+    /// finish onboarding" empty state instead of a generic 400).
+    /// </summary>
+    private async Task EnsurePayoutReadyIfEnforcedAsync(Db.Entities.Organization? organization)
+    {
+        var enforced = await settings.GetBoolAsync(SettingsKeys.ConnectEnforcementEnabled);
+        if (!enforced) return;
+
+        if (organization is null)
+            throw new OrganizationNotPayoutReadyException(
+                "This event's organizer hasn't been assigned to an organization yet — contact support");
+
+        if (string.IsNullOrEmpty(organization.StripeConnectedAccountId) || !organization.StripeChargesEnabled)
+            throw new OrganizationNotPayoutReadyException(
+                "Organizer not yet configured for payouts");
+    }
+
     // Builds PaymentIntent metadata so the payment, purchase, and tax breakdown are reconcilable
     // from the Stripe dashboard alone. Key "tax_calculation" is Stripe's standard for linking a
     // Tax Calculation to a PaymentIntent (see https://docs.stripe.com/tax/custom).
     // Payout split: admin_payout_cents goes to the organizer via transfer_data.amount;
     // developer_gross_cents = platform_fee + tax; developer owes the tax to the jurisdiction,
     // so developer's net revenue = platform_fee - stripe_fee (stripe_fee isn't known at create time).
+    //
+    // Event name + type + start date are duplicated into the PaymentIntent so the Stripe
+    // dashboard search ("show me all charges for The Lyric Theatre's spring gala") works
+    // without joining back to our DB. Truncated where Stripe enforces a 500-char metadata
+    // value limit.
     private static Dictionary<string, string> BuildPaymentIntentMetadata(
         string purchaseNumber,
-        Guid eventId,
+        EventView ev,
         int subtotalCents,
         int platformFeeCents,
         int taxCents,
@@ -416,7 +446,10 @@ public class PurchaseService(
         var metadata = new Dictionary<string, string>
         {
             ["purchase_number"] = purchaseNumber,
-            ["event_id"] = eventId.ToString(),
+            ["event_id"] = ev.EventId.ToString(),
+            ["event_name"] = Truncate(ev.Title, 500),
+            ["event_type"] = ev.LayoutMode,
+            ["event_start_date"] = ev.StartDate.ToString("o"),
             ["subtotal_cents"] = subtotalCents.ToString(),
             ["platform_fee_cents"] = platformFeeCents.ToString(),
             ["tax_cents"] = taxCents.ToString(),
@@ -432,6 +465,9 @@ public class PurchaseService(
             metadata["seats"] = s.ToString();
         return metadata;
     }
+
+    private static string Truncate(string value, int max) =>
+        string.IsNullOrEmpty(value) || value.Length <= max ? value : value[..max];
 
     private static string GenerateQrToken()
     {

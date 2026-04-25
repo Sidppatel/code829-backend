@@ -270,6 +270,9 @@ namespace db.Migrations
                     b.Property<DateTime?>("LockedUntil")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -283,9 +286,6 @@ namespace db.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
-
-                    b.Property<string>("StripeConnectedAccountId")
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -301,6 +301,8 @@ namespace db.Migrations
                         .IsUnique();
 
                     b.HasIndex("ImageId");
+
+                    b.HasIndex("OrganizationId");
 
                     b.ToTable("business_users", null, t =>
                         {
@@ -1010,6 +1012,80 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.Organization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasDefaultValue("US");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("StripeChargesEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("StripeConnectedAccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("StripeDetailsSubmitted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("StripeOnboardedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("StripePayoutsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("StripeRequirementsDue")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArchivedAt")
+                        .HasDatabaseName("IX_organizations_ArchivedAt");
+
+                    b.HasIndex("StripeConnectedAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_organizations_StripeConnectedAccountId")
+                        .HasFilter("\"StripeConnectedAccountId\" IS NOT NULL");
+
+                    b.ToTable("organizations", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.PlatformImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1239,6 +1315,67 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.StripePayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ArrivalDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("usd");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RawEvent")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StripePayoutId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("IX_stripe_payouts_OrganizationId");
+
+                    b.HasIndex("StripePayoutId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_stripe_payouts_StripePayoutId");
+
+                    b.ToTable("stripe_payouts", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1341,6 +1478,62 @@ namespace db.Migrations
 
                             t.HasCheckConstraint("CK_stripe_transactions_TransferAmount", "\"TransferAmountCents\" IS NULL OR \"TransferAmountCents\" >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Db.Entities.StripeTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("usd");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RawEvent")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("StripeTransferId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("IX_stripe_transfers_OrganizationId");
+
+                    b.HasIndex("PurchaseId")
+                        .HasDatabaseName("IX_stripe_transfers_PurchaseId");
+
+                    b.HasIndex("StripeTransferId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_stripe_transfers_StripeTransferId");
+
+                    b.ToTable("stripe_transfers", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Table", b =>
@@ -1902,9 +2095,6 @@ namespace db.Migrations
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeConnectedAccountId")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -3131,7 +3321,14 @@ namespace db.Migrations
                         .HasForeignKey("ImageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Db.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Image");
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("Db.Entities.BusinessUserEvent", b =>
@@ -3346,6 +3543,17 @@ namespace db.Migrations
                     b.Navigation("Purchase");
                 });
 
+            modelBuilder.Entity("Db.Entities.StripePayout", b =>
+                {
+                    b.HasOne("Db.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
             modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.HasOne("Db.Entities.Purchase", "Purchase")
@@ -3353,6 +3561,24 @@ namespace db.Migrations
                         .HasForeignKey("Db.Entities.StripeTransaction", "PurchaseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Purchase");
+                });
+
+            modelBuilder.Entity("Db.Entities.StripeTransfer", b =>
+                {
+                    b.HasOne("Db.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Db.Entities.Purchase", "Purchase")
+                        .WithMany()
+                        .HasForeignKey("PurchaseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organization");
 
                     b.Navigation("Purchase");
                 });

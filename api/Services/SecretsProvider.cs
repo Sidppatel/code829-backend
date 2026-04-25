@@ -46,4 +46,12 @@ public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
     public string S3Bucket => configuration["S3_BUCKET"] ?? "";
     public string S3EndpointUrl => configuration["S3_ENDPOINT_URL"] ?? "";
     public string CdnBaseUrl => configuration["CDN_BASE_URL"] ?? "";
+
+    /// <summary>
+    /// Falls back to <c>http://localhost:5174</c> for local development so the
+    /// Stripe Connect flow works out of the box without an extra env var.
+    /// In Production this should be set explicitly to the deployed admin host.
+    /// </summary>
+    public string FrontendUrlAdmin =>
+        configuration["FRONTEND_URL_ADMIN"] ?? "http://localhost:5174";
 }

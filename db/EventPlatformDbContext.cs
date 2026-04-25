@@ -11,6 +11,7 @@ public class EventPlatformDbContext(
     // Core entities
     public DbSet<User> Users => Set<User>();
     public DbSet<BusinessUser> BusinessUsers => Set<BusinessUser>();
+    public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
@@ -34,6 +35,8 @@ public class EventPlatformDbContext(
     public DbSet<PurchaseTicket> PurchaseTickets => Set<PurchaseTicket>();
     public DbSet<PurchaseTable> PurchaseTables => Set<PurchaseTable>();
     public DbSet<StripeTransaction> StripeTransactions => Set<StripeTransaction>();
+    public DbSet<StripeTransfer> StripeTransfers => Set<StripeTransfer>();
+    public DbSet<StripePayout> StripePayouts => Set<StripePayout>();
 
     // Images
     public DbSet<Image> Images => Set<Image>();
@@ -133,6 +136,7 @@ public class EventPlatformDbContext(
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.EmailHash).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.OrganizationId);
             entity.Property(e => e.Email).HasMaxLength(256);
             entity.Property(e => e.EmailHash).HasMaxLength(128);
             entity.Property(e => e.FirstName).HasMaxLength(128);
@@ -142,6 +146,66 @@ public class EventPlatformDbContext(
             entity.Property(e => e.Phone).HasMaxLength(20);
             entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId)
+                .IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Organization>(entity =>
+        {
+            entity.ToTable("organizations");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StripeConnectedAccountId)
+                .IsUnique()
+                .HasFilter("\"StripeConnectedAccountId\" IS NOT NULL")
+                .HasDatabaseName("IX_organizations_StripeConnectedAccountId");
+            entity.HasIndex(e => e.ArchivedAt)
+                .HasDatabaseName("IX_organizations_ArchivedAt");
+            entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.LegalName).HasMaxLength(256);
+            entity.Property(e => e.CountryCode).HasMaxLength(2).HasDefaultValue("US");
+            entity.Property(e => e.StripeConnectedAccountId).HasMaxLength(128);
+            entity.Property(e => e.StripeChargesEnabled).HasDefaultValue(false);
+            entity.Property(e => e.StripePayoutsEnabled).HasDefaultValue(false);
+            entity.Property(e => e.StripeDetailsSubmitted).HasDefaultValue(false);
+            entity.Property(e => e.StripeRequirementsDue).HasColumnType("jsonb");
+        });
+
+        // ─── Stripe Connect: transfers + payouts (webhook-fed) ──────────────
+        // Append-only audit rows. We keep the raw event JSON so support can
+        // replay any payload that arrives malformed without going back to Stripe.
+        modelBuilder.Entity<StripeTransfer>(entity =>
+        {
+            entity.ToTable("stripe_transfers");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StripeTransferId).IsUnique()
+                .HasDatabaseName("IX_stripe_transfers_StripeTransferId");
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("IX_stripe_transfers_OrganizationId");
+            entity.HasIndex(e => e.PurchaseId)
+                .HasDatabaseName("IX_stripe_transfers_PurchaseId");
+            entity.Property(e => e.StripeTransferId).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Currency).HasMaxLength(8).HasDefaultValue("usd");
+            entity.Property(e => e.RawEvent).HasColumnType("jsonb");
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Purchase).WithMany().HasForeignKey(e => e.PurchaseId)
+                .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<StripePayout>(entity =>
+        {
+            entity.ToTable("stripe_payouts");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StripePayoutId).IsUnique()
+                .HasDatabaseName("IX_stripe_payouts_StripePayoutId");
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("IX_stripe_payouts_OrganizationId");
+            entity.Property(e => e.StripePayoutId).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Currency).HasMaxLength(8).HasDefaultValue("usd");
+            entity.Property(e => e.Status).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.RawEvent).HasColumnType("jsonb");
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Invitation>(entity =>

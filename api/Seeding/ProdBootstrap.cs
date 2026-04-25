@@ -51,6 +51,7 @@ public static class ProdBootstrap
             ["default_platform_fee_open_cents"] = ("1000", "Default platform fee for Open events in cents"),
             ["default_platform_fee_grid_cents"] = ("2500", "Default platform fee for Grid events in cents"),
             ["stripe_tax_enabled"] = ("true", "Enable Stripe Tax for automatic tax calculation"),
+            ["connect_enforcement_enabled"] = ("false", "When true, every purchase requires the organizer's Organization to have a fully onboarded Stripe Connect account"),
             ["frontend_url"] = (Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "https://code829.com", "Frontend URL for magic link emails"),
             ["cors_origins"] = (Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? "https://code829.com", "Comma-separated allowed CORS origins"),
             ["search_results_per_page"] = ("20", "Search pagination page size"),
