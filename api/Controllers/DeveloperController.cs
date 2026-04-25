@@ -704,6 +704,44 @@ public class DeveloperController(
         }
     }
 
+    /// <summary>
+    /// Email a fresh Stripe onboarding link to a BusinessUser member of the
+    /// given organization. Useful when the developer creates the Connect
+    /// account on behalf of the organizer and wants them to finish KYC
+    /// without the developer having to forward the AccountLink URL manually.
+    ///
+    /// Body must reference a BusinessUser that belongs to the same org
+    /// (validated in the service via the organization-by-business-user
+    /// lookup) — the {id} on the route is part of the URL contract for
+    /// future-proofing but is not enforced beyond a 404 here.
+    /// </summary>
+    [HttpPost("organizations/{id:guid}/stripe-onboarding-email")]
+    public async Task<IActionResult> SendStripeOnboardingEmail(
+        Guid id, [FromBody] StripeOnboardingEmailRequest request)
+    {
+        var org = await organizationService.GetAsync(id);
+        if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
+
+        try
+        {
+            await organizationService.SendOnboardingLinkEmailAsync(request.BusinessUserId);
+            return Ok(new { message = "Onboarding link emailed", businessUserId = request.BusinessUserId, organizationId = id });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ApiError(404, ex.Message, HttpContext.TraceIdentifier));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ApiError(400, ex.Message, HttpContext.TraceIdentifier));
+        }
+        catch (StripeException ex)
+        {
+            Log.Error(ex, "[Developer] Stripe onboarding link creation failed for org {OrganizationId}", id);
+            return StatusCode(502, new ApiError(502, "Failed to create Stripe onboarding link", HttpContext.TraceIdentifier));
+        }
+    }
+
     /// <summary>Generate a new onboarding link (identity or bank scope) for an org with an existing Stripe account.</summary>
     [HttpPost("organizations/{id:guid}/stripe-onboarding-link")]
     public async Task<IActionResult> CreateStripeOnboardingLink(Guid id, [FromBody] StripeOnboardingLinkRequest request)

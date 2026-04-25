@@ -36,4 +36,19 @@ public interface IOrganizationService
     Task RemoveMemberAsync(Guid orgId, Guid businessUserId);
 
     Task<PagedResponse<OrganizationListItemDto>> ListAsync(string? search, int page, int pageSize, bool includeArchived = false);
+
+    /// <summary>
+    /// Generates a fresh identity-scope Stripe onboarding link for the
+    /// Organization that <paramref name="businessUserId"/> belongs to and
+    /// emails it to the BusinessUser's account email. Looks up the
+    /// BusinessUser's name + email server-side so the developer endpoint
+    /// only has to pass the id.
+    ///
+    /// Throws <see cref="KeyNotFoundException"/> when the BusinessUser doesn't
+    /// exist; throws <see cref="InvalidOperationException"/> when the
+    /// BusinessUser has no Organization, or when the Organization has no
+    /// Stripe account yet (the developer must call POST /stripe-account
+    /// before this endpoint can fire).
+    /// </summary>
+    Task SendOnboardingLinkEmailAsync(Guid businessUserId);
 }

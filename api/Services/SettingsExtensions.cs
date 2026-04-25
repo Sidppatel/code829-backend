@@ -24,4 +24,20 @@ public static class SettingsExtensions
         }
         return value;
     }
+
+    /// <summary>
+    /// Reads a boolean setting (stored as "true"/"false" string) with safe fallback.
+    /// Used by the Stripe Connect enforcement flag and other gradual-rollout toggles.
+    /// </summary>
+    public static async Task<bool> GetBoolAsync(
+        this ISettingsService settings,
+        string key,
+        bool defaultValue = false)
+    {
+        var raw = await settings.GetOrDefaultAsync(key, defaultValue ? "true" : "false");
+        if (string.IsNullOrEmpty(raw)) return defaultValue;
+        if (bool.TryParse(raw, out var parsed)) return parsed;
+        Log.Warning("[Settings] Invalid bool setting {Key}={Raw}; using default {Default}", key, raw, defaultValue);
+        return defaultValue;
+    }
 }

@@ -108,6 +108,7 @@ public static class DataSeeder
             ["default_platform_fee_open_cents"] = ("1000", "Default platform fee for Open events in cents ($10.00)"),
             ["default_platform_fee_grid_cents"] = ("2500", "Default platform fee for Grid events in cents ($25.00)"),
             ["stripe_tax_enabled"] = ("true", "Enable Stripe Tax for automatic tax calculation"),
+            ["connect_enforcement_enabled"] = ("false", "When true, every purchase requires the organizer's Organization to have a fully onboarded Stripe Connect account (charges_enabled=true)"),
             ["frontend_url"] = ("http://localhost:5173", "Frontend URL for magic link emails"),
             ["cors_origins"] = ("http://localhost:5173", "Comma-separated allowed CORS origins"),
             ["search_results_per_page"] = ("20", "Search pagination page size"),

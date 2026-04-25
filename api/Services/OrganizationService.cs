@@ -9,8 +9,17 @@ namespace Api.Services;
 /// <summary>
 /// Default implementation of <see cref="IOrganizationService"/>. Delegates all
 /// data access to <see cref="IOrganizationProcedures"/>; no direct DbSet usage.
+/// The Stripe-onboarding-email path additionally pulls the BusinessUser row
+/// for name/email and bridges to <see cref="IStripeConnectService"/> + the
+/// Resend-backed <see cref="IEmailService"/>.
 /// </summary>
-public class OrganizationService(IOrganizationProcedures orgProc) : IOrganizationService
+public class OrganizationService(
+    IOrganizationProcedures orgProc,
+    IBusinessUserProcedures businessUserProc,
+    IStripeConnectService stripeConnect,
+    IEmailService emailService,
+    ISettingsService settings
+) : IOrganizationService
 {
     public async Task<Guid> CreateAsync(string name, string? legalName, string countryCode, Guid? initialMemberBusinessUserId)
     {
@@ -82,6 +91,39 @@ public class OrganizationService(IOrganizationProcedures orgProc) : IOrganizatio
         )).ToList();
 
         return new PagedResponse<OrganizationListItemDto>(items, totalCount, page, pageSize);
+    }
+
+    public async Task SendOnboardingLinkEmailAsync(Guid businessUserId)
+    {
+        var member = await businessUserProc.GetByIdAsync(businessUserId)
+            ?? throw new KeyNotFoundException($"BusinessUser {businessUserId} not found");
+
+        var organization = await orgProc.GetByBusinessUserAsync(businessUserId)
+            ?? throw new InvalidOperationException(
+                "BusinessUser is not attached to any organization — assign them to one before sending the onboarding link");
+
+        if (string.IsNullOrEmpty(organization.StripeConnectedAccountId))
+            throw new InvalidOperationException(
+                "Organization has no Stripe account yet — call POST /developer/organizations/{id}/stripe-account first");
+
+        // Identity scope is the right starting point: a fresh BusinessUser has
+        // never seen the onboarding flow, so we route them through the full
+        // KYC + bank capture rather than the bank-only resume link.
+        var url = await stripeConnect.CreateOnboardingLinkAsync(
+            organization.StripeConnectedAccountId, OnboardingLinkScope.Identity);
+
+        // Stripe AccountLink URLs expire ~5 minutes after creation; that's the
+        // "expiry" we surface in the email copy.
+        var brandName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+        var subject = $"Finish setting up payouts for {organization.Name} | {brandName}";
+        var body = EmailTemplates.OnboardingLinkEmail(
+            brandName, member.FirstName, organization.Name, url, expiryMinutes: 5);
+
+        await emailService.SendAsync(member.Email, subject, body);
+
+        Log.Information(
+            "[Organization] Sent onboarding link to BusinessUser {BusinessUserId} for org {OrganizationId}",
+            businessUserId, organization.Id);
     }
 
     private static OrganizationDto MapToDto(Organization o) => new(

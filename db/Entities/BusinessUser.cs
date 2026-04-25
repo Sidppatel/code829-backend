@@ -18,17 +18,11 @@ public class BusinessUser : BaseEntity
     public Image? Image { get; set; }
     public string? Phone { get; set; }
 
-    /// <summary>
-    /// Stripe Connect account ID for organizers (e.g., "acct_xxx").
-    /// Required for organizers to receive payouts via destination charges.
-    /// </summary>
-    /// <remarks>
-    /// DEPRECATED — superseded by Organization.StripeConnectedAccountId.
-    /// Kept temporarily so the BackfillOrganizationsFromBusinessUsers migration
-    /// can copy the value over; the column is dropped by
-    /// DropLegacyStripeOnBusinessUser (Migration 3) once the backfill runs.
-    /// </remarks>
-    public string? StripeConnectedAccountId { get; set; }
+    // StripeConnectedAccountId column was dropped by DropLegacyStripeOnBusinessUser
+    // (migration 20260425000300) once the BackfillOrganizationsFromBusinessUsers
+    // migration had copied every value over to organizations.StripeConnectedAccountId.
+    // All Stripe Connect flows now read/write the column on Organization instead;
+    // see Db.Entities.Organization.StripeConnectedAccountId.
 
     /// <summary>
     /// FK to Organization this BusinessUser belongs to. Permanently nullable —
