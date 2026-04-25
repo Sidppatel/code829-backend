@@ -249,6 +249,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ICheckInProcedures, Db.Repositories.StoredProcedures.CheckInProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserEventProcedures, Db.Repositories.StoredProcedures.BusinessUserEventProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IOrganizationProcedures, Db.Repositories.StoredProcedures.OrganizationProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeEventProcedures, Db.Repositories.StoredProcedures.StripeEventProcedures>();
 
     // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
