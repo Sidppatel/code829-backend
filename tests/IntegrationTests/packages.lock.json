@@ -776,8 +776,8 @@
       },
       "nClam": {
         "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "XZdQ43CefOSryaZ0mwJ61saPoV+NZtGkUfuBhGyHYLR6uIuUVBl5I/DUInq5nefJQBWkl5Z3eSKO7s/cfTLpaQ=="
+        "resolved": "9.0.0",
+        "contentHash": "kjJ9W3TJOl0VIS2lCpblfDHDZTUG7oejwx2PkjKxu6r+XSmcgBGJUMsrx2c8Utm4EfNDhjtKbJqwIzDpgog0Bw=="
       },
       "Newtonsoft.Json": {
         "type": "Transitive",
@@ -1231,7 +1231,7 @@
           "Stripe.net": "[51.1.0, )",
           "contracts": "[1.0.0, )",
           "db": "[1.0.0, )",
-          "nClam": "[8.0.0, )"
+          "nClam": "[9.0.0, )"
         }
       },
       "contracts": {
