@@ -16,7 +16,7 @@ BEGIN
     SET "StripeChargesEnabled"   = p_charges_enabled,
         "StripePayoutsEnabled"   = p_payouts_enabled,
         "StripeDetailsSubmitted" = p_details_submitted,
-        "StripeRequirementsDue"  = COALESCE(p_requirements_due_json::text, "StripeRequirementsDue"),
+        "StripeRequirementsDue"  = COALESCE(p_requirements_due_json, "StripeRequirementsDue"),
         "StripeOnboardedAt"      = CASE
             WHEN "StripeOnboardedAt" IS NULL AND p_details_submitted = true THEN now()
             ELSE "StripeOnboardedAt"
