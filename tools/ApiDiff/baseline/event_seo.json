@@ -1,0 +1,10 @@
+{
+  "path": "/v1/events/ab242739-4983-4eb0-b8a5-ddc1cd4ca416/seo",
+  "method": "GET",
+  "auth": null,
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 1,
+  "status": 200,
+  "tier": "smoke",
+  "id": "event_seo"
+}

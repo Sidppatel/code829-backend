@@ -1,0 +1,89 @@
+{
+  "body": {
+    "checkedInPurchases": 20,
+    "eventsByCategory": {
+      "business": 1,
+      "dining": 1,
+      "music": 2,
+      "social": 4,
+      "tech": 2
+    },
+    "paidPurchases": 84,
+    "publishedEvents": 9,
+    "purchasesByStatus": {
+      "cancelled": 8,
+      "checkedIn": 20,
+      "paid": 84,
+      "pending": 18,
+      "refunded": 5
+    },
+    "topEvents": [
+      {
+        "eventId": "003fbc0c-d11b-4b7d-99f7-f9d794d0bb43",
+        "purchaseCount": 15,
+        "revenueCents": 4132500,
+        "title": "Gulf Coast Coding Bootcamp"
+      },
+      {
+        "eventId": "48ebfb1d-0832-4baf-8caa-dc421836e648",
+        "purchaseCount": 33,
+        "revenueCents": 1446000,
+        "title": "Mardi Gras Coronation Ball"
+      },
+      {
+        "eventId": "4b68877b-92c5-487d-9a63-6ab5e2128aad",
+        "purchaseCount": 20,
+        "revenueCents": 430500,
+        "title": "Sunset Rhythm & Blues Festival"
+      },
+      {
+        "eventId": "ad97f2e2-20f2-4805-b8ae-2de65a4b635b",
+        "purchaseCount": 7,
+        "revenueCents": 68500,
+        "title": "Bellingrath Gardens Spring Gala"
+      },
+      {
+        "eventId": "15126c29-e35d-483a-82dd-cd52a2c4001e",
+        "purchaseCount": 6,
+        "revenueCents": 45000,
+        "title": "Fairhope Lakeside Jazz Festival"
+      },
+      {
+        "eventId": "a20a40a5-0ab1-460f-8dae-68e2183de5bd",
+        "purchaseCount": 12,
+        "revenueCents": 36700,
+        "title": "Mobile Arts & Crafts Fair"
+      },
+      {
+        "eventId": "7622c116-ebdf-4929-a757-e10040473cdf",
+        "purchaseCount": 4,
+        "revenueCents": 34000,
+        "title": "Farm-to-Table Dinner: Coastal Harvest"
+      },
+      {
+        "eventId": "1720b13d-853d-4014-a4e1-0f9604eda7be",
+        "purchaseCount": 3,
+        "revenueCents": 19500,
+        "title": "Mobile Tech Leadership Summit"
+      },
+      {
+        "eventId": "ab242739-4983-4eb0-b8a5-ddc1cd4ca416",
+        "purchaseCount": 4,
+        "revenueCents": 19000,
+        "title": "Blind Mule Comedy Showcase"
+      }
+    ],
+    "totalEvents": 10,
+    "totalPurchases": 135,
+    "totalRevenueCents": 6231700,
+    "totalUsers": 8,
+    "totalVenues": 10
+  },
+  "path": "/v1/admin/dashboard",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "admin_dashboard"
+}

@@ -1,0 +1,10 @@
+{
+  "path": "/v1/tickets/mine",
+  "method": "GET",
+  "auth": "user",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 16,
+  "status": 200,
+  "tier": "smoke",
+  "id": "tickets_mine"
+}

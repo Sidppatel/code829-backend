@@ -163,7 +163,7 @@ public class EventsController(
     public async Task<IActionResult> GetFacets()
     {
         var now = DateTime.UtcNow;
-        var published = context.EventSummaryViews
+        var published = context.EventFacetsViews
             .AsNoTracking()
             .Where(e => e.Status == "Published" && e.EndDate >= now);
 

@@ -75,6 +75,14 @@ public class EventPlatformDbContext(
     public DbSet<SystemLogView> SystemLogViews => Set<SystemLogView>();
     public DbSet<DeveloperLogView> DeveloperLogViews => Set<DeveloperLogView>();
 
+    // Dashboard aggregates (used by AdminDashboardController + DeveloperDashboardController)
+    public DbSet<AdminDashboardStatsView> AdminDashboardStatsViews => Set<AdminDashboardStatsView>();
+    public DbSet<TopEventRevenueView> TopEventRevenueViews => Set<TopEventRevenueView>();
+    public DbSet<PurchasesByStatusView> PurchasesByStatusViews => Set<PurchasesByStatusView>();
+    public DbSet<EventsByCategoryView> EventsByCategoryViews => Set<EventsByCategoryView>();
+    public DbSet<EventTableStatsView> EventTableStatsViews => Set<EventTableStatsView>();
+    public DbSet<EventFacetsView> EventFacetsViews => Set<EventFacetsView>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -851,6 +859,42 @@ public class EventPlatformDbContext(
             entity.ToView("v_developer_logs");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Severity).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<AdminDashboardStatsView>(entity =>
+        {
+            entity.ToView("v_admin_dashboard_stats");
+            entity.HasNoKey();
+        });
+
+        modelBuilder.Entity<TopEventRevenueView>(entity =>
+        {
+            entity.ToView("v_top_events_revenue");
+            entity.HasKey(e => e.EventId);
+        });
+
+        modelBuilder.Entity<PurchasesByStatusView>(entity =>
+        {
+            entity.ToView("v_purchases_by_status");
+            entity.HasKey(e => e.Status);
+        });
+
+        modelBuilder.Entity<EventsByCategoryView>(entity =>
+        {
+            entity.ToView("v_events_by_category");
+            entity.HasKey(e => e.Category);
+        });
+
+        modelBuilder.Entity<EventTableStatsView>(entity =>
+        {
+            entity.ToView("v_event_table_stats");
+            entity.HasKey(e => e.EventId);
+        });
+
+        modelBuilder.Entity<EventFacetsView>(entity =>
+        {
+            entity.ToView("v_event_facets");
+            entity.HasNoKey();
         });
     }
 }

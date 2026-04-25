@@ -1,0 +1,10 @@
+{
+  "path": "/v1/admin/purchases?page=1&pageSize=10",
+  "method": "GET",
+  "auth": "organizer",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 10,
+  "status": 200,
+  "tier": "smoke",
+  "id": "admin_purchases_list"
+}

@@ -2,6 +2,7 @@ using Api.Middleware;
 using Contracts.DTOs.Admin;
 using Contracts.Enums;
 using Db;
+using Db.Repositories.StoredProcedures;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,113 +16,52 @@ namespace Api.Controllers;
 [RequireRole(UserRole.Admin)]
 public class AdminDashboardController(
     EventPlatformDbContext context,
-    Db.Repositories.StoredProcedures.IUserProcedures userProc) : ControllerBase
+    IDashboardProcedures dashboardProc) : ControllerBase
 {
     [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard()
+    public async Task<IActionResult> GetDashboard(CancellationToken ct)
     {
-        var totalEvents = await context.EventViews.AsNoTracking().CountAsync();
-        var publishedEvents = await context.EventViews.AsNoTracking().CountAsync(e => e.Status == "Published");
-        var totalPurchases = await context.PurchaseViews.AsNoTracking().CountAsync();
-        var paidPurchases = await context.PurchaseViews.AsNoTracking().CountAsync(b => b.Status == "Paid");
-        var checkedIn = await context.PurchaseViews.AsNoTracking().CountAsync(b => b.Status == "CheckedIn");
-        var revenueList = await context.PurchaseViews.AsNoTracking()
-            .Where(b => b.Status == "Paid" || b.Status == "CheckedIn")
-            .Select(b => b.TotalCents)
-            .ToListAsync();
-        var totalRevenue = revenueList.Sum(x => (long)x);
-        var totalUsers = (await userProc.GetCountsAsync()).Total;
-        var totalVenues = await context.VenueViews.AsNoTracking().CountAsync();
+        var stats = await context.AdminDashboardStatsViews.AsNoTracking().FirstAsync(ct);
+        var topRows = await context.TopEventRevenueViews.AsNoTracking().ToListAsync(ct);
+        var statusRows = await context.PurchasesByStatusViews.AsNoTracking().ToListAsync(ct);
+        var categoryRows = await context.EventsByCategoryViews.AsNoTracking().ToListAsync(ct);
 
-        var topEventsRaw = await context.PurchaseViews.AsNoTracking()
-            .Where(b => b.Status == "Paid" || b.Status == "CheckedIn")
-            .GroupBy(b => new { b.EventId, b.EventTitle })
-            .Select(g => new { g.Key.EventId, g.Key.EventTitle, Count = g.Count(), Revenue = g.Sum(b => b.TotalCents) })
-            .OrderByDescending(e => e.Revenue)
-            .Take(10)
-            .ToListAsync();
-        var topEvents = topEventsRaw.Select(e => new EventRevenueDto(e.EventId, e.EventTitle, e.Count, e.Revenue)).ToList();
-
-        var purchasesByStatus = await context.PurchaseViews.AsNoTracking()
-            .GroupBy(b => b.Status)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Status, x => x.Count);
-
-        var eventsByCategory = await context.EventViews.AsNoTracking()
-            .GroupBy(e => e.Category)
-            .Select(g => new { Category = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Category, x => x.Count);
+        var topEvents = topRows
+            .Select(r => new EventRevenueDto(r.EventId, r.Title, r.PurchaseCount, r.RevenueCents))
+            .ToList();
+        var purchasesByStatus = statusRows.ToDictionary(r => r.Status, r => r.Count);
+        var eventsByCategory = categoryRows.ToDictionary(r => r.Category, r => r.Count);
 
         return Ok(new DashboardStatsDto(
-            totalEvents, publishedEvents, totalPurchases, paidPurchases, checkedIn,
-            totalRevenue, totalUsers, totalVenues, topEvents, purchasesByStatus, eventsByCategory
+            stats.TotalEvents, stats.PublishedEvents, stats.TotalPurchases,
+            stats.PaidPurchases, stats.CheckedInPurchases,
+            stats.TotalRevenueCents, stats.TotalUsers, stats.TotalVenues,
+            topEvents, purchasesByStatus, eventsByCategory
         ));
     }
 
     [HttpGet("dashboard/next-event")]
-    public virtual async Task<IActionResult> GetNextEvent()
+    public virtual async Task<IActionResult> GetNextEvent(CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
-        var ev = await context.EventViews.AsNoTracking()
-            .Where(e => e.Status == "Published" && e.StartDate > now)
-            .OrderBy(e => e.StartDate)
-            .FirstOrDefaultAsync();
-
-        if (ev is null)
-        {
-            ev = await context.EventViews.AsNoTracking()
-                .Where(e => e.StartDate > now && e.Status != "Cancelled")
-                .OrderBy(e => e.StartDate)
-                .FirstOrDefaultAsync();
-        }
-
-        if (ev is null)
+        var stats = await dashboardProc.GetNextEventDashboardAsync(DateTime.UtcNow, ct);
+        if (stats is null)
             return Ok(new { hasUpcoming = false });
 
-        var purchases = await context.PurchaseViews.AsNoTracking()
-            .Where(b => b.EventId == ev.EventId)
-            .ToListAsync();
-
-        var paid = purchases.Count(b => b.Status == "Paid");
-        var checkedInCount = purchases.Count(b => b.Status == "CheckedIn");
-        var pending = purchases.Count(b => b.Status == "Pending");
-        var cancelled = purchases.Count(b => b.Status == "Cancelled");
-        var refunded = purchases.Count(b => b.Status == "Refunded");
-        var revenue = purchases
-            .Where(b => b.Status is "Paid" or "CheckedIn")
-            .Sum(b => (long)b.TotalCents);
-
-        var tables = await context.TableViews.AsNoTracking()
-            .Where(t => t.EventId == ev.EventId && t.IsActive)
-            .ToListAsync();
-        var totalCapacity = ev.MaxCapacity ?? tables.Sum(t => t.Capacity);
-        var soldCount = paid + checkedInCount;
-
-        long potentialRevenue;
-        if (ev.LayoutMode == "Open" && ev.PricePerPersonCents.HasValue)
-            potentialRevenue = (long)ev.PricePerPersonCents.Value * totalCapacity;
-        else
-            potentialRevenue = tables.Sum(t => (long)t.PriceCents);
-
-        var recentPurchases = purchases
-            .OrderByDescending(b => b.CreatedAt)
-            .Take(8)
-            .Select(b => new RecentPurchaseDto(b.PurchaseId, b.PurchaseNumber,
-                $"{b.UserFirstName} {b.UserLastName}", b.UserEmail,
-                b.Status, b.TotalCents, b.CreatedAt))
+        var recent = await dashboardProc.GetEventRecentPurchasesAsync(stats.EventId, 8, ct);
+        var recentPurchases = recent
+            .Select(r => new RecentPurchaseDto(r.PurchaseId, r.PurchaseNumber, r.UserName, r.UserEmail, r.Status, r.TotalCents, r.CreatedAt))
             .ToList();
-
-        var daysUntil = (int)Math.Ceiling((ev.StartDate - now).TotalDays);
 
         return Ok(new
         {
             hasUpcoming = true,
             data = new NextEventDashboardDto(
-                ev.EventId, ev.Title, ev.Slug, ev.Status, ev.Category,
-                ev.StartDate, ev.EndDate, ev.VenueName, ev.VenueAddress, ev.VenueCity, ev.VenueState,
-                ev.ImagePath, ev.LayoutMode, daysUntil,
-                purchases.Count, paid, checkedInCount, pending, cancelled, refunded,
-                revenue, potentialRevenue, totalCapacity, soldCount,
+                stats.EventId, stats.Title, stats.Slug, stats.Status, stats.Category,
+                stats.StartDate, stats.EndDate, stats.VenueName, stats.VenueAddress, stats.VenueCity, stats.VenueState,
+                stats.ImagePath, stats.LayoutMode, stats.DaysUntil,
+                stats.TotalPurchases, stats.PaidPurchases, stats.CheckedInPurchases,
+                stats.PendingPurchases, stats.CancelledPurchases, stats.RefundedPurchases,
+                stats.RevenueCents, stats.PotentialRevenueCents, stats.TotalCapacity, stats.SoldCount,
                 recentPurchases
             )
         });

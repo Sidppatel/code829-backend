@@ -1,0 +1,10 @@
+{
+  "path": "/v1/auth/me",
+  "method": "GET",
+  "auth": "user",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 1,
+  "status": 200,
+  "tier": "smoke",
+  "id": "auth_me"
+}

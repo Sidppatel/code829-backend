@@ -1,0 +1,10 @@
+{
+  "path": "/v1/developer/logs?page=1&pageSize=10",
+  "method": "GET",
+  "auth": "developer",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 0,
+  "status": 200,
+  "tier": "smoke",
+  "id": "developer_logs"
+}

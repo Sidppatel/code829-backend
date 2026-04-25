@@ -24,6 +24,7 @@ public class AdminLayoutController(
     EventPlatformDbContext context,
     ILayoutProcedures layoutProc,
     ITableProcedures tableProc,
+    IDashboardProcedures dashboardProc,
     IConnectionMultiplexer redis,
     ISettingsService settings,
     ICacheService cache) : ControllerBase
@@ -534,19 +535,8 @@ public class AdminLayoutController(
 
     private async Task<Dictionary<Guid, TablePurchaseInfo>> GetPurchaseInfoForEvent(Guid eventId)
     {
-        var grouped = await context.PurchaseViews.AsNoTracking()
-            .Where(b => b.EventId == eventId && b.TableId.HasValue
-                && (b.Status == "Paid" || b.Status == "CheckedIn"))
-            .GroupBy(b => b.TableId!.Value)
-            .Select(g => new
-            {
-                TableId = g.Key,
-                PurchaseCount = g.Count(),
-                SeatsBooked = g.Sum(b => b.SeatsReserved ?? 0),
-                SubtotalCents = g.Sum(b => (long)b.SubtotalCents)
-            })
-            .ToListAsync();
-        return grouped.ToDictionary(x => x.TableId, x => new TablePurchaseInfo(x.PurchaseCount, x.SeatsBooked, x.SubtotalCents));
+        var rows = await dashboardProc.GetPurchaseInfoForEventAsync(eventId);
+        return rows.ToDictionary(r => r.TableId, r => new TablePurchaseInfo(r.PurchaseCount, r.SeatsBooked, r.SubtotalCents));
     }
 
     private async Task<List<EventTableResponse>> MapEventTables(IEnumerable<EventTable> eventTables, Guid eventId)

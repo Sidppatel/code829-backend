@@ -3,6 +3,7 @@ using System;
 using Db;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    partial class EventPlatformDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260425214029_ExtractDashboardSqlArtifacts")]
+    partial class ExtractDashboardSqlArtifacts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2235,41 +2238,6 @@ namespace db.Migrations
                     b.ToView("v_device_sessions", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.Views.EventFacetsView", b =>
-                {
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("PricePerPersonCents")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("VenueCity")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("VenueId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("VenueName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.ToTable((string)null);
-
-                    b.ToView("v_event_facets", (string)null);
-                });
-
             modelBuilder.Entity("Db.Entities.Views.EventImageView", b =>
                 {
                     b.Property<Guid>("EventImageId")
@@ -2419,24 +2387,6 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_event_summary", (string)null);
-                });
-
-            modelBuilder.Entity("Db.Entities.Views.EventTableStatsView", b =>
-                {
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("BookedTables")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalTables")
-                        .HasColumnType("integer");
-
-                    b.HasKey("EventId");
-
-                    b.ToTable((string)null);
-
-                    b.ToView("v_event_table_stats", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.EventTablesSummaryView", b =>

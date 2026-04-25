@@ -1,0 +1,9 @@
+{
+  "id": "admin_platform_images",
+  "tier": "smoke",
+  "method": "GET",
+  "contentType": "application/json; charset=utf-8",
+  "path": "/v1/admin/platform-images",
+  "status": 200,
+  "auth": "developer"
+}

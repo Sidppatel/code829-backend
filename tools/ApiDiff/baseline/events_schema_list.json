@@ -1,0 +1,72 @@
+{
+  "body": {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "name": "Blind Mule Comedy Showcase",
+        "position": 1,
+        "url": "http://localhost:5173/events/blind-mule-comedy-showcase"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Mobile Arts & Crafts Fair",
+        "position": 2,
+        "url": "http://localhost:5173/events/mobile-arts-crafts-fair"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Farm-to-Table Dinner: Coastal Harvest",
+        "position": 3,
+        "url": "http://localhost:5173/events/farm-to-table-dinner-coastal-harvest"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Mobile Tech Leadership Summit",
+        "position": 4,
+        "url": "http://localhost:5173/events/mobile-tech-leadership-summit"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Fairhope Lakeside Jazz Festival",
+        "position": 5,
+        "url": "http://localhost:5173/events/fairhope-lakeside-jazz-festival"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Mardi Gras Coronation Ball",
+        "position": 6,
+        "url": "http://localhost:5173/events/mardi-gras-coronation-ball"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Bellingrath Gardens Spring Gala",
+        "position": 7,
+        "url": "http://localhost:5173/events/bellingrath-gardens-spring-gala"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Sunset Rhythm & Blues Festival",
+        "position": 8,
+        "url": "http://localhost:5173/events/sunset-rhythm-blues-festival"
+      },
+      {
+        "@type": "ListItem",
+        "name": "Gulf Coast Coding Bootcamp",
+        "position": 9,
+        "url": "http://localhost:5173/events/gulf-coast-coding-bootcamp"
+      }
+    ],
+    "name": "Upcoming Events",
+    "numberOfItems": 9,
+    "url": "http://localhost:5173/events"
+  },
+  "path": "/v1/events/schema-list",
+  "method": "GET",
+  "auth": null,
+  "contentType": "application/json; charset=utf-8",
+  "status": 200,
+  "tier": "detail",
+  "id": "events_schema_list"
+}

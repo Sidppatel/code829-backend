@@ -1,0 +1,9 @@
+{
+  "id": "sitemap",
+  "tier": "smoke",
+  "method": "GET",
+  "contentType": "application/xml",
+  "path": "/sitemap.xml",
+  "status": 200,
+  "auth": null
+}

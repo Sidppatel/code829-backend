@@ -22,5 +22,6 @@ public class DeveloperPurchasesController(
     EventPlatformDbContext context,
     IPurchaseService purchaseService,
     IOrganizationProcedures organizationProc,
+    IDashboardProcedures dashboardProc,
     IConnectionMultiplexer redis
-) : AdminPurchasesController(context, purchaseService, organizationProc, redis);
+) : AdminPurchasesController(context, purchaseService, organizationProc, dashboardProc, redis);

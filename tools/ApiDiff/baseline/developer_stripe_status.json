@@ -1,0 +1,10 @@
+{
+  "path": "/v1/developer/stripe/status",
+  "method": "GET",
+  "auth": "developer",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 1,
+  "status": 200,
+  "tier": "smoke",
+  "id": "developer_stripe_status"
+}

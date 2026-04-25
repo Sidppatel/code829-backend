@@ -260,6 +260,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IPlatformImageProcedures, Db.Repositories.StoredProcedures.PlatformImageProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ISettingsProcedures, Db.Repositories.StoredProcedures.SettingsProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.ILogProcedures, Db.Repositories.StoredProcedures.LogProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IDashboardProcedures, Db.Repositories.StoredProcedures.DashboardProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IFeedbackProcedures, Db.Repositories.StoredProcedures.FeedbackProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventTicketTypeProcedures, Db.Repositories.StoredProcedures.EventTicketTypeProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserProcedures, Db.Repositories.StoredProcedures.BusinessUserProcedures>();

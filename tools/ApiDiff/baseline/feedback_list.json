@@ -1,0 +1,10 @@
+{
+  "path": "/v1/feedback",
+  "method": "GET",
+  "auth": "developer",
+  "contentType": "application/json; charset=utf-8",
+  "itemCount": 0,
+  "status": 200,
+  "tier": "smoke",
+  "id": "feedback_list"
+}
