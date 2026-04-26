@@ -289,6 +289,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IVenueImageService, VenueImageService>();
     builder.Services.AddScoped<IPlatformImageService, PlatformImageService>();
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
+    builder.Services.AddScoped<IFinancialService, FinancialService>();
 
     // Malware scanner: ClamAV when CLAMAV_HOST is set, no-op otherwise (local dev convenience).
     // Production must set CLAMAV_HOST — see docs/runbooks/secret-rotation.md is not the place; deployment env config is.

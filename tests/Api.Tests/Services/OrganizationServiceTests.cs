@@ -1,5 +1,6 @@
 using Api.Services;
 using Contracts.DTOs.Organizations;
+using Db;
 using Db.Entities;
 using Db.Repositories.StoredProcedures;
 using FluentAssertions;
@@ -13,8 +14,9 @@ namespace Api.Tests.Services;
 /// boundary; integration tests cover the SP-side guarantees (last-member
 /// removal block, archive idempotency).
 /// </summary>
-public class OrganizationServiceTests
+public class OrganizationServiceTests : IDisposable
 {
+    private readonly EventPlatformDbContext _context;
     private readonly Mock<IOrganizationProcedures> _orgProc;
     private readonly Mock<IBusinessUserProcedures> _businessUserProc;
     private readonly Mock<IStripeConnectService> _stripeConnect;
@@ -24,6 +26,7 @@ public class OrganizationServiceTests
 
     public OrganizationServiceTests()
     {
+        _context = TestDbContextFactory.Create();
         _orgProc = new Mock<IOrganizationProcedures>();
         _businessUserProc = new Mock<IBusinessUserProcedures>();
         _stripeConnect = new Mock<IStripeConnectService>();
@@ -34,8 +37,15 @@ public class OrganizationServiceTests
             .ReturnsAsync((string _, string? def) => def);
 
         _service = new OrganizationService(
+            _context,
             _orgProc.Object, _businessUserProc.Object,
             _stripeConnect.Object, _emailService.Object, _settings.Object);
+    }
+
+    public void Dispose()
+    {
+        _context.Database.EnsureDeleted();
+        _context.Dispose();
     }
 
     // ─── CRUD happy path ────────────────────────────────────────────────────

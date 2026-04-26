@@ -60,6 +60,8 @@ public class EventPlatformDbContext(
     public DbSet<PurchaseView> PurchaseViews => Set<PurchaseView>();
     public DbSet<PurchaseTicketView> PurchaseTicketViews => Set<PurchaseTicketView>();
     public DbSet<VenueView> VenueViews => Set<VenueView>();
+    public DbSet<OrganizationView> OrganizationViews => Set<OrganizationView>();
+    public DbSet<StripeTransactionView> StripeTransactionViews => Set<StripeTransactionView>();
     public DbSet<UserProfileView> UserProfileViews => Set<UserProfileView>();
     public DbSet<EventTablesSummaryView> EventTablesSummaryViews => Set<EventTablesSummaryView>();
     public DbSet<EventTicketTypeSummaryView> EventTicketTypeSummaryViews => Set<EventTicketTypeSummaryView>();
@@ -770,6 +772,20 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_venues");
             entity.HasKey(e => e.VenueId);
+        });
+
+        modelBuilder.Entity<OrganizationView>(entity =>
+        {
+            entity.ToView("v_organizations");
+            entity.HasKey(e => e.OrganizationId);
+        });
+
+        modelBuilder.Entity<StripeTransactionView>(entity =>
+        {
+            entity.ToView("v_stripe_transactions");
+            entity.HasKey(e => e.TransactionId);
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.PurchaseStatus).HasConversion<string>();
         });
 
         modelBuilder.Entity<UserProfileView>(entity =>

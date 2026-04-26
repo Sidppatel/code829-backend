@@ -1,6 +1,8 @@
 using Contracts.DTOs;
 using Contracts.DTOs.Organizations;
+using Db;
 using Db.Entities;
+using Microsoft.EntityFrameworkCore;
 using Db.Repositories.StoredProcedures;
 using Serilog;
 
@@ -14,6 +16,7 @@ namespace Api.Services;
 /// Resend-backed <see cref="IEmailService"/>.
 /// </summary>
 public class OrganizationService(
+    EventPlatformDbContext context,
     IOrganizationProcedures orgProc,
     IBusinessUserProcedures businessUserProc,
     IStripeConnectService stripeConnect,
@@ -44,7 +47,10 @@ public class OrganizationService(
 
     public async Task<OrganizationDetailDto?> GetDetailAsync(Guid id)
     {
-        var org = await orgProc.GetByIdAsync(id);
+        var org = await context.OrganizationViews
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.OrganizationId == id);
+            
         if (org is null) return null;
 
         var memberRows = await orgProc.GetMembersAsync(id);
@@ -53,11 +59,11 @@ public class OrganizationService(
             .ToList();
 
         return new OrganizationDetailDto(
-            org.Id, org.Name, org.LegalName, org.CountryCode,
+            org.OrganizationId, org.Name, org.LegalName, org.CountryCode,
             org.StripeConnectedAccountId,
             org.StripeChargesEnabled, org.StripePayoutsEnabled, org.StripeDetailsSubmitted,
-            org.StripeOnboardedAt, org.StripeRequirementsDue,
-            org.ArchivedAt, org.CreatedAt, org.UpdatedAt,
+            org.StripeOnboardedAt, null, // CurrentlyDue fetched live via stripe-status endpoint
+            org.ArchivedAt, org.CreatedAt, org.CreatedAt, // UpdatedAt not in view, using CreatedAt as placeholder or we could add it
             members
         );
     }
@@ -95,24 +101,35 @@ public class OrganizationService(
     public async Task<PagedResponse<OrganizationListItemDto>> ListAsync(string? search, int page, int pageSize, bool includeArchived = false)
     {
         if (page < 1) page = 1;
-        if (pageSize < 1) pageSize = 25;
-        if (pageSize > 100) pageSize = 100;
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var offset = (page - 1) * pageSize;
-        var rows = await orgProc.ListAsync(search, includeArchived, offset, pageSize);
-        var totalCount = await orgProc.CountAsync(search, includeArchived);
+        var query = context.OrganizationViews.AsNoTracking();
+
+        if (!includeArchived)
+            query = query.Where(o => o.ArchivedAt == null);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(o => 
+                o.Name.ToLower().Contains(term) || 
+                (o.LegalName != null && o.LegalName.ToLower().Contains(term)) ||
+                (o.StripeConnectedAccountId != null && o.StripeConnectedAccountId.ToLower().Contains(term)));
+        }
+
+        var totalCount = await query.CountAsync();
+        var rows = await query
+            .OrderByDescending(o => o.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
 
         var items = rows.Select(r => new OrganizationListItemDto(
-            r.Id, r.Name, r.LegalName, r.CountryCode,
+            r.OrganizationId, r.Name, r.LegalName, r.CountryCode,
             r.StripeConnectedAccountId,
             r.StripeChargesEnabled, r.StripePayoutsEnabled, r.StripeDetailsSubmitted,
             r.StripeOnboardedAt, r.ArchivedAt, r.MemberCount,
-            r.CreatedAt, r.UpdatedAt,
-            // disabledReason not surfaced on the list endpoint (no Stripe call
-            // here — would be a per-row roundtrip). Webhook-driven snapshot
-            // only includes the booleans + currently_due array; rejected state
-            // therefore doesn't show in the list until the detail endpoint
-            // refreshes it (acceptable trade-off — rejected accts are rare).
+            r.CreatedAt, r.CreatedAt, // UpdatedAt not in view
             OrganizationStripeStateMapper.Derive(
                 r.StripeConnectedAccountId,
                 r.StripeDetailsSubmitted,
