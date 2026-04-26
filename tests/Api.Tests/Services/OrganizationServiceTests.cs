@@ -205,16 +205,11 @@ public class OrganizationServiceTests : IDisposable
     [Fact]
     public async Task ListAsync_ClampsPageSize_ToServerMax()
     {
-        _orgProc.Setup(p => p.ListAsync(null, false, 0, 100, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<OrganizationListRow>());
-        _orgProc.Setup(p => p.CountAsync(null, false, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
-
+        // No setup for _orgProc needed as we use the context directly via View
+        
         var result = await _service.ListAsync(null, page: 1, pageSize: 5000);
 
         result.PageSize.Should().Be(100);
-        // Clamping verified by the SP being called with limit=100, not 5000.
-        _orgProc.Verify(p => p.ListAsync(null, false, 0, 100, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -224,11 +219,6 @@ public class OrganizationServiceTests : IDisposable
     [InlineData(3, 3)]
     public async Task ListAsync_ClampsPage_ToMinimumOne(int requestedPage, int expectedPage)
     {
-        _orgProc.Setup(p => p.ListAsync(It.IsAny<string?>(), false, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<OrganizationListRow>());
-        _orgProc.Setup(p => p.CountAsync(It.IsAny<string?>(), false, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
-
         var result = await _service.ListAsync(null, page: requestedPage, pageSize: 25);
 
         result.Page.Should().Be(expectedPage);

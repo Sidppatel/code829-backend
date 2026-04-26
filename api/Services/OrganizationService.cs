@@ -9,11 +9,10 @@ using Serilog;
 namespace Api.Services;
 
 /// <summary>
-/// Default implementation of <see cref="IOrganizationService"/>. Delegates all
-/// data access to <see cref="IOrganizationProcedures"/>; no direct DbSet usage.
-/// The Stripe-onboarding-email path additionally pulls the BusinessUser row
-/// for name/email and bridges to <see cref="IStripeConnectService"/> + the
-/// Resend-backed <see cref="IEmailService"/>.
+/// Default implementation of <see cref="IOrganizationService"/>. Uses 
+/// <see cref="OrganizationView"/> for read operations (preferred pattern for 
+/// read-heavy API endpoints) and delegates mutations to 
+/// <see cref="IOrganizationProcedures"/>.
 /// </summary>
 public class OrganizationService(
     EventPlatformDbContext context,
