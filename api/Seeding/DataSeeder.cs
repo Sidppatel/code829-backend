@@ -178,6 +178,9 @@ public static class DataSeeder
             new TableTemplate { Id = Guid.NewGuid(), Name = "Banquet 6", DefaultCapacity = 6, DefaultShape = TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 15000, DefaultRowSpan = 1, DefaultColSpan = 2, IsActive = true },
             new TableTemplate { Id = Guid.NewGuid(), Name = "Long 10", DefaultCapacity = 10, DefaultShape = TableShape.Rectangle, DefaultColor = "#f97316", DefaultPriceCents = 22000, DefaultRowSpan = 1, DefaultColSpan = 3, IsActive = true },
             new TableTemplate { Id = Guid.NewGuid(), Name = "Square 4", DefaultCapacity = 4, DefaultShape = TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 12000, DefaultRowSpan = 1, DefaultColSpan = 1, IsActive = true },
+            // LayoutSeeder needs a Cocktail-shape template for several scripted layouts (Bellingrath / Farm-to-Table / Comedy / Default).
+            // Keep alongside the four mock spec templates.
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 12000, DefaultRowSpan = 1, DefaultColSpan = 1, IsActive = true },
         };
 
         context.TableTemplates.AddRange(templates);
