@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -73,6 +73,7 @@ namespace db.Migrations
             // before the table exists. CREATE OR REPLACE FUNCTION is
             // idempotent, so subsequent loads remain safe.
             MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.ProceduresOrg");
+            MigrationSqlLoader.LoadAll(migrationBuilder, "Sql.ViewsOrg");
         }
 
         /// <inheritdoc />
