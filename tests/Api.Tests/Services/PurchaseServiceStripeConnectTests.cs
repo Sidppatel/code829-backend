@@ -123,7 +123,8 @@ public class PurchaseServiceStripeConnectTests : IDisposable
                 PaymentIntentAmountCents: 5150,
                 SeatsIncluded: 1,
                 TaxCalculationId: "txcalc_test_123",
-                Currency: "usd"));
+                Currency: "usd",
+                Lines: []));
     }
 
     private static CreatePurchaseRequest OpenSeatRequest(Guid eventId)

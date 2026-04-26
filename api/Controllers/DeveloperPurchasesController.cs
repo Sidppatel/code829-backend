@@ -21,7 +21,8 @@ namespace Api.Controllers;
 public class DeveloperPurchasesController(
     EventPlatformDbContext context,
     IPurchaseService purchaseService,
+    IPricingService pricingService,
     IOrganizationProcedures organizationProc,
     IDashboardProcedures dashboardProc,
     IConnectionMultiplexer redis
-) : AdminPurchasesController(context, purchaseService, organizationProc, dashboardProc, redis);
+) : AdminPurchasesController(context, purchaseService, pricingService, organizationProc, dashboardProc, redis);

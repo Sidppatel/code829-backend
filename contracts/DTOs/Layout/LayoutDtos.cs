@@ -9,7 +9,9 @@ public record TableTemplateResponse(
     string DefaultShape,
     string? DefaultColor,
     int DefaultPriceCents,
-    bool IsActive
+    bool IsActive,
+    int DefaultRowSpan = 1,
+    int DefaultColSpan = 1
 );
 
 public record CreateTableTemplateRequest(
@@ -18,7 +20,9 @@ public record CreateTableTemplateRequest(
     string DefaultShape,
     string? DefaultColor = null,
     int DefaultPriceCents = 0,
-    bool? IsActive = null
+    bool? IsActive = null,
+    int DefaultRowSpan = 1,
+    int DefaultColSpan = 1
 );
 
 // ─── Event Tables (per-event table types) ────────────────────
@@ -34,7 +38,9 @@ public record EventTableResponse(
     Guid EventId,
     Guid? TableTemplateId,
     string? TableTemplateName,
-    int TableCount
+    int TableCount,
+    int? RowSpan = null,
+    int? ColSpan = null
 );
 
 public record CreateEventTableRequest(
@@ -43,7 +49,9 @@ public record CreateEventTableRequest(
     int? Capacity = null,
     string? Shape = null,
     string? Color = null,
-    int? PriceCents = null
+    int? PriceCents = null,
+    int? RowSpan = null,
+    int? ColSpan = null
 );
 
 public record UpdateEventTableRequest(
@@ -52,7 +60,9 @@ public record UpdateEventTableRequest(
     string? Shape = null,
     string? Color = null,
     int? PriceCents = null,
-    bool? IsActive = null
+    bool? IsActive = null,
+    int? RowSpan = null,
+    int? ColSpan = null
 );
 
 // ─── Layout (table instances on grid) ────────────────────────
@@ -77,7 +87,9 @@ public record LayoutTableResponse(
     string Shape,
     string? Color,
     int PriceCents,
-    string Status = "Available"
+    string Status = "Available",
+    int RowSpan = 1,
+    int ColSpan = 1
 );
 
 public record SaveLayoutRequest(
@@ -93,14 +105,18 @@ public record SaveLayoutTableRequest(
     int GridCol,
     bool IsActive,
     int SortOrder,
-    Guid EventTableId
+    Guid EventTableId,
+    int RowSpan = 1,
+    int ColSpan = 1
 );
 
 public record AddTableRequest(
     string Label,
     int GridRow,
     int GridCol,
-    Guid EventTableId
+    Guid EventTableId,
+    int RowSpan = 1,
+    int ColSpan = 1
 );
 
 public record UpdateTableRequest(
@@ -109,7 +125,9 @@ public record UpdateTableRequest(
     int? GridCol = null,
     bool? IsActive = null,
     int? SortOrder = null,
-    Guid? EventTableId = null
+    Guid? EventTableId = null,
+    int? RowSpan = null,
+    int? ColSpan = null
 );
 
 public record LayoutStatsResponse(

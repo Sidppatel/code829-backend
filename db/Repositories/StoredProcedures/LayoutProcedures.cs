@@ -9,23 +9,25 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
 {
     // ─── Table templates ───────────────────────────────────────────
 
-    public async Task<Guid> CreateTableTemplateAsync(string name, int capacity, string shape, string? color, int priceCents, CancellationToken ct = default)
+    public async Task<Guid> CreateTableTemplateAsync(string name, int capacity, string shape, string? color, int priceCents, int defaultRowSpan = 1, int defaultColSpan = 1, CancellationToken ct = default)
     {
         return await context.Database
             .SqlQueryRaw<Guid>(
-                "SELECT sp_create_table_template(@p0, @p1, @p2, @p3, @p4) AS \"Value\"",
+                "SELECT sp_create_table_template(@p0, @p1, @p2, @p3, @p4, @p5, @p6) AS \"Value\"",
                 new NpgsqlParameter("p0", name),
                 new NpgsqlParameter("p1", capacity),
                 new NpgsqlParameter("p2", shape),
                 new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)color ?? DBNull.Value },
-                new NpgsqlParameter("p4", priceCents))
+                new NpgsqlParameter("p4", priceCents),
+                new NpgsqlParameter("p5", defaultRowSpan),
+                new NpgsqlParameter("p6", defaultColSpan))
             .FirstAsync(ct);
     }
 
-    public async Task UpdateTableTemplateAsync(Guid id, string? name, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, CancellationToken ct = default)
+    public async Task UpdateTableTemplateAsync(Guid id, string? name, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, int? defaultRowSpan = null, int? defaultColSpan = null, CancellationToken ct = default)
     {
         await context.Database.ExecuteSqlRawAsync(
-            "SELECT sp_update_table_template(@p0, @p1, @p2, @p3, @p4, @p5, @p6)",
+            "SELECT sp_update_table_template(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)",
             [
                 new NpgsqlParameter("p0", id),
                 new NpgsqlParameter("p1", NpgsqlDbType.Text) { Value = (object?)name ?? DBNull.Value },
@@ -33,7 +35,9 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
                 new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)shape ?? DBNull.Value },
                 new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)color ?? DBNull.Value },
                 new NpgsqlParameter("p5", NpgsqlDbType.Integer) { Value = (object?)priceCents ?? DBNull.Value },
-                new NpgsqlParameter("p6", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value }
+                new NpgsqlParameter("p6", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value },
+                new NpgsqlParameter("p7", NpgsqlDbType.Integer) { Value = (object?)defaultRowSpan ?? DBNull.Value },
+                new NpgsqlParameter("p8", NpgsqlDbType.Integer) { Value = (object?)defaultColSpan ?? DBNull.Value }
             ], ct);
     }
 
@@ -90,10 +94,10 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
 
     // ─── Event tables ──────────────────────────────────────────────
 
-    public async Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, int? platformFeeCents = null, CancellationToken ct = default)
+    public async Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, int? platformFeeCents = null, int? rowSpan = null, int? colSpan = null, CancellationToken ct = default)
     {
         await context.Database.ExecuteSqlRawAsync(
-            "SELECT sp_update_event_table(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)",
+            "SELECT sp_update_event_table(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9)",
             [
                 new NpgsqlParameter("p0", id),
                 new NpgsqlParameter("p1", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value },
@@ -102,7 +106,9 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
                 new NpgsqlParameter("p4", NpgsqlDbType.Text) { Value = (object?)color ?? DBNull.Value },
                 new NpgsqlParameter("p5", NpgsqlDbType.Integer) { Value = (object?)priceCents ?? DBNull.Value },
                 new NpgsqlParameter("p6", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value },
-                new NpgsqlParameter("p7", NpgsqlDbType.Integer) { Value = (object?)platformFeeCents ?? DBNull.Value }
+                new NpgsqlParameter("p7", NpgsqlDbType.Integer) { Value = (object?)platformFeeCents ?? DBNull.Value },
+                new NpgsqlParameter("p8", NpgsqlDbType.Integer) { Value = (object?)rowSpan ?? DBNull.Value },
+                new NpgsqlParameter("p9", NpgsqlDbType.Integer) { Value = (object?)colSpan ?? DBNull.Value }
             ], ct);
     }
 
@@ -138,10 +144,10 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
 
     // ─── Tables ────────────────────────────────────────────────────
 
-    public async Task UpdateTableAsync(Guid id, string? label, Guid? eventTableId, int? gridRow, int? gridCol, bool? isActive, int? sortOrder, CancellationToken ct = default)
+    public async Task UpdateTableAsync(Guid id, string? label, Guid? eventTableId, int? gridRow, int? gridCol, bool? isActive, int? sortOrder, int? rowSpan = null, int? colSpan = null, CancellationToken ct = default)
     {
         await context.Database.ExecuteSqlRawAsync(
-            "SELECT sp_update_table(@p0, @p1, @p2, @p3, @p4, @p5, @p6)",
+            "SELECT sp_update_table(@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)",
             [
                 new NpgsqlParameter("p0", id),
                 new NpgsqlParameter("p1", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value },
@@ -149,7 +155,9 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
                 new NpgsqlParameter("p3", NpgsqlDbType.Integer) { Value = (object?)gridRow ?? DBNull.Value },
                 new NpgsqlParameter("p4", NpgsqlDbType.Integer) { Value = (object?)gridCol ?? DBNull.Value },
                 new NpgsqlParameter("p5", NpgsqlDbType.Boolean) { Value = (object?)isActive ?? DBNull.Value },
-                new NpgsqlParameter("p6", NpgsqlDbType.Integer) { Value = (object?)sortOrder ?? DBNull.Value }
+                new NpgsqlParameter("p6", NpgsqlDbType.Integer) { Value = (object?)sortOrder ?? DBNull.Value },
+                new NpgsqlParameter("p7", NpgsqlDbType.Integer) { Value = (object?)rowSpan ?? DBNull.Value },
+                new NpgsqlParameter("p8", NpgsqlDbType.Integer) { Value = (object?)colSpan ?? DBNull.Value }
             ], ct);
     }
 
@@ -203,6 +211,18 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
             .SqlQueryRaw<Guid>("SELECT * FROM sp_get_locked_table_ids({0})", eventId)
             .ToListAsync(ct);
         return ids.ToHashSet();
+    }
+
+    // ─── Grid overlap detection ────────────────────────────────────
+
+    public async Task<List<GridOverlapPair>> CheckGridOverlapAsync(Guid eventId, Guid? skipTableId = null, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<GridOverlapPair>(
+                "SELECT * FROM sp_check_grid_overlap(@p0, @p1)",
+                new NpgsqlParameter("p0", eventId),
+                new NpgsqlParameter("p1", NpgsqlDbType.Uuid) { Value = (object?)skipTableId ?? DBNull.Value })
+            .ToListAsync(ct);
     }
 
     // ─── Atomic layout save ────────────────────────────────────────
