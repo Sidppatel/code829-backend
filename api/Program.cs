@@ -468,6 +468,11 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationMemberRequest>, OrganizationMemberRequestValidator>();
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.StripeOnboardingLinkRequest>, StripeOnboardingLinkRequestValidator>();
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.StartStripeOnboardingRequest>, StartStripeOnboardingRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Layout.SaveLayoutRequest>, SaveLayoutRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Layout.AddTableRequest>, AddTableRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Layout.UpdateTableRequest>, UpdateTableRequestValidator>();
+    builder.Services.AddScoped<IValidator<Contracts.DTOs.Layout.CreateTableTemplateRequest>, CreateTableTemplateRequestValidator>();
+    builder.Services.AddScoped<IValidator<PricingQuoteRequest>, PricingQuoteRequestValidator>();
 
     // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();

@@ -7,6 +7,8 @@ public class Table : BaseEntity
     public required string Label { get; set; }
     public int GridRow { get; set; }
     public int GridCol { get; set; }
+    public int RowSpan { get; set; } = 1;
+    public int ColSpan { get; set; } = 1;
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
 

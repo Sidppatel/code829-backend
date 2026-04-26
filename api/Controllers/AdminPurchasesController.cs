@@ -26,6 +26,7 @@ namespace Api.Controllers;
 public class AdminPurchasesController(
     EventPlatformDbContext context,
     IPurchaseService purchaseService,
+    IPricingService pricingService,
     IOrganizationProcedures organizationProc,
     IDashboardProcedures dashboardProc,
     IConnectionMultiplexer redis
@@ -113,6 +114,18 @@ public class AdminPurchasesController(
         await db.StringSetAsync(cacheKey, json, CacheTtl);
 
         return Ok(result);
+    }
+
+    [HttpPost("quote")]
+    public async Task<IActionResult> Quote([FromBody] PricingQuoteRequest request)
+    {
+        try
+        {
+            var quote = await pricingService.CalculateAdminQuoteAsync(request);
+            return Ok(quote);
+        }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[AdminPurchases] Quote failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[AdminPurchases] Quote failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 
     [HttpGet("stats")]

@@ -39,7 +39,8 @@ public class AdminLayoutController(
         var templates = await layoutProc.ListTableTemplatesAsync();
         return Ok(templates.Select(tt => new TableTemplateResponse(
             tt.Id, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
-            tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive)).ToList());
+            tt.DefaultColor, tt.DefaultPriceCents, tt.IsActive,
+            tt.DefaultRowSpan, tt.DefaultColSpan)).ToList());
     }
 
     [HttpPost("admin/table-templates")]
@@ -50,11 +51,13 @@ public class AdminLayoutController(
 
         var id = await layoutProc.CreateTableTemplateAsync(
             request.Name, request.DefaultCapacity, shape.ToString(),
-            request.DefaultColor, request.DefaultPriceCents);
+            request.DefaultColor, request.DefaultPriceCents,
+            request.DefaultRowSpan, request.DefaultColSpan);
 
         return Created("", new TableTemplateResponse(
             id, request.Name, request.DefaultCapacity, shape.ToString(),
-            request.DefaultColor, request.DefaultPriceCents, true));
+            request.DefaultColor, request.DefaultPriceCents, true,
+            request.DefaultRowSpan, request.DefaultColSpan));
     }
 
     [HttpPut("admin/table-templates/{id:guid}")]
@@ -68,12 +71,14 @@ public class AdminLayoutController(
 
         await layoutProc.UpdateTableTemplateAsync(
             id, request.Name, request.DefaultCapacity, shape.ToString(),
-            request.DefaultColor, request.DefaultPriceCents, request.IsActive);
+            request.DefaultColor, request.DefaultPriceCents, request.IsActive,
+            request.DefaultRowSpan, request.DefaultColSpan);
 
         var updated = await layoutProc.GetTableTemplateByIdAsync(id);
         return Ok(new TableTemplateResponse(
             updated!.Id, updated.Name, updated.DefaultCapacity, updated.DefaultShape.ToString(),
-            updated.DefaultColor, updated.DefaultPriceCents, updated.IsActive));
+            updated.DefaultColor, updated.DefaultPriceCents, updated.IsActive,
+            updated.DefaultRowSpan, updated.DefaultColSpan));
     }
 
     [HttpDelete("admin/table-templates/{id:guid}")]
@@ -135,16 +140,18 @@ public class AdminLayoutController(
         var capacity = request.Capacity ?? template?.DefaultCapacity ?? 4;
         var color = request.Color ?? template?.DefaultColor;
         var priceCents = request.PriceCents ?? template?.DefaultPriceCents ?? 0;
+        var rowSpan = request.RowSpan ?? template?.DefaultRowSpan;
+        var colSpan = request.ColSpan ?? template?.DefaultColSpan;
 
         var etId = await tableProc.CreateEventTableAsync(
             eventId, label, capacity, shape.ToString(), color,
-            priceCents, defaultGridFee, template?.Id);
+            priceCents, defaultGridFee, template?.Id, rowSpan, colSpan);
 
         await cache.InvalidateTablesAsync(eventId);
 
         return Created("", new EventTableResponse(
             etId, label, capacity, shape.ToString(), color, priceCents, true,
-            eventId, template?.Id, template?.Name, 0));
+            eventId, template?.Id, template?.Name, 0, rowSpan, colSpan));
     }
 
     [HttpPut("admin/events/{eventId:guid}/event-tables/{id:guid}")]
@@ -177,7 +184,8 @@ public class AdminLayoutController(
 
         await layoutProc.UpdateEventTableAsync(
             id, request.Label, request.Capacity, shapeOut,
-            request.Color, request.PriceCents, request.IsActive);
+            request.Color, request.PriceCents, request.IsActive,
+            rowSpan: request.RowSpan, colSpan: request.ColSpan);
 
         await cache.InvalidateTablesAsync(eventId);
 
@@ -230,11 +238,30 @@ public class AdminLayoutController(
 
         var locked = await layoutProc.GetLockedTableIdsAsync(eventId);
 
-        var cells = new HashSet<(int, int)>();
-        foreach (var rt in request.Tables)
+        var gridRows = request.GridRows ?? ev.GridRows;
+        var gridCols = request.GridCols ?? ev.GridCols;
+        if (gridRows is int gr && gridCols is int gc)
         {
-            if (!cells.Add((rt.GridRow, rt.GridCol)))
-                return BadRequest(new ApiError(400, $"Duplicate grid cell ({rt.GridRow}, {rt.GridCol})", HttpContext.TraceIdentifier));
+            foreach (var rt in request.Tables)
+            {
+                if (!rt.IsActive) continue;
+                if (rt.RowSpan < 1 || rt.ColSpan < 1)
+                    return BadRequest(new ApiError(400, $"Span must be ≥ 1 (table '{rt.Label}')", HttpContext.TraceIdentifier));
+                if (rt.GridRow + rt.RowSpan > gr || rt.GridCol + rt.ColSpan > gc)
+                    return BadRequest(new ApiError(400, $"Table '{rt.Label}' span exceeds grid bounds", HttpContext.TraceIdentifier));
+            }
+        }
+
+        var active = request.Tables.Where(t => t.IsActive).ToList();
+        for (var i = 0; i < active.Count; i++)
+        {
+            for (var j = i + 1; j < active.Count; j++)
+            {
+                if (RectanglesOverlap(active[i], active[j]))
+                    return BadRequest(new ApiError(400,
+                        $"Tables '{active[i].Label}' and '{active[j].Label}' overlap on the grid",
+                        HttpContext.TraceIdentifier));
+            }
         }
 
         var tablesJson = SerializeTablesForSave(request.Tables);
@@ -327,9 +354,24 @@ public class AdminLayoutController(
         if (eventTable is null || eventTable.EventId != eventId)
             return BadRequest(new ApiError(400, "Event table not found for this event", HttpContext.TraceIdentifier));
 
+        if (request.RowSpan < 1 || request.ColSpan < 1)
+            return BadRequest(new ApiError(400, "Span must be ≥ 1", HttpContext.TraceIdentifier));
+
+        if (ev.GridRows is int gr && ev.GridCols is int gc &&
+            (request.GridRow + request.RowSpan > gr || request.GridCol + request.ColSpan > gc))
+            return BadRequest(new ApiError(400, "Table span exceeds grid bounds", HttpContext.TraceIdentifier));
+
         var tableId = await tableProc.CreateTableAsync(
             request.EventTableId, eventId, request.Label,
-            request.GridRow, request.GridCol, 0);
+            request.GridRow, request.GridCol, 0,
+            request.RowSpan, request.ColSpan);
+
+        var overlaps = await layoutProc.CheckGridOverlapAsync(eventId);
+        if (overlaps.Any(o => o.TableAId == tableId || o.TableBId == tableId))
+        {
+            await layoutProc.DeleteTableAsync(tableId);
+            return BadRequest(new ApiError(400, "Table overlaps an existing table on the grid", HttpContext.TraceIdentifier));
+        }
 
         await cache.InvalidateTablesAsync(eventId);
 
@@ -337,7 +379,8 @@ public class AdminLayoutController(
             tableId, request.Label, request.GridRow, request.GridCol, true,
             0, request.EventTableId, eventTable.Label,
             eventTable.Capacity, eventTable.Shape.ToString(),
-            eventTable.Color, eventTable.PriceCents));
+            eventTable.Color, eventTable.PriceCents,
+            "Available", request.RowSpan, request.ColSpan));
     }
 
     [HttpPut("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
@@ -362,9 +405,27 @@ public class AdminLayoutController(
                 return BadRequest(new ApiError(400, "Event table not found for this event", HttpContext.TraceIdentifier));
         }
 
+        if (request.RowSpan is int rs && rs < 1)
+            return BadRequest(new ApiError(400, "RowSpan must be ≥ 1", HttpContext.TraceIdentifier));
+        if (request.ColSpan is int cs && cs < 1)
+            return BadRequest(new ApiError(400, "ColSpan must be ≥ 1", HttpContext.TraceIdentifier));
+
+        var newRow = request.GridRow ?? table.GridRow;
+        var newCol = request.GridCol ?? table.GridCol;
+        var newRowSpan = request.RowSpan ?? table.RowSpan;
+        var newColSpan = request.ColSpan ?? table.ColSpan;
+        if (ev.GridRows is int gridR && ev.GridCols is int gridC &&
+            (newRow + newRowSpan > gridR || newCol + newColSpan > gridC))
+            return BadRequest(new ApiError(400, "Table span exceeds grid bounds", HttpContext.TraceIdentifier));
+
         await layoutProc.UpdateTableAsync(
             tableId, request.Label, request.EventTableId,
-            request.GridRow, request.GridCol, request.IsActive, request.SortOrder);
+            request.GridRow, request.GridCol, request.IsActive, request.SortOrder,
+            request.RowSpan, request.ColSpan);
+
+        var overlaps = await layoutProc.CheckGridOverlapAsync(eventId);
+        if (overlaps.Any(o => o.TableAId == tableId || o.TableBId == tableId))
+            return BadRequest(new ApiError(400, "Updated table overlaps another table on the grid", HttpContext.TraceIdentifier));
 
         await cache.InvalidateTablesAsync(eventId);
 
@@ -375,7 +436,8 @@ public class AdminLayoutController(
             updated.Id, updated.Label, updated.GridRow, updated.GridCol, updated.IsActive,
             updated.SortOrder, updated.EventTableId, eventTable!.Label,
             eventTable.Capacity, eventTable.Shape.ToString(),
-            eventTable.Color, eventTable.PriceCents));
+            eventTable.Color, eventTable.PriceCents,
+            "Available", updated.RowSpan, updated.ColSpan));
     }
 
     [HttpDelete("admin/events/{eventId:guid}/layout/table/{tableId:guid}")]
@@ -424,6 +486,8 @@ public class AdminLayoutController(
                 t.Label,
                 t.GridRow,
                 t.GridCol,
+                t.RowSpan,
+                t.ColSpan,
                 t.IsActive,
                 t.SortOrder,
                 t.EventTableId,
@@ -499,11 +563,13 @@ public class AdminLayoutController(
         {
             var etId = await tableProc.CreateEventTableAsync(
                 eventId, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
-                tt.DefaultColor, tt.DefaultPriceCents, defaultGridFee, tt.Id);
+                tt.DefaultColor, tt.DefaultPriceCents, defaultGridFee, tt.Id,
+                tt.DefaultRowSpan, tt.DefaultColSpan);
             created.Add(new EventTableResponse(
                 etId, tt.Name, tt.DefaultCapacity, tt.DefaultShape.ToString(),
                 tt.DefaultColor, tt.DefaultPriceCents, true,
-                eventId, tt.Id, tt.Name, 0));
+                eventId, tt.Id, tt.Name, 0,
+                tt.DefaultRowSpan, tt.DefaultColSpan));
         }
 
         if (created.Count > 0)
@@ -558,14 +624,15 @@ public class AdminLayoutController(
             et.Color, et.PriceCents, et.IsActive,
             et.EventId, et.TableTemplateId,
             et.TableTemplateId.HasValue && templateMap.TryGetValue(et.TableTemplateId.Value, out var name) ? name : null,
-            tableCountByEventTable.GetValueOrDefault(et.Id, 0))).ToList();
+            tableCountByEventTable.GetValueOrDefault(et.Id, 0),
+            et.RowSpan, et.ColSpan)).ToList();
     }
 
     private static LayoutTableResponse MapTableViewToResponse(Db.Entities.Views.TableView t) => new(
         t.TableId, t.Label, t.GridRow, t.GridCol, t.IsActive,
         t.SortOrder, t.EventTableId, t.EventTableLabel,
         t.Capacity, t.Shape, t.Color, t.PriceCents,
-        t.Status);
+        t.Status, t.RowSpan, t.ColSpan);
 
     private static LayoutTableResponse MapTableViewWithStatus(Db.Entities.Views.TableView t, HashSet<Guid> lockedIds)
     {
@@ -579,8 +646,14 @@ public class AdminLayoutController(
             t.TableId, t.Label, t.GridRow, t.GridCol, t.IsActive,
             t.SortOrder, t.EventTableId, t.EventTableLabel,
             t.Capacity, t.Shape, t.Color, t.PriceCents,
-            status);
+            status, t.RowSpan, t.ColSpan);
     }
+
+    private static bool RectanglesOverlap(SaveLayoutTableRequest a, SaveLayoutTableRequest b) =>
+        a.GridRow < b.GridRow + b.RowSpan
+        && b.GridRow < a.GridRow + a.RowSpan
+        && a.GridCol < b.GridCol + b.ColSpan
+        && b.GridCol < a.GridCol + a.ColSpan;
 
     private static string SerializeTablesForSave(List<SaveLayoutTableRequest> tables)
     {
@@ -592,7 +665,9 @@ public class AdminLayoutController(
             t.GridCol,
             t.IsActive,
             t.SortOrder,
-            EventTableId = t.EventTableId.ToString()
+            EventTableId = t.EventTableId.ToString(),
+            t.RowSpan,
+            t.ColSpan
         });
         return JsonSerializer.Serialize(serializable);
     }

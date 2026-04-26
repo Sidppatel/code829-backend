@@ -8,13 +8,15 @@ namespace Api.Services;
 
 public interface IPricingService
 {
-    Task<PricingQuoteDto> CalculateQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default);
+    Task<PublicQuoteDto> CalculatePublicQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default);
+    Task<CheckoutQuoteDto> CalculateCheckoutQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default);
+    Task<AdminQuoteDto> CalculateAdminQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default);
     Task<PricingComputation> ComputeForPurchaseAsync(PricingQuoteRequest request, CancellationToken ct = default);
 }
 
 /// <summary>
-/// Full pricing breakdown used during purchase creation. Unlike the quote DTO, this carries
-/// context (tax calculation id, final PaymentIntent amount) needed server-side.
+/// Full pricing breakdown used during purchase creation. Carries the Stripe Tax calc id and
+/// the PaymentIntent amount (tax-inclusive) so the booking flow can charge the exact total.
 /// </summary>
 public record PricingComputation(
     int SubtotalCents,
@@ -24,7 +26,8 @@ public record PricingComputation(
     int PaymentIntentAmountCents,
     int SeatsIncluded,
     string? TaxCalculationId,
-    string Currency
+    string Currency,
+    List<QuoteLineDto> Lines
 );
 
 public class PricingService(
@@ -33,41 +36,87 @@ public class PricingService(
     ISettingsService settings
 ) : IPricingService
 {
-    public async Task<PricingQuoteDto> CalculateQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default)
+    public async Task<PublicQuoteDto> CalculatePublicQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default)
     {
-        var comp = await ComputeForPurchaseAsync(request, ct);
-        // The quote's Total must be what the customer actually gets charged — subtotal + fee + tax.
-        // PaymentIntentAmountCents is the tax-inclusive amount Stripe authorizes. TotalCents inside
-        // PricingComputation is pre-tax and stays that way for the purchase record; only the DTO
-        // surfaces the grand total.
-        return new PricingQuoteDto(
-            comp.SubtotalCents,
-            comp.FeeCents,
-            comp.TaxCents,
-            comp.PaymentIntentAmountCents,
-            comp.SubtotalCents + comp.FeeCents,
-            comp.SeatsIncluded,
-            comp.Currency,
-            FormatUsd(comp.PaymentIntentAmountCents),
+        // Public quote skips Stripe Tax — guests don't see tax until checkout.
+        var (subtotal, fee, seats, _, _) = await ComputeBaseAsync(request, ct);
+        var displayTotal = subtotal + fee;
+        return new PublicQuoteDto(
+            displayTotal,
+            seats,
+            "usd",
+            FormatUsd(displayTotal),
             DateTime.UtcNow.AddMinutes(5));
     }
 
+    public async Task<CheckoutQuoteDto> CalculateCheckoutQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default)
+    {
+        var comp = await ComputeForPurchaseAsync(request, ct);
+        var displayTotal = comp.SubtotalCents + comp.FeeCents;
+        return new CheckoutQuoteDto(
+            displayTotal,
+            comp.TaxCents,
+            comp.PaymentIntentAmountCents,
+            comp.SeatsIncluded,
+            comp.Currency,
+            FormatUsd(displayTotal),
+            FormatUsd(comp.TaxCents),
+            FormatUsd(comp.PaymentIntentAmountCents),
+            comp.TaxCalculationId,
+            DateTime.UtcNow.AddMinutes(5));
+    }
+
+    public async Task<AdminQuoteDto> CalculateAdminQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default)
+    {
+        var comp = await ComputeForPurchaseAsync(request, ct);
+        var displayTotal = comp.SubtotalCents + comp.FeeCents;
+        return new AdminQuoteDto(
+            comp.SubtotalCents,
+            comp.FeeCents,
+            displayTotal,
+            comp.TaxCents,
+            comp.PaymentIntentAmountCents,
+            comp.SeatsIncluded,
+            comp.Currency,
+            FormatUsd(displayTotal),
+            FormatUsd(comp.PaymentIntentAmountCents),
+            comp.TaxCalculationId,
+            DateTime.UtcNow.AddMinutes(5),
+            comp.Lines);
+    }
+
     public async Task<PricingComputation> ComputeForPurchaseAsync(PricingQuoteRequest request, CancellationToken ct = default)
+    {
+        var (subtotal, fee, seats, lines, ev) = await ComputeBaseAsync(request, ct);
+        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, subtotal + fee, seats, lines, ct);
+    }
+
+    private async Task<(int Subtotal, int Fee, int Seats, List<QuoteLineDto> Lines, EventView Event)> ComputeBaseAsync(
+        PricingQuoteRequest request, CancellationToken ct)
     {
         var ev = await context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.EventId == request.EventId, ct)
             ?? throw new KeyNotFoundException("Event not found");
 
         if (request.TableIds is { Count: > 0 })
-            return await ComputeTablePricingAsync(ev, request.TableIds, ct);
+        {
+            if (request.SeatCount.HasValue)
+                throw new InvalidOperationException("SeatCount is not valid for table bookings");
+            return await ComputeTableBaseAsync(ev, request.TableIds, ct);
+        }
 
         if (request.SeatCount is int seats and > 0)
-            return await ComputeOpenPricingAsync(ev, seats, request.EventTicketTypeId, ct);
+        {
+            if (request.TableIds is { Count: > 0 })
+                throw new InvalidOperationException("TableIds is not valid for open-capacity bookings");
+            return await ComputeOpenBaseAsync(ev, seats, request.EventTicketTypeId, ct);
+        }
 
         throw new InvalidOperationException("Either TableIds or SeatCount must be provided");
     }
 
-    private async Task<PricingComputation> ComputeTablePricingAsync(EventView ev, List<Guid> tableIds, CancellationToken ct)
+    private async Task<(int, int, int, List<QuoteLineDto>, EventView)> ComputeTableBaseAsync(
+        EventView ev, List<Guid> tableIds, CancellationToken ct)
     {
         if (ev.LayoutMode != "Grid")
             throw new InvalidOperationException("Table pricing only applies to Grid events");
@@ -83,13 +132,26 @@ public class PricingService(
 
         var subtotal = tables.Sum(t => t.PriceCents);
         var fee = tables.Sum(t => t.PlatformFeeCents ?? defaultFeeCents);
-        var total = subtotal + fee;
         var seatsIncluded = tables.Sum(t => t.Capacity);
 
-        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, total, seatsIncluded, ct);
+        var lines = tables.Select(t =>
+        {
+            var lineFee = t.PlatformFeeCents ?? defaultFeeCents;
+            return new QuoteLineDto(
+                t.TableId,
+                null,
+                t.Label,
+                1,
+                t.PriceCents,
+                lineFee,
+                t.PriceCents + lineFee);
+        }).ToList();
+
+        return (subtotal, fee, seatsIncluded, lines, ev);
     }
 
-    private async Task<PricingComputation> ComputeOpenPricingAsync(EventView ev, int seats, Guid? ticketTypeId, CancellationToken ct)
+    private async Task<(int, int, int, List<QuoteLineDto>, EventView)> ComputeOpenBaseAsync(
+        EventView ev, int seats, Guid? ticketTypeId, CancellationToken ct)
     {
         if (ev.LayoutMode != "Open")
             throw new InvalidOperationException("Open pricing only applies to Open events");
@@ -100,6 +162,8 @@ public class PricingService(
 
         int pricePerPerson;
         int feePerTicket;
+        Guid? lineTicketTypeId = null;
+        string lineLabel;
 
         if (ticketTypes.Count > 0)
         {
@@ -110,34 +174,42 @@ public class PricingService(
             pricePerPerson = selected.PriceCents;
             var defaultOpenFee = await settings.GetIntAsync("default_platform_fee_open_cents", 1000);
             feePerTicket = selected.PlatformFeeCents ?? defaultOpenFee;
+            lineTicketTypeId = selected.EventTicketTypeId;
+            lineLabel = selected.Label;
         }
         else
         {
             pricePerPerson = ev.PricePerPersonCents
                 ?? throw new InvalidOperationException("Event has no price configured");
             feePerTicket = await settings.GetIntAsync("default_platform_fee_open_cents", 1000);
+            lineLabel = "General Admission";
         }
 
         var subtotal = pricePerPerson * seats;
         var fee = feePerTicket * seats;
-        var total = subtotal + fee;
 
-        return await ApplyTaxIfEnabledAsync(ev, subtotal, fee, total, seats, ct);
+        var lines = new List<QuoteLineDto>
+        {
+            new(null, lineTicketTypeId, lineLabel, seats, pricePerPerson, feePerTicket, pricePerPerson + feePerTicket)
+        };
+
+        return (subtotal, fee, seats, lines, ev);
     }
 
-    private async Task<PricingComputation> ApplyTaxIfEnabledAsync(EventView ev, int subtotal, int fee, int total, int seatsIncluded, CancellationToken ct)
+    private async Task<PricingComputation> ApplyTaxIfEnabledAsync(
+        EventView ev, int subtotal, int fee, int total, int seatsIncluded, List<QuoteLineDto> lines, CancellationToken ct)
     {
         var stripeTaxSetting = await settings.GetOrDefaultAsync("stripe_tax_enabled", "false");
         var stripeTaxEnabled = "true".Equals(stripeTaxSetting, StringComparison.OrdinalIgnoreCase);
         if (!stripeTaxEnabled)
-            return new PricingComputation(subtotal, fee, 0, total, total, seatsIncluded, null, "usd");
+            return new PricingComputation(subtotal, fee, 0, total, total, seatsIncluded, null, "usd", lines);
 
         try
         {
             var taxResult = await taxService.CalculateAsync(total, "usd",
                 ev.VenueAddress, ev.VenueCity, ev.VenueState, ev.VenueZipCode, ct: ct);
             return new PricingComputation(subtotal, fee, taxResult.TaxAmountExclusive, total,
-                taxResult.AmountTotal, seatsIncluded, taxResult.CalculationId, "usd");
+                taxResult.AmountTotal, seatsIncluded, taxResult.CalculationId, "usd", lines);
         }
         catch (Exception ex)
         {

@@ -120,6 +120,8 @@ public static class DataSeeder
             ["system_log_retention_days"] = ("30", "System log retention in days"),
             ["s3_region"] = ("auto", "Cloudflare R2 region (always 'auto')"),
             ["rate_limit_disabled"] = ("false", "Set to 'true' to bypass all rate limits (testing only)"),
+            ["default_table_row_span"] = ("1", "Default row span for new layout tables"),
+            ["default_table_col_span"] = ("1", "Default column span for new layout tables"),
         };
 
         foreach (var (key, (value, description)) in defaults)
@@ -172,10 +174,10 @@ public static class DataSeeder
 
         var templates = new[]
         {
-            new TableTemplate { Id = Guid.NewGuid(), Name = "Standard Round (4)", DefaultCapacity = 4, DefaultShape = TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 10000, IsActive = true },
-            new TableTemplate { Id = Guid.NewGuid(), Name = "VIP Rectangle (6)", DefaultCapacity = 6, DefaultShape = TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 15000, IsActive = true },
-            new TableTemplate { Id = Guid.NewGuid(), Name = "Cocktail Highboy (2)", DefaultCapacity = 2, DefaultShape = TableShape.Cocktail, DefaultColor = "#f97316", DefaultPriceCents = 12000, IsActive = true },
-            new TableTemplate { Id = Guid.NewGuid(), Name = "Lounge Section (8)", DefaultCapacity = 8, DefaultShape = TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 18000, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Round 8", DefaultCapacity = 8, DefaultShape = TableShape.Round, DefaultColor = "#4f46e5", DefaultPriceCents = 16000, DefaultRowSpan = 1, DefaultColSpan = 1, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Banquet 6", DefaultCapacity = 6, DefaultShape = TableShape.Rectangle, DefaultColor = "#7c3aed", DefaultPriceCents = 15000, DefaultRowSpan = 1, DefaultColSpan = 2, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Long 10", DefaultCapacity = 10, DefaultShape = TableShape.Rectangle, DefaultColor = "#f97316", DefaultPriceCents = 22000, DefaultRowSpan = 1, DefaultColSpan = 3, IsActive = true },
+            new TableTemplate { Id = Guid.NewGuid(), Name = "Square 4", DefaultCapacity = 4, DefaultShape = TableShape.Square, DefaultColor = "#22c55e", DefaultPriceCents = 12000, DefaultRowSpan = 1, DefaultColSpan = 1, IsActive = true },
         };
 
         context.TableTemplates.AddRange(templates);

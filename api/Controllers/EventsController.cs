@@ -384,7 +384,10 @@ public class EventsController(
             .Where(et => et.EventId == id)
             .Select(et => new EventTableTypeInfo(
                 et.EventTableId, et.Label, et.Capacity, et.Shape, et.Color, null,
-                et.PriceCents + (et.PlatformFeeCents ?? 0)))
+                et.PriceCents + (et.PlatformFeeCents ?? 0),
+                null,
+                et.DefaultRowSpan,
+                et.DefaultColSpan))
             .ToListAsync();
 
         var dtos = tables.Select(t =>
@@ -422,7 +425,9 @@ public class EventsController(
                 IsAvailable: status == "Available" || isLockedByYou,
                 IsLockedByYou: isLockedByYou,
                 EventTableId: t.EventTableId,
-                EventTableLabel: t.EventTableLabel);
+                EventTableLabel: t.EventTableLabel,
+                RowSpan: t.RowSpan,
+                ColSpan: t.ColSpan);
         }).ToList();
 
         return Ok(new EventTablesResponse(id, ev.GridRows, ev.GridCols, eventTableTypes, dtos));

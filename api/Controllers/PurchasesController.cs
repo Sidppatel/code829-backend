@@ -44,16 +44,29 @@ public class PurchasesController(
     }
 
     [HttpPost("quote")]
-    [RequireRole(UserRole.User)]
+    [AllowAnonymous]
     public async Task<IActionResult> GetQuote([FromBody] PricingQuoteRequest request)
     {
         try
         {
-            var quote = await pricingService.CalculateQuoteAsync(request);
+            var quote = await pricingService.CalculatePublicQuoteAsync(request);
             return Ok(quote);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Quote failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Quote failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
+    }
+
+    [HttpPost("checkout-quote")]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> GetCheckoutQuote([FromBody] PricingQuoteRequest request)
+    {
+        try
+        {
+            var quote = await pricingService.CalculateCheckoutQuoteAsync(request);
+            return Ok(quote);
+        }
+        catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] CheckoutQuote failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
+        catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] CheckoutQuote failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
 
     [HttpPost("{id:guid}/confirm")]

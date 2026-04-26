@@ -9,6 +9,8 @@ public class TableTemplate : BaseEntity
     public TableShape DefaultShape { get; set; } = TableShape.Round;
     public string? DefaultColor { get; set; }
     public int DefaultPriceCents { get; set; }
+    public int DefaultRowSpan { get; set; } = 1;
+    public int DefaultColSpan { get; set; } = 1;
     public bool IsActive { get; set; } = true;
 
     public ICollection<EventTable> EventTables { get; set; } = [];

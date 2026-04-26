@@ -16,7 +16,9 @@ public record EventTableDto(
     bool IsAvailable,
     bool IsLockedByYou = false,
     Guid? EventTableId = null,
-    string? EventTableLabel = null
+    string? EventTableLabel = null,
+    int RowSpan = 1,
+    int ColSpan = 1
 );
 
 public record EventTableTypeInfo(
@@ -27,7 +29,9 @@ public record EventTableTypeInfo(
     string? Color,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PriceCents,
     int DisplayPriceCents,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PlatformFeeCents = null
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? PlatformFeeCents = null,
+    int DefaultRowSpan = 1,
+    int DefaultColSpan = 1
 );
 
 public record EventTablesResponse(
