@@ -49,6 +49,10 @@ public class TicketsController(
             .OrderBy(t => t.SeatNumber)
             .ToListAsync();
 
+        var alreadyClaimedByMe = tickets.Any(t =>
+            t.GuestUserId == userId &&
+            (t.Status == nameof(TicketStatus.Claimed) || t.Status == nameof(TicketStatus.CheckedIn)));
+
         var dtos = tickets.Select(t => new PurchaseTicketDto(
             t.PurchaseTicketId, t.TicketCode, t.SeatNumber, t.Status,
             purchase.PurchaseId, purchase.PurchaseNumber,
@@ -58,7 +62,9 @@ public class TicketsController(
             t.GuestFirstName is not null ? $"{t.GuestFirstName} {t.GuestLastName}" : null,
             t.GuestEmail,
             t.InvitedEmail, t.InviteSentAt, t.ClaimedAt,
-            t.GuestUserId
+            t.GuestUserId,
+            !alreadyClaimedByMe &&
+                (t.Status == nameof(TicketStatus.Unassigned) || t.Status == nameof(TicketStatus.Invited))
         ));
 
         return Ok(dtos);

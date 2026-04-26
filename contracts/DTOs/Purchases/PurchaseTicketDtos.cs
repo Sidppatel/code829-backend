@@ -17,7 +17,8 @@ public record PurchaseTicketDto(
     string? InvitedEmail,
     DateTime? InviteSentAt,
     DateTime? ClaimedAt,
-    Guid? GuestUserId
+    Guid? GuestUserId,
+    bool CanClaimSelf
 );
 
 /// <summary>
