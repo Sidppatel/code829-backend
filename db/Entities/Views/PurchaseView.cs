@@ -36,6 +36,7 @@ public class PurchaseView
     // Table
     public Guid? TableId { get; set; }
     public string? TableLabel { get; set; }
+    public string[] TableLabels { get; set; } = [];
 
     // Ticket type (Open events)
     public Guid? EventTicketTypeId { get; set; }

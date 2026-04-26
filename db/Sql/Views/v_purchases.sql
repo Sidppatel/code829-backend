@@ -34,7 +34,8 @@ SELECT
     st."TransferAmountCents",
     st."PaidAt", st."RefundedAt",
     COALESCE(tc.cnt, 0)::int AS "TicketCount",
-    e."BusinessUserId"
+    e."BusinessUserId",
+    COALESCE(pt_labels.labels, ARRAY[]::text[]) AS "TableLabels"
 FROM purchases b
 JOIN users u ON b."UserId" = u."Id"
 JOIN events e ON b."EventId" = e."Id"
@@ -45,4 +46,10 @@ LEFT JOIN event_ticket_types ett ON b."EventTicketTypeId" = ett."Id"
 LEFT JOIN stripe_transactions st ON st."PurchaseId" = b."Id"
 LEFT JOIN LATERAL (
     SELECT COUNT(*)::int AS cnt FROM purchase_tickets bt WHERE bt."PurchaseId" = b."Id"
-) tc ON true;
+) tc ON true
+LEFT JOIN LATERAL (
+    SELECT array_agg(t."Label" ORDER BY t."Label") AS labels
+    FROM purchase_tables pt
+    JOIN tables t ON t."Id" = pt."TableId"
+    WHERE pt."PurchaseId" = b."Id"
+) pt_labels ON true;

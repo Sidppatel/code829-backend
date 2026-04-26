@@ -235,7 +235,7 @@ public class PurchasesController(
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, !string.IsNullOrEmpty(b.VenueAddress) ? $"{b.VenueAddress}, {b.VenueCity}, {b.VenueState}" : null,
             null, b.TotalCents, null,
-            b.TableId, b.TableLabel, b.SeatsReserved, b.EventTicketTypeId, b.EventTicketTypeLabel, b.TicketCount,
+            b.TableId, b.TableLabel, b.TableLabels, b.SeatsReserved, b.EventTicketTypeId, b.EventTicketTypeLabel, b.TicketCount,
             b.StripeTransactionId.HasValue ? new StripeTransactionDto(
                 b.StripeTransactionId.Value, b.PaymentIntentId!, b.PaymentStatus!,
                 b.PaymentAmountCents ?? 0, b.TotalChargedCents, b.TaxAmountCents,

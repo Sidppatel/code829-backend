@@ -20,6 +20,7 @@ public record PurchaseDto(
     string? QrToken,
     Guid? TableId,
     string? TableLabel,
+    IReadOnlyList<string> TableLabels,
     int? SeatsReserved,
     Guid? EventTicketTypeId,
     string? EventTicketTypeLabel,

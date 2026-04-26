@@ -375,7 +375,7 @@ public class PurchaseService(
             b.EventStartDate, b.EventEndDate, b.EventCategory, b.EventImagePath,
             b.VenueName, venueAddress,
             null, b.TotalCents, b.QrToken,
-            b.TableId, b.TableLabel, b.SeatsReserved,
+            b.TableId, b.TableLabel, b.TableLabels, b.SeatsReserved,
             b.EventTicketTypeId, b.EventTicketTypeLabel,
             b.TicketCount,
             b.StripeTransactionId.HasValue ? new StripeTransactionDto(
