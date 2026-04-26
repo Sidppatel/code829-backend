@@ -487,19 +487,12 @@ public class PurchaseService(
     /// (for destination charges) to the Transfer to the connected account, so
     /// the organizer's Stripe Express dashboard line item reads
     /// <c>"BK-260425-126825 — Test Event (2 tables)"</c> instead of a bare
-    /// dollar amount.
+    /// dollar amount. Format lives in <see cref="PaymentDescriptions.Build"/>
+    /// so the webhook fallback path can reproduce it from PI metadata.
     /// </summary>
     private static string BuildPaymentIntentDescription(
-        string purchaseNumber, EventView ev, int? tableCount = null, int? seats = null)
-    {
-        var qty = tableCount is int tc
-            ? $" ({tc} {(tc == 1 ? "table" : "tables")})"
-            : seats is int s
-                ? $" ({s} {(s == 1 ? "seat" : "seats")})"
-                : string.Empty;
-        var raw = $"{purchaseNumber} - {ev.Title}{qty}";
-        return raw.Length > 1000 ? raw[..1000] : raw;
-    }
+        string purchaseNumber, EventView ev, int? tableCount = null, int? seats = null) =>
+        PaymentDescriptions.Build(purchaseNumber, ev.Title, tableCount, seats);
 
     /// <summary>
     /// 22-char-max statement-descriptor suffix shown on the customer's bank

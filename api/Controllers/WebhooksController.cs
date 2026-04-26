@@ -308,35 +308,76 @@ public class WebhooksController(
         }
 
         // Enrich the destination CHARGE (the one visible in the organizer's
-        // Stripe Express dashboard). Destination charges create a separate
-        // charge under the connected account whose metadata + description
-        // default to empty — set them by calling Charge.update under the
-        // Stripe-Account header so the organizer sees the purchase context.
-        if (sourcePi is not null
-            && !string.IsNullOrEmpty(transfer.DestinationPaymentId)
-            && !string.IsNullOrEmpty(secrets.StripeSecretKey))
+        // Stripe Express dashboard) AND the platform-side Transfer. Destination
+        // charges create a separate charge under the connected account whose
+        // metadata + description default to empty, so the Express dashboard
+        // shows the generic "Payment from <platform>" string. Updating both
+        // the Charge (under the Stripe-Account header) and the Transfer (on
+        // the platform) gives the organizer the booking context everywhere.
+        if (sourcePi is not null && !string.IsNullOrEmpty(secrets.StripeSecretKey))
         {
-            try
+            // Older bookings predate the PI.description code path — fall back
+            // to building the same string from PI metadata so historical
+            // events resent from the Stripe dashboard still get a useful label.
+            var description = !string.IsNullOrEmpty(sourcePi.Description)
+                ? sourcePi.Description
+                : Services.PaymentDescriptions.FromMetadata(sourcePi.Metadata);
+
+            if (!string.IsNullOrEmpty(description))
             {
                 var client = new StripeClient(secrets.StripeSecretKey);
-                var chargeOpts = new ChargeUpdateOptions
+                var metadata = sourcePi.Metadata is { Count: > 0 }
+                    ? new Dictionary<string, string>(sourcePi.Metadata)
+                    : null;
+
+                // Platform-side Transfer.update — surfaces the booking context
+                // in the platform's Stripe events feed and any future audit
+                // view that reads stripe_transfers.RawEvent.
+                try
                 {
-                    Description = sourcePi.Description,
-                    Metadata = sourcePi.Metadata is { Count: > 0 }
-                        ? new Dictionary<string, string>(sourcePi.Metadata)
-                        : null
-                };
-                var requestOpts = new RequestOptions { StripeAccount = transfer.DestinationId };
-                await new ChargeService(client).UpdateAsync(transfer.DestinationPaymentId, chargeOpts, requestOpts);
-                Log.Information(
-                    "[Webhook] transfer.created enriched destination charge {ChargeId} on {Account} with desc + metadata",
-                    transfer.DestinationPaymentId, transfer.DestinationId);
+                    await new TransferService(client).UpdateAsync(transfer.Id, new TransferUpdateOptions
+                    {
+                        Description = description,
+                        Metadata = metadata
+                    });
+                    Log.Information(
+                        "[Webhook] transfer.created updated platform transfer {TransferId} description",
+                        transfer.Id);
+                }
+                catch (StripeException ex)
+                {
+                    Log.Warning(ex,
+                        "[Webhook] transfer.created — failed to update platform transfer {TransferId} description",
+                        transfer.Id);
+                    // Non-fatal: the destination charge update below is the
+                    // user-visible fix. Don't abort the whole handler if
+                    // Stripe rejects the platform-side update (e.g. on an
+                    // already-reversed transfer).
+                }
+
+                // Destination charge update — drives the organizer's Express
+                // dashboard description column. Re-throws on failure so the
+                // outer handler clears the Redis dedupe key and Stripe retries.
+                // Charge.update is idempotent.
+                if (!string.IsNullOrEmpty(transfer.DestinationPaymentId))
+                {
+                    var chargeOpts = new ChargeUpdateOptions
+                    {
+                        Description = description,
+                        Metadata = metadata
+                    };
+                    var requestOpts = new RequestOptions { StripeAccount = transfer.DestinationId };
+                    await new ChargeService(client).UpdateAsync(transfer.DestinationPaymentId, chargeOpts, requestOpts);
+                    Log.Information(
+                        "[Webhook] transfer.created enriched destination charge {ChargeId} on {Account} with desc + metadata",
+                        transfer.DestinationPaymentId, transfer.DestinationId);
+                }
             }
-            catch (StripeException ex)
+            else
             {
-                Log.Warning(ex,
-                    "[Webhook] transfer.created — failed to enrich destination charge {ChargeId} on {Account}",
-                    transfer.DestinationPaymentId, transfer.DestinationId);
+                Log.Warning(
+                    "[Webhook] transfer.created {TransferId} — source PI {PiId} has no description and no usable metadata; skipping enrichment",
+                    transfer.Id, paymentIntentId);
             }
         }
 
