@@ -33,12 +33,18 @@ public class TicketProcedures(EventPlatformDbContext context) : ITicketProcedure
             : new TicketClaimByTokenResult(row.TicketId, row.Success, row.Message, row.AlreadyByMe);
     }
 
-    public async Task<bool> ClaimSelfAsync(Guid ticketId, Guid userId, CancellationToken ct = default)
+    public async Task<TicketClaimSelfResult> ClaimSelfAsync(Guid ticketId, Guid userId, CancellationToken ct = default)
     {
         var rows = await context.Database
-            .SqlQueryRaw<bool>("SELECT sp_claim_ticket_self(@p0, @p1)", ticketId, userId)
+            .SqlQueryRaw<TicketClaimSelfRow>(
+                "SELECT * FROM sp_claim_ticket_self(@p0, @p1)",
+                ticketId, userId)
             .ToListAsync(ct);
-        return rows.FirstOrDefault();
+
+        var row = rows.FirstOrDefault();
+        return row is null
+            ? new TicketClaimSelfResult(false, "Ticket not found")
+            : new TicketClaimSelfResult(row.Success, row.Message);
     }
 
     private sealed class TicketClaimByTokenRow
@@ -47,5 +53,11 @@ public class TicketProcedures(EventPlatformDbContext context) : ITicketProcedure
         public bool Success { get; set; }
         public string Message { get; set; } = string.Empty;
         public bool AlreadyByMe { get; set; }
+    }
+
+    private sealed class TicketClaimSelfRow
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 }

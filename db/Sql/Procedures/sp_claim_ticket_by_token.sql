@@ -7,12 +7,14 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_id uuid;
+    v_purchase_id uuid;
     v_status text;
     v_guest_user_id uuid;
     v_expires_at timestamptz;
+    v_already_count int;
 BEGIN
-    SELECT "Id", "Status"::text, "GuestUserId", "InviteExpiresAt"
-        INTO v_id, v_status, v_guest_user_id, v_expires_at
+    SELECT "Id", "PurchaseId", "Status"::text, "GuestUserId", "InviteExpiresAt"
+        INTO v_id, v_purchase_id, v_status, v_guest_user_id, v_expires_at
         FROM purchase_tickets
         WHERE "InviteTokenHash" = p_invite_hash
         FOR UPDATE;
@@ -39,6 +41,18 @@ BEGIN
 
     IF v_status = 'Claimed' THEN
         RETURN QUERY SELECT v_id, false, 'This ticket has already been claimed', false;
+        RETURN;
+    END IF;
+
+    SELECT COUNT(*) INTO v_already_count
+        FROM purchase_tickets
+        WHERE "PurchaseId" = v_purchase_id
+          AND "GuestUserId" = p_guest_user_id
+          AND "Id" <> v_id
+          AND "Status" IN ('Claimed', 'CheckedIn');
+
+    IF v_already_count > 0 THEN
+        RETURN QUERY SELECT v_id, false, 'You already have a ticket on this purchase. One ticket per person.', false;
         RETURN;
     END IF;
 

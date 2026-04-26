@@ -159,12 +159,12 @@ public class TicketsController(
         if (ticket.Status == nameof(TicketStatus.Claimed) && ticket.GuestUserId == userId)
             return Ok(new { message = "Already claimed by you", ticketId = ticket.PurchaseTicketId });
 
-        var claimed = await ticketProc.ClaimSelfAsync(ticket.PurchaseTicketId, userId);
-        if (!claimed)
-            return Conflict(new ApiError(409, "This ticket has already been claimed. Revoke it first.", HttpContext.TraceIdentifier));
+        var result = await ticketProc.ClaimSelfAsync(ticket.PurchaseTicketId, userId);
+        if (!result.Success)
+            return Conflict(new ApiError(409, result.Message, HttpContext.TraceIdentifier));
 
         Log.Information("[Tickets] {TicketCode} self-claimed by owner {UserId}", ticket.TicketCode, userId);
-        return Ok(new { message = "Ticket claimed", ticketId = ticket.PurchaseTicketId });
+        return Ok(new { message = result.Message, ticketId = ticket.PurchaseTicketId });
     }
 
     // ═══════════════════════════════════════════════════════════
