@@ -90,6 +90,7 @@ public class EventPlatformDbContext(
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.HasPostgresExtension("extensions", "pg_trgm");
+        modelBuilder.HasPostgresExtension("extensions", "pgcrypto");
 
         // ─── DB-side defaults for all BaseEntity tables ──────────
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
