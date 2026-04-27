@@ -779,7 +779,8 @@ public class DeveloperController(
 
         try
         {
-            var response = await organizationService.SendOnboardingLinkEmailAsync(request.BusinessUserId);
+            var response = await organizationService.SendOnboardingLinkEmailAsync(
+                id, request.BusinessUserId, request.RecipientEmail);
             return Ok(response);
         }
         catch (KeyNotFoundException ex)

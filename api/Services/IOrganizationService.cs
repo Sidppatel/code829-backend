@@ -47,18 +47,25 @@ public interface IOrganizationService
 
     /// <summary>
     /// Generates a fresh identity-scope Stripe onboarding link for the
-    /// Organization that <paramref name="businessUserId"/> belongs to and
-    /// emails it to the BusinessUser's account email. Looks up the
-    /// BusinessUser's name + email server-side so the developer endpoint
-    /// only has to pass the id.
+    /// organization and emails it.
     ///
-    /// Throws <see cref="KeyNotFoundException"/> when the BusinessUser doesn't
-    /// exist; throws <see cref="InvalidOperationException"/> when the
-    /// BusinessUser has no Organization, or when the Organization has no
-    /// Stripe account yet (the developer must call POST /stripe-account
-    /// before this endpoint can fire).
+    /// <para>One of <paramref name="businessUserId"/> or <paramref name="recipientEmail"/>
+    /// must be supplied. <paramref name="recipientEmail"/> wins when both are
+    /// present so the developer can override the BU's recorded address (useful
+    /// when bootstrapping an org for an organizer who doesn't have a platform
+    /// account yet).</para>
+    ///
+    /// Throws <see cref="KeyNotFoundException"/> when the organization or the
+    /// referenced BusinessUser doesn't exist; throws
+    /// <see cref="InvalidOperationException"/> when the BusinessUser belongs to
+    /// a different organization, when neither id nor email is provided, or when
+    /// the Organization has no Stripe account yet (the developer must call
+    /// POST /stripe-account before this endpoint can fire).
     /// </summary>
-    Task<StripeOnboardingEmailResponse> SendOnboardingLinkEmailAsync(Guid businessUserId);
+    Task<StripeOnboardingEmailResponse> SendOnboardingLinkEmailAsync(
+        Guid organizationId,
+        Guid? businessUserId = null,
+        string? recipientEmail = null);
 
     /// <summary>
     /// Clean-restart hook: deletes the organization's connected account at

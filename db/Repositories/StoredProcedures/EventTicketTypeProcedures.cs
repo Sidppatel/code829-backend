@@ -47,4 +47,13 @@ public class EventTicketTypeProcedures(EventPlatformDbContext context) : IEventT
                 "SELECT sp_delete_event_ticket_type(@p0)",
                 [new NpgsqlParameter("@p0", id)], ct);
     }
+
+    public async Task<int> RelinkOrphansAsync(Guid eventId, CancellationToken ct = default)
+    {
+        return await context.Database
+            .SqlQueryRaw<int>(
+                "SELECT sp_relink_orphan_ticket_types(@p0) AS \"Value\"",
+                new NpgsqlParameter("@p0", eventId))
+            .FirstAsync(ct);
+    }
 }

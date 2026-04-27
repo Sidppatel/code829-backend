@@ -237,72 +237,112 @@ public class OrganizationServiceTests : IDisposable
     };
 
     [Fact]
-    public async Task SendOnboardingLinkEmailAsync_WhenBusinessUserMissing_ThrowsKeyNotFound()
+    public async Task SendOnboardingLinkEmailAsync_WhenNeitherIdNorEmailProvided_ThrowsInvalidOp()
     {
-        _businessUserProc.Setup(p => p.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((BusinessUser?)null);
-
         var act = () => _service.SendOnboardingLinkEmailAsync(Guid.NewGuid());
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*businessUserId or recipientEmail*");
+    }
+
+    [Fact]
+    public async Task SendOnboardingLinkEmailAsync_WhenOrgMissing_ThrowsKeyNotFound()
+    {
+        _orgProc.Setup(p => p.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Organization?)null);
+
+        var act = () => _service.SendOnboardingLinkEmailAsync(Guid.NewGuid(), businessUserId: Guid.NewGuid());
 
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
 
     [Fact]
-    public async Task SendOnboardingLinkEmailAsync_WhenNoOrganization_ThrowsInvalidOp()
+    public async Task SendOnboardingLinkEmailAsync_WhenBusinessUserMissing_ThrowsKeyNotFound()
     {
+        var orgId = Guid.NewGuid();
+        _orgProc.Setup(p => p.GetByIdAsync(orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = orgId, Name = "Org", CountryCode = "US", StripeConnectedAccountId = "acct_x" });
+        _businessUserProc.Setup(p => p.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BusinessUser?)null);
+
+        var act = () => _service.SendOnboardingLinkEmailAsync(orgId, businessUserId: Guid.NewGuid());
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task SendOnboardingLinkEmailAsync_WhenBusinessUserInDifferentOrg_ThrowsInvalidOp()
+    {
+        var orgId = Guid.NewGuid();
+        var otherOrgId = Guid.NewGuid();
         var bu = MakeBu();
+        _orgProc.Setup(p => p.GetByIdAsync(orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = orgId, Name = "Org", CountryCode = "US", StripeConnectedAccountId = "acct_x" });
         _businessUserProc.Setup(p => p.GetByIdAsync(bu.Id, It.IsAny<CancellationToken>())).ReturnsAsync(bu);
         _orgProc.Setup(p => p.GetByBusinessUserAsync(bu.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Organization?)null);
+            .ReturnsAsync(new Organization { Id = otherOrgId, Name = "Other", CountryCode = "US" });
 
-        var act = () => _service.SendOnboardingLinkEmailAsync(bu.Id);
+        var act = () => _service.SendOnboardingLinkEmailAsync(orgId, businessUserId: bu.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not attached*");
+            .WithMessage("*not a member*");
     }
 
     [Fact]
     public async Task SendOnboardingLinkEmailAsync_WhenOrgHasNoStripeAccount_ThrowsInvalidOp()
     {
-        var bu = MakeBu();
-        _businessUserProc.Setup(p => p.GetByIdAsync(bu.Id, It.IsAny<CancellationToken>())).ReturnsAsync(bu);
-        _orgProc.Setup(p => p.GetByBusinessUserAsync(bu.Id, It.IsAny<CancellationToken>()))
+        var orgId = Guid.NewGuid();
+        _orgProc.Setup(p => p.GetByIdAsync(orgId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Organization
             {
-                Id = Guid.NewGuid(),
+                Id = orgId,
                 Name = "Org",
                 CountryCode = "US",
                 StripeConnectedAccountId = null
             });
 
-        var act = () => _service.SendOnboardingLinkEmailAsync(bu.Id);
+        var act = () => _service.SendOnboardingLinkEmailAsync(orgId, businessUserId: Guid.NewGuid());
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*no Stripe account*");
     }
 
     [Fact]
-    public async Task SendOnboardingLinkEmailAsync_HappyPath_CallsStripeAndEmail()
+    public async Task SendOnboardingLinkEmailAsync_HappyPath_BusinessUser_CallsStripeAndEmail()
     {
+        var orgId = Guid.NewGuid();
         var bu = MakeBu(firstName: "Alex");
+        var org = new Organization { Id = orgId, Name = "The Lyric", CountryCode = "US", StripeConnectedAccountId = "acct_real" };
+        _orgProc.Setup(p => p.GetByIdAsync(orgId, It.IsAny<CancellationToken>())).ReturnsAsync(org);
         _businessUserProc.Setup(p => p.GetByIdAsync(bu.Id, It.IsAny<CancellationToken>())).ReturnsAsync(bu);
-        _orgProc.Setup(p => p.GetByBusinessUserAsync(bu.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Organization
-            {
-                Id = Guid.NewGuid(),
-                Name = "The Lyric",
-                CountryCode = "US",
-                StripeConnectedAccountId = "acct_real"
-            });
+        _orgProc.Setup(p => p.GetByBusinessUserAsync(bu.Id, It.IsAny<CancellationToken>())).ReturnsAsync(org);
         _stripeConnect.Setup(s => s.CreateOnboardingLinkAsync("acct_real", OnboardingLinkScope.Identity))
             .ReturnsAsync("https://connect.stripe.com/onboard/abc");
 
-        await _service.SendOnboardingLinkEmailAsync(bu.Id);
+        await _service.SendOnboardingLinkEmailAsync(orgId, businessUserId: bu.Id);
 
         _stripeConnect.Verify(s => s.CreateOnboardingLinkAsync("acct_real", OnboardingLinkScope.Identity), Times.Once);
         _emailService.Verify(e => e.SendAsync(
             "admin@example.com",
             It.Is<string>(subj => subj.Contains("The Lyric")),
             It.Is<string>(body => body.Contains("https://connect.stripe.com/onboard/abc"))), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendOnboardingLinkEmailAsync_HappyPath_RecipientEmailOverride_SendsToOverride()
+    {
+        var orgId = Guid.NewGuid();
+        var org = new Organization { Id = orgId, Name = "The Lyric", CountryCode = "US", StripeConnectedAccountId = "acct_real" };
+        _orgProc.Setup(p => p.GetByIdAsync(orgId, It.IsAny<CancellationToken>())).ReturnsAsync(org);
+        _stripeConnect.Setup(s => s.CreateOnboardingLinkAsync("acct_real", OnboardingLinkScope.Identity))
+            .ReturnsAsync("https://connect.stripe.com/onboard/abc");
+
+        var result = await _service.SendOnboardingLinkEmailAsync(orgId, recipientEmail: "organizer@third-party.com");
+
+        result.RecipientEmail.Should().Be("organizer@third-party.com");
+        _emailService.Verify(e => e.SendAsync(
+            "organizer@third-party.com",
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Once);
     }
 }

@@ -13,15 +13,15 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     [DbContext(typeof(EventPlatformDbContext))]
-    [Migration("20260422054100_HardenFunctionSearchPath")]
-    partial class HardenFunctionSearchPath
+    [Migration("20260427002906_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.6")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "extensions", "pg_trgm");
@@ -112,7 +112,7 @@ namespace db.Migrations
                     b.ToTable("app_settings", (string)null);
                 });
 
-            modelBuilder.Entity("Db.Entities.BusinessLog", b =>
+            modelBuilder.Entity("Db.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -124,39 +124,53 @@ namespace db.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<Guid?>("BusinessUserId")
+                    b.Property<Guid?>("ActorId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<Guid?>("EntityId")
+                    b.Property<Guid?>("CorrelationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("EntityType")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Timestamp")
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubjectType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Action");
+                    b.HasIndex("ActorType", "ActorId", "CreatedAt")
+                        .HasDatabaseName("idx_audit_logs_actor");
 
-                    b.HasIndex("Timestamp");
+                    b.HasIndex("SubjectType", "SubjectId", "CreatedAt")
+                        .HasDatabaseName("idx_audit_logs_subject");
 
-                    b.ToTable("business_logs", (string)null);
+                    b.ToTable("audit_logs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_audit_logs_ActorType", "\"ActorType\" IN ('User','Admin','Developer','System')");
+                        });
                 });
 
             modelBuilder.Entity("Db.Entities.BusinessPasswordResetToken", b =>
@@ -259,6 +273,9 @@ namespace db.Migrations
                     b.Property<DateTime?>("LockedUntil")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -272,9 +289,6 @@ namespace db.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
-
-                    b.Property<string>("StripeConnectedAccountId")
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -290,6 +304,8 @@ namespace db.Migrations
                         .IsUnique();
 
                     b.HasIndex("ImageId");
+
+                    b.HasIndex("OrganizationId");
 
                     b.ToTable("business_users", null, t =>
                         {
@@ -333,72 +349,6 @@ namespace db.Migrations
                         .IsUnique();
 
                     b.ToTable("business_user_events", (string)null);
-                });
-
-            modelBuilder.Entity("Db.Entities.DeveloperLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid?>("BusinessUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("ExceptionType")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RequestMethod")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("RequestPath")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("StackTrace")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("StatusCode")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("Timestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Severity");
-
-                    b.HasIndex("Timestamp");
-
-                    b.ToTable("developer_logs", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_developer_logs_Severity", "\"Severity\" IN ('Warning','Error','Critical')");
-                        });
                 });
 
             modelBuilder.Entity("Db.Entities.DeviceSession", b =>
@@ -690,6 +640,9 @@ namespace db.Migrations
                     b.Property<int>("Capacity")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ColSpan")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Color")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -714,6 +667,9 @@ namespace db.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("PriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RowSpan")
                         .HasColumnType("integer");
 
                     b.Property<string>("Shape")
@@ -1065,6 +1021,80 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.Organization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasDefaultValue("US");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("StripeChargesEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("StripeConnectedAccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("StripeDetailsSubmitted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("StripeOnboardedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("StripePayoutsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("StripeRequirementsDue")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArchivedAt")
+                        .HasDatabaseName("IX_organizations_ArchivedAt");
+
+                    b.HasIndex("StripeConnectedAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_organizations_StripeConnectedAccountId")
+                        .HasFilter("\"StripeConnectedAccountId\" IS NOT NULL");
+
+                    b.ToTable("organizations", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.PlatformImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1294,6 +1324,67 @@ namespace db.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Db.Entities.StripePayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ArrivalDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("usd");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RawEvent")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StripePayoutId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("IX_stripe_payouts_OrganizationId");
+
+                    b.HasIndex("StripePayoutId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_stripe_payouts_StripePayoutId");
+
+                    b.ToTable("stripe_payouts", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1398,70 +1489,60 @@ namespace db.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Db.Entities.SystemLog", b =>
+            modelBuilder.Entity("Db.Entities.StripeTransfer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("integer");
 
-                    b.Property<string>("AfterJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("BeforeJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<long?>("DurationMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid?>("EntityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EntityType")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Source")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<DateTime>("Timestamp")
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid?>("UserId")
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("usd");
+
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RawEvent")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("StripeTransferId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Category");
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("IX_stripe_transfers_OrganizationId");
 
-                    b.HasIndex("Timestamp");
+                    b.HasIndex("PurchaseId")
+                        .HasDatabaseName("IX_stripe_transfers_PurchaseId");
 
-                    b.ToTable("system_logs", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_system_logs_Category", "\"Category\" IN ('EntityChange','BackgroundWorker','Cache','MockService','Migration')");
+                    b.HasIndex("StripeTransferId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_stripe_transfers_StripeTransferId");
 
-                            t.HasCheckConstraint("CK_system_logs_DurationMs", "\"DurationMs\" IS NULL OR \"DurationMs\" >= 0");
-                        });
+                    b.ToTable("stripe_transfers", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Table", b =>
@@ -1470,6 +1551,9 @@ namespace db.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("ColSpan")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -1501,6 +1585,9 @@ namespace db.Migrations
 
                     b.Property<Guid?>("LockedByUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("RowSpan")
+                        .HasColumnType("integer");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
@@ -1563,11 +1650,17 @@ namespace db.Migrations
                     b.Property<int>("DefaultCapacity")
                         .HasColumnType("integer");
 
+                    b.Property<int>("DefaultColSpan")
+                        .HasColumnType("integer");
+
                     b.Property<string>("DefaultColor")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
                     b.Property<int>("DefaultPriceCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DefaultRowSpan")
                         .HasColumnType("integer");
 
                     b.Property<string>("DefaultShape")
@@ -1882,6 +1975,37 @@ namespace db.Migrations
                     b.ToTable("venue_images", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.Views.AdminDashboardStatsView", b =>
+                {
+                    b.Property<int>("CheckedInPurchases")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PaidPurchases")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PublishedEvents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalEvents")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalPurchases")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TotalRevenueCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TotalUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalVenues")
+                        .HasColumnType("integer");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_admin_dashboard_stats", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.BusinessLogView", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2025,9 +2149,6 @@ namespace db.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("StripeConnectedAccountId")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2036,6 +2157,57 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_business_users", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.DeveloperLogView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BusinessUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExceptionType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RequestMethod")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RequestPath")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("StackTrace")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_developer_logs", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.DeviceSessionView", b =>
@@ -2082,6 +2254,41 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_device_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.EventFacetsView", b =>
+                {
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PricePerPersonCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VenueCity")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("VenueId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VenueName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_event_facets", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.EventImageView", b =>
@@ -2235,6 +2442,24 @@ namespace db.Migrations
                     b.ToView("v_event_summary", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.Views.EventTableStatsView", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BookedTables")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalTables")
+                        .HasColumnType("integer");
+
+                    b.HasKey("EventId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_event_table_stats", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.EventTablesSummaryView", b =>
                 {
                     b.Property<Guid>("EventTableId")
@@ -2251,6 +2476,12 @@ namespace db.Migrations
 
                     b.Property<string>("Color")
                         .HasColumnType("text");
+
+                    b.Property<int>("DefaultColSpan")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DefaultRowSpan")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
@@ -2478,6 +2709,21 @@ namespace db.Migrations
                     b.ToView("v_events", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.Views.EventsByCategoryView", b =>
+                {
+                    b.Property<string>("Category")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Category");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_events_by_category", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.FeedbackView", b =>
                 {
                     b.Property<Guid>("FeedbackId")
@@ -2575,6 +2821,59 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_invitations", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.OrganizationView", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EventCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LegalName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("StripeChargesEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("StripeConnectedAccountId")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("StripeDetailsSubmitted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("StripeOnboardedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("StripePayoutsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("TotalRevenueCents")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("OrganizationId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_organizations", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.PlatformImageView", b =>
@@ -2823,6 +3122,10 @@ namespace db.Migrations
                     b.Property<string>("TableLabel")
                         .HasColumnType("text");
 
+                    b.PrimitiveCollection<string[]>("TableLabels")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
                     b.Property<int?>("TaxAmountCents")
                         .HasColumnType("integer");
 
@@ -2880,6 +3183,105 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_purchases", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.PurchasesByStatusView", b =>
+                {
+                    b.Property<string>("Status")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Status");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_purchases_by_status", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.StripeTransactionView", b =>
+                {
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventTitle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentIntentId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PurchaseNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PurchaseStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RefundId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("StripeFeesCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TotalChargedCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TransferAmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserFirstName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserLastName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("TransactionId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_stripe_transactions", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.SystemLogView", b =>
@@ -2947,6 +3349,9 @@ namespace db.Migrations
                     b.Property<int>("Capacity")
                         .HasColumnType("integer");
 
+                    b.Property<int>("ColSpan")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Color")
                         .HasColumnType("text");
 
@@ -2988,6 +3393,9 @@ namespace db.Migrations
                     b.Property<int>("PriceCents")
                         .HasColumnType("integer");
 
+                    b.Property<int>("RowSpan")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Shape")
                         .IsRequired()
                         .HasColumnType("text");
@@ -3010,6 +3418,28 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_tables", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.TopEventRevenueView", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PurchaseCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("RevenueCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("EventId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_top_events_revenue", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.UserProfileView", b =>
@@ -3201,7 +3631,14 @@ namespace db.Migrations
                         .HasForeignKey("ImageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Db.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Image");
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("Db.Entities.BusinessUserEvent", b =>
@@ -3416,6 +3853,17 @@ namespace db.Migrations
                     b.Navigation("Purchase");
                 });
 
+            modelBuilder.Entity("Db.Entities.StripePayout", b =>
+                {
+                    b.HasOne("Db.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
             modelBuilder.Entity("Db.Entities.StripeTransaction", b =>
                 {
                     b.HasOne("Db.Entities.Purchase", "Purchase")
@@ -3423,6 +3871,24 @@ namespace db.Migrations
                         .HasForeignKey("Db.Entities.StripeTransaction", "PurchaseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Purchase");
+                });
+
+            modelBuilder.Entity("Db.Entities.StripeTransfer", b =>
+                {
+                    b.HasOne("Db.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Db.Entities.Purchase", "Purchase")
+                        .WithMany()
+                        .HasForeignKey("PurchaseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organization");
 
                     b.Navigation("Purchase");
                 });

@@ -2820,6 +2820,59 @@ namespace db.Migrations
                     b.ToView("v_invitations", (string)null);
                 });
 
+            modelBuilder.Entity("Db.Entities.Views.OrganizationView", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EventCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LegalName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("StripeChargesEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("StripeConnectedAccountId")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("StripeDetailsSubmitted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("StripeOnboardedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("StripePayoutsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("TotalRevenueCents")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("OrganizationId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_organizations", (string)null);
+                });
+
             modelBuilder.Entity("Db.Entities.Views.PlatformImageView", b =>
                 {
                     b.Property<Guid>("PlatformImageId")
@@ -3142,6 +3195,90 @@ namespace db.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("v_purchases_by_status", (string)null);
+                });
+
+            modelBuilder.Entity("Db.Entities.Views.StripeTransactionView", b =>
+                {
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventTitle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentIntentId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PurchaseNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PurchaseStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RefundId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("StripeFeesCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TotalChargedCents")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TransferAmountCents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserFirstName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserLastName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("TransactionId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("v_stripe_transactions", (string)null);
                 });
 
             modelBuilder.Entity("Db.Entities.Views.SystemLogView", b =>

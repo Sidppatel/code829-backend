@@ -7,13 +7,13 @@ using NpgsqlTypes;
 namespace db.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialSchema : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterDatabase()
-                .Annotation("Npgsql:PostgresExtension:pg_trgm", ",,");
+                .Annotation("Npgsql:PostgresExtension:extensions.pg_trgm", ",,");
 
             migrationBuilder.CreateTable(
                 name: "addresses",
@@ -34,25 +34,6 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "admin_logs",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Action = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    EntityType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    EntityId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Description = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
-                    MetadataJson = table.Column<string>(type: "text", nullable: true),
-                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_admin_logs", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "app_settings",
                 columns: table => new
                 {
@@ -69,27 +50,25 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "developer_logs",
+                name: "audit_logs",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Severity = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    Message = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: false),
-                    ExceptionType = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    StackTrace = table.Column<string>(type: "text", nullable: true),
-                    RequestPath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    RequestMethod = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    StatusCode = table.Column<int>(type: "integer", nullable: true),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
-                    CorrelationId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    MetadataJson = table.Column<string>(type: "text", nullable: true)
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    EventType = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ActorType = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    ActorId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SubjectType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    SubjectId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Action = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    MetadataJson = table.Column<string>(type: "jsonb", nullable: true),
+                    Ip = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
+                    CorrelationId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_developer_logs", x => x.Id);
-                    table.CheckConstraint("CK_developer_logs_Severity", "\"Severity\" IN ('Warning','Error','Critical')");
+                    table.PrimaryKey("PK_audit_logs", x => x.Id);
+                    table.CheckConstraint("CK_audit_logs_ActorType", "\"ActorType\" IN ('User','Admin','Developer','System')");
                 });
 
             migrationBuilder.CreateTable(
@@ -156,28 +135,26 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "system_logs",
+                name: "organizations",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Category = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
-                    Action = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Source = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    EntityType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    EntityId = table.Column<Guid>(type: "uuid", nullable: true),
-                    BeforeJson = table.Column<string>(type: "text", nullable: true),
-                    AfterJson = table.Column<string>(type: "text", nullable: true),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CorrelationId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    DurationMs = table.Column<long>(type: "bigint", nullable: true),
-                    MetadataJson = table.Column<string>(type: "text", nullable: true)
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    LegalName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    CountryCode = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: false, defaultValue: "US"),
+                    StripeConnectedAccountId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    StripeChargesEnabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    StripePayoutsEnabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    StripeDetailsSubmitted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    StripeOnboardedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    StripeRequirementsDue = table.Column<string>(type: "jsonb", nullable: true),
+                    ArchivedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_system_logs", x => x.Id);
-                    table.CheckConstraint("CK_system_logs_Category", "\"Category\" IN ('EntityChange','BackgroundWorker','Cache','MockService','Migration')");
-                    table.CheckConstraint("CK_system_logs_DurationMs", "\"DurationMs\" IS NULL OR \"DurationMs\" >= 0");
+                    table.PrimaryKey("PK_organizations", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -190,6 +167,8 @@ namespace db.Migrations
                     DefaultShape = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     DefaultColor = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     DefaultPriceCents = table.Column<int>(type: "integer", nullable: false),
+                    DefaultRowSpan = table.Column<int>(type: "integer", nullable: false),
+                    DefaultColSpan = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
@@ -230,39 +209,6 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "admin_users",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    PasswordHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    FailedLoginAttempts = table.Column<int>(type: "integer", nullable: false),
-                    LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ImageId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
-                    StripeConnectedAccountId = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_admin_users", x => x.Id);
-                    table.CheckConstraint("CK_admin_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
-                    table.ForeignKey(
-                        name: "FK_admin_users_images_ImageId",
-                        column: x => x.ImageId,
-                        principalTable: "images",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "platform_images",
                 columns: table => new
                 {
@@ -294,6 +240,9 @@ namespace db.Migrations
                     EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    PasswordHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    EmailVerified = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    EmailVerifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     AddressId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -322,6 +271,72 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "business_users",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    EmailHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    LastName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    PasswordHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    LastLoginAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    FailedLoginAttempts = table.Column<int>(type: "integer", nullable: false),
+                    LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ImageId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Phone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_business_users", x => x.Id);
+                    table.CheckConstraint("CK_business_users_Role", "\"Role\" IN ('Staff','Admin','Developer')");
+                    table.ForeignKey(
+                        name: "FK_business_users_images_ImageId",
+                        column: x => x.ImageId,
+                        principalTable: "images",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_business_users_organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "organizations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "stripe_payouts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    StripePayoutId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AmountCents = table.Column<int>(type: "integer", nullable: false),
+                    Currency = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false, defaultValue: "usd"),
+                    Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ArrivalDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    PaidAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    RawEvent = table.Column<string>(type: "jsonb", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_stripe_payouts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_stripe_payouts_organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "organizations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "venue_images",
                 columns: table => new
                 {
@@ -346,149 +361,6 @@ namespace db.Migrations
                         name: "FK_venue_images_venues_VenueId",
                         column: x => x.VenueId,
                         principalTable: "venues",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "admin_password_reset_tokens",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    IsUsed = table.Column<bool>(type: "boolean", nullable: false),
-                    UsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_admin_password_reset_tokens", x => x.Id);
-                    table.CheckConstraint("CK_admin_password_reset_tokens_Usage", "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
-                    table.ForeignKey(
-                        name: "FK_admin_password_reset_tokens_admin_users_AdminUserId",
-                        column: x => x.AdminUserId,
-                        principalTable: "admin_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "events",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Slug = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
-                    Description = table.Column<string>(type: "character varying(8192)", maxLength: 8192, nullable: true),
-                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    Category = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
-                    StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ImagePath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    IsFeatured = table.Column<bool>(type: "boolean", nullable: false),
-                    LayoutMode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    MaxCapacity = table.Column<int>(type: "integer", nullable: true),
-                    PublishedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ScheduledPublishAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    GridRows = table.Column<int>(type: "integer", nullable: true),
-                    GridCols = table.Column<int>(type: "integer", nullable: true),
-                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
-                        .Annotation("Npgsql:TsVectorConfig", "english")
-                        .Annotation("Npgsql:TsVectorProperties", new[] { "Title", "Description" }),
-                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_events", x => x.Id);
-                    table.CheckConstraint("CK_events_Category", "\"Category\" IS NULL OR \"Category\" IN ('Music','Business','Social','Dining','Tech','Arts','Family','Sports')");
-                    table.CheckConstraint("CK_events_CompletedRequiresPublish", "\"Status\" <> 'Completed' OR \"PublishedAt\" IS NOT NULL");
-                    table.CheckConstraint("CK_events_DateRange", "\"EndDate\" > \"StartDate\"");
-                    table.CheckConstraint("CK_events_DraftNoPublishDate", "\"Status\" <> 'Draft' OR \"PublishedAt\" IS NULL");
-                    table.CheckConstraint("CK_events_GridDimensions", "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
-                    table.CheckConstraint("CK_events_LayoutMode", "\"LayoutMode\" IN ('Grid','Open')");
-                    table.CheckConstraint("CK_events_MaxCapacity", "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
-                    table.CheckConstraint("CK_events_PublishLifecycle", "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
-                    table.CheckConstraint("CK_events_Status", "\"Status\" IN ('Draft','Published','Completed','Cancelled')");
-                    table.ForeignKey(
-                        name: "FK_events_admin_users_AdminUserId",
-                        column: x => x.AdminUserId,
-                        principalTable: "admin_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_events_venues_VenueId",
-                        column: x => x.VenueId,
-                        principalTable: "venues",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "invitations",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    InvitedByAdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    AcceptedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_invitations", x => x.Id);
-                    table.CheckConstraint("CK_invitations_Role", "\"Role\" IN ('Staff','Admin','Developer')");
-                    table.CheckConstraint("CK_invitations_Status", "\"Status\" IN ('Pending','Accepted','Revoked','Expired')");
-                    table.ForeignKey(
-                        name: "FK_invitations_admin_users_InvitedByAdminUserId",
-                        column: x => x.InvitedByAdminUserId,
-                        principalTable: "admin_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "device_sessions",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    SessionHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    DeviceFingerprint = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    DeviceName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
-                    LastActivityAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_device_sessions", x => x.Id);
-                    table.CheckConstraint("CK_device_sessions_UserType", "(\"UserId\" IS NOT NULL AND \"AdminUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"AdminUserId\" IS NOT NULL)");
-                    table.ForeignKey(
-                        name: "FK_device_sessions_admin_users_AdminUserId",
-                        column: x => x.AdminUserId,
-                        principalTable: "admin_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_device_sessions_users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -522,33 +394,224 @@ namespace db.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "admin_user_events",
+                name: "user_email_verification_tokens",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    AdminUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
-                    AssignedByAdminUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_admin_user_events", x => x.Id);
+                    table.PrimaryKey("PK_user_email_verification_tokens", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_admin_user_events_admin_users_AdminUserId",
-                        column: x => x.AdminUserId,
-                        principalTable: "admin_users",
+                        name: "FK_user_email_verification_tokens_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "user_password_reset_tokens",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_user_password_reset_tokens", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_user_password_reset_tokens_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "business_password_reset_tokens",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    BusinessUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsUsed = table.Column<bool>(type: "boolean", nullable: false),
+                    UsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_business_password_reset_tokens", x => x.Id);
+                    table.CheckConstraint("CK_business_password_reset_tokens_Usage", "(\"IsUsed\" = false AND \"UsedAt\" IS NULL) OR (\"IsUsed\" = true AND \"UsedAt\" IS NOT NULL)");
+                    table.ForeignKey(
+                        name: "FK_business_password_reset_tokens_business_users_BusinessUserId",
+                        column: x => x.BusinessUserId,
+                        principalTable: "business_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "device_sessions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    BusinessUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SessionHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    DeviceFingerprint = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    DeviceName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
+                    LastActivityAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_device_sessions", x => x.Id);
+                    table.CheckConstraint("CK_device_sessions_UserType", "(\"UserId\" IS NOT NULL AND \"BusinessUserId\" IS NULL) OR (\"UserId\" IS NULL AND \"BusinessUserId\" IS NOT NULL)");
+                    table.ForeignKey(
+                        name: "FK_device_sessions_business_users_BusinessUserId",
+                        column: x => x.BusinessUserId,
+                        principalTable: "business_users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_admin_user_events_admin_users_AssignedByAdminUserId",
-                        column: x => x.AssignedByAdminUserId,
-                        principalTable: "admin_users",
+                        name: "FK_device_sessions_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "events",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Slug = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    Description = table.Column<string>(type: "character varying(8192)", maxLength: 8192, nullable: true),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Category = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ImagePath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    IsFeatured = table.Column<bool>(type: "boolean", nullable: false),
+                    LayoutMode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    MaxCapacity = table.Column<int>(type: "integer", nullable: true),
+                    PublishedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ScheduledPublishAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    GridRows = table.Column<int>(type: "integer", nullable: true),
+                    GridCols = table.Column<int>(type: "integer", nullable: true),
+                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
+                        .Annotation("Npgsql:TsVectorConfig", "english")
+                        .Annotation("Npgsql:TsVectorProperties", new[] { "Title", "Description" }),
+                    VenueId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BusinessUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_events", x => x.Id);
+                    table.CheckConstraint("CK_events_Category", "\"Category\" IS NULL OR \"Category\" IN ('Music','Business','Social','Dining','Tech','Arts','Family','Sports')");
+                    table.CheckConstraint("CK_events_CompletedRequiresPublish", "\"Status\" <> 'Completed' OR \"PublishedAt\" IS NOT NULL");
+                    table.CheckConstraint("CK_events_DateRange", "\"EndDate\" > \"StartDate\"");
+                    table.CheckConstraint("CK_events_DraftNoPublishDate", "\"Status\" <> 'Draft' OR \"PublishedAt\" IS NULL");
+                    table.CheckConstraint("CK_events_GridDimensions", "(\"GridRows\" IS NULL OR \"GridRows\" > 0) AND (\"GridCols\" IS NULL OR \"GridCols\" > 0)");
+                    table.CheckConstraint("CK_events_LayoutMode", "\"LayoutMode\" IN ('Grid','Open')");
+                    table.CheckConstraint("CK_events_MaxCapacity", "\"MaxCapacity\" IS NULL OR \"MaxCapacity\" > 0");
+                    table.CheckConstraint("CK_events_PublishLifecycle", "\"Status\" <> 'Published' OR \"PublishedAt\" IS NOT NULL");
+                    table.CheckConstraint("CK_events_Status", "\"Status\" IN ('Draft','Published','Completed','Cancelled')");
+                    table.ForeignKey(
+                        name: "FK_events_business_users_BusinessUserId",
+                        column: x => x.BusinessUserId,
+                        principalTable: "business_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_events_venues_VenueId",
+                        column: x => x.VenueId,
+                        principalTable: "venues",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "invitations",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    InvitedByBusinessUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    AcceptedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_invitations", x => x.Id);
+                    table.CheckConstraint("CK_invitations_Role", "\"Role\" IN ('Staff','Admin','Developer')");
+                    table.CheckConstraint("CK_invitations_Status", "\"Status\" IN ('Pending','Accepted','Revoked','Expired')");
+                    table.ForeignKey(
+                        name: "FK_invitations_business_users_InvitedByBusinessUserId",
+                        column: x => x.InvitedByBusinessUserId,
+                        principalTable: "business_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "business_user_events",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    BusinessUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AssignedByBusinessUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_business_user_events", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_business_user_events_business_users_AssignedByBusinessUserId",
+                        column: x => x.AssignedByBusinessUserId,
+                        principalTable: "business_users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
-                        name: "FK_admin_user_events_events_EventId",
+                        name: "FK_business_user_events_business_users_BusinessUserId",
+                        column: x => x.BusinessUserId,
+                        principalTable: "business_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_business_user_events_events_EventId",
                         column: x => x.EventId,
                         principalTable: "events",
                         principalColumn: "Id",
@@ -595,6 +658,8 @@ namespace db.Migrations
                     Color = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     PriceCents = table.Column<int>(type: "integer", nullable: false),
                     PlatformFeeCents = table.Column<int>(type: "integer", nullable: true),
+                    RowSpan = table.Column<int>(type: "integer", nullable: true),
+                    ColSpan = table.Column<int>(type: "integer", nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     EventId = table.Column<Guid>(type: "uuid", nullable: false),
                     TableTemplateId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -659,6 +724,8 @@ namespace db.Migrations
                     Label = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     GridRow = table.Column<int>(type: "integer", nullable: false),
                     GridCol = table.Column<int>(type: "integer", nullable: false),
+                    RowSpan = table.Column<int>(type: "integer", nullable: false),
+                    ColSpan = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     SortOrder = table.Column<int>(type: "integer", nullable: false),
                     Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "Available"),
@@ -857,64 +924,36 @@ namespace db.Migrations
                         onDelete: ReferentialAction.Restrict);
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_logs_Action",
-                table: "admin_logs",
-                column: "Action");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_logs_Timestamp",
-                table: "admin_logs",
-                column: "Timestamp");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_password_reset_tokens_AdminUserId",
-                table: "admin_password_reset_tokens",
-                column: "AdminUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_password_reset_tokens_ExpiresAt",
-                table: "admin_password_reset_tokens",
-                column: "ExpiresAt");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_password_reset_tokens_TokenHash",
-                table: "admin_password_reset_tokens",
-                column: "TokenHash",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_user_events_AdminUserId_EventId",
-                table: "admin_user_events",
-                columns: new[] { "AdminUserId", "EventId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_user_events_AssignedByAdminUserId",
-                table: "admin_user_events",
-                column: "AssignedByAdminUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_user_events_EventId",
-                table: "admin_user_events",
-                column: "EventId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_users_Email",
-                table: "admin_users",
-                column: "Email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_users_EmailHash",
-                table: "admin_users",
-                column: "EmailHash",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_admin_users_ImageId",
-                table: "admin_users",
-                column: "ImageId");
+            migrationBuilder.CreateTable(
+                name: "stripe_transfers",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    StripeTransferId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    PurchaseId = table.Column<Guid>(type: "uuid", nullable: true),
+                    AmountCents = table.Column<int>(type: "integer", nullable: false),
+                    Currency = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false, defaultValue: "usd"),
+                    RawEvent = table.Column<string>(type: "jsonb", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_stripe_transfers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_stripe_transfers_organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "organizations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_stripe_transfers_purchases_PurchaseId",
+                        column: x => x.PurchaseId,
+                        principalTable: "purchases",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
 
             migrationBuilder.CreateIndex(
                 name: "IX_app_settings_Key",
@@ -923,14 +962,68 @@ namespace db.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_developer_logs_Severity",
-                table: "developer_logs",
-                column: "Severity");
+                name: "idx_audit_logs_actor",
+                table: "audit_logs",
+                columns: new[] { "ActorType", "ActorId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_developer_logs_Timestamp",
-                table: "developer_logs",
-                column: "Timestamp");
+                name: "idx_audit_logs_subject",
+                table: "audit_logs",
+                columns: new[] { "SubjectType", "SubjectId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_password_reset_tokens_BusinessUserId",
+                table: "business_password_reset_tokens",
+                column: "BusinessUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_password_reset_tokens_ExpiresAt",
+                table: "business_password_reset_tokens",
+                column: "ExpiresAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_password_reset_tokens_TokenHash",
+                table: "business_password_reset_tokens",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_user_events_AssignedByBusinessUserId",
+                table: "business_user_events",
+                column: "AssignedByBusinessUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_user_events_BusinessUserId_EventId",
+                table: "business_user_events",
+                columns: new[] { "BusinessUserId", "EventId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_user_events_EventId",
+                table: "business_user_events",
+                column: "EventId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_users_Email",
+                table: "business_users",
+                column: "Email",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_users_EmailHash",
+                table: "business_users",
+                column: "EmailHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_users_ImageId",
+                table: "business_users",
+                column: "ImageId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_users_OrganizationId",
+                table: "business_users",
+                column: "OrganizationId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_device_sessions_Active",
@@ -939,9 +1032,9 @@ namespace db.Migrations
                 filter: "\"RevokedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_device_sessions_AdminUserId",
+                name: "IX_device_sessions_BusinessUserId",
                 table: "device_sessions",
-                column: "AdminUserId");
+                column: "BusinessUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_device_sessions_SessionHash",
@@ -1003,9 +1096,9 @@ namespace db.Migrations
                 columns: new[] { "EventId", "SortOrder" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_events_AdminUserId",
+                name: "IX_events_BusinessUserId",
                 table: "events",
-                column: "AdminUserId");
+                column: "BusinessUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_events_Category",
@@ -1070,9 +1163,9 @@ namespace db.Migrations
                 column: "Email");
 
             migrationBuilder.CreateIndex(
-                name: "IX_invitations_InvitedByAdminUserId",
+                name: "IX_invitations_InvitedByBusinessUserId",
                 table: "invitations",
-                column: "InvitedByAdminUserId");
+                column: "InvitedByBusinessUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_invitations_TokenHash",
@@ -1095,6 +1188,18 @@ namespace db.Migrations
                 table: "magic_link_tokens",
                 column: "TokenHash",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_organizations_ArchivedAt",
+                table: "organizations",
+                column: "ArchivedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_organizations_StripeConnectedAccountId",
+                table: "organizations",
+                column: "StripeConnectedAccountId",
+                unique: true,
+                filter: "\"StripeConnectedAccountId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_platform_images_ImageId",
@@ -1185,6 +1290,17 @@ namespace db.Migrations
                 columns: new[] { "UserId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_stripe_payouts_OrganizationId",
+                table: "stripe_payouts",
+                column: "OrganizationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_stripe_payouts_StripePayoutId",
+                table: "stripe_payouts",
+                column: "StripePayoutId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_stripe_transactions_PaymentIntentId",
                 table: "stripe_transactions",
                 column: "PaymentIntentId",
@@ -1202,14 +1318,20 @@ namespace db.Migrations
                 columns: new[] { "Status", "PaidAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_system_logs_Category",
-                table: "system_logs",
-                column: "Category");
+                name: "IX_stripe_transfers_OrganizationId",
+                table: "stripe_transfers",
+                column: "OrganizationId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_system_logs_Timestamp",
-                table: "system_logs",
-                column: "Timestamp");
+                name: "IX_stripe_transfers_PurchaseId",
+                table: "stripe_transfers",
+                column: "PurchaseId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_stripe_transfers_StripeTransferId",
+                table: "stripe_transfers",
+                column: "StripeTransferId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_tables_EventId",
@@ -1242,6 +1364,38 @@ namespace db.Migrations
                 name: "IX_tables_LockedByUserId",
                 table: "tables",
                 column: "LockedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_email_verification_tokens_ExpiresAt",
+                table: "user_email_verification_tokens",
+                column: "ExpiresAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_email_verification_tokens_TokenHash",
+                table: "user_email_verification_tokens",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_email_verification_tokens_UserId",
+                table: "user_email_verification_tokens",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_password_reset_tokens_ExpiresAt",
+                table: "user_password_reset_tokens",
+                column: "ExpiresAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_password_reset_tokens_TokenHash",
+                table: "user_password_reset_tokens",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_password_reset_tokens_UserId",
+                table: "user_password_reset_tokens",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_users_AddressId",
@@ -1297,27 +1451,22 @@ namespace db.Migrations
                 name: "IX_venues_Name",
                 table: "venues",
                 column: "Name");
-
-            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "admin_logs");
-
-            migrationBuilder.DropTable(
-                name: "admin_password_reset_tokens");
-
-            migrationBuilder.DropTable(
-                name: "admin_user_events");
-
-            migrationBuilder.DropTable(
                 name: "app_settings");
 
             migrationBuilder.DropTable(
-                name: "developer_logs");
+                name: "audit_logs");
+
+            migrationBuilder.DropTable(
+                name: "business_password_reset_tokens");
+
+            migrationBuilder.DropTable(
+                name: "business_user_events");
 
             migrationBuilder.DropTable(
                 name: "device_sessions");
@@ -1347,10 +1496,19 @@ namespace db.Migrations
                 name: "purchase_tickets");
 
             migrationBuilder.DropTable(
+                name: "stripe_payouts");
+
+            migrationBuilder.DropTable(
                 name: "stripe_transactions");
 
             migrationBuilder.DropTable(
-                name: "system_logs");
+                name: "stripe_transfers");
+
+            migrationBuilder.DropTable(
+                name: "user_email_verification_tokens");
+
+            migrationBuilder.DropTable(
+                name: "user_password_reset_tokens");
 
             migrationBuilder.DropTable(
                 name: "venue_images");
@@ -1377,13 +1535,16 @@ namespace db.Migrations
                 name: "table_templates");
 
             migrationBuilder.DropTable(
-                name: "admin_users");
+                name: "business_users");
 
             migrationBuilder.DropTable(
                 name: "venues");
 
             migrationBuilder.DropTable(
                 name: "images");
+
+            migrationBuilder.DropTable(
+                name: "organizations");
 
             migrationBuilder.DropTable(
                 name: "addresses");

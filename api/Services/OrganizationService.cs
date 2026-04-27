@@ -141,20 +141,53 @@ public class OrganizationService(
         return new PagedResponse<OrganizationListItemDto>(items, totalCount, page, pageSize);
     }
 
-    public async Task<StripeOnboardingEmailResponse> SendOnboardingLinkEmailAsync(Guid businessUserId)
+    public async Task<StripeOnboardingEmailResponse> SendOnboardingLinkEmailAsync(
+        Guid organizationId,
+        Guid? businessUserId = null,
+        string? recipientEmail = null)
     {
-        var member = await businessUserProc.GetByIdAsync(businessUserId)
-            ?? throw new KeyNotFoundException($"BusinessUser {businessUserId} not found");
+        if (businessUserId is null && string.IsNullOrWhiteSpace(recipientEmail))
+            throw new InvalidOperationException(
+                "Provide either businessUserId or recipientEmail to address the onboarding email");
 
-        var organization = await orgProc.GetByBusinessUserAsync(businessUserId)
-            ?? throw new InvalidOperationException(
-                "BusinessUser is not attached to any organization — assign them to one before sending the onboarding link");
+        var organization = await orgProc.GetByIdAsync(organizationId)
+            ?? throw new KeyNotFoundException($"Organization {organizationId} not found");
 
         if (string.IsNullOrEmpty(organization.StripeConnectedAccountId))
             throw new InvalidOperationException(
                 "Organization has no Stripe account yet — call POST /developer/organizations/{id}/stripe-account first");
 
-        // Identity scope is the right starting point: a fresh BusinessUser has
+        // Resolve the email + greeting name. recipientEmail (when supplied) is
+        // the authoritative recipient; the BU lookup is only for the greeting
+        // name and only when the developer also passed an id.
+        string toEmail;
+        string greetingName;
+        if (!string.IsNullOrWhiteSpace(recipientEmail))
+        {
+            toEmail = recipientEmail.Trim();
+            greetingName = "there";
+            if (businessUserId is { } buId)
+            {
+                var bu = await businessUserProc.GetByIdAsync(buId);
+                if (bu is not null) greetingName = bu.FirstName;
+            }
+        }
+        else
+        {
+            var buId = businessUserId!.Value;
+            var member = await businessUserProc.GetByIdAsync(buId)
+                ?? throw new KeyNotFoundException($"BusinessUser {buId} not found");
+
+            var memberOrg = await orgProc.GetByBusinessUserAsync(buId);
+            if (memberOrg is null || memberOrg.Id != organizationId)
+                throw new InvalidOperationException(
+                    "BusinessUser is not a member of this organization — assign them first or pass recipientEmail to override");
+
+            toEmail = member.Email;
+            greetingName = member.FirstName;
+        }
+
+        // Identity scope is the right starting point: a fresh recipient has
         // never seen the onboarding flow, so we route them through the full
         // KYC + bank capture rather than the bank-only resume link.
         var url = await stripeConnect.CreateOnboardingLinkAsync(
@@ -165,18 +198,18 @@ public class OrganizationService(
         var brandName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var subject = $"Finish setting up payouts for {organization.Name} | {brandName}";
         var body = EmailTemplates.OnboardingLinkEmail(
-            brandName, member.FirstName, organization.Name, url, expiryMinutes: 5);
+            brandName, greetingName, organization.Name, url, expiryMinutes: 5);
 
-        await emailService.SendAsync(member.Email, subject, body);
+        await emailService.SendAsync(toEmail, subject, body);
 
         Log.Information(
-            "[Organization] Sent onboarding link to BusinessUser {BusinessUserId} for org {OrganizationId}",
-            businessUserId, organization.Id);
+            "[Organization] Sent onboarding link to {Recipient} for org {OrganizationId} (bu={BusinessUserId})",
+            toEmail, organization.Id, businessUserId);
 
         // TODO: surface email_log id from sp_insert_email_log — IEmailService.SendAsync
         // currently discards the row id returned by sp_create_email_log; when that
         // signature is widened to surface it, plumb it through here.
-        return new StripeOnboardingEmailResponse(Guid.Empty, member.Email);
+        return new StripeOnboardingEmailResponse(Guid.Empty, toEmail);
     }
 
     private static OrganizationDto MapToDto(Organization o) => new(

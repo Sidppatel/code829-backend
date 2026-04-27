@@ -290,7 +290,14 @@ public class AdminEventsController(
         if (newStatus is not null)
             await eventProc.ChangeEventStatusAsync(id, newStatus, null);
 
-        // Sync Ticket Types (Pricing Tiers) for Open events
+        // Sync Ticket Types (Pricing Tiers) for Open events.
+        //
+        // Match existing tiers by id (preferred) or by case-insensitive label and
+        // update them in place. Never delete-and-recreate — that orphans every
+        // purchase that still references the old tier id and zeroes out historic
+        // sold counts in v_event_ticket_types_summary. New rows are only INSERTed
+        // when the request introduces a label that does not already exist on the
+        // event.
         if (request.TicketTypes != null && (request.LayoutMode == "Open" || (request.LayoutMode == null && ev.LayoutMode == "Open")))
         {
             var existingTiers = await context.EventTicketTypeSummaryViews
@@ -298,29 +305,63 @@ public class AdminEventsController(
                 .Where(tt => tt.EventId == id && tt.IsActive)
                 .ToListAsync();
 
-            var requestIds = request.TicketTypes.Where(t => t.EventTicketTypeId.HasValue).Select(t => t.EventTicketTypeId!.Value).ToList();
-            
-            // Delete tiers not in request
-            var toDelete = existingTiers.Where(et => !requestIds.Contains(et.EventTicketTypeId)).ToList();
-            foreach (var td in toDelete)
-            {
-                await ticketTypeProc.DeleteAsync(td.EventTicketTypeId);
-            }
-
-            // Upsert remaining — preserve existing platform fees, assign default to new tiers
+            var matchedExistingIds = new HashSet<Guid>();
             var defaultFeeStr = await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000");
             var defaultFee = int.TryParse(defaultFeeStr, out var df) ? df : 1000;
             var sortOrder = 0;
+
             foreach (var tt in request.TicketTypes)
             {
-                if (tt.EventTicketTypeId.HasValue && existingTiers.FirstOrDefault(et => et.EventTicketTypeId == tt.EventTicketTypeId.Value) is { } existing)
+                EventTicketTypeSummaryView? match = null;
+                if (tt.EventTicketTypeId.HasValue)
                 {
-                    await ticketTypeProc.UpdateAsync(tt.EventTicketTypeId.Value, tt.Name, tt.PriceCents, existing.PlatformFeeCents, tt.Capacity, sortOrder++, true, tt.Description);
+                    match = existingTiers.FirstOrDefault(et => et.EventTicketTypeId == tt.EventTicketTypeId.Value);
+                    if (match is null)
+                        return BadRequest(new ApiError(400,
+                            $"Ticket type {tt.EventTicketTypeId.Value} not found on this event",
+                            HttpContext.TraceIdentifier));
+                }
+                else
+                {
+                    match = existingTiers.FirstOrDefault(et =>
+                        !matchedExistingIds.Contains(et.EventTicketTypeId) &&
+                        string.Equals(et.Label, tt.Name, StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (match is not null)
+                {
+                    matchedExistingIds.Add(match.EventTicketTypeId);
+
+                    if (tt.PriceCents != match.PriceCents && match.SoldCount > 0)
+                        return BadRequest(new ApiError(400,
+                            $"Cannot change price for '{match.Label}' — {match.SoldCount} ticket(s) already sold",
+                            HttpContext.TraceIdentifier));
+
+                    if (tt.Capacity.HasValue && tt.Capacity.Value < match.SoldCount)
+                        return BadRequest(new ApiError(400,
+                            $"Cannot reduce '{match.Label}' capacity to {tt.Capacity.Value} — {match.SoldCount} already sold",
+                            HttpContext.TraceIdentifier));
+
+                    await ticketTypeProc.UpdateAsync(
+                        match.EventTicketTypeId, tt.Name, tt.PriceCents,
+                        match.PlatformFeeCents, tt.Capacity, sortOrder++, true, tt.Description);
                 }
                 else
                 {
                     await ticketTypeProc.CreateAsync(id, tt.Name, tt.PriceCents, defaultFee, tt.Capacity, sortOrder++, tt.Description);
                 }
+            }
+
+            // Tiers absent from the request: refuse if they have active purchases,
+            // otherwise soft-delete.
+            var toRemove = existingTiers.Where(et => !matchedExistingIds.Contains(et.EventTicketTypeId)).ToList();
+            foreach (var td in toRemove)
+            {
+                if (td.SoldCount > 0)
+                    return BadRequest(new ApiError(400,
+                        $"Cannot remove '{td.Label}' — {td.SoldCount} ticket(s) already sold",
+                        HttpContext.TraceIdentifier));
+                await ticketTypeProc.DeleteAsync(td.EventTicketTypeId);
             }
         }
 
@@ -631,6 +672,11 @@ public class AdminEventsController(
             if (hasActivePurchases)
                 return BadRequest(new ApiError(400, "Cannot change pricing — tickets have been sold or locked for this ticket type", HttpContext.TraceIdentifier));
         }
+
+        if (request.MaxQuantity.HasValue && request.MaxQuantity.Value < existing.SoldCount)
+            return BadRequest(new ApiError(400,
+                $"Cannot reduce capacity to {request.MaxQuantity.Value} — {existing.SoldCount} ticket(s) already sold",
+                HttpContext.TraceIdentifier));
 
         await ticketTypeProc.UpdateAsync(typeId, request.Label, request.PriceCents,
             request.PlatformFeeCents, request.MaxQuantity, request.SortOrder, request.IsActive, request.Description);
