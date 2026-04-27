@@ -182,6 +182,20 @@ var builder = WebApplication.CreateBuilder(args);
         ?? throw new InvalidOperationException("DATABASE_URL is required");
     var connStr = ConvertPostgresUrl(dbUrl);
 
+    // Surface the parsed host:port at startup so prod can confirm which pooler
+    // tier is in use without leaking creds. Crucial when chasing 5432 vs 6543
+    // mismatches between Render env and what the runtime actually loads.
+    try
+    {
+        var csb = new Npgsql.NpgsqlConnectionStringBuilder(connStr);
+        Log.Information("[DB] Connecting to {Host}:{Port} db={Database} pool={Min}-{Max} sslmode={Ssl}",
+            csb.Host, csb.Port, csb.Database, csb.MinPoolSize, csb.MaxPoolSize, csb.SslMode);
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "[DB] Failed to parse connection string for startup log");
+    }
+
     builder.Services.AddDbContext<EventPlatformDbContext>((sp, options) =>
     {
         options.UseNpgsql(connStr);
@@ -717,11 +731,34 @@ finally
 
 /// <summary>
 /// Converts a postgres:// URL to an ADO.NET connection string for Npgsql.
+///
+/// Pool defaults are tuned for Supabase's pgbouncer transaction pooler (port 6543)
+/// where keeping many idle sessions is harmful — pgbouncer holds slots open per
+/// idle Npgsql connection and quickly exhausts the project quota across replicas.
+/// Override per-env via DB_MIN_POOL / DB_MAX_POOL / DB_IDLE_LIFETIME / DB_CMD_TIMEOUT
+/// / DB_CONN_TIMEOUT to tune for direct or session-pooler connections.
+///
+/// `No Reset On Close=true` is required when talking to pgbouncer in transaction
+/// mode because `DISCARD ALL` is not supported across pooled connections.
+/// `Max Auto Prepare=0` (Npgsql default) disables auto-prepare which pgbouncer's
+/// transaction pooler does not preserve between transactions.
 /// </summary>
 static string ConvertPostgresUrl(string url)
 {
     var sslMode = Environment.GetEnvironmentVariable("DATABASE_SSL_MODE")
         ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ? "Disable" : "VerifyFull");
+
+    var minPool = Environment.GetEnvironmentVariable("DB_MIN_POOL") ?? "1";
+    var maxPool = Environment.GetEnvironmentVariable("DB_MAX_POOL") ?? "20";
+    var idleLifetime = Environment.GetEnvironmentVariable("DB_IDLE_LIFETIME") ?? "60";
+    var cmdTimeout = Environment.GetEnvironmentVariable("DB_CMD_TIMEOUT") ?? "30";
+    var connTimeout = Environment.GetEnvironmentVariable("DB_CONN_TIMEOUT") ?? "15";
+
+    var poolSuffix =
+        $";Minimum Pool Size={minPool};Maximum Pool Size={maxPool}" +
+        $";Connection Idle Lifetime={idleLifetime}" +
+        $";Command Timeout={cmdTimeout};Timeout={connTimeout}" +
+        ";No Reset On Close=true";
 
     // If it's already an Npgsql connection string (contains "Host="), use it directly
     if (url.Contains("Host=", StringComparison.OrdinalIgnoreCase))
@@ -730,7 +767,7 @@ static string ConvertPostgresUrl(string url)
         if (!url.Contains("SslMode=", StringComparison.OrdinalIgnoreCase))
             url += $";SslMode={sslMode}";
         if (!url.Contains("Minimum Pool Size=", StringComparison.OrdinalIgnoreCase))
-            url += ";Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=300;Command Timeout=30;Timeout=15";
+            url += poolSuffix;
         return url;
     }
 
@@ -740,7 +777,7 @@ static string ConvertPostgresUrl(string url)
     if (userInfo.Length < 2)
         throw new InvalidOperationException("DATABASE_URL missing user:password");
     var host = ResolveToIPv4(uri.Host);
-    return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode};Minimum Pool Size=10;Maximum Pool Size=100;Connection Idle Lifetime=300;Command Timeout=30;Timeout=15";
+    return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode}{poolSuffix}";
 }
 
 /// <summary>
