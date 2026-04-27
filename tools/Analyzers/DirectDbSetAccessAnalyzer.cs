@@ -133,13 +133,13 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
             || normalized.Contains("/tests/")
             || normalized.Contains("/Tests/")
             || normalized.Contains(".Tests/")
-            // db/Repositories/*.cs (excluding the StoredProcedures/ subfolder) are
-            // low-level data-access adapters below the API layer. The rule targets
+            // api/Data/Repositories/*.cs (excluding the StoredProcedures/ subfolder)
+            // are low-level data-access adapters below the API layer. The rule targets
             // controllers + services; adapters wrapping EF primitives for non-SP-
             // covered surfaces (legacy log/image/app_setting CRUD) are permitted here.
             // StoredProcedures/ files under this folder are still checked.
-            || (normalized.Contains("/db/Repositories/")
-                && !normalized.Contains("/db/Repositories/StoredProcedures/"));
+            || (normalized.Contains("/api/Data/Repositories/")
+                && !normalized.Contains("/api/Data/Repositories/StoredProcedures/"));
     }
 
     private static bool HasAllowDirectDbAccessAttribute(SyntaxNodeAnalysisContext ctx, SyntaxNode node)

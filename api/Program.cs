@@ -527,27 +527,35 @@ var builder = WebApplication.CreateBuilder(args);
         }
     }
 
-    // Apply pending migrations on every startup — with retry for slow DB startup.
-    // Set SKIP_MIGRATIONS=true to bypass for schema-validation / read-only boot.
-    var skipMigrations = string.Equals(
-        Environment.GetEnvironmentVariable("SKIP_MIGRATIONS"), "true", StringComparison.OrdinalIgnoreCase);
-    const int maxRetries = 5;
-    for (var attempt = 1; attempt <= maxRetries && !skipMigrations; attempt++)
+    // Schema is owned by the code829-db repo. Run its MigrationRunner before
+    // starting the api. We probe a known view here to fail fast if the schema
+    // is missing or behind.
+    using (var probeScope = app.Services.CreateScope())
     {
-        try
+        var probe = probeScope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        const int probeRetries = 5;
+        for (var attempt = 1; attempt <= probeRetries; attempt++)
         {
-            using var scope = app.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-            await db.Database.MigrateAsync();
-            Log.Information("Database migrations applied");
-            break;
-        }
-        catch (Npgsql.NpgsqlException ex) when (attempt < maxRetries)
-        {
-            var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
-            Log.Warning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in {Delay}s...",
-                attempt, maxRetries, delay.TotalSeconds);
-            await Task.Delay(delay);
+            try
+            {
+                await probe.EventViews.Take(1).ToListAsync();
+                Log.Information("Schema probe ok");
+                break;
+            }
+            catch (Npgsql.NpgsqlException ex) when (attempt < probeRetries)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                Log.Warning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in {Delay}s...",
+                    attempt, probeRetries, delay.TotalSeconds);
+                await Task.Delay(delay);
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Schema probe failed. Run code829-db MigrationRunner before starting api.");
+                await Log.CloseAndFlushAsync();
+                Environment.Exit(2);
+                return;
+            }
         }
     }
 
@@ -567,11 +575,7 @@ var builder = WebApplication.CreateBuilder(args);
             app.Environment.EnvironmentName);
     }
 
-    if (skipMigrations)
-    {
-        Log.Warning("SKIP_MIGRATIONS=true — bypassed db.Database.MigrateAsync() and all seeders");
-    }
-    else if (app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment())
     {
         // Opt-out via SEED_USERS_AND_PURCHASES=false: skips the regular-user
         // seed (8 default ticket buyers) and the synthetic purchase seed
