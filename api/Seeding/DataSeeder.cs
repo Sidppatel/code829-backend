@@ -108,7 +108,7 @@ public static class DataSeeder
             ["hold_expiry_minutes"] = ("10", "Seat hold duration in minutes"),
             ["email_from_address"] = ("noreply@code829.local", "Sender email address"),
             ["app_name"] = ("Code829", "Application name used in emails and SEO"),
-            ["default_platform_fee_open_cents"] = ("1000", "Default platform fee for Open events in cents ($10.00)"),
+            ["default_platform_fee_open_cents"] = ("700", "Default platform fee for Open events in cents ($10.00)"),
             ["default_platform_fee_grid_cents"] = ("2500", "Default platform fee for Grid events in cents ($25.00)"),
             ["stripe_tax_enabled"] = ("true", "Enable Stripe Tax for automatic tax calculation"),
             ["connect_enforcement_enabled"] = ("false", "When true, every purchase requires the organizer's Organization to have a fully onboarded Stripe Connect account (charges_enabled=true)"),

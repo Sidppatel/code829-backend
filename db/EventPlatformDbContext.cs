@@ -629,7 +629,7 @@ public class EventPlatformDbContext(
             entity.Property(e => e.EntityType).HasMaxLength(20);
             entity.Property(e => e.StorageKey).HasMaxLength(500);
             entity.Property(e => e.OriginalName).HasMaxLength(255);
-            entity.Property(e => e.UploaderType).HasMaxLength(10);
+            entity.Property(e => e.UploaderType).HasMaxLength(255);
             entity.Property(e => e.AltText).HasMaxLength(512);
             entity.Property(e => e.Caption).HasMaxLength(1024);
             entity.Property(e => e.ContentType).HasMaxLength(64);

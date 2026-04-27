@@ -11,7 +11,7 @@ public class Image : BaseEntity
     public int Height { get; set; }
     public int SortOrder { get; set; }
     public Guid? UploadedById { get; set; }
-    public string? UploaderType { get; set; }   // "user" or "admin"
+    public string? UploaderType { get; set; }   // "user", "admin", "business_user"
     public string? AltText { get; set; }
     public string? Caption { get; set; }
     public string? ContentType { get; set; }   // e.g. "image/webp"
