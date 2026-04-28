@@ -7,7 +7,7 @@ name: Security
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
   schedule:
     # Mondays 05:32 UTC — offset so we don't stampede with CIDR refresh (06:00)
