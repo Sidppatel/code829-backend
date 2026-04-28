@@ -497,9 +497,9 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // Schema is owned by the code829-db repo. Run its MigrationRunner before
-    // starting the api. We probe a known view here to fail fast if the schema
-    // is missing or behind.
+    // Schema is owned by the code829-db repo. Backend never migrates. We assert
+    // here that no migrations are pending — if any are, exit 2 so Render flags
+    // the deploy red instead of serving traffic against an outdated schema.
     using (var probeScope = app.Services.CreateScope())
     {
         var probe = probeScope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
@@ -508,8 +508,18 @@ var builder = WebApplication.CreateBuilder(args);
         {
             try
             {
+                var pending = (await probe.Database.GetPendingMigrationsAsync()).ToList();
+                if (pending.Count > 0)
+                {
+                    Log.Fatal("Schema is behind. Pending migrations: {Pending}. Run code829-db MigrationRunner against the target DB, then redeploy.",
+                        pending);
+                    await Log.CloseAndFlushAsync();
+                    Environment.Exit(2);
+                    return;
+                }
                 await probe.EventViews.AnyAsync();
-                Log.Information("Schema probe ok");
+                var applied = (await probe.Database.GetAppliedMigrationsAsync()).Count();
+                Log.Information("Schema probe ok ({Applied} migrations applied)", applied);
                 break;
             }
             catch (Npgsql.NpgsqlException ex) when (attempt < probeRetries)
@@ -521,7 +531,7 @@ var builder = WebApplication.CreateBuilder(args);
             }
             catch (Exception ex)
             {
-                Log.Fatal(ex, "Schema probe failed. Run code829-db MigrationRunner before starting api.");
+                Log.Fatal(ex, "Schema probe failed.");
                 await Log.CloseAndFlushAsync();
                 Environment.Exit(2);
                 return;

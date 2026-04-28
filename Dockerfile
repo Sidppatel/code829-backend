@@ -3,7 +3,22 @@
 # bump blindly — validate the rebuilt image before promoting.
 
 # =========================
-# BUILD STAGE
+# CODE829-DB BUILD STAGE
+# =========================
+# Clones the sibling code829-db repo and publishes MigrationRunner so the
+# runtime image can apply schema migrations on boot. Pin DB_REF to a specific
+# commit/tag for reproducible deploys; default 'main' pulls latest.
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:732cd42c6f659814c9804ad7b05c7f761e83ef8379c5b2fdc3af673353caff73 AS db-build
+RUN apk add --no-cache git
+WORKDIR /db
+ARG DB_REPO=https://github.com/Sidppatel/code829-db.git
+ARG DB_REF=main
+RUN git clone --depth 1 --branch "$DB_REF" "$DB_REPO" . \
+    && dotnet publish src/MigrationRunner -c Release -o /app/migrate \
+       -p:UseAppHost=false
+
+# =========================
+# BACKEND BUILD STAGE
 # =========================
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:732cd42c6f659814c9804ad7b05c7f761e83ef8379c5b2fdc3af673353caff73 AS build
 WORKDIR /src
@@ -44,13 +59,13 @@ RUN apk add --no-cache krb5-libs=1.22.1-r0
 
 WORKDIR /app
 
-# Runtime image ships prod only. Prod uses S3FileStorageService (see Program.cs
-# DI wiring) and logs stream to OTLP + stdout — no `logs/` or `uploads/` dirs
-# are written to the filesystem. Keeping these directories here would imply a
-# writable volume contract we no longer honor.
+# Bundle MigrationRunner from code829-db into the image. entrypoint.sh runs
+# migrations first; if they fail the api never starts.
+COPY --from=db-build --chown=app:app /app/migrate /app/migrate
+COPY --from=build    --chown=app:app /app/publish /app
+COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# .NET 10 Alpine images ship with a non-root `app` user (UID/GID 10001) pre-created.
-COPY --from=build --chown=app:app /app/publish .
 USER app
 
 # Render supplies PORT at runtime (set to 10000 in render.yaml). The Dockerfile
@@ -62,4 +77,4 @@ EXPOSE 10000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health/live || exit 1
 
-ENTRYPOINT ["dotnet", "api.dll"]
+ENTRYPOINT ["/app/entrypoint.sh"]
