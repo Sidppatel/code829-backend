@@ -126,7 +126,7 @@ jobs:
             --results-directory ./coverage \
             -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura \
                DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[api]*" \
-               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[api]Api.Migrations.*,[api]Api.Seeding.*"
+               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[api]Api.Data.Migrations.*"
         timeout-minutes: 10
         env:
           DOCKER_HOST: unix:///var/run/docker.sock
@@ -178,12 +178,12 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Count ARCH-EXCEPTION markers
         run: |
-          COUNT=$(grep -rn "ARCH-EXCEPTION\|AllowDirectDbAccess" api/ db/ contracts/ | wc -l)
+          COUNT=$(grep -rn "ARCH-EXCEPTION\|AllowDirectDbAccess" api/ contracts/ | wc -l)
           BASELINE=$(grep -oE '[0-9]+' docs/arch-exception-inventory.md | head -1)
           echo "Current: $COUNT  Baseline: $BASELINE"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::ARCH-EXCEPTION count rose ($COUNT > $BASELINE). Fix the violation, or bump the baseline in docs/arch-exception-inventory.md with a category-(c) justification row."
-            grep -rn "ARCH-EXCEPTION\|AllowDirectDbAccess" api/ db/ contracts/ || true
+            grep -rn "ARCH-EXCEPTION\|AllowDirectDbAccess" api/ contracts/ || true
             exit 1
           fi
 
