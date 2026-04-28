@@ -37,7 +37,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\api\api.csproj" />
     <ProjectReference Include="..\..\contracts\contracts.csproj" />
-    <ProjectReference Include="..\..\db\db.csproj" />
   </ItemGroup>
 
   <ItemGroup>

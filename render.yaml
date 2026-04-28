@@ -35,9 +35,14 @@ services:
         value: "10000"
 
       # ─── Required secrets ───────────────────────────────────────
-      # Supabase transaction pooler URL (port 6543). Migrations run locally
-      # against the session URL (5432). See DEPLOYMENT.md.
+      # Supabase transaction pooler URL (port 6543) — runtime queries.
       - key: DATABASE_URL
+        sync: false
+      # Supabase session pooler URL (port 5432) — DDL only. docker/entrypoint.sh
+      # runs MigrationRunner with this URL before the api starts. Supabase blocks
+      # DDL on the transaction pooler, so this MUST be the session endpoint.
+      # If unset, MigrationRunner falls back to DATABASE_URL.
+      - key: MIGRATION_DATABASE_URL
         sync: false
       # Upstash Redis TLS URL (rediss://…:6380)
       - key: REDIS_URL

@@ -154,9 +154,9 @@ public class DeveloperEventsController(
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
 
         var moved = await ticketTypeProc.RelinkOrphansAsync(id);
-        await adminLog.LogAsync("event.ticket_type.orphans_relinked", "Event", id,
+        await AdminLog.LogAsync("event.ticket_type.orphans_relinked", "Event", id,
             $"Relinked {moved} orphan purchase row(s) for event '{ev.Title}'");
-        await cache.InvalidateEventAsync(id);
+        await Cache.InvalidateEventAsync(id);
 
         return Ok(new { eventId = id, purchasesUpdated = moved });
     }

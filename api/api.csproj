@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\contracts\contracts.csproj" />
-    <ProjectReference Include="..\db\db.csproj" />
     <ProjectReference Include="..\tools\Analyzers\Analyzers.csproj"
       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>

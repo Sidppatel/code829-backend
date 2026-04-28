@@ -1254,20 +1254,11 @@
           "StackExchange.Redis": "[2.12.14, )",
           "Stripe.net": "[51.1.0, )",
           "contracts": "[1.0.0, )",
-          "db": "[1.0.0, )",
           "nClam": "[9.0.0, )"
         }
       },
       "contracts": {
         "type": "Project"
-      },
-      "db": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore": "[10.0.7, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.1, )",
-          "contracts": "[1.0.0, )"
-        }
       }
     }
   }

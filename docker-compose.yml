@@ -1,39 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
-    container_name: event-platform-db
-    restart: unless-stopped
-    mem_limit: 512m
-    memswap_limit: 512m
-    cpus: 1.0
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-event_platform}
-      POSTGRES_USER: ${POSTGRES_USER:-ep_dev}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-      # Consumed by docker-init/01-extensions-and-roles.sql via psql \getenv
-      # to provision the ep_app + ep_readonly runtime roles without embedding
-      # passwords in the SQL file.
-      EP_APP_PASSWORD: ${EP_APP_PASSWORD:?EP_APP_PASSWORD must be set in .env}
-      EP_READONLY_PASSWORD: ${EP_READONLY_PASSWORD:?EP_READONLY_PASSWORD must be set in .env}
-    ports:
-      - "127.0.0.1:5432:5432"
-    read_only: true
-    tmpfs:
-      - /tmp
-      - /var/run/postgresql
-    volumes:
-      # Named volume so lifecycle is managed by Docker (`docker volume ls`) and
-      # the host working tree is never polluted with a postgres data directory.
-      # The old `./docker-data/postgres` bind mount is obsolete — delete that
-      # folder locally after switching.
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker-init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ep_dev} -d ${POSTGRES_DB:-event_platform}"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   redis:
     image: redis:7-alpine@sha256:119c9edaa6389b4c141f7faa74dae3f3b91ac50c3376d39596044ef07c2592e2
     container_name: event-platform-redis
@@ -41,9 +6,6 @@ services:
     mem_limit: 128m
     memswap_limit: 128m
     cpus: 0.5
-    # Password is mounted as a Docker secret at /run/secrets/redis_password so
-    # it does NOT appear in `docker inspect` env or in this compose file.
-    # redis-server reads the file via --requirepass-file (Redis 7+).
     command: >
       sh -c "exec redis-server
       --requirepass $$(cat /run/secrets/redis_password)
@@ -79,15 +41,8 @@ services:
       start_period: 120s
 
 volumes:
-  # Postgres data — named volume. `docker compose down -v` wipes it; otherwise
-  # persists across restarts and survives container recreation.
-  postgres_data:
   clamav-defs:
 
 secrets:
   redis_password:
-    # File is generated from the REDIS_PASSWORD env var by the start scripts
-    # before compose up (see ../start-backend.ps1 + scripts/write-redis-secret.sh).
-    # The file is gitignored. The env var itself is NOT mounted into the
-    # container, so `docker inspect` shows no plaintext password.
     file: ./docker-secrets/redis_password

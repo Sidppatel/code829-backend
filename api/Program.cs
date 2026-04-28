@@ -1,6 +1,5 @@
 using System.Text;
 using Api.Middleware;
-using Api.Seeding;
 using Api.Services;
 using Api.Validators;
 using Api.Workers;
@@ -158,12 +157,6 @@ var builder = WebApplication.CreateBuilder(args);
                     retainedFileCountLimit: 30,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] [trace={TraceId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
 
-            lc.WriteTo.Logger(lc2 => lc2
-                .Filter.ByIncludingOnly(le => le.MessageTemplate.Text.Contains("[Seed]"))
-                .WriteTo.File("logs/seeding-.log",
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 30,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
         }
     });
 
@@ -504,94 +497,45 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // One-shot prod bootstrap: RUN_PROD_BOOTSTRAP=true + Production environment.
-    // Runs migrations + seeds default AppSettings + initial developer user, logs result,
-    // then exits 0 so the server never starts on a bootstrap boot. See docs/runbooks/prod-bootstrap.md.
-    if (app.Environment.IsProduction()
-        && string.Equals(Environment.GetEnvironmentVariable("RUN_PROD_BOOTSTRAP"), "true", StringComparison.OrdinalIgnoreCase))
+    // Schema is owned by the code829-db repo. Backend never migrates. We assert
+    // here that no migrations are pending — if any are, exit 2 so Render flags
+    // the deploy red instead of serving traffic against an outdated schema.
+    using (var probeScope = app.Services.CreateScope())
     {
-        try
+        var probe = probeScope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        const int probeRetries = 5;
+        for (var attempt = 1; attempt <= probeRetries; attempt++)
         {
-            await Api.Seeding.ProdBootstrap.RunAsync(app.Services);
-            Log.Information("[ProdBootstrap] Exiting 0 — unset RUN_PROD_BOOTSTRAP and redeploy to start server");
-            await Log.CloseAndFlushAsync();
-            Environment.Exit(0);
-            return;
-        }
-        catch (Exception ex)
-        {
-            Log.Fatal(ex, "[ProdBootstrap] Failed");
-            await Log.CloseAndFlushAsync();
-            Environment.Exit(1);
-            return;
-        }
-    }
-
-    // Apply pending migrations on every startup — with retry for slow DB startup.
-    // Set SKIP_MIGRATIONS=true to bypass for schema-validation / read-only boot.
-    var skipMigrations = string.Equals(
-        Environment.GetEnvironmentVariable("SKIP_MIGRATIONS"), "true", StringComparison.OrdinalIgnoreCase);
-    const int maxRetries = 5;
-    for (var attempt = 1; attempt <= maxRetries && !skipMigrations; attempt++)
-    {
-        try
-        {
-            using var scope = app.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-            await db.Database.MigrateAsync();
-            Log.Information("Database migrations applied");
-            break;
-        }
-        catch (Npgsql.NpgsqlException ex) when (attempt < maxRetries)
-        {
-            var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
-            Log.Warning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in {Delay}s...",
-                attempt, maxRetries, delay.TotalSeconds);
-            await Task.Delay(delay);
-        }
-    }
-
-    // Seed data — only in Development. The historical SEED_DATA override is
-    // IGNORED in non-Development environments because the admin seeders plant
-    // accounts with well-known default passwords. Use ProdBootstrap for real
-    // deploys. Log the misconfiguration loudly but do not crash — the seeding
-    // branch below is independently gated by IsDevelopment(), so no unsafe
-    // seed can occur regardless of this flag's value in prod.
-    if (Environment.GetEnvironmentVariable("SEED_DATA")?.ToLower() == "true"
-        && !app.Environment.IsDevelopment())
-    {
-        Log.Warning(
-            "SEED_DATA=true set in non-Development environment (ASPNETCORE_ENVIRONMENT={Env}). " +
-            "Ignoring — default-password seeding is never executed outside Development. " +
-            "Unset SEED_DATA in your deploy environment to silence this warning.",
-            app.Environment.EnvironmentName);
-    }
-
-    if (skipMigrations)
-    {
-        Log.Warning("SKIP_MIGRATIONS=true — bypassed db.Database.MigrateAsync() and all seeders");
-    }
-    else if (app.Environment.IsDevelopment())
-    {
-        // Opt-out via SEED_USERS_AND_PURCHASES=false: skips the regular-user
-        // seed (8 default ticket buyers) and the synthetic purchase seed
-        // (~135 rows). Useful when you want a clean stage with only events
-        // and your custom business_users (e.g. for manual onboarding tests).
-        // Defaults to true — preserves the standard dev experience.
-        var seedUsersAndPurchases =
-            (Environment.GetEnvironmentVariable("SEED_USERS_AND_PURCHASES") ?? "true")
-            .Equals("true", StringComparison.OrdinalIgnoreCase);
-
-        await DataSeeder.SeedAsync(app.Services, seedUsers: seedUsersAndPurchases);
-        await VenueEventSeeder.SeedAsync(app.Services);
-        await LayoutSeeder.SeedAsync(app.Services);
-        if (seedUsersAndPurchases)
-        {
-            await PurchaseSeeder.SeedAsync(app.Services);
-        }
-        else
-        {
-            Log.Information("[Seed] SEED_USERS_AND_PURCHASES=false — skipped user + purchase seeding");
+            try
+            {
+                var pending = (await probe.Database.GetPendingMigrationsAsync()).ToList();
+                if (pending.Count > 0)
+                {
+                    Log.Fatal("Schema is behind. Pending migrations: {Pending}. Run code829-db MigrationRunner against the target DB, then redeploy.",
+                        pending);
+                    await Log.CloseAndFlushAsync();
+                    Environment.Exit(2);
+                    return;
+                }
+                await probe.EventViews.AnyAsync();
+                var applied = (await probe.Database.GetAppliedMigrationsAsync()).Count();
+                Log.Information("Schema probe ok ({Applied} migrations applied)", applied);
+                break;
+            }
+            catch (Npgsql.NpgsqlException ex) when (attempt < probeRetries)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                Log.Warning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in {Delay}s...",
+                    attempt, probeRetries, delay.TotalSeconds);
+                await Task.Delay(delay);
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Schema probe failed.");
+                await Log.CloseAndFlushAsync();
+                Environment.Exit(2);
+                return;
+            }
         }
     }
 

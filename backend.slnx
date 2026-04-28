@@ -1,7 +1,6 @@
 <Solution>
   <Project Path="api/api.csproj" />
   <Project Path="contracts/contracts.csproj" />
-  <Project Path="db/db.csproj" />
   <Project Path="tests/Api.Tests/Api.Tests.csproj" />
   <Project Path="tests/IntegrationTests/IntegrationTests.csproj" />
   <Project Path="tools/Analyzers/Analyzers.csproj" />

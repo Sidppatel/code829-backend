@@ -18,11 +18,13 @@
 ```
 backend.slnx
 ├── api/                # ASP.NET Web API — controllers, services, middleware, workers, seeding, validators
+│   └── Data/           # Runtime data access: AppDbContext (EventPlatformDbContext), entity POCOs, view DbSets, SP wrappers
 ├── contracts/          # Shared DTOs and Enums (no dependencies)
-├── db/                 # EF Core DbContext, entities, migrations, views, SP wrappers, raw SQL
 ├── tests/Api.Tests/    # xUnit + Moq
 └── tools/Analyzers/    # Roslyn analyzers (EP0001 enforces Data Access Rule)
 ```
+
+Schema (migrations, raw SQL artifacts for views/SPs/functions, MigrationRunner) lives in the sibling repo `D:\event-platform\code829-db`. Backend has no schema-authoring code and never runs migrations on startup. The two repos communicate exclusively via `DATABASE_URL`.
 
 ## Build & Run
 
@@ -30,18 +32,21 @@ backend.slnx
 dotnet build                          # Build entire solution (analyzer EP0001 fires here)
 dotnet test                           # Run xUnit tests
 dotnet run --project api              # Run API (listens on http://localhost:8000)
-dotnet ef migrations add <Name> --project db --startup-project api
-dotnet ef database update --project db --startup-project api
+
+# Migrations — owned by code829-db, NOT this repo:
+cd ..\code829-db
+dotnet run --project src/MigrationRunner                                            # apply
+dotnet ef migrations add <Name> --project src/Db --startup-project src/MigrationRunner   # author
 ```
 
-The boot scripts at the monorepo root (`..\start.ps1`, `..\start-backend.ps1`) handle Docker + secrets + migrations + run in one shot. Use them for normal dev — invoke `dotnet run` directly only when you need a debugger or detailed control.
+The boot scripts at the monorepo root (`..\start.ps1`, `..\start-backend.ps1`) handle Docker + secrets + migrations + run in one shot. Migration step now invokes `code829-db/src/MigrationRunner` before backing up `dotnet run --project api`.
 
 ## Architecture
 
 ### Layers
 - **Controllers** — Thin, handle HTTP concerns only. Delegate to services.
 - **Services** — Business logic. Each has an interface (`IXxxService`) and implementation.
-- **Entities** — EF Core models in `db/Entities/`. `BaseEntity` provides `Id`, `CreatedAt`, `UpdatedAt`.
+- **Entities** — POCO models in `api/Data/Entities/`. `BaseEntity` provides `Id`, `CreatedAt`, `UpdatedAt`. Backend treats them as runtime DTOs for SP results — schema authoring lives in `code829-db`.
 - **DTOs** — In `contracts/DTOs/`, organized by domain. Never expose entities directly.
 - **Validators** — FluentValidation validators in `api/Validators/`.
 - **Middleware** — Custom middleware for error handling, CORS, rate limiting, role auth, correlation IDs, security headers.
@@ -98,9 +103,9 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 
 ### Database
 - PostgreSQL 16 via Docker
-- EF Core code-first migrations in `db/Migrations/`
-- DB views in `db/Entities/Views/` (EventView, EventSummaryView, TableView)
-- Seeding in `api/Seeding/` — runs on startup in development
+- EF Core code-first migrations live in `code829-db/src/Db/Migrations/` (separate repo)
+- DB views (read-side mappings) in `api/Data/Entities/Views/` (EventView, EventSummaryView, TableView, ...)
+- Database hydrates from production via `..\sync-data-from-supabase.ps1`. No in-process seeders.
 
 ### Environment
 - **Secrets** sourced from Infisical (`infisical export --env=dev --format=dotenv`) — no `.env` files in the repo
@@ -121,13 +126,13 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 ## Data Access Rule (architectural)
 
 **The API must never read or write tables directly via EF Core LINQ.** All data access goes through:
-- Stored Procedures (`sp_*`) called via `SqlQueryRaw<T>()` / `ExecuteSqlRawAsync()` — wrapped in `db/Repositories/StoredProcedures/`
+- Stored Procedures (`sp_*`) called via `SqlQueryRaw<T>()` / `ExecuteSqlRawAsync()` — wrapped in `api/Data/Repositories/StoredProcedures/`
 - SQL Functions (`SELECT * FROM sp_foo(...)`)
 - Views (keyless entities mapped in `OnModelCreating`, e.g., `context.EventViews`, `context.UserProfileViews` — these ARE views and are fine)
 
 Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`, `context.Events.Add(...)`, `context.Bookings.AnyAsync(...)`, `context.Tables.Where(...).ToListAsync()`, `context.AdminUsers.CountAsync()`.
 
-**Exceptions:** `api/Seeding/**`, `tests/**`, and `db/Repositories/*.cs` (legacy low-level adapters, excluding the `StoredProcedures/` subfolder) are path-whitelisted. For a specific site, annotate with `[AllowDirectDbAccess("reason")]` on the method/class, or put `// ARCH-EXCEPTION: <reason>` on the invocation line.
+**Exceptions:** `tests/**` and `api/Data/Repositories/*.cs` (legacy low-level adapters, excluding the `StoredProcedures/` subfolder) are path-whitelisted. For a specific site, annotate with `[AllowDirectDbAccess("reason")]` on the method/class, or put `// ARCH-EXCEPTION: <reason>` on the invocation line.
 
 **Roslyn analyzer `EP0001`** in `tools/Analyzers/` enforces this at build time at **Error** severity — new direct-DbSet access fails `dotnet build`. Intentional exceptions use inline `// ARCH-EXCEPTION: <reason>` comments (dozens of these exist in legacy controllers where the read+mutate pattern would require deep SP redesign; grep for them).
 
@@ -139,7 +144,7 @@ Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`,
 - For writes: create `sp_create_*` / `sp_update_*` / `sp_delete_*` returning whatever the caller needs (uuid of new row, void, etc.).
 - For existence checks: prefer `SELECT EXISTS(...)` via `sp_*_exists_*` returning `bool`.
 
-**PR checklist:** reviewer confirms no new `context.<NonViewTable>.<EFMethod>` outside `Seeding/` or `Tests/`.
+**PR checklist:** reviewer confirms no new `context.<NonViewTable>.<EFMethod>` outside `Tests/`.
 
 ## Roslyn Analyzers (`tools/Analyzers/`)
 

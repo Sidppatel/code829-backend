@@ -13,7 +13,7 @@ namespace EventPlatform.Analyzers;
 /// Blocks direct EF Core LINQ access to non-view DbSets outside allowed paths.
 /// The architectural rule is: reads and writes go through SPs, functions, or views.
 /// View DbSets (property name ending in "Views") are allowed.
-/// Seeding/** and tests/** paths are exempt.
+/// tests/** paths are exempt.
 /// Per-method opt-out via [AllowDirectDbAccess] attribute or
 /// a line-level `// ARCH-EXCEPTION:` comment.
 /// </summary>
@@ -129,17 +129,16 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
     private static bool IsWhitelistedPath(string filePath)
     {
         var normalized = filePath.Replace('\\', '/');
-        return normalized.Contains("/Seeding/")
-            || normalized.Contains("/tests/")
+        return normalized.Contains("/tests/")
             || normalized.Contains("/Tests/")
             || normalized.Contains(".Tests/")
-            // db/Repositories/*.cs (excluding the StoredProcedures/ subfolder) are
-            // low-level data-access adapters below the API layer. The rule targets
+            // api/Data/Repositories/*.cs (excluding the StoredProcedures/ subfolder)
+            // are low-level data-access adapters below the API layer. The rule targets
             // controllers + services; adapters wrapping EF primitives for non-SP-
             // covered surfaces (legacy log/image/app_setting CRUD) are permitted here.
             // StoredProcedures/ files under this folder are still checked.
-            || (normalized.Contains("/db/Repositories/")
-                && !normalized.Contains("/db/Repositories/StoredProcedures/"));
+            || (normalized.Contains("/api/Data/Repositories/")
+                && !normalized.Contains("/api/Data/Repositories/StoredProcedures/"));
     }
 
     private static bool HasAllowDirectDbAccessAttribute(SyntaxNodeAnalysisContext ctx, SyntaxNode node)
