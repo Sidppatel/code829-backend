@@ -497,9 +497,12 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // Schema is owned by the code829-db repo. Backend never migrates. We assert
-    // here that no migrations are pending — if any are, exit 2 so Render flags
-    // the deploy red instead of serving traffic against an outdated schema.
+    // Schema is owned by the code829-db repo. Backend never migrates. The
+    // container entrypoint (docker/entrypoint.sh) runs code829-db's
+    // MigrationRunner BEFORE api starts; if migrations fail, the container
+    // exits and Render shows red. This probe is a defense-in-depth check that
+    // a known view (v_events) exists — catches misconfigured DATABASE_URL,
+    // wrong DB target, or schema-drift between MigrationRunner and api code.
     using (var probeScope = app.Services.CreateScope())
     {
         var probe = probeScope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
@@ -508,18 +511,8 @@ var builder = WebApplication.CreateBuilder(args);
         {
             try
             {
-                var pending = (await probe.Database.GetPendingMigrationsAsync()).ToList();
-                if (pending.Count > 0)
-                {
-                    Log.Fatal("Schema is behind. Pending migrations: {Pending}. Run code829-db MigrationRunner against the target DB, then redeploy.",
-                        pending);
-                    await Log.CloseAndFlushAsync();
-                    Environment.Exit(2);
-                    return;
-                }
                 await probe.EventViews.AnyAsync();
-                var applied = (await probe.Database.GetAppliedMigrationsAsync()).Count();
-                Log.Information("Schema probe ok ({Applied} migrations applied)", applied);
+                Log.Information("Schema probe ok");
                 break;
             }
             catch (Npgsql.NpgsqlException ex) when (attempt < probeRetries)
@@ -531,7 +524,7 @@ var builder = WebApplication.CreateBuilder(args);
             }
             catch (Exception ex)
             {
-                Log.Fatal(ex, "Schema probe failed.");
+                Log.Fatal(ex, "Schema probe failed. Run code829-db MigrationRunner against the target DB, then redeploy.");
                 await Log.CloseAndFlushAsync();
                 Environment.Exit(2);
                 return;

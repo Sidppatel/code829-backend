@@ -52,4 +52,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Schema artifacts mirrored from code829-db. Authoring lives in that repo;
+         api ships a copy so tests + GetPendingMigrationsAsync see the same model. -->
+    <EmbeddedResource Include="Data/Sql/**/*.sql" />
+  </ItemGroup>
+
 </Project>
