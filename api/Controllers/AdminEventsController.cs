@@ -44,6 +44,8 @@ public class AdminEventsController(
     // which would trigger CS9107.
     protected EventPlatformDbContext Context => context;
     protected ISettingsService Settings => settingsService;
+    protected IAdminLogService AdminLog => adminLog;
+    protected ICacheService Cache => cache;
 
     [HttpGet]
     public virtual async Task<IActionResult> GetAll(

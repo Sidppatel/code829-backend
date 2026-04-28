@@ -508,7 +508,7 @@ var builder = WebApplication.CreateBuilder(args);
         {
             try
             {
-                await probe.EventViews.Take(1).ToListAsync();
+                await probe.EventViews.AnyAsync();
                 Log.Information("Schema probe ok");
                 break;
             }
