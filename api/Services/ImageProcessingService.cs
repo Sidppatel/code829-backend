@@ -25,6 +25,11 @@ public class ImageProcessingService : IImageProcessingService
             new ImageVariant("", 200, 200),
             new ImageVariant("_thumb", 80, 80)
         ],
+        ["business_user"] =
+        [
+            new ImageVariant("", 200, 200),
+            new ImageVariant("_thumb", 80, 80)
+        ],
         ["platform"] =
         [
             new ImageVariant("", 400, 400),
@@ -40,8 +45,16 @@ public class ImageProcessingService : IImageProcessingService
         var loaded = sw.ElapsedMilliseconds;
 
         var variants = VariantsByEntity.GetValueOrDefault(entityType, VariantsByEntity["event"]);
-        var resizeMode = entityType == "user" ? ResizeMode.Crop : ResizeMode.Max;
-        var encoder = new WebpEncoder { Quality = 75, FileFormat = WebpFileFormatType.Lossy };
+        var cropEntities = entityType is "user" or "business_user";
+        var resizeMode = cropEntities ? ResizeMode.Crop : ResizeMode.Max;
+        // Method=0 (fastest) ~3-5x faster encode than default 4 on Render starter
+        // 0.5 CPU. Quality difference imperceptible at thumbnail sizes.
+        var encoder = new WebpEncoder
+        {
+            Quality = 75,
+            FileFormat = WebpFileFormatType.Lossy,
+            Method = WebpEncodingMethod.Fastest
+        };
 
         // Process all variants in parallel — each clone is independent so this is safe.
         var tasks = variants.Select(async variant =>
