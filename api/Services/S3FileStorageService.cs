@@ -16,6 +16,11 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
+    // AmazonS3Client is thread-safe; reusing it keeps TLS connections warm and
+    // avoids per-call config bootstrap. Lazily initialised on first use.
+    private AmazonS3Client? _client;
+    private readonly object _clientLock = new();
+
     public async Task<string> SaveAsync(Stream fileStream, string entityType, string fileName)
     {
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
@@ -135,22 +140,31 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
 
     private AmazonS3Client GetClient()
     {
-        var accessKey = secrets.S3AccessKey;
-        var secretKey = secrets.S3SecretKey;
-        var region = settings.GetOrDefaultAsync("s3_region", "us-east-1").GetAwaiter().GetResult() ?? "us-east-1";
-        var endpointUrl = secrets.S3EndpointUrl;
-
-        var config = new AmazonS3Config
+        if (_client is not null) return _client;
+        lock (_clientLock)
         {
-            RegionEndpoint = RegionEndpoint.GetBySystemName(region),
-        };
+            if (_client is not null) return _client;
 
-        if (!string.IsNullOrEmpty(endpointUrl))
-        {
-            config.ServiceURL = endpointUrl;
-            config.ForcePathStyle = true;
+            var accessKey = secrets.S3AccessKey;
+            var secretKey = secrets.S3SecretKey;
+            // Region read once at first use. Avoids per-upload sync-over-async DB hit
+            // that previously dominated upload latency on slow plans.
+            var region = settings.GetOrDefaultAsync("s3_region", "us-east-1").GetAwaiter().GetResult() ?? "us-east-1";
+            var endpointUrl = secrets.S3EndpointUrl;
+
+            var config = new AmazonS3Config
+            {
+                RegionEndpoint = RegionEndpoint.GetBySystemName(region),
+            };
+
+            if (!string.IsNullOrEmpty(endpointUrl))
+            {
+                config.ServiceURL = endpointUrl;
+                config.ForcePathStyle = true;
+            }
+
+            _client = new AmazonS3Client(accessKey, secretKey, config);
+            return _client;
         }
-
-        return new AmazonS3Client(accessKey, secretKey, config);
     }
 }

@@ -24,8 +24,8 @@ public class VenueImageService(
         var detail = variants.First(v => v.Suffix == "");
 
         var baseKey = $"venue/{Guid.NewGuid()}";
-        foreach (var variant in variants)
-            await fileStorage.SaveWithKeyAsync(variant.Stream, $"{baseKey}{variant.Suffix}.webp", "image/webp");
+        await Task.WhenAll(variants.Select(variant =>
+            fileStorage.SaveWithKeyAsync(variant.Stream, $"{baseKey}{variant.Suffix}.webp", "image/webp")));
         foreach (var v in variants) v.Stream.Dispose();
 
         var result = await venueImageProc.AddAsync(
