@@ -11,13 +11,14 @@ namespace Api.Services;
 /// Production file storage using S3-compatible object storage (AWS S3, Cloudflare R2, etc.).
 /// Reads configuration from ISettingsService.
 /// </summary>
-public class S3FileStorageService(ISecretsProvider secrets, ISettingsService settings, IMalwareScanner scanner) : IFileStorageService
+public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scanner) : IFileStorageService
 {
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-    // AmazonS3Client is thread-safe; reusing it keeps TLS connections warm and
-    // avoids per-call config bootstrap. Lazily initialised on first use.
+    // AmazonS3Client is thread-safe; reusing it across all requests keeps TLS
+    // connections warm and avoids per-call config bootstrap. Service is now
+    // registered Singleton so the client survives the request scope.
     private AmazonS3Client? _client;
     private readonly object _clientLock = new();
 
@@ -173,9 +174,10 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
 
             var accessKey = secrets.S3AccessKey;
             var secretKey = secrets.S3SecretKey;
-            // Region read once at first use. Avoids per-upload sync-over-async DB hit
-            // that previously dominated upload latency on slow plans.
-            var region = settings.GetOrDefaultAsync("s3_region", "us-east-1").GetAwaiter().GetResult() ?? "us-east-1";
+            // R2 accepts any region (uses 'auto' internally); 'us-east-1' is the
+            // safe default for AWS S3 too. Override via S3_REGION env var only
+            // if pointing the SDK at a non-R2 S3-compatible bucket.
+            var region = Environment.GetEnvironmentVariable("S3_REGION") ?? "us-east-1";
             var endpointUrl = secrets.S3EndpointUrl;
 
             var config = new AmazonS3Config

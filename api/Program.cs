@@ -322,7 +322,12 @@ var builder = WebApplication.CreateBuilder(args);
             throw new InvalidOperationException(
                 "S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET are required outside Development. See .env.example.");
 
-        builder.Services.AddScoped<IFileStorageService, S3FileStorageService>();
+        // Singleton so the AmazonS3Client (created lazily on first call)
+        // survives across requests. Reusing the client keeps TLS pools warm
+        // and avoids per-request init that previously cost ~400ms on the
+        // first upload variant. Safe because dependencies are themselves
+        // singletons.
+        builder.Services.AddSingleton<IFileStorageService, S3FileStorageService>();
     }
 
     builder.Services.AddScoped<IEmailService>(sp =>
