@@ -73,24 +73,42 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
 
     public async Task SaveWithKeyAsync(Stream fileStream, string key, string contentType)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var client = GetClient();
         var bucket = secrets.S3Bucket;
 
-        // Buffer into MemoryStream so the SDK knows Content-Length upfront.
-        var ms = new MemoryStream();
-        await fileStream.CopyToAsync(ms);
-        ms.Position = 0;
+        // R2 requires Content-Length upfront. If caller already passes a MemoryStream
+        // (the typical hot path — image variants are produced as MemoryStream), use
+        // it directly to avoid the per-call alloc + CopyTo. Only re-buffer when the
+        // input isn't seekable.
+        Stream uploadStream;
+        bool ownedStream = false;
+        if (fileStream is MemoryStream existing && existing.CanSeek)
+        {
+            existing.Position = 0;
+            uploadStream = existing;
+        }
+        else
+        {
+            var ms = new MemoryStream();
+            await fileStream.CopyToAsync(ms);
+            ms.Position = 0;
+            uploadStream = ms;
+            ownedStream = true;
+        }
 
-        var scan = await scanner.ScanAsync(ms);
+        var scanStart = sw.ElapsedMilliseconds;
+        var scan = await scanner.ScanAsync(uploadStream);
         if (!scan.IsClean)
             throw new MalwareDetectedException(scan.Threat);
-        ms.Position = 0;
+        uploadStream.Position = 0;
+        var afterScan = sw.ElapsedMilliseconds;
 
         var request = new PutObjectRequest
         {
             BucketName = bucket,
             Key = key,
-            InputStream = ms,
+            InputStream = uploadStream,
             ContentType = contentType,
             DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
             Headers =
@@ -103,7 +121,11 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
         await RetryHelper.WithRetryAsync(
             () => client.PutObjectAsync(request),
             context: "S3 upload");
-        Log.Information("[S3] Uploaded {Key} to {Bucket}", key, bucket);
+        var afterPut = sw.ElapsedMilliseconds;
+
+        if (ownedStream) uploadStream.Dispose();
+        Log.Information("[S3] Uploaded {Key} ({Bytes}b) bucket={Bucket} timing prep={Prep}ms scan={Scan}ms put={Put}ms total={Total}ms",
+            key, uploadStream.Length, bucket, scanStart, afterScan - scanStart, afterPut - afterScan, sw.ElapsedMilliseconds);
     }
 
     public async Task<bool> DeleteAsync(string path)

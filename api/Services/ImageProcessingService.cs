@@ -34,32 +34,42 @@ public class ImageProcessingService : IImageProcessingService
 
     public async Task<List<ProcessedImage>> ProcessAsync(Stream input, string entityType)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         input.Position = 0;
         using var image = await Image.LoadAsync(input);
+        var loaded = sw.ElapsedMilliseconds;
 
         var variants = VariantsByEntity.GetValueOrDefault(entityType, VariantsByEntity["event"]);
         var resizeMode = entityType == "user" ? ResizeMode.Crop : ResizeMode.Max;
+        var encoder = new WebpEncoder { Quality = 75, FileFormat = WebpFileFormatType.Lossy };
 
         // Process all variants in parallel — each clone is independent so this is safe.
         var tasks = variants.Select(async variant =>
         {
-            using var clone = image.Clone(ctx =>
-                ctx.Resize(new ResizeOptions
-                {
-                    Size = new Size(variant.MaxWidth, variant.MaxHeight),
-                    Mode = resizeMode
-                }));
+            // Skip the resize entirely when source is already smaller than target —
+            // ImageSharp Resize allocates a new framebuffer even when it's a no-op.
+            using var clone = (image.Width <= variant.MaxWidth && image.Height <= variant.MaxHeight && resizeMode == ResizeMode.Max)
+                ? image.Clone(_ => { })
+                : image.Clone(ctx =>
+                    ctx.Resize(new ResizeOptions
+                    {
+                        Size = new Size(variant.MaxWidth, variant.MaxHeight),
+                        Mode = resizeMode
+                    }));
 
             var width = clone.Width;
             var height = clone.Height;
             var ms = new MemoryStream();
-            await clone.SaveAsWebpAsync(ms, new WebpEncoder { Quality = 80 });
+            await clone.SaveAsWebpAsync(ms, encoder);
             ms.Position = 0;
 
             return new ProcessedImage(ms, variant.Suffix, width, height, (int)ms.Length);
         });
 
-        return [.. await Task.WhenAll(tasks)];
+        var result = await Task.WhenAll(tasks);
+        Serilog.Log.Information("[ImgProc] entity={Entity} variants={Count} src={SrcW}x{SrcH} timing load={Load}ms encode={Encode}ms total={Total}ms",
+            entityType, result.Length, image.Width, image.Height, loaded, sw.ElapsedMilliseconds - loaded, sw.ElapsedMilliseconds);
+        return [.. result];
     }
 
     public async Task<(int Width, int Height)> GetDimensionsAsync(Stream input)
