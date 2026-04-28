@@ -13,7 +13,6 @@ WORKDIR /src
 COPY backend.slnx ./
 COPY api/api.csproj                                    ./api/
 COPY contracts/contracts.csproj                        ./contracts/
-COPY db/db.csproj                                      ./db/
 COPY tests/Api.Tests/Api.Tests.csproj                  ./tests/Api.Tests/
 COPY tests/IntegrationTests/IntegrationTests.csproj    ./tests/IntegrationTests/
 COPY tools/Analyzers/Analyzers.csproj                  ./tools/Analyzers/
