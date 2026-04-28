@@ -1,6 +1,5 @@
 using System.Text;
 using Api.Middleware;
-using Api.Seeding;
 using Api.Services;
 using Api.Validators;
 using Api.Workers;
@@ -158,12 +157,6 @@ var builder = WebApplication.CreateBuilder(args);
                     retainedFileCountLimit: 30,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [{UserId}] [trace={TraceId}] {SourceContext}{NewLine}  {Message:lj}{NewLine}{Exception}"));
 
-            lc.WriteTo.Logger(lc2 => lc2
-                .Filter.ByIncludingOnly(le => le.MessageTemplate.Text.Contains("[Seed]"))
-                .WriteTo.File("logs/seeding-.log",
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 30,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} {Message:lj}{NewLine}{Exception}"));
         }
     });
 
@@ -504,29 +497,6 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // One-shot prod bootstrap: RUN_PROD_BOOTSTRAP=true + Production environment.
-    // Runs migrations + seeds default AppSettings + initial developer user, logs result,
-    // then exits 0 so the server never starts on a bootstrap boot. See docs/runbooks/prod-bootstrap.md.
-    if (app.Environment.IsProduction()
-        && string.Equals(Environment.GetEnvironmentVariable("RUN_PROD_BOOTSTRAP"), "true", StringComparison.OrdinalIgnoreCase))
-    {
-        try
-        {
-            await Api.Seeding.ProdBootstrap.RunAsync(app.Services);
-            Log.Information("[ProdBootstrap] Exiting 0 — unset RUN_PROD_BOOTSTRAP and redeploy to start server");
-            await Log.CloseAndFlushAsync();
-            Environment.Exit(0);
-            return;
-        }
-        catch (Exception ex)
-        {
-            Log.Fatal(ex, "[ProdBootstrap] Failed");
-            await Log.CloseAndFlushAsync();
-            Environment.Exit(1);
-            return;
-        }
-    }
-
     // Schema is owned by the code829-db repo. Run its MigrationRunner before
     // starting the api. We probe a known view here to fail fast if the schema
     // is missing or behind.
@@ -556,46 +526,6 @@ var builder = WebApplication.CreateBuilder(args);
                 Environment.Exit(2);
                 return;
             }
-        }
-    }
-
-    // Seed data — only in Development. The historical SEED_DATA override is
-    // IGNORED in non-Development environments because the admin seeders plant
-    // accounts with well-known default passwords. Use ProdBootstrap for real
-    // deploys. Log the misconfiguration loudly but do not crash — the seeding
-    // branch below is independently gated by IsDevelopment(), so no unsafe
-    // seed can occur regardless of this flag's value in prod.
-    if (Environment.GetEnvironmentVariable("SEED_DATA")?.ToLower() == "true"
-        && !app.Environment.IsDevelopment())
-    {
-        Log.Warning(
-            "SEED_DATA=true set in non-Development environment (ASPNETCORE_ENVIRONMENT={Env}). " +
-            "Ignoring — default-password seeding is never executed outside Development. " +
-            "Unset SEED_DATA in your deploy environment to silence this warning.",
-            app.Environment.EnvironmentName);
-    }
-
-    if (app.Environment.IsDevelopment())
-    {
-        // Opt-out via SEED_USERS_AND_PURCHASES=false: skips the regular-user
-        // seed (8 default ticket buyers) and the synthetic purchase seed
-        // (~135 rows). Useful when you want a clean stage with only events
-        // and your custom business_users (e.g. for manual onboarding tests).
-        // Defaults to true — preserves the standard dev experience.
-        var seedUsersAndPurchases =
-            (Environment.GetEnvironmentVariable("SEED_USERS_AND_PURCHASES") ?? "true")
-            .Equals("true", StringComparison.OrdinalIgnoreCase);
-
-        await DataSeeder.SeedAsync(app.Services, seedUsers: seedUsersAndPurchases);
-        await VenueEventSeeder.SeedAsync(app.Services);
-        await LayoutSeeder.SeedAsync(app.Services);
-        if (seedUsersAndPurchases)
-        {
-            await PurchaseSeeder.SeedAsync(app.Services);
-        }
-        else
-        {
-            Log.Information("[Seed] SEED_USERS_AND_PURCHASES=false — skipped user + purchase seeding");
         }
     }
 

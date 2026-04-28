@@ -105,7 +105,7 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 - PostgreSQL 16 via Docker
 - EF Core code-first migrations live in `code829-db/src/Db/Migrations/` (separate repo)
 - DB views (read-side mappings) in `api/Data/Entities/Views/` (EventView, EventSummaryView, TableView, ...)
-- Seeding in `api/Seeding/` — runs on startup in development
+- Database hydrates from production via `..\sync-data-from-supabase.ps1`. No in-process seeders.
 
 ### Environment
 - **Secrets** sourced from Infisical (`infisical export --env=dev --format=dotenv`) — no `.env` files in the repo
@@ -132,7 +132,7 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 
 Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`, `context.Events.Add(...)`, `context.Bookings.AnyAsync(...)`, `context.Tables.Where(...).ToListAsync()`, `context.AdminUsers.CountAsync()`.
 
-**Exceptions:** `api/Seeding/**`, `tests/**`, and `api/Data/Repositories/*.cs` (legacy low-level adapters, excluding the `StoredProcedures/` subfolder) are path-whitelisted. For a specific site, annotate with `[AllowDirectDbAccess("reason")]` on the method/class, or put `// ARCH-EXCEPTION: <reason>` on the invocation line.
+**Exceptions:** `tests/**` and `api/Data/Repositories/*.cs` (legacy low-level adapters, excluding the `StoredProcedures/` subfolder) are path-whitelisted. For a specific site, annotate with `[AllowDirectDbAccess("reason")]` on the method/class, or put `// ARCH-EXCEPTION: <reason>` on the invocation line.
 
 **Roslyn analyzer `EP0001`** in `tools/Analyzers/` enforces this at build time at **Error** severity — new direct-DbSet access fails `dotnet build`. Intentional exceptions use inline `// ARCH-EXCEPTION: <reason>` comments (dozens of these exist in legacy controllers where the read+mutate pattern would require deep SP redesign; grep for them).
 
@@ -144,7 +144,7 @@ Forbidden examples on non-view DbSets: `context.Users.FirstOrDefaultAsync(...)`,
 - For writes: create `sp_create_*` / `sp_update_*` / `sp_delete_*` returning whatever the caller needs (uuid of new row, void, etc.).
 - For existence checks: prefer `SELECT EXISTS(...)` via `sp_*_exists_*` returning `bool`.
 
-**PR checklist:** reviewer confirms no new `context.<NonViewTable>.<EFMethod>` outside `Seeding/` or `Tests/`.
+**PR checklist:** reviewer confirms no new `context.<NonViewTable>.<EFMethod>` outside `Tests/`.
 
 ## Roslyn Analyzers (`tools/Analyzers/`)
 

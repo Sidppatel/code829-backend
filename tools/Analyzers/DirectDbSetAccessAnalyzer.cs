@@ -13,7 +13,7 @@ namespace EventPlatform.Analyzers;
 /// Blocks direct EF Core LINQ access to non-view DbSets outside allowed paths.
 /// The architectural rule is: reads and writes go through SPs, functions, or views.
 /// View DbSets (property name ending in "Views") are allowed.
-/// Seeding/** and tests/** paths are exempt.
+/// tests/** paths are exempt.
 /// Per-method opt-out via [AllowDirectDbAccess] attribute or
 /// a line-level `// ARCH-EXCEPTION:` comment.
 /// </summary>
@@ -129,8 +129,7 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
     private static bool IsWhitelistedPath(string filePath)
     {
         var normalized = filePath.Replace('\\', '/');
-        return normalized.Contains("/Seeding/")
-            || normalized.Contains("/tests/")
+        return normalized.Contains("/tests/")
             || normalized.Contains("/Tests/")
             || normalized.Contains(".Tests/")
             // api/Data/Repositories/*.cs (excluding the StoredProcedures/ subfolder)
