@@ -104,6 +104,10 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
         uploadStream.Position = 0;
         var afterScan = sw.ElapsedMilliseconds;
 
+        // Capture length BEFORE PutObject — AWS SDK closes InputStream after upload
+        // (AutoCloseStream defaults true), so reading Length afterward throws.
+        var bytes = uploadStream.Length;
+
         var request = new PutObjectRequest
         {
             BucketName = bucket,
@@ -111,6 +115,7 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
             InputStream = uploadStream,
             ContentType = contentType,
             DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
+            AutoCloseStream = ownedStream,  // only let SDK close streams we own
             Headers =
             {
                 CacheControl = "public, max-age=31536000, immutable",
@@ -123,9 +128,8 @@ public class S3FileStorageService(ISecretsProvider secrets, ISettingsService set
             context: "S3 upload");
         var afterPut = sw.ElapsedMilliseconds;
 
-        if (ownedStream) uploadStream.Dispose();
         Log.Information("[S3] Uploaded {Key} ({Bytes}b) bucket={Bucket} timing prep={Prep}ms scan={Scan}ms put={Put}ms total={Total}ms",
-            key, uploadStream.Length, bucket, scanStart, afterScan - scanStart, afterPut - afterScan, sw.ElapsedMilliseconds);
+            key, bytes, bucket, scanStart, afterScan - scanStart, afterPut - afterScan, sw.ElapsedMilliseconds);
     }
 
     public async Task<bool> DeleteAsync(string path)
