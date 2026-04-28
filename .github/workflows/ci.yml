@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [main]
   pull_request:
-    branches: [master, main]
+    branches: [main]
 
 permissions:
   contents: read
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   preflight-branch-protection:
-    # Verifies that master branch protection is still configured with required
+    # Verifies that main branch protection is still configured with required
     # status checks. Catches the failure mode where a well-meaning admin turns
     # protection off and CI silently keeps passing. Skipped on private repos
     # without GitHub Pro (the Branch Protection API 403s with a plan message);
@@ -26,10 +26,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -uo pipefail
-          if response=$(gh api "repos/${{ github.repository }}/branches/master/protection" 2>/tmp/err); then
+          if response=$(gh api "repos/${{ github.repository }}/branches/main/protection" 2>/tmp/err); then
             required=$(echo "$response" | jq -r '.required_status_checks.contexts // empty')
             if [ -z "$required" ]; then
-              echo "::error::master branch protection is missing required_status_checks"
+              echo "::error::main branch protection is missing required_status_checks"
               echo "$response" | jq .
               exit 1
             fi
@@ -38,7 +38,7 @@ jobs:
           fi
           err=$(cat /tmp/err)
           if echo "$err" | grep -q "HTTP 404"; then
-            echo "::error::master branch has no protection rule"
+            echo "::error::main branch has no protection rule"
             echo "$err"
             exit 1
           fi

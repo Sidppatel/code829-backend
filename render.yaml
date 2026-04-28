@@ -3,7 +3,7 @@
 #
 # Usage:
 #   1. In the Render dashboard, click "New" → "Blueprint" and point it at this repo.
-#   2. Render auto-discovers this file and provisions the service on `master` pushes.
+#   2. Render auto-discovers this file and provisions the service on `main` pushes.
 #   3. Fill in the env vars marked `sync: false` — those are secrets that never live
 #      in this file. Non-secret defaults (ASPNETCORE_ENVIRONMENT, PORT) are set here.
 #
@@ -19,8 +19,8 @@ services:
     # See docs/adr/0008-render-plan.md for tier selection rationale.
     plan: starter
     region: oregon
-    branch: master
-    # autoDeploy must stay off: pushes to master should NOT ship code unreviewed.
+    branch: main
+    # autoDeploy must stay off: pushes to main should NOT ship code unreviewed.
     # Deploys are triggered manually in the Render dashboard after CI + review.
     autoDeploy: false
     healthCheckPath: /health/live
