@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using FluentValidation;
 using Api.Filters;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -199,7 +200,18 @@ var builder = WebApplication.CreateBuilder(args);
     // Redis
     var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL") ?? "redis://localhost:6379";
     var redisConfig = ConvertRedisUrl(redisUrl);
-    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConfig));
+    var redisMux = ConnectionMultiplexer.Connect(redisConfig);
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redisMux);
+
+    // Persist DataProtection key ring to Redis so anti-forgery tokens, auth cookies,
+    // and IDataProtector payloads survive container recycles. Without this, every
+    // Render deploy wipes /home/app/.aspnet/DataProtection-Keys and invalidates every
+    // logged-in session. SetApplicationName isolates this app's keys from any other
+    // service that might share the same Redis instance.
+    builder.Services
+        .AddDataProtection()
+        .PersistKeysToStackExchangeRedis(redisMux, "ep:dataprotection-keys")
+        .SetApplicationName("EventPlatform");
 
     // Health checks — /health/ready (deep), /health/live stays in HealthController
     builder.Services.AddHealthChecks()
@@ -600,11 +612,10 @@ var builder = WebApplication.CreateBuilder(args);
     app.UseMiddleware<IdempotencyMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();
 
-    // HTTPS redirect in production
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseHttpsRedirection();
-    }
+    // HTTPS enforced upstream by Cloudflare ("Always Use HTTPS"). Removed
+    // app.UseHttpsRedirection() — backend only ever sees HTTP from CF, so the
+    // middleware logged "Failed to determine the https port for redirect" on
+    // every request without doing anything useful.
 
     // Static files for uploads — Development only. Prod uses S3FileStorageService
     // exclusively and does not write a writable `uploads/` dir to the filesystem
