@@ -221,9 +221,9 @@
       },
       "Scalar.AspNetCore": {
         "type": "Direct",
-        "requested": "[2.14.4, )",
-        "resolved": "2.14.4",
-        "contentHash": "PyuqLRi7JXyTJm/rh+IWCA4Fct1SlZuWrdYiui5hiaBuSY88+roc4eWKfYaE6zrupBIwnEP8pJLe4ifvU7HtZA=="
+        "requested": "[2.14.8, )",
+        "resolved": "2.14.8",
+        "contentHash": "v9afCyheCy+t5zXQvAF5JMqXt6BMCEQuqxtBl/52eGiwan3xGeDKpuUNH+DdKyY+LrSjIecCwCCUGaPbdtiuwg=="
       },
       "Sentry.AspNetCore": {
         "type": "Direct",
