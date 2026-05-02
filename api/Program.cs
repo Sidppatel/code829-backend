@@ -523,29 +523,18 @@ var builder = WebApplication.CreateBuilder(args);
     using (var probeScope = app.Services.CreateScope())
     {
         var probe = probeScope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-        const int probeRetries = 5;
-        for (var attempt = 1; attempt <= probeRetries; attempt++)
+        using var probeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
         {
-            try
-            {
-                await probe.EventViews.AnyAsync();
-                Log.Information("Schema probe ok");
-                break;
-            }
-            catch (Npgsql.NpgsqlException ex) when (attempt < probeRetries)
-            {
-                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
-                Log.Warning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in {Delay}s...",
-                    attempt, probeRetries, delay.TotalSeconds);
-                await Task.Delay(delay);
-            }
-            catch (Exception ex)
-            {
-                Log.Fatal(ex, "Schema probe failed. Run code829-db MigrationRunner against the target DB, then redeploy.");
-                await Log.CloseAndFlushAsync();
-                Environment.Exit(2);
-                return;
-            }
+            await probe.EventViews.AnyAsync(probeCts.Token);
+            Log.Information("Schema probe ok");
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Schema probe failed. Run code829-db MigrationRunner against the target DB, then redeploy.");
+            await Log.CloseAndFlushAsync();
+            Environment.Exit(2);
+            return;
         }
     }
 
