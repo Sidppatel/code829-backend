@@ -514,29 +514,12 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // Schema is owned by the code829-db repo. Backend never migrates. The
-    // container entrypoint (docker/entrypoint.sh) runs code829-db's
-    // MigrationRunner BEFORE api starts; if migrations fail, the container
-    // exits and Render shows red. This probe is a defense-in-depth check that
-    // a known view (v_events) exists — catches misconfigured DATABASE_URL,
-    // wrong DB target, or schema-drift between MigrationRunner and api code.
-    using (var probeScope = app.Services.CreateScope())
-    {
-        var probe = probeScope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
-        using var probeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        try
-        {
-            await probe.EventViews.AnyAsync(probeCts.Token);
-            Log.Information("Schema probe ok");
-        }
-        catch (Exception ex)
-        {
-            Log.Fatal(ex, "Schema probe failed. Run code829-db MigrationRunner against the target DB, then redeploy.");
-            await Log.CloseAndFlushAsync();
-            Environment.Exit(2);
-            return;
-        }
-    }
+    // Schema is owned by the code829-db repo. Backend never migrates.
+    // Render preDeployCommand runs MigrationRunner once per deploy and gates
+    // the rollout — if migrations fail, the new image never serves traffic.
+    // No in-process schema probe: it forced a synchronous cold-pool DB round
+    // trip on every container start and added 5-15s to cold start without
+    // catching anything preDeployCommand doesn't already catch.
 
     // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);
