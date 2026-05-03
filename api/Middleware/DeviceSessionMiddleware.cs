@@ -21,7 +21,8 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         IJwtService jwtService,
         IConnectionMultiplexer redis,
         IUserProcedures userProc,
-        IBusinessUserProcedures businessUserProc)
+        IBusinessUserProcedures businessUserProc,
+        IServiceScopeFactory scopeFactory)
     {
         // Per-portal cookie lookup: each frontend declares which portal it is via X-Portal,
         // so we know exactly which cookie to resolve. Missing/unknown header = no session.
@@ -143,8 +144,9 @@ public class DeviceSessionMiddleware(RequestDelegate next)
                 try
                 {
                     await db.StringSetAsync($"session:activity:{sessionHash}", "1", ActivityDebounce);
-                    // The actual DB update is deferred — we only update if not recently updated
-                    using var scope = httpContext.RequestServices.CreateScope();
+                    // Use root-scoped factory: httpContext.RequestServices is disposed
+                    // once the request completes, which races this fire-and-forget task.
+                    using var scope = scopeFactory.CreateScope();
                     var ctx = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
                     await ctx.Database.ExecuteSqlRawAsync(
                         "SELECT sp_update_session_activity(@p0)", sessionHash);
