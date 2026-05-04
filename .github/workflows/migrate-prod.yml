@@ -1,0 +1,35 @@
+name: Migrate prod DB
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: migrate-prod
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Clone code829-db @ main
+        run: git clone --depth 1 --branch main https://github.com/Sidppatel/code829-db.git db
+
+      - name: Run MigrationRunner against prod (session pooler)
+        working-directory: db
+        env:
+          DB_HOST:     ${{ vars.DB_HOST }}
+          DB_PORT:     ${{ vars.DB_PORT_SESSION }}
+          DB_USER:     ${{ vars.DB_USER }}
+          DB_NAME:     ${{ vars.DB_NAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          PASS_ENC=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['DB_PASSWORD'],safe=''))")
+          export MIGRATION_DATABASE_URL="postgresql://${DB_USER}:${PASS_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require"
+          dotnet run --project src/MigrationRunner -c Release
