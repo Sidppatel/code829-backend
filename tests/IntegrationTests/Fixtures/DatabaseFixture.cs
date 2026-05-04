@@ -1,5 +1,4 @@
-using Db;
-using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
@@ -7,12 +6,23 @@ using Testcontainers.Redis;
 namespace IntegrationTests.Fixtures;
 
 /// <summary>
-/// Shared fixture that boots postgres:16-alpine + redis:7-alpine via Testcontainers,
-/// runs EF Core migrations, and seeds all stored procedures from the db assembly.
+/// Shared fixture that boots postgres:16-alpine + redis:7-alpine via Testcontainers
+/// and applies the schema by invoking the code829-db MigrationRunner — the same
+/// binary that runs against prod. Schema authority is single-sourced in code829-db.
+///
+/// The runner DLL path comes from the MIGRATION_RUNNER_DLL env var (set by the CI
+/// workflow's pre-build step). When unset (local dev), the fixture clones code829-db
+/// at https://github.com/Sidppatel/code829-db and publishes MigrationRunner into the
+/// system temp dir on first use, then caches the path in MIGRATION_RUNNER_DLL for
+/// subsequent fixtures in the same process.
+///
 /// Shared across all test classes in the "Database" collection to avoid cold-start overhead.
 /// </summary>
 public sealed class DatabaseFixture : IAsyncLifetime
 {
+    private const string DbRepoUrl = "https://github.com/Sidppatel/code829-db.git";
+    private const string DbRef = "main";
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("ep_test")
         .WithUsername("ep_test")
@@ -47,7 +57,6 @@ public sealed class DatabaseFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("STRIPE_WEBHOOK_SECRET", "whsec_integration_test_secret");
 
         await RunMigrationsAsync();
-        await SeedStoredProceduresAsync();
 
         Factory = new TestApiFactory(PostgresConnectionString, RedisConnectionString);
     }
@@ -61,47 +70,92 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     private async Task RunMigrationsAsync()
     {
-        var options = new DbContextOptionsBuilder<EventPlatformDbContext>()
-            .UseNpgsql(PostgresConnectionString)
-            .Options;
+        var runnerDll = await ResolveMigrationRunnerAsync();
+        var migrationUrl = NpgsqlKvToUrl(PostgresConnectionString);
 
-        await using var ctx = new EventPlatformDbContext(options);
-        await ctx.Database.MigrateAsync();
+        var psi = new ProcessStartInfo("dotnet", $"\"{runnerDll}\"")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.Environment["MIGRATION_DATABASE_URL"] = migrationUrl;
+
+        using var p = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to start dotnet for MigrationRunner");
+
+        var stdout = p.StandardOutput.ReadToEndAsync();
+        var stderr = p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+
+        if (p.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"MigrationRunner exited {p.ExitCode}\nstdout:\n{await stdout}\nstderr:\n{await stderr}");
     }
 
-    private async Task SeedStoredProceduresAsync()
+    /// <summary>
+    /// Returns the absolute path to a published MigrationRunner.dll. Honors
+    /// MIGRATION_RUNNER_DLL when set (CI workflow pre-builds it). Otherwise
+    /// clones code829-db@main into a process-cached temp dir and publishes
+    /// MigrationRunner once.
+    /// </summary>
+    private static async Task<string> ResolveMigrationRunnerAsync()
     {
-        // EventPlatformDbContext lives in the db project which has the embedded SQL resources.
-        // Stripe Connect SPs live under Sql.ProceduresOrg + Sql.ProceduresStripe (separate from
-        // Sql.Procedures so the table-create migrations can install them in their own Up(); see
-        // db/Migrations/20260424232408_AddOrganizationsTable.cs). Re-seed all three folders here
-        // so SP fixes during a test run take effect without having to bump the migration history.
-        var asm = typeof(EventPlatformDbContext).Assembly;
-        var prefixes = new[]
+        var pre = Environment.GetEnvironmentVariable("MIGRATION_RUNNER_DLL");
+        if (!string.IsNullOrEmpty(pre) && File.Exists(pre))
+            return pre;
+
+        var cacheDir = Path.Combine(Path.GetTempPath(), "ep-code829-db-migrate");
+        var dll = Path.Combine(cacheDir, "MigrationRunner.dll");
+        if (File.Exists(dll))
         {
-            $"{asm.GetName().Name}.Sql.Procedures.",
-            $"{asm.GetName().Name}.Sql.ProceduresOrg.",
-            $"{asm.GetName().Name}.Sql.ProceduresStripe."
-        };
-
-        var sqlFiles = asm.GetManifestResourceNames()
-            .Where(n => prefixes.Any(p => n.StartsWith(p, StringComparison.OrdinalIgnoreCase))
-                     && n.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
-
-        await using var conn = new NpgsqlConnection(PostgresConnectionString);
-        await conn.OpenAsync();
-
-        foreach (var name in sqlFiles)
-        {
-            using var stream = asm.GetManifestResourceStream(name)!;
-            using var reader = new StreamReader(stream);
-            var sql = await reader.ReadToEndAsync();
-
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = sql;
-            await cmd.ExecuteNonQueryAsync();
+            Environment.SetEnvironmentVariable("MIGRATION_RUNNER_DLL", dll);
+            return dll;
         }
+
+        var srcDir = Path.Combine(Path.GetTempPath(), "ep-code829-db-src");
+        if (Directory.Exists(srcDir)) Directory.Delete(srcDir, recursive: true);
+        await RunAsync("git", $"clone --depth 1 --branch {DbRef} {DbRepoUrl} \"{srcDir}\"");
+        await RunAsync("dotnet", $"publish \"{Path.Combine(srcDir, "src", "MigrationRunner")}\" -c Release -o \"{cacheDir}\" -p:UseAppHost=false");
+
+        if (!File.Exists(dll))
+            throw new InvalidOperationException($"MigrationRunner publish did not produce {dll}");
+
+        Environment.SetEnvironmentVariable("MIGRATION_RUNNER_DLL", dll);
+        return dll;
+    }
+
+    private static async Task RunAsync(string file, string args)
+    {
+        var psi = new ProcessStartInfo(file, args)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        using var p = Process.Start(psi)
+            ?? throw new InvalidOperationException($"Failed to start {file}");
+        var stdout = p.StandardOutput.ReadToEndAsync();
+        var stderr = p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+        if (p.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"{file} {args} exited {p.ExitCode}\nstdout:\n{await stdout}\nstderr:\n{await stderr}");
+    }
+
+    /// <summary>
+    /// Converts the Testcontainers-style key/value Npgsql connection string into
+    /// the URL form that MigrationRunner expects: postgresql://user:pass@host:port/db.
+    /// </summary>
+    private static string NpgsqlKvToUrl(string kv)
+    {
+        var b = new NpgsqlConnectionStringBuilder(kv);
+        var user = Uri.EscapeDataString(b.Username ?? "");
+        var pass = Uri.EscapeDataString(b.Password ?? "");
+        var host = b.Host ?? "localhost";
+        var port = b.Port == 0 ? 5432 : b.Port;
+        var db = b.Database ?? "postgres";
+        return $"postgresql://{user}:{pass}@{host}:{port}/{db}";
     }
 
     /// <summary>Opens a raw Npgsql connection to the test database.</summary>

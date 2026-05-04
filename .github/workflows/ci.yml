@@ -108,6 +108,17 @@ jobs:
       - name: Build integration tests
         run: dotnet build tests/IntegrationTests/IntegrationTests.csproj --no-restore --configuration Release
 
+      - name: Pre-build code829-db MigrationRunner
+        # Single source of truth: integration tests apply the schema using the
+        # same MigrationRunner that runs against prod. Pre-publishing here keeps
+        # each Testcontainers Postgres bootstrap fast (no clone/build per test run).
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch main https://github.com/Sidppatel/code829-db.git /tmp/code829-db
+          dotnet publish /tmp/code829-db/src/MigrationRunner -c Release -o /tmp/code829-db-migrate -p:UseAppHost=false
+          test -f /tmp/code829-db-migrate/MigrationRunner.dll
+          echo "MIGRATION_RUNNER_DLL=/tmp/code829-db-migrate/MigrationRunner.dll" >> "$GITHUB_ENV"
+
       - name: Generate ephemeral CI secrets
         # Secrets only need to exist for this job. Literal values in CI yaml look
         # like real secrets to automated scrapers, so we synthesize them here

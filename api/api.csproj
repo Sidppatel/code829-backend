@@ -53,10 +53,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- Schema artifacts mirrored from code829-db. Authoring lives in that repo;
-         api ships a copy so tests + GetPendingMigrationsAsync see the same model. -->
-    <EmbeddedResource Include="Data/Sql/**/*.sql" />
-  </ItemGroup>
+  <!-- Schema authority lives in code829-db. Backend reads it via DATABASE_URL only.
+       Integration tests apply the schema by invoking code829-db's MigrationRunner
+       (see tests/IntegrationTests/Fixtures/DatabaseFixture.cs). -->
 
 </Project>
