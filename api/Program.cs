@@ -630,10 +630,33 @@ var builder = WebApplication.CreateBuilder(args);
         },
     });
 
-    // OpenAPI + Scalar: only available in development
+    // OpenAPI: dev = open, prod = bearer-gated via OPENAPI_PUBLIC_TOKEN env var.
+    // 404 (not 401) on auth failure to avoid advertising endpoint existence.
+    app.MapOpenApi().AddEndpointFilter(async (ctx, next) =>
+    {
+        if (app.Environment.IsDevelopment())
+        {
+            return await next(ctx);
+        }
+
+        var expected = app.Configuration["OPENAPI_PUBLIC_TOKEN"];
+        if (string.IsNullOrEmpty(expected))
+        {
+            return Results.NotFound();
+        }
+
+        var auth = ctx.HttpContext.Request.Headers.Authorization.ToString();
+        if (!string.Equals(auth, $"Bearer {expected}", StringComparison.Ordinal))
+        {
+            return Results.NotFound();
+        }
+
+        return await next(ctx);
+    });
+
+    // Scalar interactive UI: dev only.
     if (app.Environment.IsDevelopment())
     {
-        app.MapOpenApi();
         app.MapScalarApiReference();
     }
 
