@@ -3,5 +3,9 @@ RETURNS void LANGUAGE plpgsql
     SET search_path = public, extensions, pg_catalog
 AS $$
 BEGIN
-    UPDATE business_users SET "LastLoginAt" = now(), "UpdatedAt" = now() WHERE "Id" = p_id;
+    UPDATE business_users
+       SET "LastLoginAt" = now(),
+           "LastRequestAt" = now(),
+           "UpdatedAt" = now()
+     WHERE "Id" = p_id;
 END; $$;
