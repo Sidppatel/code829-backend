@@ -116,6 +116,12 @@ Every endpoint without `[RequireRole]` has been reviewed and is intentionally pu
 
 ## Conventions
 
+- **NO COMMENTS in code.** Source files (`.cs`, `.ts`, `.tsx`, `.ps1`, `.sh`, `.yml`, `.sql`) ship without inline comments, block comments, or XML doc comments. Well-named identifiers + small functions document themselves. The "why" belongs in the commit message + PR description, not in the file. Exceptions, narrowly:
+  - A single-line `// ARCH-EXCEPTION: <reason>` annotation required by the EP0001 analyzer escape hatch.
+  - SPDX license headers if a third-party file requires one.
+  - `# pragma` / preprocessor directives (`#region` is banned anyway).
+  - A workaround for a documented external bug — link the upstream issue, one line.
+  Existing comments stay until the surrounding code is touched, at which point the comments go too. Do not add comments "just to explain the change" — the diff is the explanation.
 - Async all the way — all service methods are async, suffixed with `Async`
 - Nullable reference types enabled — use `!` only inside async closures where null is already checked
 - Use typed generics in service responses, not `any`/`object`
