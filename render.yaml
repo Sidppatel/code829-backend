@@ -24,9 +24,10 @@ services:
     # Deploys are triggered manually in the Render dashboard after CI + review.
     autoDeploy: false
     healthCheckPath: /health/live
-    # Migrations are owned exclusively by .github/workflows/migrate-prod.yml.
-    # The backend image no longer bundles MigrationRunner; Program.cs verifies
-    # __EFMigrationsHistory at boot and refuses to start if the schema is missing.
+    # Migrations are owned exclusively by code829-db/.github/workflows/migrate.yml
+    # (this repo never authors or applies schema). The backend image does not bundle
+    # MigrationRunner; Program.cs verifies __EFMigrationsHistory at boot and refuses
+    # to start if the schema is missing or EXPECTED_MIGRATION_ID does not match.
     envVars:
       # ─── Runtime (non-secret) ───────────────────────────────────
       # Default to Production. Flip in the Render dashboard only for the
