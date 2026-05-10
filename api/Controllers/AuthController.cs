@@ -169,6 +169,49 @@ public class AuthController(
         return StatusCode(429, new { statusCode = 429, message = "Too many requests. Please try again shortly.", retryAfterSeconds = retryAfter });
     }
 
+    [HttpPost("google")]
+    public async Task<IActionResult> SignInWithGoogle(
+        [FromBody] GoogleSignInRequest request,
+        [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
+    {
+        if (string.IsNullOrWhiteSpace(request.Credential))
+            return BadRequest(new ApiError(400, "Credential is required", HttpContext.TraceIdentifier));
+
+        var ipKey = $"ratelimit:google:{HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+        var db = redis.GetDatabase();
+        var count = await db.StringIncrementAsync(ipKey);
+        if (count == 1) await db.KeyExpireAsync(ipKey, MagicLinkWindow);
+        if (count > MagicLinkLimit)
+        {
+            var ttl = await db.KeyTimeToLiveAsync(ipKey);
+            var retryAfter = (int)Math.Ceiling((ttl ?? MagicLinkWindow).TotalSeconds);
+            return StatusCode(429, new { statusCode = 429, message = "Too many requests. Please try again shortly.", retryAfterSeconds = retryAfter });
+        }
+
+        try
+        {
+            var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var (user, sessionToken, _) = await authService.SignInWithGoogleAsync(request.Credential, deviceName, ip);
+            SetSessionCookie(sessionToken);
+            return Ok(new AuthResponse(user));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log.Warning(ex, "[Auth] Google sign-in unauthorized: {Message}", ex.Message);
+            return Unauthorized(new ApiError(401, "Invalid or expired credentials", HttpContext.TraceIdentifier));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PASSWORD_ACCOUNT_LINK_REQUIRED")
+        {
+            return Conflict(new ApiError(409, "Sign in with your password first to link Google to this account", HttpContext.TraceIdentifier));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log.Warning(ex, "[Auth] Google sign-in not configured: {Message}", ex.Message);
+            return StatusCode(503, new ApiError(503, "Google sign-in is not available", HttpContext.TraceIdentifier));
+        }
+    }
+
     [HttpPost("magic-link/verify")]
     public async Task<IActionResult> VerifyMagicLink([FromBody] MagicLinkVerifyRequest request)
     {

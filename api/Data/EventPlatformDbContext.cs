@@ -119,6 +119,11 @@ public class EventPlatformDbContext(
             entity.Property(e => e.LastName).HasMaxLength(128);
             entity.Property(e => e.PasswordHash).HasMaxLength(256);
             entity.Property(e => e.EmailVerified).HasDefaultValue(false);
+            entity.Property(e => e.GoogleSubject).HasMaxLength(64);
+            entity.HasIndex(e => e.GoogleSubject)
+                .IsUnique()
+                .HasFilter("\"GoogleSubject\" IS NOT NULL")
+                .HasDatabaseName("IX_users_GoogleSubject");
             entity.HasOne(e => e.Image).WithMany().HasForeignKey(e => e.ImageId)
                 .IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.Address).WithMany().HasForeignKey(e => e.AddressId)

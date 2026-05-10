@@ -28,6 +28,7 @@
     <PackageReference Include="AWSSDK.S3" Version="4.0.22.1" />
     <PackageReference Include="nClam" Version="9.0.0" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.71.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Sentry.AspNetCore" Version="6.4.1" />

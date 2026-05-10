@@ -15,4 +15,5 @@ public interface IImageService
     Task ReorderAsync(string entityType, Guid entityId, List<Guid> imageIds);
     Task<string> ReplaceImageAsync(Guid ownerId, string uploaderType, IFormFile file);
     Task DeleteImageAsync(Guid ownerId, string uploaderType);
+    Task<string?> IngestFromUrlAsync(string url, Guid userId, CancellationToken ct = default);
 }

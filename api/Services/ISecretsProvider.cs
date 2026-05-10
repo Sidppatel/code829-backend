@@ -26,4 +26,6 @@ public interface ISecretsProvider
     /// but lives here because the same env-var pipeline supplies it.
     /// </summary>
     string FrontendUrlAdmin { get; }
+
+    string GoogleOAuthClientId { get; }
 }

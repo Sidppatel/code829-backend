@@ -13,9 +13,13 @@ public class ImageService(
     IImageProcessingService imageProcessing,
     IImageRepository imageRepo,
     IUserProcedures userProc,
-    IBusinessUserProcedures businessUserProc
+    IBusinessUserProcedures businessUserProc,
+    IHttpClientFactory httpClientFactory
 ) : IImageService
 {
+    private const long MaxRemoteImageBytes = 5 * 1024 * 1024;
+    private static readonly TimeSpan RemoteImageTimeout = TimeSpan.FromSeconds(10);
+
     public async Task<ImageUploadResponse> UploadAsync(
         Stream fileStream, string fileName, string entityType, Guid entityId,
         Guid? uploadedById, string? uploaderType = null,
@@ -153,6 +157,83 @@ public class ImageService(
 
         if (oldImageId.HasValue)
             await DeleteAsync(oldImageId.Value);
+    }
+
+    public async Task<string?> IngestFromUrlAsync(string url, Guid userId, CancellationToken ct = default)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        {
+            Log.Warning("[Image] IngestFromUrl rejected non-https URL for user {UserId}", userId);
+            return null;
+        }
+
+        var client = httpClientFactory.CreateClient("remote-image");
+        client.Timeout = RemoteImageTimeout;
+
+        try
+        {
+            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                Log.Warning("[Image] IngestFromUrl HTTP {Status} for user {UserId}", (int)response.StatusCode, userId);
+                return null;
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+            if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Warning("[Image] IngestFromUrl bad content-type '{ContentType}' for user {UserId}", contentType, userId);
+                return null;
+            }
+
+            if (response.Content.Headers.ContentLength is long len && len > MaxRemoteImageBytes)
+            {
+                Log.Warning("[Image] IngestFromUrl payload {Bytes} exceeds limit for user {UserId}", len, userId);
+                return null;
+            }
+
+            await using var sourceStream = await response.Content.ReadAsStreamAsync(ct);
+            using var bounded = new MemoryStream();
+            var buffer = new byte[8192];
+            int read;
+            long total = 0;
+            while ((read = await sourceStream.ReadAsync(buffer, ct)) > 0)
+            {
+                total += read;
+                if (total > MaxRemoteImageBytes)
+                {
+                    Log.Warning("[Image] IngestFromUrl streamed payload exceeded limit for user {UserId}", userId);
+                    return null;
+                }
+                await bounded.WriteAsync(buffer.AsMemory(0, read), ct);
+            }
+            bounded.Position = 0;
+
+            var fileName = Path.GetFileName(uri.LocalPath);
+            if (string.IsNullOrWhiteSpace(fileName)) fileName = "remote-image";
+
+            var result = await UploadAsync(
+                bounded, fileName,
+                entityType: "user", entityId: userId,
+                uploadedById: userId, uploaderType: "user",
+                tag: "ProfilePic");
+
+            var oldImageId = await userProc.SetUserImageAsync(userId, result.ImageId, ct);
+            if (oldImageId.HasValue && oldImageId.Value != result.ImageId)
+                await DeleteAsync(oldImageId.Value);
+
+            return result.StorageKey;
+        }
+        catch (TaskCanceledException ex)
+        {
+            Log.Warning(ex, "[Image] IngestFromUrl timed out for user {UserId}", userId);
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            Log.Warning(ex, "[Image] IngestFromUrl HTTP error for user {UserId}", userId);
+            return null;
+        }
     }
 
     private ImageDto MapToDto(Image i) => new(

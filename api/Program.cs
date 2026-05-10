@@ -271,6 +271,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IAdminLogService, AdminLogService>();
     builder.Services.AddScoped<IImageRepository, ImageRepository>();
     builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
+    builder.Services.AddHttpClient();
     builder.Services.AddScoped<IImageService, ImageService>();
     builder.Services.AddScoped<IEventImageService, EventImageService>();
     builder.Services.AddScoped<IVenueImageService, VenueImageService>();

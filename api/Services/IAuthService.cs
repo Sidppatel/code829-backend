@@ -20,4 +20,5 @@ public interface IAuthService
     Task<(UserDto User, string SessionToken, string Jwt)> VerifyEmailAsync(string token, string? deviceName, string? ip);
     Task RequestPasswordResetAsync(string email, string? ip, string? frontendOrigin);
     Task ResetPasswordAsync(string token, string newPassword);
+    Task<(UserDto User, string SessionToken, string Jwt)> SignInWithGoogleAsync(string credential, string? deviceName, string? ip);
 }

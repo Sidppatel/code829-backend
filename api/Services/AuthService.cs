@@ -23,7 +23,9 @@ public class AuthService(
     IWebHostEnvironment environment,
     IFileStorageService fileStorage,
     IConnectionMultiplexer redis,
-    IJwtService jwtService
+    IJwtService jwtService,
+    ISecretsProvider secretsProvider,
+    IImageService imageService
 ) : IAuthService
 {
     public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? frontendOrigin = null)
@@ -388,5 +390,74 @@ public class AuthService(
         await RevokeAllSessionsAsync(user.Id, null);
 
         Log.Information("[Auth] Password reset successful for {EmailHash}", HashEmailForLog(user.Email));
+    }
+
+    public async Task<(UserDto User, string SessionToken, string Jwt)> SignInWithGoogleAsync(string credential, string? deviceName, string? ip)
+    {
+        var clientId = secretsProvider.GoogleOAuthClientId;
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new InvalidOperationException("Google sign-in is not configured");
+
+        Google.Apis.Auth.GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            payload = await Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync(credential,
+                new Google.Apis.Auth.GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[] { clientId }
+                });
+        }
+        catch (Google.Apis.Auth.InvalidJwtException ex)
+        {
+            Log.Warning(ex, "[Auth] Google credential rejected");
+            throw new UnauthorizedAccessException("Invalid Google credential");
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.Subject) || string.IsNullOrWhiteSpace(payload.Email))
+            throw new UnauthorizedAccessException("Google credential missing subject or email");
+
+        var normalizedEmail = payload.Email.ToLowerInvariant().Trim();
+        var emailHash = encryptionService.HashEmail(normalizedEmail);
+        var firstName = string.IsNullOrWhiteSpace(payload.GivenName) ? normalizedEmail.Split('@')[0] : payload.GivenName.Trim();
+        var lastName = payload.FamilyName?.Trim() ?? "";
+
+        Db.Entities.User user;
+        try
+        {
+            user = await userProc.SignInUserGoogleAsync(payload.Subject, normalizedEmail, emailHash, firstName, lastName);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002")
+        {
+            Log.Warning("[Auth] Google sign-in blocked: existing password account requires password login first {EmailHash}", HashEmailForLog(normalizedEmail));
+            throw new InvalidOperationException("PASSWORD_ACCOUNT_LINK_REQUIRED");
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0001")
+        {
+            Log.Warning("[Auth] Google sign-in conflict: subject already linked elsewhere {EmailHash}", HashEmailForLog(normalizedEmail));
+            throw new UnauthorizedAccessException("Google account already linked to a different identity");
+        }
+
+        var fullUser = await userRepository.GetByIdAsync(user.Id)
+            ?? throw new InvalidOperationException("User lookup failed after Google sign-in");
+
+        if (fullUser.ImageId is null && !string.IsNullOrWhiteSpace(payload.Picture))
+        {
+            try
+            {
+                await imageService.IngestFromUrlAsync(payload.Picture, fullUser.Id);
+                fullUser = await userRepository.GetByIdAsync(user.Id) ?? fullUser;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[Auth] Google profile picture ingest failed for {EmailHash}", HashEmailForLog(normalizedEmail));
+            }
+        }
+
+        var (sessionToken, _) = await CreateDeviceSessionAsync(fullUser.Id, deviceName, ip);
+        var userDto = MapUserDto(fullUser);
+        var jwt = await jwtService.GenerateUserJwtAsync(fullUser);
+
+        Log.Information("[Auth] Google sign-in for {EmailHash}", HashEmailForLog(normalizedEmail));
+        return (userDto, sessionToken, jwt);
     }
 }

@@ -33,4 +33,6 @@ public class User : BaseEntity
 
     public Guid? ImageId { get; set; }
     public Image? Image { get; set; }
+
+    public string? GoogleSubject { get; set; }
 }

@@ -192,6 +192,17 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         return user;
     }
 
+    public async Task<User> SignInUserGoogleAsync(string googleSubject, string email, string emailHash,
+        string firstName, string lastName, CancellationToken ct = default)
+    {
+        var user = await context.Users
+            .FromSqlRaw("SELECT * FROM sp_signin_user_google({0}, {1}, {2}, {3}, {4})",
+                googleSubject, email, emailHash, firstName, lastName)
+            .AsNoTracking()
+            .FirstAsync(ct);
+        return user;
+    }
+
     private sealed class UserCountsRow
     {
         public int Total { get; set; }
