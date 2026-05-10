@@ -21,7 +21,6 @@ public class OrganizationUpdateRequestValidator : AbstractValidator<Organization
             .Matches(@"^[A-Z]{2}$").WithMessage("CountryCode must be uppercase letters")
             .When(x => !string.IsNullOrEmpty(x.CountryCode));
 
-        // Reject completely empty bodies — there's no useful UPDATE in that case.
         RuleFor(x => x)
             .Must(x => x.Name is not null || x.LegalName is not null || x.CountryCode is not null)
             .WithMessage("At least one field (name, legalName, countryCode) must be provided");

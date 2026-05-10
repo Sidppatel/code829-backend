@@ -14,7 +14,6 @@ public class UserProfileView
     public string? ImageStorageKey { get; set; }
     public DateTime CreatedAt { get; set; }
 
-    // Address
     public string? AddressLine1 { get; set; }
     public string? City { get; set; }
     public string? State { get; set; }

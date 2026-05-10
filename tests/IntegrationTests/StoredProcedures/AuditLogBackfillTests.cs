@@ -73,7 +73,7 @@ public sealed class AuditLogBackfillTests(DatabaseFixture db)
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*)::int FROM v_business_logs";
         var adminCount = (int)(await cmd.ExecuteScalarAsync())!;
-        adminCount.Should().Be(1); // only Admin rows project into v_business_logs.
+        adminCount.Should().Be(1);
 
         await using var cmd2 = conn.CreateCommand();
         cmd2.CommandText = "SELECT \"Description\" FROM v_business_logs LIMIT 1";

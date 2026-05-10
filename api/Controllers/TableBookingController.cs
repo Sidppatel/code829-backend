@@ -77,8 +77,6 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
 
-            // Explicit ownership re-check at the controller boundary. ReleaseTableLockAsync
-            // also checks but we verify up-front so a misbehaving client can't probe lock state.
             var table = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
                 .FirstOrDefaultAsync(context.TableViews, t => t.TableId == request.TableId);
             if (table is null) return Ok();
@@ -94,7 +92,7 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
         catch (Exception ex)
         {
             Log.Warning(ex, "[TableBooking] Beacon release failed for table {TableId}", request.EventTableId);
-            return Ok(); // Still return 200 for beacon (fire-and-forget) but LOG the error
+            return Ok();
         }
     }
 

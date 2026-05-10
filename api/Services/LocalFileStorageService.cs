@@ -10,7 +10,7 @@ namespace Api.Services;
 public class LocalFileStorageService(IMalwareScanner scanner) : IFileStorageService
 {
     private const string UploadsDir = "uploads";
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
     private static readonly HashSet<string> AllowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
     private static readonly Dictionary<string, string[]> ExtensionToContentTypes = new()
     {
@@ -23,7 +23,7 @@ public class LocalFileStorageService(IMalwareScanner scanner) : IFileStorageServ
 
     public async Task<string> SaveAsync(Stream fileStream, string entityType, string fileName)
     {
-        // Sanitize filename — strip path traversal characters
+
         fileName = Path.GetFileName(fileName);
 
         var ext = Path.GetExtension(fileName).ToLowerInvariant();

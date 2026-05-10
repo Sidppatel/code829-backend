@@ -64,7 +64,6 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
     {
         var (_, qrToken) = await SeedPurchaseWithTicketAsync();
 
-        // First check-in
         await using (var conn1 = await db.OpenConnectionAsync())
         await using (var cmd1 = conn1.CreateCommand())
         {
@@ -73,7 +72,6 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
             await cmd1.ExecuteReaderAsync();
         }
 
-        // Second check-in on same token
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT \"Success\", \"Message\" FROM sp_check_in_ticket(@qr)";
@@ -94,7 +92,6 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
 
         await using var reader = await cmd.ExecuteReaderAsync();
 
-        // SP returns empty result set or Success=false for unknown token
         if (reader.HasRows)
         {
             await reader.ReadAsync();

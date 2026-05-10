@@ -42,7 +42,6 @@ public sealed class SpConsumeMagicLinkTests(DatabaseFixture db)
     {
         var tokenHash = await SeedMagicLinkAsync();
 
-        // First consume — should succeed
         await using (var conn1 = await db.OpenConnectionAsync())
         await using (var cmd1 = conn1.CreateCommand())
         {
@@ -52,7 +51,6 @@ public sealed class SpConsumeMagicLinkTests(DatabaseFixture db)
             r.HasRows.Should().BeTrue("first consume must return data");
         }
 
-        // Second consume — must return no rows (token already used)
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM sp_consume_magic_link(@hash)";

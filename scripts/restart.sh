@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Stop, clear backend build artifacts, then start.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib.sh
+
 source "$SCRIPT_DIR/lib.sh"
 
 ROOT="$(resolve_monorepo_root)"

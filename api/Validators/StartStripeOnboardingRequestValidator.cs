@@ -12,7 +12,6 @@ public class StartStripeOnboardingRequestValidator : AbstractValidator<StartStri
             .Must(t => t is "individual" or "company")
             .WithMessage("BusinessType must be 'individual' or 'company'");
 
-        // Stripe rejects business_profile.product_description outside 10-500 chars.
         When(x => !string.IsNullOrWhiteSpace(x.ProductDescription), () =>
         {
             RuleFor(x => x.ProductDescription!)

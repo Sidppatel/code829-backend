@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Shared helpers for event-platform boot scripts.
-# Source this file: `source "$(dirname "$0")/lib.sh"`
 
 set -euo pipefail
 
@@ -17,11 +15,10 @@ log_ok()    { printf "${COLOR_GREEN}%s${COLOR_RESET}\n"  "$*"; }
 log_err()   { printf "${COLOR_RED}%s${COLOR_RESET}\n"    "$*" >&2; }
 log_gray()  { printf "${COLOR_GRAY}%s${COLOR_RESET}\n"   "$*"; }
 
-# Resolve monorepo root (parent of code829-backend).
 resolve_monorepo_root() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-$0}")" && pwd)"
-    # scripts/ -> backend -> monorepo root
+
     echo "$(cd "$script_dir/../.." && pwd)"
 }
 
@@ -33,18 +30,16 @@ require_tool() {
     fi
 }
 
-# Export KEY=VALUE pairs from a dotenv-format string (stdin) into the environment.
-# Strips surrounding quotes, skips comments and blank lines.
 parse_env() {
     local line key value
     while IFS= read -r line || [ -n "$line" ]; do
-        # skip comments / blanks
+
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ "$line" =~ ^[[:space:]]*$ ]] && continue
         if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
             key="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
-            # strip surrounding single or double quotes
+
             if [[ "$value" =~ ^\"(.*)\"$ ]] || [[ "$value" =~ ^\'(.*)\'$ ]]; then
                 value="${BASH_REMATCH[1]}"
             fi
@@ -53,8 +48,6 @@ parse_env() {
     done
 }
 
-# Load secrets from infisical (dev env). Expects to be run from the backend dir
-# (where .infisical.json lives).
 load_infisical_dev() {
     require_tool infisical
     local out
@@ -67,7 +60,6 @@ load_infisical_dev() {
     log_gray "Loaded environment from Infisical (dev)"
 }
 
-# Load .env.local from monorepo root if present. Locals override Infisical for local dev.
 load_env_local() {
     local root="$1"
     local f="$root/.env.local"
@@ -79,17 +71,12 @@ load_env_local() {
     fi
 }
 
-# Write the Redis password into the docker-compose secret file. The docker
-# compose `redis_password` secret mounts this file at /run/secrets/redis_password
-# so the container never sees REDIS_PASSWORD in its env (invisible to
-# `docker inspect`). Call after env is loaded but before `docker compose up`.
-# Expects BACKEND to point at code829-backend/.
 write_redis_secret() {
     local backend="$1"
     local secrets_dir="$backend/docker-secrets"
     local secret_file="$secrets_dir/redis_password"
     if [ -z "${REDIS_PASSWORD:-}" ]; then
-        log_err "ERROR: REDIS_PASSWORD not set — cannot write $secret_file"
+        log_err "ERROR: REDIS_PASSWORD not set - cannot write $secret_file"
         exit 1
     fi
     mkdir -p "$secrets_dir"
@@ -98,7 +85,6 @@ write_redis_secret() {
     log_gray "Wrote Redis password to docker-secrets/redis_password (gitignored)"
 }
 
-# Wait for a TCP port to accept connections. Uses bash /dev/tcp.
 wait_for_port() {
     local host="$1" port="$2" timeout="${3:-30}" i
     for ((i=1; i<=timeout; i++)); do
@@ -111,7 +97,6 @@ wait_for_port() {
     return 1
 }
 
-# Wait for Postgres + Redis containers to be ready via healthcheck exec.
 check_docker_ready() {
     local max_wait="${1:-30}" i db_ready redis_ready
     for ((i=1; i<=max_wait; i++)); do
@@ -126,8 +111,6 @@ check_docker_ready() {
     return 1
 }
 
-# Track a background PID to a JSON file at monorepo root.
-# Usage: track_pid <file> <key> <pid> [<key> <pid> ...]
 track_pid() {
     local file="$1"; shift
     local json="{"

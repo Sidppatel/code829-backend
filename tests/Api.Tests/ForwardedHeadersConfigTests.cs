@@ -39,8 +39,6 @@ public class ForwardedHeadersConfigTests
 
         ForwardedHeadersConfig.Configure(options, isDevelopment: false, trustedProxies: null);
 
-        // Defaults should not be cleared — loopback entries remain to prevent random peers
-        // from spoofing X-Forwarded-For.
         options.KnownIPNetworks.Count.Should().Be(defaultNetworkCount);
     }
 

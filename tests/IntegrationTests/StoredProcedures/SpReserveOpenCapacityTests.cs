@@ -6,7 +6,6 @@ namespace IntegrationTests.StoredProcedures;
 [Collection("Database")]
 public sealed class SpReserveOpenCapacityTests(DatabaseFixture db)
 {
-    // ── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEventAsync(int maxCapacity = 50)
     {
@@ -40,8 +39,6 @@ public sealed class SpReserveOpenCapacityTests(DatabaseFixture db)
 
         return (userId, ttId);
     }
-
-    // ── tests ────────────────────────────────────────────────────────────────
 
     [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
     public async Task ReturnsNewPurchaseId_WhenCapacityAvailable()
@@ -96,8 +93,6 @@ public sealed class SpReserveOpenCapacityTests(DatabaseFixture db)
         var eventId = await SeedEventAsync(1);
         var (userId, ttId) = await SeedUserAndTicketTypeAsync(eventId, quota: 10);
 
-        // Fill the event to capacity with a direct INSERT rather than going through the SP
-        // (tests/ is whitelisted from the data access rule)
         await db.ExecuteSqlAsync("""
             INSERT INTO purchases ("Id","UserId","EventId","Status","Seats",
                 "SubtotalCents","FeeCents","TotalCents","PurchaseNumber","CreatedAt","UpdatedAt")

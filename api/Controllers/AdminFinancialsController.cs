@@ -30,13 +30,13 @@ public class AdminFinancialsController(
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var user = await businessUserProc.GetByIdAsync(userId);
-        
+
         if (user?.OrganizationId == null)
             return Forbid();
 
         var result = await financialService.GetTransactionsAsync(
             user.OrganizationId.Value, search, page, pageSize, fromDate, toDate);
-            
+
         return Ok(result);
     }
 }
@@ -62,7 +62,7 @@ public class DeveloperFinancialsController(IFinancialService financialService) :
     {
         var result = await financialService.GetTransactionsAsync(
             organizationId, search, page, pageSize, fromDate, toDate);
-            
+
         return Ok(result);
     }
 }

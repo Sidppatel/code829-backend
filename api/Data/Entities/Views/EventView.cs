@@ -24,7 +24,6 @@ public class EventView
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    // Venue
     public string VenueName { get; set; } = null!;
     public string VenueAddress { get; set; } = null!;
     public string VenueCity { get; set; } = null!;
@@ -38,11 +37,9 @@ public class EventView
     public bool VenueIsActive { get; set; }
     public DateTime VenueCreatedAt { get; set; }
 
-    // Organizer
     public string OrganizerFirstName { get; set; } = null!;
     public string OrganizerLastName { get; set; } = null!;
 
-    // Aggregates
     public int TotalCapacity { get; set; }
     public int TotalSold { get; set; }
     public int AvailableTables { get; set; }

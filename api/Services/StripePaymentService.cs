@@ -31,21 +31,13 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
 
         if (metadata is { Count: > 0 })
         {
-            // Stripe caps metadata keys at 50 and values at 500 chars; short keys/values below are well within limits.
+
             options.Metadata = new Dictionary<string, string>(metadata);
         }
 
-        // Description propagates to the underlying Charge and (for destination
-        // charges) to the auto-created Transfer to the connected account, so
-        // the organizer's Stripe Express dashboard shows a human-readable
-        // line item (e.g. "BK-260425-126825 - Test Event"). Stripe truncates
-        // descriptions at 1000 chars; we cap defensively.
         if (!string.IsNullOrEmpty(description))
             options.Description = description.Length > 1000 ? description[..1000] : description;
 
-        // statement_descriptor_suffix is what shows on the customer's bank
-        // statement after the platform's prefix. Stripe limits to 22 chars
-        // and disallows <>"' characters.
         if (!string.IsNullOrEmpty(statementDescriptorSuffix))
             options.StatementDescriptorSuffix = SanitizeStatementDescriptor(statementDescriptorSuffix);
 

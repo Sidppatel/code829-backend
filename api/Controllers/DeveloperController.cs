@@ -207,18 +207,15 @@ public class DeveloperController(
         var verified = false;
         string? verificationError = null;
 
-        // Verify by calling Stripe Balance API (lightweight) then fetch account info
         if (secretStatus.Configured)
         {
             try
             {
                 var client = new StripeClient(secretKey);
 
-                // Step 1: Verify key is valid via Balance API (no ID required)
                 var balanceService = new BalanceService(client);
                 await balanceService.GetAsync();
 
-                // Step 2: Fetch account details via raw request to GET /v1/account
                 var response = await client.RawRequestAsync(HttpMethod.Get, "/v1/account");
                 var doc = System.Text.Json.JsonDocument.Parse(response.Content);
                 var root = doc.RootElement;
@@ -512,10 +509,8 @@ public class DeveloperController(
 
         var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
 
-        // Use a fixed entity ID for the platform logo so there's only ever one
         var platformEntityId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-        // Delete old logo if any
         var existing = await imageService.GetByEntityAsync("platform", platformEntityId);
         foreach (var old in existing)
             await imageService.DeleteAsync(old.ImageId);
@@ -537,14 +532,6 @@ public class DeveloperController(
         if (logo is null) return NotFound(new ApiError(404, "No logo uploaded", HttpContext.TraceIdentifier));
         return Ok(logo);
     }
-
-    // ───────────────────────────────────────────────────────────────────
-    // Organizations + Stripe Connect (developer-scoped)
-    //
-    // Per the Stripe Connect plan, every connected-account flow is owned by
-    // an Organization (one acct_... per org), not by a BusinessUser. Members
-    // of the org share the payout destination.
-    // ───────────────────────────────────────────────────────────────────
 
     /// <summary>List organizations with pagination + search.</summary>
     [HttpGet("organizations")]
@@ -624,7 +611,7 @@ public class DeveloperController(
         {
             await organizationService.AddMemberAsync(id, request.BusinessUserId);
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "22023" /* invalid_parameter_value */ )
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "22023"  )
         {
             return BadRequest(new ApiError(400, ex.MessageText, HttpContext.TraceIdentifier));
         }
@@ -644,7 +631,7 @@ public class DeveloperController(
         {
             await organizationService.RemoveMemberAsync(id, businessUserId);
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "23503" /* foreign_key_violation — last-member guard */ )
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "23503"  )
         {
             return Conflict(new ApiError(409, ex.MessageText, HttpContext.TraceIdentifier));
         }
@@ -669,16 +656,10 @@ public class DeveloperController(
 
         if (string.IsNullOrEmpty(stripeAccountId))
         {
-            // Use the developer's email as the contact for Stripe — once members
-            // exist a future endpoint can let dev pick one of them. For an org
-            // with no Stripe account yet there's no pre-existing contact source.
+
             var devEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
                 ?? "platform@code829.com";
 
-            // Defaults: business_type defaults to "individual" (sole-organizer
-            // case dominates); legal name + product description fall back to
-            // org row + auto-template; MCC pinned to 7922 (Theatrical
-            // Producers / Ticket Agencies) — exact fit for event ticketing.
             var businessType = string.IsNullOrWhiteSpace(request?.BusinessType)
                 ? "individual"
                 : request.BusinessType;
@@ -713,9 +694,7 @@ public class DeveloperController(
         try
         {
             var url = await stripeConnect.CreateOnboardingLinkAsync(stripeAccountId, OnboardingLinkScope.Identity);
-            // Stripe AccountLink URLs expire ~5 minutes after creation; surface
-            // the conservative figure to the FE so it can prompt the user to
-            // refresh if they wait too long.
+
             var expiresAt = DateTime.UtcNow.AddMinutes(5);
             return Created($"/v1/developer/organizations/{id}/stripe-account",
                 new StripeOnboardingLinkResponse(url, expiresAt));
@@ -839,9 +818,7 @@ public class DeveloperController(
 
         if (string.IsNullOrEmpty(org.StripeConnectedAccountId))
         {
-            // Org exists but has no connected Stripe account yet. Mirror the admin
-            // shape so the FE can render the "no Stripe account yet" empty state
-            // off the same DTO it uses elsewhere.
+
             return Ok(new OrganizationStripeStatusDto(
                 OrganizationId: org.Id,
                 OrganizationName: org.Name,
@@ -853,7 +830,7 @@ public class DeveloperController(
                     payoutsEnabled: false,
                     disabledReason: null),
                 BankAccountLast4: null,
-                // TODO: populate members once sp_get_organization_members exists
+
                 Members: new List<OrganizationMemberDto>(),
                 ExpressDashboardUrl: null,
                 FetchedAt: DateTime.UtcNow));
@@ -863,8 +840,6 @@ public class DeveloperController(
         {
             var status = await stripeConnect.FetchAccountStatusAsync(org.StripeConnectedAccountId);
 
-            // Persist the snapshot so other readers don't have to round-trip Stripe.
-            // requirements_due is jsonb; serialize as a JSON array.
             var requirementsJson = System.Text.Json.JsonSerializer.Serialize(status.RequirementsCurrentlyDue);
             await organizationProc.UpdateStripeStatusAsync(
                 status.AccountId,
@@ -878,8 +853,6 @@ public class DeveloperController(
                 payoutsEnabled: status.PayoutsEnabled,
                 disabledReason: status.DisabledReason);
 
-            // LoginLinks expire ~5 minutes after creation — only mint when the
-            // account is actually payouts-ready, otherwise Stripe rejects the call.
             var expressDashboardUrl = status.PayoutsEnabled
                 ? await stripeConnect.CreateLoginLinkAsync(org.StripeConnectedAccountId)
                 : null;
@@ -897,7 +870,7 @@ public class DeveloperController(
                 StripeAccount: stripeAccountDto,
                 State: state,
                 BankAccountLast4: status.BankAccountLast4,
-                // TODO: populate members once sp_get_organization_members exists
+
                 Members: new List<OrganizationMemberDto>(),
                 ExpressDashboardUrl: expressDashboardUrl,
                 FetchedAt: DateTime.UtcNow));

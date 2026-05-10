@@ -53,11 +53,6 @@ public class InvitationService(
 
         Log.Information("[Invitation] Sending invitation to {Email}. Signup URL: {Url}", normalizedEmail, signupUrl);
 
-        // Email failures (Resend 403, transient SMTP) MUST NOT propagate — the
-        // invitation row is already persisted, the developer can re-send via
-        // the existing flow + the signup URL is in the log for fallback. A
-        // 5xx here would roll back the UX and force the developer to manually
-        // chase delivery. Sentry captures so ops still sees the failure.
         try
         {
             await emailService.SendAsync(
@@ -179,12 +174,6 @@ public class InvitationService(
         return Convert.ToHexStringLower(bytes);
     }
 
-    // Constructs the portal URL for the invited role. Production subdomains the
-    // base host (admin.code829.com etc.); local dev swaps the port because apps
-    // run as separate Vite servers on 5173–5176 rather than real subdomains.
-    // UriBuilder handles scheme/port/path safely — string.Replace on "://" or
-    // "localhost:5173" would mishandle IPv6 hosts, ports embedded in paths, or
-    // any future change to the base URL format.
     private static string BuildPortalUrl(string frontendUrl, AdminRole role)
     {
         if (!Uri.TryCreate(frontendUrl, UriKind.Absolute, out var baseUri))

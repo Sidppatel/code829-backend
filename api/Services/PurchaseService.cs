@@ -33,7 +33,6 @@ public class PurchaseService(
         if (ev.Status != "Published")
             throw new InvalidOperationException("Event is not available for purchase");
 
-        // Normalize: TableIds takes precedence, fall back to single TableId
         var tableIds = request.TableIds is { Count: > 0 }
             ? request.TableIds
             : request.TableId.HasValue ? [request.TableId.Value] : null;
@@ -82,7 +81,6 @@ public class PurchaseService(
         var organization = await organizationProc.GetByBusinessUserAsync(ev.BusinessUserId);
         await EnsurePayoutReadyIfEnforcedAsync(organization);
 
-        // Generate purchase number up-front so we can attach it to the PaymentIntent metadata.
         var purchaseNumber = GeneratePurchaseNumber();
         var piMetadata = BuildPaymentIntentMetadata(
             purchaseNumber, ev, subtotal, fee, estimatedTaxCents, piAmount, taxCalculationId, tableCount: tables.Count);
@@ -93,17 +91,9 @@ public class PurchaseService(
             piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata,
             description: piDescription, statementDescriptorSuffix: piStatementSuffix);
 
-        // Create purchase with the first table as primary (for backward compat)
         var purchaseId = await purchaseProc.CreatePurchaseAsync(
             userId, ev.EventId, tables[0].TableId, totalSeats, null, subtotal, fee, total, purchaseNumber);
 
-        // Insert additional tables into the purchase_tables junction table. Using
-        // ExecuteSqlInterpolated (FormattableString) instead of ExecuteSqlRawAsync
-        // so EF Core parameterizes the Guids at compile time — any future edit that
-        // accidentally interpolates user input still goes through parameter binding.
-        // The junction has no EF entity mapping; sp_create_purchase inserts the
-        // primary table row and this loop adds the rest. ON CONFLICT DO NOTHING
-        // keeps the call idempotent if the SP ever adds overlapping rows.
         foreach (var table in tables.Skip(1))
         {
             var tableId = table.TableId;
@@ -144,7 +134,6 @@ public class PurchaseService(
 
         var seatsRequested = request.SeatsReserved!.Value;
 
-        // Check if event has ticket types
         var ticketTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
             .Where(tt => tt.EventId == request.EventId && tt.IsActive)
             .ToListAsync();
@@ -192,9 +181,6 @@ public class PurchaseService(
             piAmount, subtotal, organization?.StripeConnectedAccountId, "usd", piMetadata,
             description: piDescription, statementDescriptorSuffix: piStatementSuffix);
 
-        // sp_reserve_open_capacity serializes capacity + ticket-type quota checks via row-level
-        // locks on events/event_ticket_types rows. Replaces the previous Redis-lock + SELECT +
-        // INSERT pattern which could race under concurrent load.
         Guid purchaseId;
         try
         {
@@ -207,7 +193,7 @@ public class PurchaseService(
             Log.Warning(
                 "[Audit] capacity_race_rejected event={EventId} user={UserId} requested={Seats} reason={Reason}",
                 request.EventId, userId, seatsRequested, ex.Message);
-            // Roll back the Stripe intent we just created so we don't orphan it
+
             try { await paymentService.RefundPaymentAsync(intentId); } catch { }
             throw new InvalidOperationException(ex.Message, ex);
         }
@@ -275,17 +261,12 @@ public class PurchaseService(
         var qrToken = GenerateQrToken();
         await purchaseProc.ConfirmPurchaseAsync(purchaseId, qrToken);
 
-        // Enrich + record tax — same call the webhook makes. Idempotent; if
-        // the webhook also fires (e.g. with `stripe listen` forwarding) the
-        // upserts are no-ops. Without this, the FE-driven confirm path leaves
-        // tax/fee fields null in dev where no public webhook URL is wired.
         await paymentEnrichment.EnrichAndRecordAsync(purchase.PaymentIntentId, purchase.TaxCalculationId);
 
         var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var checkinLink = $"{frontendUrl}/purchases/{purchaseId}/tickets";
-        // Email is a notification, not a purchase invariant — a failure here (bad Resend domain,
-        // network, etc.) should not un-confirm a paid purchase. Log and continue.
+
         try
         {
             await emailService.SendAsync(
@@ -336,9 +317,6 @@ public class PurchaseService(
         if (purchase.PaymentIntentId is not null)
             await paymentService.RefundPaymentAsync(purchase.PaymentIntentId);
 
-        // Reverse the tax transaction if one was recorded. This is accounting-critical —
-        // a missing reversal means we'll over-report sales tax remitted. Log as Error (not
-        // Warning) with a TAX_REVERSAL_FAILED marker so alerts can pattern-match it.
         if (!string.IsNullOrEmpty(purchase.TaxTransactionId) && purchase.PaymentIntentId is not null)
         {
             try
@@ -434,17 +412,6 @@ public class PurchaseService(
                 "Organizer not yet configured for payouts");
     }
 
-    // Builds PaymentIntent metadata so the payment, purchase, and tax breakdown are reconcilable
-    // from the Stripe dashboard alone. Key "tax_calculation" is Stripe's standard for linking a
-    // Tax Calculation to a PaymentIntent (see https://docs.stripe.com/tax/custom).
-    // Payout split: admin_payout_cents goes to the organizer via transfer_data.amount;
-    // developer_gross_cents = platform_fee + tax; developer owes the tax to the jurisdiction,
-    // so developer's net revenue = platform_fee - stripe_fee (stripe_fee isn't known at create time).
-    //
-    // Event name + type + start date are duplicated into the PaymentIntent so the Stripe
-    // dashboard search ("show me all charges for The Lyric Theatre's spring gala") works
-    // without joining back to our DB. Truncated where Stripe enforces a 500-char metadata
-    // value limit.
     private static Dictionary<string, string> BuildPaymentIntentMetadata(
         string purchaseNumber,
         EventView ev,
@@ -502,8 +469,7 @@ public class PurchaseService(
     private static string BuildStatementDescriptorSuffix(EventView ev)
     {
         var title = ev.Title ?? string.Empty;
-        // Stripe disallows < > " ' * and limits to 22 chars. Bank statement
-        // also strips most non-ASCII; collapse whitespace.
+
         var ascii = new string(title
             .Where(c => c >= ' ' && c <= '~' && c is not ('<' or '>' or '"' or '\'' or '*'))
             .ToArray()).Trim();

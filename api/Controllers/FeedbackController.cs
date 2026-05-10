@@ -42,7 +42,6 @@ public class FeedbackController(
         if (claim is not null && Guid.TryParse(claim.Value, out var uid))
             userId = uid;
 
-        // Merge pageUrl + stepsToReproduce into the diagnostics blob (no schema change needed).
         var diagDict = new System.Collections.Generic.Dictionary<string, object?>();
         if (!string.IsNullOrWhiteSpace(request.PageUrl))
             diagDict["pageUrl"] = request.PageUrl.Trim();
@@ -55,7 +54,6 @@ public class FeedbackController(
             ? System.Text.Json.JsonSerializer.Serialize(diagDict)
             : null;
 
-        // Cap diagnostics payload to 16KB to avoid abuse.
         if (diagnostics is not null && diagnostics.Length > 16_384)
             diagnostics = diagnostics[..16_384];
 

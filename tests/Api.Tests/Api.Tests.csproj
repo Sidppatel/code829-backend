@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <!-- xUnit v3 runs tests in-process, so the test project must be an Exe. -->
+
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 

@@ -10,7 +10,7 @@ public class ImageProcessingService : IImageProcessingService
     {
         ["venue"] =
         [
-            new ImageVariant("", 1200, 800),        // detail (original key)
+            new ImageVariant("", 1200, 800),
             new ImageVariant("_card", 400, 300),
             new ImageVariant("_thumb", 150, 150)
         ],
@@ -47,8 +47,7 @@ public class ImageProcessingService : IImageProcessingService
         var variants = VariantsByEntity.GetValueOrDefault(entityType, VariantsByEntity["event"]);
         var cropEntities = entityType is "user" or "business_user";
         var resizeMode = cropEntities ? ResizeMode.Crop : ResizeMode.Max;
-        // Method=0 (fastest) ~3-5x faster encode than default 4 on Render starter
-        // 0.5 CPU. Quality difference imperceptible at thumbnail sizes.
+
         var encoder = new WebpEncoder
         {
             Quality = 75,
@@ -56,11 +55,9 @@ public class ImageProcessingService : IImageProcessingService
             Method = WebpEncodingMethod.Fastest
         };
 
-        // Process all variants in parallel — each clone is independent so this is safe.
         var tasks = variants.Select(async variant =>
         {
-            // Skip the resize entirely when source is already smaller than target —
-            // ImageSharp Resize allocates a new framebuffer even when it's a no-op.
+
             using var clone = (image.Width <= variant.MaxWidth && image.Height <= variant.MaxHeight && resizeMode == ResizeMode.Max)
                 ? image.Clone(_ => { })
                 : image.Clone(ctx =>

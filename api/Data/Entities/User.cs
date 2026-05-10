@@ -24,7 +24,6 @@ public class User : BaseEntity
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
 
-    // Address (separate table)
     public Guid? AddressId { get; set; }
     public Address? Address { get; set; }
 

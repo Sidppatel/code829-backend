@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Stop all dev processes tracked in .ep-pids.json / .ep-backend-pid.json and docker containers.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib.sh
+
 source "$SCRIPT_DIR/lib.sh"
 
 ROOT="$(resolve_monorepo_root)"
@@ -15,7 +14,7 @@ kill_tree() {
     local pid="$1"
     [ -z "$pid" ] && return 0
     if kill -0 "$pid" 2>/dev/null; then
-        # kill the process group (negative pid) to take down children
+
         kill -TERM -"$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
         sleep 1
         kill -KILL -"$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
@@ -24,7 +23,7 @@ kill_tree() {
 
 for pidfile in "$ROOT/.ep-pids.json" "$ROOT/.ep-backend-pid.json"; do
     if [ -f "$pidfile" ]; then
-        # Extract numeric values with grep (avoid jq dependency)
+
         while IFS=: read -r key pid; do
             pid="${pid//[^0-9]/}"
             [ -z "$pid" ] && continue
@@ -37,8 +36,6 @@ for pidfile in "$ROOT/.ep-pids.json" "$ROOT/.ep-backend-pid.json"; do
     fi
 done
 
-# Fallback: kill lingering dotnet / node dev-server processes launched from the workspace.
-# Conservative: only match explicit project paths to avoid killing unrelated work.
 pkill -f "dotnet.*api/api.csproj" 2>/dev/null || true
 pkill -f "pnpm dev:(public|admin|staff|developer)" 2>/dev/null || true
 

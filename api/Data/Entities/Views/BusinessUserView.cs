@@ -14,9 +14,7 @@ public class BusinessUserView
     public DateTime? LastLoginAt { get; set; }
     public string? ImageStorageKey { get; set; }
     public string? Phone { get; set; }
-    // StripeConnectedAccountId removed when business_users.StripeConnectedAccountId
-    // was dropped by DropLegacyStripeOnBusinessUser. Connect data now lives on
-    // organizations.StripeConnectedAccountId; query that table directly when needed.
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

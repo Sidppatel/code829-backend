@@ -14,11 +14,7 @@ public class SecurityHeadersOptions
     public string[] ScriptSrc { get; set; } = ["'self'", "https://js.stripe.com"];
     public string[] StyleSrc { get; set; } = ["'self'", "https://fonts.googleapis.com"];
     public string[] FontSrc { get; set; } = ["'self'", "https://fonts.gstatic.com"];
-    // Narrow to only the origins the app actually loads images from:
-    //   - 'self' + data: + blob: for inline/generated previews (QR codes, upload previews)
-    //   - R2 public bucket for user-uploaded event art
-    //   - Cloudflare Images delivery for resized variants
-    // Override via appsettings "Security:Csp:ImgSrc" if a new CDN is introduced.
+
     public string[] ImgSrc { get; set; } = [
         "'self'",
         "data:",
@@ -36,10 +32,7 @@ public class SecurityHeadersOptions
 /// </summary>
 public class SecurityHeadersMiddleware(RequestDelegate next, IOptions<SecurityHeadersOptions> options)
 {
-    // Key under which the per-request CSP nonce is exposed to downstream components.
-    // Any server-rendered content that injects inline scripts must read it and set
-    // nonce="..." on the script tag. JSON APIs don't need it but the value is still
-    // emitted so the header stays consistent across requests.
+
     public const string NonceHttpContextKey = "csp-nonce";
 
     private readonly SecurityHeadersOptions _opts = options.Value;
@@ -54,9 +47,6 @@ public class SecurityHeadersMiddleware(RequestDelegate next, IOptions<SecurityHe
         context.Response.Headers.Remove("X-Powered-By");
         context.Response.Headers.Remove("Server");
 
-        // BE #95 — per-request CSP nonce. Generated for every request so even error
-        // pages and redirects get a fresh value. Stripe.js is allow-listed by origin
-        // so adding the nonce does not affect Stripe Elements loading.
         var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
         context.Items[NonceHttpContextKey] = nonce;
 

@@ -123,8 +123,6 @@ public class PurchaseServiceTests : IDisposable
         });
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        // CancelAsync reads from PurchaseViews which doesn't exist in in-memory DB.
-        // This test verifies the service throws KeyNotFoundException when purchase not found in view.
         var act = () => _service.CancelAsync(purchaseId, _userId);
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }

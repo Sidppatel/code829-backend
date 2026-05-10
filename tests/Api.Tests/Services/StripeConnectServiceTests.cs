@@ -77,13 +77,7 @@ public class StripeConnectServiceTests
     [InlineData(OnboardingLinkScope.BankOnly)]
     public async Task CreateOnboardingLinkAsync_WithBogusKey_TranslatesStripeAuthErrorToTypedException(OnboardingLinkScope scope)
     {
-        // Use a syntactically-valid but bogus test key so the SDK reaches the
-        // network and returns 401 — we want the MapStripeException path, not
-        // the "secret not configured" guard. Stripe SDK reports invalid keys
-        // as "invalid_request_error", which our mapper translates to
-        // ArgumentException. This test exists so both Identity and BankOnly
-        // scope branches execute their request-shaping code (Identity skips
-        // ExtraParams, BankOnly populates the dotted key).
+
         _secrets.Setup(s => s.StripeSecretKey).Returns("sk_test_invalid_key_for_unit_test_only");
 
         var act = () => _service.CreateOnboardingLinkAsync("acct_test_404", scope);
@@ -148,12 +142,7 @@ public class StripeConnectServiceTests
     [Fact]
     public async Task DeleteAccountAsync_WithBogusKey_TranslatesStripeAuthErrorToTypedException()
     {
-        // Bogus key triggers Stripe's invalid_request_error (key auth fail) —
-        // mapped to ArgumentException by MapStripeException. The service's
-        // "already deleted = success" branch keys on the account_invalid code
-        // which only fires when the key is valid but the account id is gone;
-        // we cover that path in integration tests against the real Stripe
-        // sandbox, not here.
+
         _secrets.Setup(s => s.StripeSecretKey).Returns("sk_test_invalid_key_for_unit_test_only");
 
         var act = () => _service.DeleteAccountAsync("acct_test_404");

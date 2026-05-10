@@ -31,10 +31,7 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
     private static readonly LocalizableString Description =
         "The Event Platform API must never read or write tables directly via EF LINQ. Route access through Db.Repositories.StoredProcedures.* or keyless view DbSets.";
 
-    // Severity is Error: the backlog has been cleared. Existing intentional exceptions use
-    // `// ARCH-EXCEPTION: <reason>` line comments with justification. New direct-DbSet access
-    // fails the build.
-#pragma warning disable RS2008 // Single-rule analyzer; release-tracking infra is overkill here.
+#pragma warning disable RS2008
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticId,
         title: Title,
@@ -45,8 +42,6 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
         description: Description);
 #pragma warning restore RS2008
 
-    // Raw-SQL escape hatches. These are how SP-backed access threads through the DbSet
-    // property without actually reading tables directly, and are expressly allowed.
     private static readonly HashSet<string> AllowedMethods = new(StringComparer.Ordinal)
     {
         "FromSqlRaw", "FromSqlInterpolated", "FromSql"
@@ -66,22 +61,17 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
     {
         var memberAccess = (MemberAccessExpressionSyntax)ctx.Node;
 
-        // Match the pattern: <something>.<DbSetProperty>.<Method>(...).
-        // This node is the inner ".DbSetProperty" when part of a call expression.
         if (memberAccess.Parent is not MemberAccessExpressionSyntax outer)
             return;
 
-        // The outer member must be invoked.
         if (outer.Parent is not InvocationExpressionSyntax invocation)
             return;
 
         var methodName = outer.Name.Identifier.ValueText;
 
-        // Raw SQL escape hatches are allowed on any DbSet — that's the whole point.
         if (AllowedMethods.Contains(methodName))
             return;
 
-        // The inner access must be on a property that returns DbSet<T>.
         var propertySymbol = ctx.SemanticModel.GetSymbolInfo(memberAccess).Symbol as IPropertySymbol;
         if (propertySymbol is null)
             return;
@@ -89,21 +79,17 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
         if (!IsDbSet(propertySymbol.Type, out _))
             return;
 
-        // Views are allowed.
         var propertyName = propertySymbol.Name;
         if (propertyName.EndsWith("Views", StringComparison.Ordinal))
             return;
 
-        // Path-based whitelist: seeders and tests.
         var filePath = invocation.SyntaxTree.FilePath ?? string.Empty;
         if (IsWhitelistedPath(filePath))
             return;
 
-        // [AllowDirectDbAccess] attribute on the containing method, class, or assembly.
         if (HasAllowDirectDbAccessAttribute(ctx, invocation))
             return;
 
-        // Line-level escape hatch: `// ARCH-EXCEPTION: ...` comment on the invocation line.
         if (HasArchExceptionComment(invocation))
             return;
 
@@ -132,11 +118,7 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
         return normalized.Contains("/tests/")
             || normalized.Contains("/Tests/")
             || normalized.Contains(".Tests/")
-            // api/Data/Repositories/*.cs (excluding the StoredProcedures/ subfolder)
-            // are low-level data-access adapters below the API layer. The rule targets
-            // controllers + services; adapters wrapping EF primitives for non-SP-
-            // covered surfaces (legacy log/image/app_setting CRUD) are permitted here.
-            // StoredProcedures/ files under this folder are still checked.
+
             || (normalized.Contains("/api/Data/Repositories/")
                 && !normalized.Contains("/api/Data/Repositories/StoredProcedures/"));
     }
@@ -173,7 +155,7 @@ public sealed class DirectDbSetAccessAnalyzer : DiagnosticAnalyzer
 
     private static bool HasArchExceptionComment(InvocationExpressionSyntax invocation)
     {
-        // Check trivia on the statement containing this invocation.
+
         var statement = invocation.FirstAncestorOrSelf<StatementSyntax>();
         if (statement is null) return false;
 

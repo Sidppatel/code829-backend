@@ -14,7 +14,6 @@ public class EventTablesSummaryView
     public int DefaultColSpan { get; set; }
     public bool IsActive { get; set; }
 
-    // Aggregates
     public int TotalTables { get; set; }
     public int AvailableTables { get; set; }
     public int LockedTables { get; set; }

@@ -32,28 +32,21 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
     private const int CatalogLimit = 60;
     private static readonly TimeSpan CatalogWindow = TimeSpan.FromMinutes(1);
 
-    // BE #68 — Per-token magic-link verify counter. Prevents replay / brute-force on a
-    // single token. Window covers magic-link expiry + retry grace. Limit = 1: one
-    // attempt per token; anything after either a success (AuthService deletes the key)
-    // or a failure (key lingers to block retries) is rejected.
     private const int MagicLinkVerifyLimit = 1;
     private static readonly TimeSpan MagicLinkVerifyWindow = TimeSpan.FromMinutes(30);
     private const string MagicLinkVerifyPath = "/auth/magic-link/verify";
 
-    // magic-link request has its own per-email rate limit in AuthController;
-    // verify endpoint gets the stricter auth limit here too
     private static readonly string[] AuthPaths = ["/auth/dev-login", "/auth/magic-link/verify", "/admin/auth/login"];
     private static readonly string[] CatalogPaths = ["/events", "/admin/events", "/developer/events", "/events/facets", "/events/schema-list"];
     private static readonly string[] SeatHoldPaths = ["/seats/hold", "/seats/hold-table", "/tables/lock"];
-    // Purchase-critical mutations — payment integrity endpoints get their own bucket.
+
     private static readonly string[] PurchasePaths = ["/purchases", "/purchases/quote"];
     private static readonly string[] ConfirmPathSuffixes = ["/confirm", "/confirm-by-intent"];
     private static readonly string[] BeaconPaths = ["/purchases/cancel-beacon", "/tables/release-beacon"];
 
     public async Task InvokeAsync(HttpContext context, ISettingsService settings)
     {
-        // Skip rate limiting for loopback ONLY in Development — in Production we never trust
-        // loopback IPs even if they reach the app, so misconfiguration can't disable limits.
+
         var remoteIp = context.Connection.RemoteIpAddress;
         if (env.IsDevelopment() && remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp))
         {
@@ -61,8 +54,6 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
             return;
         }
 
-        // DB flag: set AppSetting "rate_limit_disabled" = "true" to bypass all limits.
-        // Cached in Redis for 30s, so changes take effect within half a minute.
         var disabled = await settings.GetOrDefaultAsync("rate_limit_disabled", "false");
         if (string.Equals(disabled, "true", StringComparison.OrdinalIgnoreCase))
         {
@@ -72,9 +63,7 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
 
         var ip = remoteIp?.ToString() ?? "unknown";
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "/";
-        // Strip API version segment (/v1, /v2, …) so bucket matching stays stable
-        // across versions. BE #16 introduced URL-segment versioning; bucket keys
-        // below are defined without the version prefix.
+
         path = System.Text.RegularExpressions.Regex.Replace(path, @"^/v\d+(?=/|$)", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (string.IsNullOrEmpty(path)) path = "/";
 
@@ -99,10 +88,6 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
             return;
         }
 
-        // BE #68 — per-token rate limit for magic-link verify. Runs after the per-IP
-        // check so IP-wide abuse still short-circuits first. Reads the token from the
-        // JSON body, hashes it, and increments a counter keyed by hash. Single use:
-        // AuthService.VerifyMagicLinkAsync deletes the key on successful consume.
         if (string.Equals(path, MagicLinkVerifyPath, StringComparison.OrdinalIgnoreCase))
         {
             var token = await TryReadTokenFromBodyAsync(context);

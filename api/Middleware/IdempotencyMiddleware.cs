@@ -19,10 +19,9 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
     private static readonly TimeSpan FallbackTtl = TimeSpan.FromMinutes(5);
     private static readonly HashSet<string> IdempotentMethods = ["POST", "PUT"];
 
-    // Purchase-critical paths where we insist on idempotency even if the client forgot a header.
     private static readonly string[] EnforcedPathPrefixes = ["/purchases"];
     private static readonly string[] EnforcedPathSuffixes = ["/confirm", "/confirm-by-intent"];
-    // Pure read-style POSTs under /purchases that never mutate state — skip enforcement.
+
     private static readonly string[] ExemptPaths = ["/purchases/quote"];
 
     public async Task InvokeAsync(HttpContext context)
@@ -46,8 +45,6 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
                 return;
             }
 
-            // Fallback: hash the user + path + body. Short TTL — guards against accidental
-            // double-tap within minutes, but doesn't pin results for hours.
             idempotencyKey = await BuildFallbackKeyAsync(context, path);
             Log.Warning("[Idempotency] No Idempotency-Key on {Method} {Path} — using server-generated fallback", method, path);
         }
@@ -55,7 +52,6 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
         var cacheKey = $"idempotency:{idempotencyKey}";
         var db = redis.GetDatabase();
 
-        // Check if we already processed this key
         var cached = await db.StringGetAsync(cacheKey);
         if (cached.HasValue)
         {
@@ -70,7 +66,6 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
             }
         }
 
-        // Capture the response
         var originalBody = context.Response.Body;
         using var memoryStream = new MemoryStream();
         context.Response.Body = memoryStream;
@@ -80,7 +75,6 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
         memoryStream.Seek(0, SeekOrigin.Begin);
         var responseBody = await new StreamReader(memoryStream).ReadToEndAsync();
 
-        // Cache successful responses (2xx)
         if (context.Response.StatusCode >= 200 && context.Response.StatusCode < 300)
         {
             var entry = new CachedResponse(context.Response.StatusCode, responseBody);
@@ -88,7 +82,6 @@ public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer 
             await db.StringSetAsync(cacheKey, JsonSerializer.Serialize(entry), ttl);
         }
 
-        // Write to original stream
         memoryStream.Seek(0, SeekOrigin.Begin);
         await memoryStream.CopyToAsync(originalBody);
         context.Response.Body = originalBody;

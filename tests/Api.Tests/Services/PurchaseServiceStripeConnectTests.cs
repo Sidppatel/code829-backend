@@ -69,10 +69,7 @@ public class PurchaseServiceStripeConnectTests : IDisposable
 
     private void SeedEvent()
     {
-        // Direct INSERT into the EventViews "table" (InMemory provider treats
-        // ToView the same as ToTable). The real Postgres view is a SELECT —
-        // this seeding is a unit-test shortcut to avoid wiring up base tables
-        // for the read view.
+
         _context.EventViews.Add(new EventView
         {
             EventId = _eventId,
@@ -102,8 +99,7 @@ public class PurchaseServiceStripeConnectTests : IDisposable
     {
         _settingsService.Setup(s => s.GetOrDefaultAsync(SettingsKeys.ConnectEnforcementEnabled, It.IsAny<string?>()))
             .ReturnsAsync(enabled ? "true" : "false");
-        // Pricing service uses default platform fee from settings; supply a
-        // safe default for any other key the service might read.
+
         _settingsService.Setup(s => s.GetOrDefaultAsync(
                 It.Is<string>(k => k != SettingsKeys.ConnectEnforcementEnabled), It.IsAny<string?>()))
             .ReturnsAsync((string _, string? def) => def ?? "10");
@@ -111,9 +107,7 @@ public class PurchaseServiceStripeConnectTests : IDisposable
 
     private void SetupPricing()
     {
-        // Minimal pricing breakdown so the call survives long enough to reach
-        // the enforcement guard. SubtotalCents must be >0 so the metadata
-        // builder produces a sensible payload to assert on.
+
         _pricingService.Setup(p => p.ComputeForPurchaseAsync(It.IsAny<PricingQuoteRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PricingComputation(
                 SubtotalCents: 5000,
@@ -130,12 +124,10 @@ public class PurchaseServiceStripeConnectTests : IDisposable
     private static CreatePurchaseRequest OpenSeatRequest(Guid eventId)
         => new(EventId: eventId, TableId: null, TableIds: null, SeatsReserved: 1, EventTicketTypeId: null);
 
-    // ─── Enforcement = false (rollout flag off) — purchase succeeds regardless ─
-
     [Theory]
-    [InlineData(false, null)] // BU has no org
-    [InlineData(false, "")]   // org has no Stripe acct
-    [InlineData(false, "acct_pending")] // org has acct but unverified
+    [InlineData(false, null)]
+    [InlineData(false, "")]
+    [InlineData(false, "acct_pending")]
     public async Task CreateAsync_EnforcementDisabled_AllowsPurchaseRegardlessOfOrgState(
         bool enforced, string? acctId)
     {
@@ -173,14 +165,8 @@ public class PurchaseServiceStripeConnectTests : IDisposable
 
         var act = () => _service.CreateAsync(_userId, OpenSeatRequest(_eventId));
 
-        // Either succeeds (when downstream GetByIdAsync finds nothing → null
-        // → InvalidOperationException("Purchase creation failed")) or throws
-        // a generic "Purchase creation failed" — the key assertion is that
-        // OrganizationNotPayoutReadyException is NEVER thrown.
         await act.Should().NotThrowAsync<OrganizationNotPayoutReadyException>();
     }
-
-    // ─── Enforcement = true ─────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateAsync_EnforcementEnabled_RejectsWhenBusinessUserHasNoOrganization()
@@ -238,8 +224,6 @@ public class PurchaseServiceStripeConnectTests : IDisposable
             .WithMessage("*payouts*");
     }
 
-    // ─── Metadata payload — ensure Connect-relevant keys are sent through to Stripe ─
-
     [Fact]
     public async Task CreateAsync_PassesAllRequiredMetadataKeysToPaymentIntent()
     {
@@ -270,11 +254,8 @@ public class PurchaseServiceStripeConnectTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Guid.NewGuid());
 
-        // The downstream GetByIdAsync hits PurchaseViews which we haven't
-        // seeded — accept the resulting throw, the metadata capture happens
-        // before that branch.
         try { await _service.CreateAsync(_userId, OpenSeatRequest(_eventId)); }
-        catch (InvalidOperationException) { /* expected — no PurchaseView seed */ }
+        catch (InvalidOperationException) {  }
 
         capturedMetadata.Should().NotBeNull();
         capturedMetadata!.Should().ContainKey("purchase_number");
@@ -296,10 +277,9 @@ public class PurchaseServiceStripeConnectTests : IDisposable
         capturedMetadata["platform_fee_cents"].Should().Be("100");
         capturedMetadata["tax_cents"].Should().Be("50");
         capturedMetadata["admin_payout_cents"].Should().Be("5000");
-        // developer_gross_cents = platform_fee + tax (per BuildPaymentIntentMetadata XML doc)
+
         capturedMetadata["developer_gross_cents"].Should().Be("150");
 
-        // No PII permitted on Stripe metadata per project security rule.
         capturedMetadata.Should().NotContainKey("customer_email");
         capturedMetadata.Should().NotContainKey("organizer_email");
         capturedMetadata.Should().NotContainKey("organizer_name");

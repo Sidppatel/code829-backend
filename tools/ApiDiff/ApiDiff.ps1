@@ -1,30 +1,4 @@
-#requires -Version 7.0
-<#
-.SYNOPSIS
-  API parity harness — captures + compares JSON responses across two backend instances.
 
-.PARAMETER Mode
-  Capture | Compare
-
-.PARAMETER BaseUrl
-  Required for Capture. Base URL of the API (e.g. http://localhost:8000).
-
-.PARAMETER OutDir
-  Required for Capture. Where to write per-endpoint JSON snapshots.
-
-.PARAMETER BaselineDir
-  Required for Compare. Directory of captured baseline.
-
-.PARAMETER CurrentUrl
-  Required for Compare. Base URL of the API to compare against the baseline.
-
-.PARAMETER ReportPath
-  Required for Compare. Where to write parity-report.md.
-
-.NOTES
-  - Strips volatile fields (createdAt, updatedAt, traceId, expiresAt, lastActivityAt, ip, userAgent, deviceName, ETag headers) before diff.
-  - Detail-tier endpoints get full body diff. Smoke-tier only diffs status code + array length.
-#>
 param(
   [Parameter(Mandatory=$true)][ValidateSet('Capture','Compare')][string]$Mode,
   [string]$BaseUrl,
@@ -38,7 +12,6 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-# -- volatile field strip list ------------------------------------------------
 $Script:VolatileKeys = @(
   'createdAt','updatedAt','deletedAt','expiresAt','lastActivityAt',
   'traceId','etag','eTag','ETag','requestId',
@@ -86,7 +59,6 @@ function To-NormalJson {
   return ($n | ConvertTo-Json -Depth 100 -Compress:$false)
 }
 
-# -- HTTP helpers -------------------------------------------------------------
 function New-Session {
   $session = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
   return $session
@@ -139,13 +111,12 @@ function Invoke-Endpoint {
   return @{ status = [int]$resp.StatusCode; body = $body; contentType = $contentType }
 }
 
-# -- main ---------------------------------------------------------------------
 $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json -AsHashtable
 $endpoints = $cfg.endpoints
 
 function Get-NestedValue {
   param($obj, [string]$Path)
-  # Path like "items[0].eventId" — split on '.' and '[N]' tokens
+
   $cur = $obj
   $tokens = [System.Collections.Generic.List[string]]::new()
   $buf = ''
@@ -262,7 +233,6 @@ function Run-Compare {
   if (-not (Test-Path $baselineManifestPath)) { throw "baseline manifest missing: $baselineManifestPath" }
   $baselineManifest = Get-Content $baselineManifestPath -Raw | ConvertFrom-Json -AsHashtable
 
-  # Capture current into a temp dir
   $currentDir = Join-Path ([System.IO.Path]::GetTempPath()) ("apidiff-current-" + [guid]::NewGuid())
   Write-Host "capturing current: $CurrentUrl -> $currentDir"
   Run-Capture -BaseUrl $CurrentUrl -OutDir $currentDir
@@ -282,7 +252,7 @@ function Run-Compare {
       $cJ = $cur.body  | ConvertTo-Json -Depth 100 -Compress
       if ($bJ -ne $cJ) {
         $row.result = 'BODY_MISMATCH'
-        # crude diff: list keys present in one but not the other; compare top-level keys
+
         $row.detail = "body bytes differ ($([math]::Abs($bJ.Length - $cJ.Length)) byte delta)"
         $fail++
       } else {

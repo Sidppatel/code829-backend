@@ -14,7 +14,6 @@ public class OrganizationView
     public DateTime CreatedAt { get; set; }
     public DateTime? ArchivedAt { get; set; }
 
-    // Aggregates
     public int MemberCount { get; set; }
     public int EventCount { get; set; }
     public long TotalRevenueCents { get; set; }

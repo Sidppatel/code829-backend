@@ -23,13 +23,7 @@ public class AdminAuthController(
     IFileStorageService fileStorage
 ) : ControllerBase
 {
-    // Admin-side sessions are split across three cookie names (session_admin, session_staff,
-    // session_developer) so the same browser can hold independent logins for each portal
-    // without cookies clobbering each other. See Api.Helpers.PortalHelper.
-    // Admin sessions re-auth every 14 days. Admins have destructive power (rotate
-    // Stripe keys, delete users, change fees) so the trust window is kept tighter
-    // than the regular-user cookie. Users can still use "revoke my sessions" at
-    // any time, and the DeviceSession row lets a Developer revoke remotely.
+
     private const int SessionMaxAgeDays = 14;
 
     private string? CurrentPortalCookie() =>
@@ -92,10 +86,6 @@ public class AdminAuthController(
             var (user, sessionToken, _) = await adminAuthService.LoginAsync(
                 request.Email, request.Password, deviceName, ip);
 
-            // Role-vs-portal gate: a Staff account cannot obtain a session_developer cookie
-            // even if they know developer creds, and vice versa. Match the X-Portal header
-            // against the admin's actual role before issuing a cookie. BusinessUserDto.Role is a
-            // string name; parse back to the enum for numeric comparison.
             var portal = Helpers.PortalHelper.ReadPortal(Request);
             var minRole = Helpers.PortalHelper.MinRoleForPortal(portal);
             if (minRole.HasValue
@@ -124,10 +114,6 @@ public class AdminAuthController(
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest(new ApiError(400, "Email is required", HttpContext.TraceIdentifier));
 
-        // Uniform 204 regardless of: account exists or not, email pipeline
-        // success or transient failure. Service swallows email errors +
-        // captures to Sentry (BE #71 + #84 — security session S2). Mirrors
-        // user-side /auth/forgot-password.
         try
         {
             await adminAuthService.RequestPasswordResetAsync(request.Email, Request.Headers.Origin);
@@ -168,8 +154,7 @@ public class AdminAuthController(
     [RequireRole(UserRole.Staff)]
     public async Task<IActionResult> Logout()
     {
-        // Revoke only the portal-specific session — leaves the other admin-side portals'
-        // sessions alone if the user happens to be logged into them in the same browser.
+
         var cookieName = CurrentPortalCookie();
         if (cookieName is null)
             return Ok(new { message = "Logged out" });
@@ -302,13 +287,9 @@ public class AdminAuthController(
 
     private void SetSessionCookie(string sessionToken)
     {
-        // Cookie name is chosen from the X-Portal header so admin / staff / developer portals
-        // each get their own cookie and don't clobber one another. If the header is missing
-        // (direct API hit, e.g. swagger) fall back to session_admin so something is set.
+
         var cookieName = CurrentPortalCookie() ?? Helpers.PortalHelper.AdminCookie;
-        // Secure=true over plain http://localhost causes the browser to drop the cookie, which
-        // looked like "refresh always logs me out". Mirror AuthController: Secure in Production,
-        // off in Development so localhost works.
+
         Response.Cookies.Append(cookieName, sessionToken, new CookieOptions
         {
             HttpOnly = true,

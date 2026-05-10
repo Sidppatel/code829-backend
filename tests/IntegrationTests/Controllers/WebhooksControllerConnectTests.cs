@@ -29,8 +29,6 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         return new HttpRequestMessage(HttpMethod.Post, "/webhooks/stripe") { Content = content };
     }
 
-    // ─── account.updated ────────────────────────────────────────────────────
-
     [Fact]
     public async Task AccountUpdated_FullyEnabled_FlipsAllFourFlags()
     {
@@ -38,8 +36,7 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var orgId = await TestSeed.SeedOrganizationAsync(db, stripeAccountId: stripeAcct);
 
         var payload = StripeWebhookSigner.LoadFixture("account_updated.json", stripeAcct, orgId);
-        // Fixture id collides across tests sharing the DB — randomize so Redis dedupe
-        // doesn't short-circuit the second run.
+
         payload = payload.Replace("evt_test_account_updated_001", $"evt_test_account_updated_{Guid.NewGuid():N}");
 
         var client = db.Factory.CreateClient();
@@ -47,7 +44,6 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Verify the 4 status flags + requirements_due array were persisted.
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -61,7 +57,7 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         reader.GetBoolean(0).Should().BeTrue("charges_enabled in fixture");
         reader.GetBoolean(1).Should().BeTrue("payouts_enabled in fixture");
         reader.GetBoolean(2).Should().BeTrue("details_submitted in fixture");
-        // requirements.currently_due is empty in the active fixture
+
         reader.IsDBNull(3).Should().BeFalse();
     }
 
@@ -104,31 +100,24 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var orgId = await TestSeed.SeedOrganizationAsync(db, stripeAccountId: stripeAcct);
 
         var payload = StripeWebhookSigner.LoadFixture("account_updated.json", stripeAcct, orgId);
-        // Force a fixed event id so Redis dedupe applies on the 2nd call.
+
         var eventId = $"evt_test_dupe_{Guid.NewGuid():N}";
         payload = payload.Replace("evt_test_account_updated_001", eventId);
 
         var client = db.Factory.CreateClient();
 
-        // First call processes; second call is deduped.
         var first = await client.SendAsync(BuildSignedRequest(payload));
         var second = await client.SendAsync(BuildSignedRequest(payload));
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         second.StatusCode.Should().Be(HttpStatusCode.OK);
-        // Both 200 — observable proof that handler didn't run twice would be a
-        // counter or audit table; for now we trust that StringSetAsync(NX) +
-        // the log message at the call site is enough. The behavioral check is
-        // that the second call doesn't blow up if (e.g.) DB state were
-        // mutated in a non-idempotent way.
+
     }
 
     [Fact]
     public async Task AccountUpdated_UnknownStripeAccount_Returns200WithoutCrashing()
     {
-        // Account id that doesn't correspond to any seeded org. The SP raises P0002
-        // (no_data_found from RAISE) which the handler swallows — webhook returns 200
-        // so Stripe doesn't retry forever.
+
         var unseededAcct = $"acct_unknown_{Guid.NewGuid():N}".Substring(0, 24);
 
         var payload = StripeWebhookSigner.LoadFixture("account_updated.json", unseededAcct, Guid.Empty);
@@ -137,12 +126,8 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var client = db.Factory.CreateClient();
         var resp = await client.SendAsync(BuildSignedRequest(payload));
 
-        // Webhook returns 200 even when the org isn't found — letting Stripe retry
-        // wouldn't fix the missing org and would burn API quota.
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
-
-    // ─── transfer.created ───────────────────────────────────────────────────
 
     [Fact]
     public async Task TransferCreated_LinkedAccount_InsertsStripeTransferRow()
@@ -160,7 +145,6 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Verify a row landed in stripe_transfers.
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -190,7 +174,6 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Row must NOT have landed.
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM stripe_transfers WHERE \"StripeTransferId\" = @tid";
@@ -198,8 +181,6 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var count = (long)(await cmd.ExecuteScalarAsync())!;
         count.Should().Be(0);
     }
-
-    // ─── payout.created / payout.paid ───────────────────────────────────────
 
     [Fact]
     public async Task PayoutCreated_LinkedAccount_InsertsStripePayoutRow()
@@ -243,14 +224,12 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var payoutId = $"po_test_{Guid.NewGuid():N}".Substring(0, 24);
         var client = db.Factory.CreateClient();
 
-        // Step 1: payout.created
         var createdPayload = StripeWebhookSigner.LoadFixture("payout_created.json", stripeAcct, orgId);
         createdPayload = createdPayload.Replace("\"id\": \"po_test_001\"", $"\"id\": \"{payoutId}\"");
         createdPayload = createdPayload.Replace("evt_test_payout_created_001", $"evt_test_pc_{Guid.NewGuid():N}");
         var createdResp = await client.SendAsync(BuildSignedRequest(createdPayload));
         createdResp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Step 2: payout.paid for the same payout id — upserts onto the existing row.
         var paidPayload = StripeWebhookSigner.LoadFixture("payout_paid.json", stripeAcct, orgId);
         paidPayload = paidPayload.Replace("\"id\": \"po_test_001\"", $"\"id\": \"{payoutId}\"");
         paidPayload = paidPayload.Replace("evt_test_payout_paid_001", $"evt_test_pp_{Guid.NewGuid():N}");
@@ -270,8 +249,6 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         reader.IsDBNull(1).Should().BeFalse("payout.paid stamps PaidAt server-side");
     }
 
-    // ─── Signature validation ───────────────────────────────────────────────
-
     [Theory]
     [InlineData("account_updated.json")]
     [InlineData("transfer_created.json")]
@@ -284,11 +261,9 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var payload = StripeWebhookSigner.LoadFixture(fixtureFile, stripeAcct, orgId);
 
         var client = db.Factory.CreateClient();
-        // Garbage signature — must be rejected before the handler runs.
+
         var resp = await client.SendAsync(BuildSignedRequest(payload, signatureOverride: "t=1,v1=deadbeef"));
 
-        // Webhook handler returns 400 for signature failures (or 500 if STRIPE_WEBHOOK_SECRET
-        // env var weren't configured — DatabaseFixture configures it, so 400 is the path).
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.InternalServerError);
     }
 
@@ -302,8 +277,7 @@ public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
         var stripeAcct = $"acct_test_{Guid.NewGuid():N}".Substring(0, 24);
         var orgId = await TestSeed.SeedOrganizationAsync(db, stripeAccountId: stripeAcct);
         var payload = StripeWebhookSigner.LoadFixture(fixtureFile, stripeAcct, orgId);
-        // Each test gets a unique event id so Redis dedupe doesn't make this flaky
-        // when the [Theory] cases share a DatabaseFixture across InlineData entries.
+
         payload = System.Text.RegularExpressions.Regex.Replace(payload,
             "\"id\":\\s*\"evt_test_[a-z0-9_]+\"",
             $"\"id\": \"evt_test_{Guid.NewGuid():N}\"",

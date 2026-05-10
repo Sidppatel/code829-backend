@@ -7,7 +7,6 @@ namespace Db.Repositories.StoredProcedures;
 
 public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedures
 {
-    // ─── Table templates ───────────────────────────────────────────
 
     public async Task<Guid> CreateTableTemplateAsync(string name, int capacity, string shape, string? color, int priceCents, int defaultRowSpan = 1, int defaultColSpan = 1, CancellationToken ct = default)
     {
@@ -71,8 +70,6 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
             .ToListAsync(ct);
     }
 
-    // ─── Event (for layout) ────────────────────────────────────────
-
     public async Task<Event?> GetEventByIdForLayoutAsync(Guid id, CancellationToken ct = default)
     {
         return await context.Events
@@ -91,8 +88,6 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
                 new NpgsqlParameter("p2", NpgsqlDbType.Integer) { Value = (object?)gridCols ?? DBNull.Value }
             ], ct);
     }
-
-    // ─── Event tables ──────────────────────────────────────────────
 
     public async Task UpdateEventTableAsync(Guid id, string? label, int? capacity, string? shape, string? color, int? priceCents, bool? isActive, int? platformFeeCents = null, int? rowSpan = null, int? colSpan = null, CancellationToken ct = default)
     {
@@ -142,8 +137,6 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
         return ids.ToHashSet();
     }
 
-    // ─── Tables ────────────────────────────────────────────────────
-
     public async Task UpdateTableAsync(Guid id, string? label, Guid? eventTableId, int? gridRow, int? gridCol, bool? isActive, int? sortOrder, int? rowSpan = null, int? colSpan = null, CancellationToken ct = default)
     {
         await context.Database.ExecuteSqlRawAsync(
@@ -182,8 +175,6 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
             .ToListAsync(ct);
     }
 
-    // ─── Purchase / lock checks ─────────────────────────────────────
-
     public async Task<bool> EventHasActivePurchasesAsync(Guid eventId, CancellationToken ct = default)
     {
         return await context.Database
@@ -213,8 +204,6 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
         return ids.ToHashSet();
     }
 
-    // ─── Grid overlap detection ────────────────────────────────────
-
     public async Task<List<GridOverlapPair>> CheckGridOverlapAsync(Guid eventId, Guid? skipTableId = null, CancellationToken ct = default)
     {
         return await context.Database
@@ -224,8 +213,6 @@ public class LayoutProcedures(EventPlatformDbContext context) : ILayoutProcedure
                 new NpgsqlParameter("p1", NpgsqlDbType.Uuid) { Value = (object?)skipTableId ?? DBNull.Value })
             .ToListAsync(ct);
     }
-
-    // ─── Atomic layout save ────────────────────────────────────────
 
     public async Task SaveEventLayoutAsync(Guid eventId, int? gridRows, int? gridCols, string tablesJson, Guid[] lockedIds, CancellationToken ct = default)
     {

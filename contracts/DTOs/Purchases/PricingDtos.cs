@@ -7,8 +7,6 @@ public record PricingQuoteRequest(
     Guid? EventTicketTypeId = null
 );
 
-// Public — what guest sees while browsing / in cart / table modal.
-// Single number. No subtotal, no fee, no tax.
 public record PublicQuoteDto(
     int DisplayTotalCents,
     int SeatsIncluded,
@@ -17,7 +15,6 @@ public record PublicQuoteDto(
     DateTime ExpiresAt
 );
 
-// Public — checkout screen only. Stripe Tax has run; tax appears for the first time.
 public record CheckoutQuoteDto(
     int DisplayTotalCents,
     int TaxCents,
@@ -31,7 +28,6 @@ public record CheckoutQuoteDto(
     DateTime ExpiresAt
 );
 
-// Admin / Developer — full breakdown + per-line array.
 public record AdminQuoteDto(
     int SubtotalCents,
     int FeeCents,

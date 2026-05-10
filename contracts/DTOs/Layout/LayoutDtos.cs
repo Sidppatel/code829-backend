@@ -1,7 +1,5 @@
 namespace Contracts.DTOs.Layout;
 
-// ─── Table Templates (global) ────────────────────────────────
-
 public record TableTemplateResponse(
     Guid TableTemplateId,
     string Name,
@@ -24,8 +22,6 @@ public record CreateTableTemplateRequest(
     int DefaultRowSpan = 1,
     int DefaultColSpan = 1
 );
-
-// ─── Event Tables (per-event table types) ────────────────────
 
 public record EventTableResponse(
     [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTableId,
@@ -64,8 +60,6 @@ public record UpdateEventTableRequest(
     int? RowSpan = null,
     int? ColSpan = null
 );
-
-// ─── Layout (table instances on grid) ────────────────────────
 
 public record EventLayoutResponse(
     Guid EventId,

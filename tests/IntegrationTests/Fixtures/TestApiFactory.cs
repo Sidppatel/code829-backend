@@ -28,7 +28,7 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
     {
         builder.ConfigureTestServices(services =>
         {
-            // Replace DbContext with test container connection
+
             var dbDescriptors = services
                 .Where(d => d.ServiceType == typeof(DbContextOptions<EventPlatformDbContext>)
                          || d.ServiceType == typeof(EventPlatformDbContext))
@@ -38,11 +38,9 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<EventPlatformDbContext>(options =>
                 options.UseNpgsql(_postgresConnectionString));
 
-            // Replace Redis with test container connection
             var redisDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IConnectionMultiplexer));
             if (redisDescriptor is not null) services.Remove(redisDescriptor);
 
-            // Parse redis URL → StackExchange.Redis config string (matches Program.cs ConvertRedisUrl)
             var redisConfig = ParseRedisUrl(_redisUrl);
             services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConfig));
         });

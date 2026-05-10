@@ -37,7 +37,6 @@ public class AdminImagesController(
         if (entityType is not ("venue" or "event"))
             return BadRequest(new ApiError(400, "entityType must be 'venue' or 'event'", HttpContext.TraceIdentifier));
 
-        // Verify entity exists and user has access
         var userId = GetCurrentUserId();
         if (!await CanManageEntityAsync(entityType, entityId, userId))
             return NotFound(new ApiError(404, $"{entityType} not found or access denied", HttpContext.TraceIdentifier));
@@ -103,7 +102,7 @@ public class AdminImagesController(
 
     private async Task<bool> CanManageEntityAsync(string entityType, Guid entityId, Guid userId)
     {
-        // Admin/Developer users always have access (this controller requires Admin role minimum)
+
         if (User.IsInRole(UserRole.Developer.ToString()) || User.IsInRole(UserRole.Admin.ToString()))
             return true;
 

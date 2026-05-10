@@ -29,9 +29,6 @@ public class AdminLayoutController(
     ISettingsService settings,
     ICacheService cache) : ControllerBase
 {
-    // ═══════════════════════════════════════════════════════════
-    //  Table Templates (global)
-    // ═══════════════════════════════════════════════════════════
 
     [HttpGet("admin/table-templates")]
     public async Task<IActionResult> GetTableTemplates()
@@ -90,10 +87,6 @@ public class AdminLayoutController(
         await layoutProc.DeactivateTableTemplateAsync(id);
         return NoContent();
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Event Tables (per-event table types)
-    // ═══════════════════════════════════════════════════════════
 
     [HttpGet("admin/events/{eventId:guid}/event-tables")]
     public async Task<IActionResult> GetEventTables(Guid eventId)
@@ -212,10 +205,6 @@ public class AdminLayoutController(
         return NoContent();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Layout (table instances on grid)
-    // ═══════════════════════════════════════════════════════════
-
     [HttpGet("admin/events/{eventId:guid}/layout")]
     public async Task<IActionResult> GetLayout(Guid eventId)
     {
@@ -275,8 +264,6 @@ public class AdminLayoutController(
             eventId, request.GridRows, request.GridCols,
             updatedTables.Select(t => MapTableViewWithStatus(t, updatedLocked)).ToList()));
     }
-
-    // ─── Redis Draft Endpoints ──────────────────────────────────
 
     private static string DraftKey(Guid eventId) => $"layout:draft:{eventId}";
     private static readonly TimeSpan DraftTtl = TimeSpan.FromHours(24);
@@ -340,8 +327,6 @@ public class AdminLayoutController(
         await db.KeyDeleteAsync(DraftKey(eventId));
         return Ok(new { message = "Flushed to DB" });
     }
-
-    // ─── Single Table CRUD ──────────────────────────────────────
 
     [HttpPost("admin/events/{eventId:guid}/layout/table")]
     public async Task<IActionResult> AddTable(Guid eventId, [FromBody] AddTableRequest request)
@@ -460,8 +445,6 @@ public class AdminLayoutController(
         return NoContent();
     }
 
-    // ─── Status / Stats / Locked ────────────────────────────────
-
     [HttpGet("admin/events/{eventId:guid}/layout/status")]
     public async Task<IActionResult> GetLayoutWithStatus(Guid eventId)
     {
@@ -542,8 +525,6 @@ public class AdminLayoutController(
         return Ok(new { layoutLocked, lockedTableIds = locked });
     }
 
-    // ─── Bulk Insert (templates → event tables) ─────────────────
-
     [HttpPost("admin/events/{eventId:guid}/layout/bulk-insert")]
     public async Task<IActionResult> BulkInsertEventTables(Guid eventId, [FromBody] BulkInsertRequest request)
     {
@@ -577,10 +558,6 @@ public class AdminLayoutController(
 
         return Ok(new BulkInsertResponse(created.Count, created));
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════
 
     private Guid GetCurrentUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);

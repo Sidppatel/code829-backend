@@ -38,7 +38,7 @@ public class PricingService(
 {
     public async Task<PublicQuoteDto> CalculatePublicQuoteAsync(PricingQuoteRequest request, CancellationToken ct = default)
     {
-        // Public quote skips Stripe Tax — guests don't see tax until checkout.
+
         var (subtotal, fee, seats, _, _) = await ComputeBaseAsync(request, ct);
         var displayTotal = subtotal + fee;
         return new PublicQuoteDto(

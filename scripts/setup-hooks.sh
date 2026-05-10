@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-# Installs the project's pre-commit hooks (gitleaks + detect-secrets).
-# Run once per clone. Safe to re-run.
-#
-# Requires Python 3.8+ and the `pre-commit` CLI:
-#   pip install pre-commit detect-secrets
+
 set -euo pipefail
 
 require_cmd() {

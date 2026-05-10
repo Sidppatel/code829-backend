@@ -15,7 +15,6 @@ public interface IAuthService
     Task RevokeSessionAsync(Guid sessionId, Guid userId);
     Task RevokeAllSessionsAsync(Guid userId, string? exceptSessionHash);
 
-    // ── Email+password auth ─────────────────────────
     Task<SignupResponse> SignupAsync(string email, string firstName, string lastName, string password, string? ip, string? frontendOrigin);
     Task<(UserDto User, string SessionToken, string Jwt)> SigninAsync(string email, string password, string? deviceName, string? ip);
     Task<(UserDto User, string SessionToken, string Jwt)> VerifyEmailAsync(string token, string? deviceName, string? ip);

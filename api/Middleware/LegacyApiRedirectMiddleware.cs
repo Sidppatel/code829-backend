@@ -11,9 +11,7 @@ namespace Api.Middleware;
 /// </summary>
 public partial class LegacyApiRedirectMiddleware(RequestDelegate next)
 {
-    // Infra + external-webhook endpoints stay unversioned: health probes on
-    // Render, Stripe webhook URL registered in the dashboard, SEO files indexed
-    // by crawlers. These controllers intentionally do not carry [ApiVersion].
+
     private static readonly string[] PassThroughPrefixes =
     {
         "/health",

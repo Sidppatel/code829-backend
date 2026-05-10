@@ -60,8 +60,6 @@ public class PricingDtoShapeTests
         Assert.True(doc.RootElement.TryGetProperty("grandTotalCents", out var grand));
         Assert.Equal(28620, grand.GetInt32());
 
-        // CheckoutQuoteDto carries tax + grand total, but still must not leak
-        // subtotal or platform fee — those are admin-only.
         foreach (var prop in doc.RootElement.EnumerateObject())
         {
             var n = prop.Name;

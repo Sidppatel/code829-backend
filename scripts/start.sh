@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Boot full event-platform stack: docker + backend API + 4 frontend apps.
-# Requires: docker, dotnet, pnpm, infisical CLI, bash 4+.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib.sh
+
 source "$SCRIPT_DIR/lib.sh"
 
 ROOT="$(resolve_monorepo_root)"

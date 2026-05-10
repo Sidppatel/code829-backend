@@ -81,7 +81,7 @@ public sealed class SpCancelPurchaseTests(DatabaseFixture db)
         var (purchaseId, _) = await SeedPurchaseWithTableAsync();
 
         await db.ExecuteSqlAsync("SELECT sp_cancel_purchase(@pid)", ("pid", purchaseId));
-        // Second call should not throw
+
         var act = () => db.ExecuteSqlAsync("SELECT sp_cancel_purchase(@pid)", ("pid", purchaseId));
         await act.Should().NotThrowAsync();
     }

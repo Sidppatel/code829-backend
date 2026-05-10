@@ -18,7 +18,6 @@ public class TableView
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    // Joined from EventTable
     public int Capacity { get; set; }
     public string Shape { get; set; } = null!;
     public string? Color { get; set; }

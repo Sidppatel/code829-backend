@@ -124,7 +124,7 @@ public sealed class PublicControllerBreakdownAnalyzer : DiagnosticAnalyzer
         if (name.EndsWith("SubtotalCents", StringComparison.Ordinal)
             || name.EndsWith("FeeCents", StringComparison.Ordinal))
         {
-            // Allow PlatformFeeCents references — that's admin pricing input, not a breakdown property.
+
             if (name == "PlatformFeeCents") return;
             ctx.ReportDiagnostic(Diagnostic.Create(Rule, ma.Name.GetLocation(), name));
         }

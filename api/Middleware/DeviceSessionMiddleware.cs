@@ -24,8 +24,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         IBusinessUserProcedures businessUserProc,
         IServiceScopeFactory scopeFactory)
     {
-        // Per-portal cookie lookup: each frontend declares which portal it is via X-Portal,
-        // so we know exactly which cookie to resolve. Missing/unknown header = no session.
+
         var portal = PortalHelper.ReadPortal(httpContext.Request);
         var cookieName = PortalHelper.CookieFor(portal);
         if (cookieName is null)
@@ -45,7 +44,6 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         var db = redis.GetDatabase();
         var cacheKey = $"session:{sessionHash}";
 
-        // Try Redis cache first
         var cachedJwt = await db.StringGetAsync(cacheKey);
         if (cachedJwt.HasValue)
         {
@@ -54,7 +52,6 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             return;
         }
 
-        // Cache miss — validate session in DB
         var session = await dbContext.DeviceSessionViews
             .AsNoTracking()
             .FirstOrDefaultAsync(s =>
@@ -64,15 +61,12 @@ public class DeviceSessionMiddleware(RequestDelegate next)
 
         if (session is null)
         {
-            // Invalid session — clear the cookie
+
             httpContext.Response.Cookies.Delete(cookieName);
             await next(httpContext);
             return;
         }
 
-        // Portal-vs-session-type guard: a session_user cookie must resolve to a user session,
-        // and session_admin / session_staff / session_developer to an admin session. This catches
-        // stale cookies after DB reseeds and blocks any cross-portal resolution attempts.
         var isAdminPortal = PortalHelper.IsAdminPortal(portal);
         if (isAdminPortal && !session.BusinessUserId.HasValue)
         {
@@ -87,7 +81,6 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             return;
         }
 
-        // Resolve user or admin user based on session type
         string? jwt = null;
 
         if (session.UserId.HasValue)
@@ -111,8 +104,6 @@ public class DeviceSessionMiddleware(RequestDelegate next)
                 return;
             }
 
-            // Role-vs-portal guard: staff portal requires ≥Staff, admin ≥Admin, developer =Developer.
-            // An admin who downgrades roles between sessions won't keep a stale higher-privilege cookie.
             var minRole = PortalHelper.MinRoleForPortal(portal);
             if (minRole.HasValue && (int)admin.Role < (int)minRole.Value)
             {
@@ -130,13 +121,10 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             return;
         }
 
-        // Cache in Redis
         await db.StringSetAsync(cacheKey, jwt, JwtCacheTtl);
 
-        // Attach to request
         httpContext.Request.Headers.Authorization = $"Bearer {jwt}";
 
-        // Debounced activity update
         if (session.LastActivityAt < DateTime.UtcNow - ActivityDebounce)
         {
             _ = Task.Run(async () =>
@@ -144,8 +132,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
                 try
                 {
                     await db.StringSetAsync($"session:activity:{sessionHash}", "1", ActivityDebounce);
-                    // Use root-scoped factory: httpContext.RequestServices is disposed
-                    // once the request completes, which races this fire-and-forget task.
+
                     using var scope = scopeFactory.CreateScope();
                     var ctx = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
                     await ctx.Database.ExecuteSqlRawAsync(

@@ -38,10 +38,7 @@ public class FluentValidationFilter : IAsyncActionFilter
 
         if (errors is not null)
         {
-            // Log a single Warning line per failed request so the dev box has
-            // an audit trail when a client reports a 400 — FluentValidation
-            // short-circuits before any controller code runs, so without this
-            // there is no log entry pinning down which field rejected.
+
             var path = context.HttpContext.Request.Path.ToString();
             var method = context.HttpContext.Request.Method;
             var summary = string.Join("; ",

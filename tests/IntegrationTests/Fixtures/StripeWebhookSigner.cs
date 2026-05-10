@@ -47,7 +47,7 @@ public static class StripeWebhookSigner
     /// </summary>
     public static string LoadFixture(string fileName, string stripeAccountId, Guid? organizationId = null)
     {
-        // Tests are run from bin/.../{TFM}; fixtures are copied with PreserveNewest.
+
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "StripeWebhookFixtures", fileName);
         var raw = File.ReadAllText(path);
         return raw

@@ -10,7 +10,6 @@ public class Venue : BaseEntity
     public string? Website { get; set; }
     public bool IsActive { get; set; } = true;
 
-    // Address (separate table)
     public Guid? AddressId { get; set; }
     public Address? Address { get; set; }
 

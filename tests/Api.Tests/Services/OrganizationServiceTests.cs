@@ -48,8 +48,6 @@ public class OrganizationServiceTests : IDisposable
         _context.Dispose();
     }
 
-    // ─── CRUD happy path ────────────────────────────────────────────────────
-
     [Fact]
     public async Task CreateAsync_WithoutInitialMember_OnlyCallsCreate()
     {
@@ -146,15 +144,10 @@ public class OrganizationServiceTests : IDisposable
         _orgProc.Verify(p => p.RemoveBusinessUserAsync(memberId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    // ─── Removal guarded by SP — Postgres FK violation surfaces as exception ─
-
     [Fact]
     public async Task RemoveMemberAsync_WhenSpRaisesFkViolation_PropagatesException()
     {
-        // The "can't remove the last member of an org with an active Stripe
-        // account" rule is enforced inside sp_remove_business_user_from_org —
-        // it raises a foreign_key_violation. The service merely propagates
-        // (the controller's exception filter converts it to 409).
+
         _orgProc.Setup(p => p.RemoveBusinessUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Npgsql.PostgresException("Cannot remove last member of org with active Stripe account",
                 "ERROR", "ERROR", "23503"));
@@ -164,8 +157,6 @@ public class OrganizationServiceTests : IDisposable
         await act.Should().ThrowAsync<Npgsql.PostgresException>()
             .Where(e => e.SqlState == "23503");
     }
-
-    // ─── GetByBusinessUserIdAsync — null when BU has no org ─────────────────
 
     [Fact]
     public async Task GetByBusinessUserIdAsync_ReturnsNull_WhenBusinessUserHasNoOrganization()
@@ -200,13 +191,10 @@ public class OrganizationServiceTests : IDisposable
         result.StripeConnectedAccountId.Should().Be("acct_xyz");
     }
 
-    // ─── Listing pagination clamping ────────────────────────────────────────
-
     [Fact]
     public async Task ListAsync_ClampsPageSize_ToServerMax()
     {
-        // No setup for _orgProc needed as we use the context directly via View
-        
+
         var result = await _service.ListAsync(null, page: 1, pageSize: 5000);
 
         result.PageSize.Should().Be(100);
@@ -223,8 +211,6 @@ public class OrganizationServiceTests : IDisposable
 
         result.Page.Should().Be(expectedPage);
     }
-
-    // ─── Onboarding-link email path ─────────────────────────────────────────
 
     private static BusinessUser MakeBu(string firstName = "Admin") => new()
     {

@@ -26,4 +26,3 @@ public record NestedTicketTypeUpdate(
     [property: JsonPropertyName("capacity")] int? Capacity,
     [property: JsonPropertyName("description")] string? Description = null
 );
-

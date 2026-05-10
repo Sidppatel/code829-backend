@@ -44,16 +44,14 @@ public sealed class DatabaseFixture : IAsyncLifetime
         PostgresConnectionString = _postgres.GetConnectionString();
         RedisConnectionString = $"redis://localhost:{_redis.GetMappedPublicPort(6379)}";
 
-        // Set env vars before the WebApplicationFactory builds its host
         Environment.SetEnvironmentVariable("DATABASE_URL", PostgresConnectionString);
         Environment.SetEnvironmentVariable("REDIS_URL", RedisConnectionString);
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
         Environment.SetEnvironmentVariable("JWT_SECRET", "integration-test-jwt-secret-must-be-32-chars!!");
-        // Use Stripe test placeholder — integration tests don't call Stripe directly
+
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY")))
             Environment.SetEnvironmentVariable("STRIPE_SECRET_KEY", "sk_test_integration_placeholder");
-        // Webhook signature integration tests sign payloads with this exact secret.
-        // Single value across the suite so signature helpers don't need a getter.
+
         Environment.SetEnvironmentVariable("STRIPE_WEBHOOK_SECRET", "whsec_integration_test_secret");
 
         await RunMigrationsAsync();

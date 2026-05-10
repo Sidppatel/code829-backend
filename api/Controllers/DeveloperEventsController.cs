@@ -121,8 +121,7 @@ public class DeveloperEventsController(
 
             if (feeCents != tt.PlatformFeeCents)
             {
-                // Sales + active-lock check via SP helpers (purchases on any child table OR any
-                // table currently Held/Booked under this event-table).
+
                 var hasSales = await layoutProc.EventTableHasActivePurchasesAsync(id, tt.Id);
                 var hasLocks = await layoutProc.EventTableHasLockedTablesAsync(tt.Id);
                 if (hasSales || hasLocks)

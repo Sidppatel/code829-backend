@@ -50,9 +50,7 @@ public class AdminStripeController(
 
         if (string.IsNullOrEmpty(orgDto.StripeConnectedAccountId))
         {
-            // The org exists but has no Stripe account yet. Return the org
-            // shell so the FE can render the "ask developer to enable payouts"
-            // empty state without a separate request.
+
             return Ok(new OrganizationStripeStatusDto(
                 OrganizationId: orgDto.Id,
                 OrganizationName: orgDto.Name,
@@ -64,7 +62,7 @@ public class AdminStripeController(
                     payoutsEnabled: false,
                     disabledReason: null),
                 BankAccountLast4: null,
-                // TODO: populate members once sp_get_organization_members exists
+
                 Members: new List<OrganizationMemberDto>(),
                 ExpressDashboardUrl: null,
                 FetchedAt: DateTime.UtcNow));
@@ -104,7 +102,7 @@ public class AdminStripeController(
                 StripeAccount: stripeAccountDto,
                 State: state,
                 BankAccountLast4: status.BankAccountLast4,
-                // TODO: populate members once sp_get_organization_members exists
+
                 Members: new List<OrganizationMemberDto>(),
                 ExpressDashboardUrl: expressDashboardUrl,
                 FetchedAt: DateTime.UtcNow));

@@ -48,7 +48,6 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
 
             Log.Error(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
 
-            // Report unhandled 5xx only. 4xx validation/auth errors are returned earlier and never reach here.
             SentrySdk.CaptureException(ex);
 
             try

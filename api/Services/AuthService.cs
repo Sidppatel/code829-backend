@@ -53,9 +53,6 @@ public class AuthService(
 
         Log.Information("[Auth] Magic link sent to {EmailHash}", HashEmailForLog(normalizedEmail));
 
-        // Dev-only: surface the verify URL in logs so local QA can copy it without
-        // waiting for email delivery. Never return the raw token in the HTTP response —
-        // that turned the magic-link scheme into a direct-auth bypass if Dev mode leaked.
         if (environment.IsDevelopment())
             Log.Debug("[Auth] Magic link verify URL (dev only): {Url}", verifyUrl);
 
@@ -83,8 +80,6 @@ public class AuthService(
         var userDto = MapUserDto(user);
         var jwt = await jwtService.GenerateUserJwtAsync(user);
 
-        // BE #68: successful verify clears per-token rate-limit counter. Subsequent replay
-        // attempts hit the SP, fail ConsumeMagicLinkAsync, and the counter re-creates.
         var rldb = redis.GetDatabase();
         await rldb.KeyDeleteAsync($"ratelimit:mlv:{tokenHash}");
 
@@ -161,7 +156,7 @@ public class AuthService(
 
     public async Task RevokeAllSessionsAsync(Guid userId, string? exceptSessionHash)
     {
-        // Get all active session hashes for Redis cleanup
+
         var hashes = await context.DeviceSessionViews
             .AsNoTracking()
             .Where(s => s.UserId == userId && s.RevokedAt == null && (exceptSessionHash == null || s.SessionHash != exceptSessionHash))
@@ -214,15 +209,11 @@ public class AuthService(
         return Convert.ToHexStringLower(bytes);
     }
 
-    // 12-char SHA-256 prefix for Serilog — enough to correlate log lines across a session
-    // without leaking the plaintext address. Plaintext still lands in audit_logs rows.
     private static string HashEmailForLog(string email)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(email));
         return Convert.ToHexStringLower(bytes)[..12];
     }
-
-    // ── Email+password auth ───────────────────────────────
 
     public async Task<SignupResponse> SignupAsync(string email, string firstName, string lastName, string password, string? ip, string? frontendOrigin)
     {
@@ -323,9 +314,7 @@ public class AuthService(
 
     public async Task RequestPasswordResetAsync(string email, string? ip, string? frontendOrigin)
     {
-        // BE #71 + #84: always succeed from the caller's perspective. No user-existence signal,
-        // no email-delivery signal. Failures here are captured via Sentry and logged but never
-        // surfaced to the client — the endpoint returns 204 unconditionally.
+
         var normalizedEmail = email.ToLowerInvariant().Trim();
         var emailHashLog = HashEmailForLog(normalizedEmail);
 

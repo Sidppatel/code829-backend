@@ -32,7 +32,6 @@ public class TestDbContext : EventPlatformDbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Remove NpgsqlTsVector properties that are incompatible with InMemory
         modelBuilder.Entity<Db.Entities.Event>(entity =>
         {
             entity.Ignore(e => e.SearchVector);

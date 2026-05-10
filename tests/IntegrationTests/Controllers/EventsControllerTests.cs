@@ -44,9 +44,7 @@ public sealed class EventsControllerTests(DatabaseFixture db)
         var err = await resp.Content.ReadFromJsonAsync<ApiError>(JsonSerializerOptions.Web);
         err.Should().NotBeNull();
         err!.Message.Should().Be("Event not found");
-        // Correlation id surfaces on the X-Correlation-Id response header. Some controllers
-        // pass traceId positionally into ApiError.Detail — treat either field as acceptable
-        // for trace-id presence in the body.
+
         (err.CorrelationId ?? err.Detail).Should().NotBeNullOrEmpty();
         resp.Headers.GetValues("X-Correlation-Id").Should().NotBeNullOrEmpty();
     }

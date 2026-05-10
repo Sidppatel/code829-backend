@@ -62,7 +62,7 @@ public class EventImageService(
 
     public async Task<bool> RemoveAsync(Guid eventId, Guid imageId)
     {
-        // Fetch storage key before delete so we can clean up variants.
+
         var rows = await eventImageProc.ListAsync(eventId);
         var target = rows.FirstOrDefault(r => r.ImageId == imageId);
         if (target is null) return false;

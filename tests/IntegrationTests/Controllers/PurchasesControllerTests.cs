@@ -19,9 +19,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     [Fact]
     public async Task Quote_NoAuth_AllowsAnonymousAndReturns404ForUnknownEvent()
     {
-        // Public quote (browse / cart / table-picker) is intentionally [AllowAnonymous]
-        // per the Phase 1 restructure — guests need a price before logging in.
-        // Tax breakdown is not in this DTO; that's CheckoutQuoteDto on the auth-only endpoint.
+
         var client = db.Factory.CreateClient().WithoutAuth();
         var resp = await client.PostAsJsonAsync("/v1/purchases/quote",
             new { eventId = Guid.NewGuid(), tableIds = new[] { Guid.NewGuid() } });
@@ -66,7 +64,7 @@ public sealed class PurchasesControllerTests(DatabaseFixture db)
     {
         var client = db.Factory.CreateClient();
         var resp = await client.GetAsync("/v1/purchases/stripe-config");
-        // Stripe test key may not be fully wired in test env; both OK and 503 are acceptable
+
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
     }
 

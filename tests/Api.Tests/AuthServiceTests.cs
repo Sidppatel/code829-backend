@@ -36,7 +36,6 @@ public class AuthServiceTests : IDisposable
         _authProc = new Mock<IAuthProcedures>();
         _redis = new Mock<IConnectionMultiplexer>();
 
-        // VerifyMagicLinkAsync clears per-token rate-limit key on success (BE #68).
         var redisDb = new Mock<IDatabase>();
         redisDb.Setup(d => d.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(true);
@@ -146,7 +145,7 @@ public class AuthServiceTests : IDisposable
     [Fact]
     public async Task VerifyMagicLinkAsync_DoubleConsumption_ReturnsNull()
     {
-        // SP UPDATE WHERE IsUsed=false returns 0 rows on second call → ConsumeMagicLinkAsync returns null → service throws.
+
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var userId = Guid.NewGuid();
 

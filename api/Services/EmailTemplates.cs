@@ -130,6 +130,6 @@ public static class EmailTemplates
             <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;line-height:1.6;">Hi{(string.IsNullOrEmpty(firstName) ? "" : $" {firstName}")}, the {brandName} team has set up a Stripe Connect account for <strong>{organizationName}</strong>.</p>
             <p style="margin:0 0 8px;font-size:15px;color:#3f3f46;line-height:1.6;">Click the button below to complete the onboarding form (legal name, address, bank account, etc.). Stripe will collect everything and send you back to {brandName} when you're done.</p>
             {Button("Complete Stripe Onboarding", onboardingUrl)}
-            <p style="margin:0;color:#71717a;font-size:13px;line-height:1.5;">This link expires in about {expiryMinutes} minutes — request a new one from the developer if it lapses. Your data goes directly to Stripe; we never see your bank credentials.</p>
+            <p style="margin:0;color:#71717a;font-size:13px;line-height:1.5;">This link expires in about {expiryMinutes} minutes - request a new one from the developer if it lapses. Your data goes directly to Stripe; we never see your bank credentials.</p>
             """);
 }

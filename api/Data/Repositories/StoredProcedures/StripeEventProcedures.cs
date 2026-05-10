@@ -15,9 +15,7 @@ public class StripeEventProcedures(EventPlatformDbContext context) : IStripeEven
         string rawEventJson,
         CancellationToken ct = default)
     {
-        // SqlQueryRaw on a Guid scalar mirrors the OrganizationProcedures.CreateAsync
-        // pattern. The SP's RETURNING uuid serializes through the standard
-        // "Value" column alias.
+
         return await context.Database
             .SqlQueryRaw<Guid>(
                 "SELECT sp_insert_stripe_transfer(@p0, @p1, @p2, @p3, @p4, @p5::jsonb) AS \"Value\"",

@@ -82,19 +82,15 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
     [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
     public async Task ReturnsEmptySet_WhenNoEventsAreDue()
     {
-        // Seed only future events
+
         await SeedScheduledEventAsync(DateTimeOffset.UtcNow.AddDays(10));
 
-        // Clear any previously published events so counts are predictable
-        // (Use a unique Title prefix to isolate)
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();
-        // Publish only events whose ScheduledPublishAt <= now() — none of ours qualify
+
         cmd.CommandText = "SELECT COUNT(*) FROM sp_publish_scheduled_events() AS ids WHERE ids IS NOT NULL";
         var count = (long)(await cmd.ExecuteScalarAsync() ?? 0L);
 
-        // Could be > 0 from other parallel tests but our future event must not be in it
-        // — no assertion on count; we verified "not contains" in the previous test
         count.Should().BeGreaterThanOrEqualTo(0);
     }
 }

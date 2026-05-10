@@ -14,11 +14,8 @@ namespace Api.Services;
 public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scanner) : IFileStorageService
 {
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
-    // AmazonS3Client is thread-safe; reusing it across all requests keeps TLS
-    // connections warm and avoids per-call config bootstrap. Service is now
-    // registered Singleton so the client survives the request scope.
     private AmazonS3Client? _client;
     private readonly object _clientLock = new();
 
@@ -43,8 +40,6 @@ public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scan
         var client = GetClient();
         var bucket = secrets.S3Bucket;
 
-        // Buffer into MemoryStream so the SDK knows Content-Length upfront.
-        // R2 rejects chunked/streaming uploads (STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER).
         var ms = new MemoryStream();
         await fileStream.CopyToAsync(ms);
         ms.Position = 0;
@@ -60,8 +55,8 @@ public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scan
             Key = key,
             InputStream = ms,
             ContentType = contentType,
-            DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
-            // Force download disposition so a malicious polyglot can never execute inline.
+            DisablePayloadSigning = true,
+
             Headers = { ContentDisposition = "attachment" }
         };
 
@@ -78,10 +73,6 @@ public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scan
         var client = GetClient();
         var bucket = secrets.S3Bucket;
 
-        // R2 requires Content-Length upfront. If caller already passes a MemoryStream
-        // (the typical hot path — image variants are produced as MemoryStream), use
-        // it directly to avoid the per-call alloc + CopyTo. Only re-buffer when the
-        // input isn't seekable.
         Stream uploadStream;
         bool ownedStream = false;
         if (fileStream is MemoryStream existing && existing.CanSeek)
@@ -105,8 +96,6 @@ public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scan
         uploadStream.Position = 0;
         var afterScan = sw.ElapsedMilliseconds;
 
-        // Capture length BEFORE PutObject — AWS SDK closes InputStream after upload
-        // (AutoCloseStream defaults true), so reading Length afterward throws.
         var bytes = uploadStream.Length;
 
         var request = new PutObjectRequest
@@ -115,8 +104,8 @@ public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scan
             Key = key,
             InputStream = uploadStream,
             ContentType = contentType,
-            DisablePayloadSigning = true,   // R2: use UNSIGNED-PAYLOAD instead of chunk signing
-            AutoCloseStream = ownedStream,  // only let SDK close streams we own
+            DisablePayloadSigning = true,
+            AutoCloseStream = ownedStream,
             Headers =
             {
                 CacheControl = "public, max-age=31536000, immutable",
@@ -174,9 +163,7 @@ public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scan
 
             var accessKey = secrets.S3AccessKey;
             var secretKey = secrets.S3SecretKey;
-            // R2 accepts any region (uses 'auto' internally); 'us-east-1' is the
-            // safe default for AWS S3 too. Override via S3_REGION env var only
-            // if pointing the SDK at a non-R2 S3-compatible bucket.
+
             var region = Environment.GetEnvironmentVariable("S3_REGION") ?? "us-east-1";
             var endpointUrl = secrets.S3EndpointUrl;
 

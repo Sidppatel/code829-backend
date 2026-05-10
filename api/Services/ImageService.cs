@@ -30,7 +30,7 @@ public class ImageService(
         var detailVariant = variants.First(v => v.Suffix == "");
 
         var baseKey = $"{entityType}/{Guid.NewGuid()}";
-        // Upload all variants to storage in parallel — independent network calls.
+
         await Task.WhenAll(variants.Select(variant =>
             fileStorage.SaveWithKeyAsync(variant.Stream, $"{baseKey}{variant.Suffix}.webp", "image/webp")));
 
@@ -71,7 +71,7 @@ public class ImageService(
             fileStorage.GetPublicUrl(storageKey),
             fileStorage.GetPublicUrl($"{baseKey}_thumb.webp"),
             fileStorage.GetPublicUrl($"{baseKey}_card.webp"),
-            sortOrder == 0  // first uploaded is primary
+            sortOrder == 0
         );
     }
 
@@ -102,7 +102,6 @@ public class ImageService(
         var image = await imageRepo.GetByIdAsync(imageId);
         if (image is null) return;
 
-        // Promote to primary by setting SortOrder = 0 and shifting others up.
         var all = await imageRepo.GetByEntityAsync(image.EntityType, image.EntityId);
         var target = all.FirstOrDefault(x => x.Id == imageId);
         if (target is null) return;
@@ -167,7 +166,7 @@ public class ImageService(
         i.SizeBytes,
         i.Width,
         i.Height,
-        i.SortOrder == 0,   // primary = lowest sort order
+        i.SortOrder == 0,
         i.SortOrder,
         i.CreatedAt,
         i.AltText,

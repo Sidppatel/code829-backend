@@ -25,7 +25,7 @@ public class RateLimitingMiddlewareTests
         _env = new Mock<IWebHostEnvironment>();
         _env.Setup(e => e.EnvironmentName).Returns(Environments.Production);
         _settings = new Mock<ISettingsService>();
-        // Default: rate limiting enabled
+
         _settings.Setup(s => s.GetOrDefaultAsync("rate_limit_disabled", "false")).ReturnsAsync("false");
     }
 
@@ -57,7 +57,7 @@ public class RateLimitingMiddlewareTests
     public async Task Request_AboveLimit_Returns429()
     {
         _redisDb.Setup(d => d.StringIncrementAsync(It.IsAny<RedisKey>(), It.IsAny<long>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(201); // above default limit of 200
+            .ReturnsAsync(201);
         _redisDb.Setup(d => d.KeyTimeToLiveAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(TimeSpan.FromSeconds(60));
 
@@ -94,11 +94,9 @@ public class RateLimitingMiddlewareTests
         RequestDelegate next = _ => Task.CompletedTask;
         var middleware = new RateLimitingMiddleware(next, _redis.Object, _env.Object);
 
-        // Two different IPs
         await middleware.InvokeAsync(CreateHttpContext("10.0.0.1", "/events"), _settings.Object);
         await middleware.InvokeAsync(CreateHttpContext("10.0.0.2", "/events"), _settings.Object);
 
-        // Each IP should have its own counter key
         counters.Should().HaveCount(2);
         counters.Keys.Should().Contain(k => k.Contains("10.0.0.1"));
         counters.Keys.Should().Contain(k => k.Contains("10.0.0.2"));
@@ -113,7 +111,7 @@ public class RateLimitingMiddlewareTests
     [InlineData("/events/schema-list")]
     public async Task CatalogPath_AboveCatalogLimit_Returns429(string catalogPath)
     {
-        // CatalogLimit = 60; simulate count of 61
+
         _redisDb.Setup(d => d.StringIncrementAsync(It.IsAny<RedisKey>(), It.IsAny<long>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(61);
         _redisDb.Setup(d => d.KeyTimeToLiveAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))

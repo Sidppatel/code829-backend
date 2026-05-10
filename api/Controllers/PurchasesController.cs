@@ -35,10 +35,7 @@ public class PurchasesController(
             return CreatedAtAction(nameof(GetById), new { id = purchase.PurchaseId }, purchase);
         }
         catch (KeyNotFoundException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return NotFound(new ApiError(404, "Resource not found", HttpContext.TraceIdentifier)); }
-        // OrganizationNotPayoutReadyException is a 409 distinct from the generic 400 below
-        // so the FE can render a "ask the organizer to finish onboarding" empty state instead
-        // of treating it like a malformed request. We surface the raw message because it's
-        // already user-safe (defined in PurchaseService — no PII, no internal IDs).
+
         catch (OrganizationNotPayoutReadyException ex) { Log.Warning("[Purchases] Create blocked by Connect enforcement: {Message}", ex.Message); return Conflict(new ApiError(409, ex.Message, HttpContext.TraceIdentifier)); }
         catch (InvalidOperationException ex) { Log.Warning(ex, "[Purchases] Create failed: {Message}", ex.Message); return BadRequest(new ApiError(400, "Invalid request", HttpContext.TraceIdentifier)); }
     }
@@ -141,12 +138,9 @@ public class PurchasesController(
             if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
 
-            // Explicit ownership re-check at the controller boundary. purchaseService.CancelAsync
-            // also checks, but we fail fast here so any future refactor that reshapes the service
-            // can't accidentally let a beacon cancel someone else's purchase.
             var purchase = await context.PurchaseViews.AsNoTracking()
                 .FirstOrDefaultAsync(b => b.PurchaseId == request.PurchaseId);
-            if (purchase is null) return Ok(); // nothing to cancel; beacon stays 200
+            if (purchase is null) return Ok();
             if (purchase.UserId != userId)
             {
                 Log.Warning("[Purchases] AUDIT beacon_cancel_ownership_mismatch purchase={PurchaseId} user={UserId}", request.PurchaseId, userId);
@@ -159,7 +153,7 @@ public class PurchasesController(
         catch (Exception ex)
         {
             Log.Warning(ex, "[Purchases] Beacon cancel failed for purchase {PurchaseId}", request.PurchaseId);
-            return Ok(); // Still return 200 for beacon (fire-and-forget)
+            return Ok();
         }
     }
 

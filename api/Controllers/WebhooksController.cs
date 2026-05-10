@@ -42,9 +42,7 @@ public class WebhooksController(
             }
 
             var signature = Request.Headers["Stripe-Signature"].ToString();
-            // Stripe CLI forwards events using the newest API version while the SDK is pinned to
-            // an older one. Signature + payload are still validated; we only read core fields
-            // (PaymentIntent.Id, AmountReceived, Metadata) that are stable across versions.
+
             stripeEvent = EventUtility.ConstructEvent(json, signature, webhookSecret, throwOnApiVersionMismatch: false);
         }
         catch (StripeException ex)
@@ -53,9 +51,6 @@ public class WebhooksController(
             return BadRequest("Invalid signature");
         }
 
-        // Dedupe at the controller level — Stripe retries failed webhooks and a single event
-        // can arrive multiple times. Idempotent handlers guard downstream work, but processing
-        // the same event twice still burns DB + Stripe API calls.
         var dedupeKey = $"stripe-webhook:{stripeEvent.Id}";
         var inflightKey = $"stripe-webhook:inflight:{stripeEvent.Id}";
         var db = redis.GetDatabase();
@@ -66,16 +61,11 @@ public class WebhooksController(
             return Ok();
         }
 
-        // Short-lived in-flight lock guards against two workers racing the same event id.
-        // The 7-day dedupe is cleared on handler failure (below) to allow Stripe retries;
-        // without the 60s inflight lock, concurrent retries after a crash could double-process.
         var gotInflight = await db.StringSetAsync(inflightKey, "1", InflightTtl, When.NotExists);
         if (!gotInflight)
         {
             Log.Warning("[Webhook] Event {EventId} already in-flight — returning 409 so Stripe retries", stripeEvent.Id);
-            // Release the dedupe key we just set so a fresh retry can enter after the
-            // current in-flight attempt either succeeds (and the dedupe stays) or crashes
-            // (which also deletes the dedupe in its catch block).
+
             await db.KeyDeleteAsync(dedupeKey);
             return StatusCode(409);
         }
@@ -113,7 +103,7 @@ public class WebhooksController(
         catch (Exception ex)
         {
             Log.Error(ex, "[Webhook] Error processing {EventType} {EventId}", stripeEvent.Type, stripeEvent.Id);
-            // Clear the dedupe key so Stripe's retry has a chance
+
             await db.KeyDeleteAsync(dedupeKey);
         }
         finally
@@ -168,9 +158,6 @@ public class WebhooksController(
         await purchaseProc.ConfirmPurchaseAsync(txn.PurchaseId, "");
         Log.Information("[Webhook] Payment confirmed for purchase {PurchaseId}", txn.PurchaseId);
 
-        // Enrich + record tax — shared with PurchaseService.ConfirmAsync so the
-        // FE-driven confirm path also lands the tax data in dev (no public
-        // webhook URL there). See IPaymentEnrichmentService for idempotency.
         await paymentEnrichment.EnrichAndRecordAsync(paymentIntent.Id, txn.TaxCalculationId);
     }
 
@@ -210,16 +197,6 @@ public class WebhooksController(
         }
     }
 
-    // ───────────────────────────────────────────────────────────────────
-    // Connect events: account.updated, transfer.created, payout.{created,paid}
-    //
-    // The platform receives these on the same /webhooks/stripe endpoint as the
-    // PaymentIntent flow, distinguished by event type. The Redis dedupe + inflight
-    // lock above protects every event id equally — no Connect-specific guard
-    // needed. Each handler is idempotent: account.updated UPDATEs; transfer.created
-    // INSERT ... ON CONFLICT DO NOTHING; payout.* upserts.
-    // ───────────────────────────────────────────────────────────────────
-
     /// <summary>
     /// Mirror Stripe's account.charges_enabled / payouts_enabled / details_submitted
     /// flags onto the corresponding Organization row. Also persists the
@@ -253,11 +230,9 @@ public class WebhooksController(
                 "[Webhook] account.updated processed for {AccountId}: charges={Charges} payouts={Payouts} details={Details}",
                 account.Id, account.ChargesEnabled, account.PayoutsEnabled, account.DetailsSubmitted);
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002" /* no_data_found from RAISE */ )
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002"  )
         {
-            // The org wasn't found — likely an account created outside our system, or a
-            // race where the org row hasn't landed yet. Log + swallow rather than 500;
-            // letting Stripe retry in this case won't help.
+
             Log.Warning(
                 "[Webhook] account.updated for unknown account {AccountId} — no organization linked",
                 account.Id);
@@ -284,10 +259,6 @@ public class WebhooksController(
             return;
         }
 
-        // Resolve the platform PaymentIntent from the source charge. Stripe.net
-        // exposes SourceTransactionId as the charge id; we expand only when we
-        // have a stripe key. Best-effort: a transfer without a resolvable PI is
-        // still recorded with PurchaseId=null.
         string? paymentIntentId = null;
         PaymentIntent? sourcePi = null;
         if (!string.IsNullOrEmpty(transfer.SourceTransactionId) && !string.IsNullOrEmpty(secrets.StripeSecretKey))
@@ -307,18 +278,9 @@ public class WebhooksController(
             }
         }
 
-        // Enrich the destination CHARGE (the one visible in the organizer's
-        // Stripe Express dashboard) AND the platform-side Transfer. Destination
-        // charges create a separate charge under the connected account whose
-        // metadata + description default to empty, so the Express dashboard
-        // shows the generic "Payment from <platform>" string. Updating both
-        // the Charge (under the Stripe-Account header) and the Transfer (on
-        // the platform) gives the organizer the booking context everywhere.
         if (sourcePi is not null && !string.IsNullOrEmpty(secrets.StripeSecretKey))
         {
-            // Older bookings predate the PI.description code path — fall back
-            // to building the same string from PI metadata so historical
-            // events resent from the Stripe dashboard still get a useful label.
+
             var description = !string.IsNullOrEmpty(sourcePi.Description)
                 ? sourcePi.Description
                 : Services.PaymentDescriptions.FromMetadata(sourcePi.Metadata);
@@ -330,9 +292,6 @@ public class WebhooksController(
                     ? new Dictionary<string, string>(sourcePi.Metadata)
                     : null;
 
-                // Platform-side Transfer.update — surfaces the booking context
-                // in the platform's Stripe events feed and any future audit
-                // view that reads stripe_transfers.RawEvent.
                 try
                 {
                     await new TransferService(client).UpdateAsync(transfer.Id, new TransferUpdateOptions
@@ -349,16 +308,9 @@ public class WebhooksController(
                     Log.Warning(ex,
                         "[Webhook] transfer.created — failed to update platform transfer {TransferId} description",
                         transfer.Id);
-                    // Non-fatal: the destination charge update below is the
-                    // user-visible fix. Don't abort the whole handler if
-                    // Stripe rejects the platform-side update (e.g. on an
-                    // already-reversed transfer).
+
                 }
 
-                // Destination charge update — drives the organizer's Express
-                // dashboard description column. Re-throws on failure so the
-                // outer handler clears the Redis dedupe key and Stripe retries.
-                // Charge.update is idempotent.
                 if (!string.IsNullOrEmpty(transfer.DestinationPaymentId))
                 {
                     var chargeOpts = new ChargeUpdateOptions
@@ -381,9 +333,6 @@ public class WebhooksController(
             }
         }
 
-        // ToJson lives on StripeEntity — Data.Object is typed as IHasObject so we
-        // cast through to get the SDK's serialized payload (omits undocumented
-        // properties; that's fine for our forensic store).
         var rawJson = (stripeEvent.Data.Object as StripeEntity)?.ToJson() ?? "{}";
 
         try

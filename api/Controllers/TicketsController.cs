@@ -26,9 +26,6 @@ public class TicketsController(
     ISettingsService settings
 ) : ControllerBase
 {
-    // ═══════════════════════════════════════════════════════════
-    //  Purchase owner: list all tickets for a purchase
-    // ═══════════════════════════════════════════════════════════
 
     [HttpGet("purchases/{purchaseId:guid}/tickets")]
     [Authorize]
@@ -70,10 +67,6 @@ public class TicketsController(
         return Ok(dtos);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  QR code image for a specific ticket
-    // ═══════════════════════════════════════════════════════════
-
     [HttpGet("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/qr")]
     [Authorize]
     [RequireRole(UserRole.User)]
@@ -94,10 +87,6 @@ public class TicketsController(
         using var qrCode = new PngByteQRCode(qrCodeData);
         return File(qrCode.GetGraphic(10), "image/png");
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Send invite email for a ticket
-    // ═══════════════════════════════════════════════════════════
 
     [HttpPost("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/invite")]
     [Authorize]
@@ -143,10 +132,6 @@ public class TicketsController(
         return Ok(new { message = $"Invite sent to {request.Email}" });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Claim a ticket for the purchase owner (no email roundtrip)
-    // ═══════════════════════════════════════════════════════════
-
     [HttpPost("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/claim-self")]
     [Authorize]
     [RequireRole(UserRole.User)]
@@ -173,10 +158,6 @@ public class TicketsController(
         return Ok(new { message = result.Message, ticketId = ticket.PurchaseTicketId });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Revoke a ticket invite
-    // ═══════════════════════════════════════════════════════════
-
     [HttpPost("purchases/{purchaseId:guid}/tickets/{ticketId:guid}/revoke")]
     [Authorize]
     [RequireRole(UserRole.User)]
@@ -198,10 +179,6 @@ public class TicketsController(
         Log.Information("[Tickets] Invite revoked for {TicketCode}", ticket.TicketCode);
         return Ok(new { message = "Invite revoked" });
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Validate invite token (anonymous — before login)
-    // ═══════════════════════════════════════════════════════════
 
     [HttpGet("tickets/claim")]
     [AllowAnonymous]
@@ -239,10 +216,6 @@ public class TicketsController(
         ));
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Claim a ticket (authenticated)
-    // ═══════════════════════════════════════════════════════════
-
     [HttpPost("tickets/claim")]
     [Authorize]
     [RequireRole(UserRole.User)]
@@ -272,10 +245,6 @@ public class TicketsController(
         Log.Information("[Tickets] {TicketId} claimed by user {UserId}", result.TicketId, userId);
         return Ok(new { message = result.Message, ticketId = result.TicketId });
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  My tickets (all tickets assigned to current user)
-    // ═══════════════════════════════════════════════════════════
 
     [HttpGet("tickets/mine")]
     [Authorize]
@@ -309,10 +278,6 @@ public class TicketsController(
         return Ok(dtos);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Guest QR — get QR for own ticket by ticket ID only
-    // ═══════════════════════════════════════════════════════════
-
     [HttpGet("tickets/{ticketId:guid}/qr")]
     [Authorize]
     [RequireRole(UserRole.User)]
@@ -333,10 +298,6 @@ public class TicketsController(
         using var qrCode = new PngByteQRCode(qrCodeData);
         return File(qrCode.GetGraphic(10), "image/png");
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════
 
     private Guid GetUserId() => Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 

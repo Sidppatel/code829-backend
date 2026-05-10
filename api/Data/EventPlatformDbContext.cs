@@ -8,7 +8,7 @@ public class EventPlatformDbContext(
     DbContextOptions<EventPlatformDbContext> options
 ) : DbContext(options)
 {
-    // Core entities
+
     public DbSet<User> Users => Set<User>();
     public DbSet<BusinessUser> BusinessUsers => Set<BusinessUser>();
     public DbSet<Organization> Organizations => Set<Organization>();
@@ -21,11 +21,9 @@ public class EventPlatformDbContext(
     public DbSet<UserEmailVerificationToken> UserEmailVerificationTokens => Set<UserEmailVerificationToken>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
 
-    // Template/parent entities
     public DbSet<Venue> Venues => Set<Venue>();
     public DbSet<TableTemplate> TableTemplates => Set<TableTemplate>();
 
-    // Instance/child entities
     public DbSet<Event> Events => Set<Event>();
     public DbSet<BusinessUserEvent> BusinessUserEvents => Set<BusinessUserEvent>();
     public DbSet<EventTable> EventTables => Set<EventTable>();
@@ -38,22 +36,16 @@ public class EventPlatformDbContext(
     public DbSet<StripeTransfer> StripeTransfers => Set<StripeTransfer>();
     public DbSet<StripePayout> StripePayouts => Set<StripePayout>();
 
-    // Images
     public DbSet<Image> Images => Set<Image>();
     public DbSet<EventImage> EventImages => Set<EventImage>();
     public DbSet<VenueImage> VenueImages => Set<VenueImage>();
     public DbSet<PlatformImage> PlatformImages => Set<PlatformImage>();
 
-    // User-facing
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
-    // Logging — admin/developer/system actors go through audit_logs only.
-    // Legacy write tables were dropped in the DropLegacyLogTables migration; reads
-    // continue via the BusinessLogView / DeveloperLogView / SystemLogView projections.
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-    // Read-only views
     public DbSet<EventView> EventViews => Set<EventView>();
     public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
     public DbSet<TableView> TableViews => Set<TableView>();
@@ -77,7 +69,6 @@ public class EventPlatformDbContext(
     public DbSet<SystemLogView> SystemLogViews => Set<SystemLogView>();
     public DbSet<DeveloperLogView> DeveloperLogViews => Set<DeveloperLogView>();
 
-    // Dashboard aggregates (used by AdminDashboardController + DeveloperDashboardController)
     public DbSet<AdminDashboardStatsView> AdminDashboardStatsViews => Set<AdminDashboardStatsView>();
     public DbSet<TopEventRevenueView> TopEventRevenueViews => Set<TopEventRevenueView>();
     public DbSet<PurchasesByStatusView> PurchasesByStatusViews => Set<PurchasesByStatusView>();
@@ -92,7 +83,6 @@ public class EventPlatformDbContext(
         modelBuilder.HasPostgresExtension("extensions", "pg_trgm");
         modelBuilder.HasPostgresExtension("extensions", "pgcrypto");
 
-        // ─── DB-side defaults for all BaseEntity tables ──────────
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
@@ -105,8 +95,6 @@ public class EventPlatformDbContext(
                 });
             }
         }
-
-        // ─── Core entities ───────────────────────────────────────
 
         modelBuilder.Entity<Address>(entity =>
         {
@@ -181,9 +169,6 @@ public class EventPlatformDbContext(
             entity.Property(e => e.StripeRequirementsDue).HasColumnType("jsonb");
         });
 
-        // ─── Stripe Connect: transfers + payouts (webhook-fed) ──────────────
-        // Append-only audit rows. We keep the raw event JSON so support can
-        // replay any payload that arrives malformed without going back to Stripe.
         modelBuilder.Entity<StripeTransfer>(entity =>
         {
             entity.ToTable("stripe_transfers");
@@ -331,8 +316,6 @@ public class EventPlatformDbContext(
                 .IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ─── Template/parent entities ────────────────────────────
-
         modelBuilder.Entity<Venue>(entity =>
         {
             entity.ToTable("venues");
@@ -406,8 +389,6 @@ public class EventPlatformDbContext(
             entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-
-        // ─── Instance/child entities ──────���──────────────────────
 
         modelBuilder.Entity<Event>(entity =>
         {
@@ -619,8 +600,6 @@ public class EventPlatformDbContext(
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // ─── Images ──────────────────────────────────────────────
-
         modelBuilder.Entity<Image>(entity =>
         {
             entity.ToTable("images");
@@ -681,13 +660,6 @@ public class EventPlatformDbContext(
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ─── Logging ─────────────────────────────────────────────
-
-        // DeveloperLog / BusinessLog / SystemLog write entities removed in the
-        // DropLegacyLogTables migration — all actor activity writes go to audit_logs.
-        // Read paths continue via the v_business_logs / v_developer_logs / v_system_logs
-        // view projections mapped further down.
-
         modelBuilder.Entity<EmailLog>(entity =>
         {
             entity.ToTable("email_logs");
@@ -736,8 +708,6 @@ public class EventPlatformDbContext(
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.Type);
         });
-
-        // ─── Read-only views ─────────────────────────────────────
 
         modelBuilder.Entity<EventView>(entity =>
         {

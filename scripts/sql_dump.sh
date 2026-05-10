@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Dump Postgres schema (tables, views, functions, procedures, triggers, sequences, full schema).
-# Mirrors sql_dump.ps1 at the monorepo root.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib.sh
+
 source "$SCRIPT_DIR/lib.sh"
 
 ROOT="$(resolve_monorepo_root)"

@@ -24,8 +24,7 @@ public class AuthController(
     Db.Repositories.StoredProcedures.IUserProcedures userProc
 ) : ControllerBase
 {
-    // Public user sessions live under their own cookie name — see Api.Helpers.PortalHelper.
-    // Matches the X-Portal: user header sent by the public frontend app.
+
     private const string SessionCookieName = Api.Helpers.PortalHelper.UserCookie;
     private const int SessionMaxAgeDays = 90;
     private const int MagicLinkLimit = 2;
@@ -130,8 +129,6 @@ public class AuthController(
         var rateLimit = await CheckEmailRateLimitAsync(redis, "forgot-password", request.Email, 5, TimeSpan.FromMinutes(1));
         if (rateLimit is not null) return rateLimit;
 
-        // BE #71 + #84: response is 204 regardless of whether the email exists or the
-        // delivery pipeline errors. The service swallows + Sentry-captures its own failures.
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var origin = Request.Headers.Origin.FirstOrDefault();
         await authService.RequestPasswordResetAsync(request.Email, ip, origin);
@@ -196,8 +193,7 @@ public class AuthController(
     }
 
 #if DEBUG
-    // Dev-only bypass — compiled out of Release builds. Release deploys must
-    // never expose this endpoint because it skips credential verification.
+
     [HttpPost("dev-login")]
     public async Task<IActionResult> DevLogin([FromBody] DevLoginRequest request)
     {
@@ -356,8 +352,6 @@ public class AuthController(
         await imageService.DeleteImageAsync(userId.Value, "user");
         return NoContent();
     }
-
-    // ── Helpers ──────────────────────────────────────────────────
 
     private void SetSessionCookie(string sessionToken)
     {

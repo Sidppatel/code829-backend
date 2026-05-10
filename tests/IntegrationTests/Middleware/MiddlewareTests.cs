@@ -43,7 +43,7 @@ public sealed class MiddlewareTests(DatabaseFixture db)
     [Fact]
     public async Task SecurityHeaders_HstsAndCsp_NotSetInDevelopment()
     {
-        // DatabaseFixture pins ASPNETCORE_ENVIRONMENT=Development
+
         var client = db.Factory.CreateClient();
         var resp = await client.GetAsync("/health/live");
         resp.Headers.Should().NotContainKey("Strict-Transport-Security");
@@ -61,8 +61,7 @@ public sealed class MiddlewareTests(DatabaseFixture db)
     [Fact]
     public async Task ApiError_ShapeIncludesTraceId_On403()
     {
-        // Use User JWT against an admin-only endpoint — RoleAuthorizationMiddleware
-        // runs on a path that is past the JwtBearer challenge, so it can write ApiError JSON.
+
         var client = db.Factory.CreateClient().WithUser();
         var resp = await client.GetAsync("/v1/admin/auth/me");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -76,7 +75,7 @@ public sealed class MiddlewareTests(DatabaseFixture db)
     public async Task RateLimiting_EnforcedOnAuthRoutes()
     {
         var client = db.Factory.CreateClient();
-        // Magic link endpoint is limited to 2 per 2-minute window per email
+
         var email = $"ratelimit-{Guid.NewGuid():N}@example.com";
         HttpStatusCode? lastCode = null;
         for (var i = 0; i < 6; i++)

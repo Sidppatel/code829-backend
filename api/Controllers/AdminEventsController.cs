@@ -39,9 +39,7 @@ public class AdminEventsController(
     ICacheService cache
 ) : ControllerBase
 {
-    // Exposed so derived controllers (e.g. DeveloperEventsController) can reuse these
-    // dependencies without re-capturing them in their own primary-constructor state,
-    // which would trigger CS9107.
+
     protected EventPlatformDbContext Context => context;
     protected ISettingsService Settings => settingsService;
     protected IAdminLogService AdminLog => adminLog;
@@ -60,10 +58,6 @@ public class AdminEventsController(
 
         var query = context.EventViews.AsNoTracking().AsQueryable();
 
-        // Non-developer admins are scoped to their Organization. All admins in
-        // the same org co-manage events (per CLAUDE.md "Multiple admins can
-        // share a single Organization"). Cross-org visibility is platform-only.
-        // Unattached admins fall back to their own events only.
         if (!User.IsInRole(UserRole.Developer.ToString()))
         {
             var currentUserId = GetCurrentUserId();
@@ -136,8 +130,7 @@ public class AdminEventsController(
             .FirstOrDefaultAsync(e => e.EventId == id);
 
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));
-        // Org-scope check — without this, any admin could read any org's
-        // event by guessing/iterating ids.
+
         if (!await IsOwnerOrSameOrgOrDeveloperAsync(ev.BusinessUserId)) return Forbid();
 
         var dto = MapToDto(ev);
@@ -208,7 +201,7 @@ public class AdminEventsController(
             request.VenueId, organizerId, null);
 
         await adminLog.LogAsync("event.created", "Event", eventId, $"Event '{request.Title}' created");
-        
+
         if (layoutMode == LayoutMode.Open && request.TicketTypes != null)
         {
             var defaultFeeStr = await settingsService.GetOrDefaultAsync("default_platform_fee_open_cents", "1000");
@@ -219,7 +212,6 @@ public class AdminEventsController(
                 await ticketTypeProc.CreateAsync(eventId, tt.Name, tt.PriceCents, defaultFee, tt.Capacity, sortOrder++, tt.Description);
             }
         }
-
 
         var created = await context.EventViews.AsNoTracking().FirstAsync(e => e.EventId == eventId);
         await cache.InvalidateEventAsync(eventId);
@@ -246,7 +238,6 @@ public class AdminEventsController(
         var currentUserId = GetCurrentUserId();
         if (organizerId == currentUserId) return true;
 
-        // Org-scope check — both sides must resolve to the SAME org.
         var callerOrg = await organizationProc.GetByBusinessUserAsync(currentUserId);
         if (callerOrg is null) return false;
         var ownerOrg = await organizationProc.GetByBusinessUserAsync(organizerId);
@@ -292,14 +283,6 @@ public class AdminEventsController(
         if (newStatus is not null)
             await eventProc.ChangeEventStatusAsync(id, newStatus, null);
 
-        // Sync Ticket Types (Pricing Tiers) for Open events.
-        //
-        // Match existing tiers by id (preferred) or by case-insensitive label and
-        // update them in place. Never delete-and-recreate — that orphans every
-        // purchase that still references the old tier id and zeroes out historic
-        // sold counts in v_event_ticket_types_summary. New rows are only INSERTed
-        // when the request introduces a label that does not already exist on the
-        // event.
         if (request.TicketTypes != null && (request.LayoutMode == "Open" || (request.LayoutMode == null && ev.LayoutMode == "Open")))
         {
             var existingTiers = await context.EventTicketTypeSummaryViews
@@ -354,8 +337,6 @@ public class AdminEventsController(
                 }
             }
 
-            // Tiers absent from the request: refuse if they have active purchases,
-            // otherwise soft-delete.
             var toRemove = existingTiers.Where(et => !matchedExistingIds.Contains(et.EventTicketTypeId)).ToList();
             foreach (var td in toRemove)
             {
@@ -560,7 +541,6 @@ public class AdminEventsController(
             null, null,
             original.GridRows, original.GridCols, original.VenueId, organizerId, null);
 
-        // Copy event tables and their table instances via layout procedures.
         var eventTables = await layoutProc.ListEventTablesForEventAsync(id);
         var allTables = await layoutProc.ListTablesForEventAsync(id);
         var tablesByEventTable = allTables.GroupBy(t => t.EventTableId).ToDictionary(g => g.Key, g => g.ToList());
@@ -579,7 +559,6 @@ public class AdminEventsController(
             }
         }
 
-        // Copy ticket types (Open events)
         var ticketTypes = await context.EventTicketTypeSummaryViews
             .AsNoTracking()
             .Where(tt => tt.EventId == id && tt.IsActive)
@@ -597,8 +576,6 @@ public class AdminEventsController(
         await cache.InvalidateEventAsync(copyId);
         return Created("", MapToDto(created));
     }
-
-    // ─── Ticket Type CRUD (Open events) ─────────────────────────
 
     [HttpGet("{id:guid}/ticket-types")]
     public async Task<IActionResult> GetTicketTypes(Guid id)
@@ -715,8 +692,6 @@ public class AdminEventsController(
         return NoContent();
     }
 
-    // ─── Per-event staff assignment ─────────────────────────────
-
     [HttpGet("{eventId:guid}/staff")]
     public async Task<IActionResult> ListEventStaff(Guid eventId)
     {
@@ -767,8 +742,6 @@ public class AdminEventsController(
 
         return NoContent();
     }
-
-    // ─── Helpers ──────────────────────────────────────────────────
 
     private EventDto MapToDto(EventView e)
     {

@@ -35,10 +35,6 @@ public class AdminPurchasesController(
     private Guid GetCurrentUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-    // Returns the BusinessUserIds whose events the caller can view, or null
-    // for Developer (platform-wide visibility). Admins see their own events
-    // plus those of every co-admin in the same Organization. Unattached
-    // admins fall back to their own events only.
     private async Task<List<Guid>?> GetCallerScopeAsync()
     {
         if (User.IsInRole(UserRole.Developer.ToString())) return null;

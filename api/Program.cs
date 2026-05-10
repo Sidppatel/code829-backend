@@ -33,16 +33,7 @@ try
 var bootstrapEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 if (bootstrapEnv == "Development")
 {
-    // Bootstrap precedence (LATER overrides EARLIER):
-    //   1. Process env (from Infisical via start-backend.ps1, or whatever
-    //      the parent shell injected when running `dotnet run` manually).
-    //   2. .env (Infisical-style snapshot, optional fallback for IDE runs
-    //      that bypass the start script).
-    //   3. .env.local (committed-grade, monorepo-root, gitignored — local
-    //      dev overrides like docker creds, dev URLs, and a stable
-    //      STRIPE_WEBHOOK_SECRET pinned to a `stripe listen` session).
-    // .env.local is loaded LAST so dev overrides win over Infisical
-    // snapshots, matching the order in start-backend.ps1.
+
     var envFiles = new[]
     {
         Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
@@ -63,8 +54,7 @@ if (bootstrapEnv == "Development")
             if (eqIndex <= 0) continue;
             var key = trimmed[..eqIndex].Trim();
             var value = trimmed[(eqIndex + 1)..].Trim();
-            // Strip surrounding single or double quotes — Infisical exports
-            // some secret values quoted; raw values from .env.local are not.
+
             if (value.Length >= 2 &&
                 ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
             {
@@ -77,8 +67,6 @@ if (bootstrapEnv == "Development")
 
 var builder = WebApplication.CreateBuilder(args);
 
-    // Sentry — capture unhandled 5xx exceptions only. Empty-string DSN disables transport
-    // (per Sentry docs) so local dev without a configured DSN boots cleanly.
     var sentryDsn = Environment.GetEnvironmentVariable("SENTRY_DSN") ?? string.Empty;
     builder.WebHost.UseSentry(o =>
     {
@@ -96,10 +84,6 @@ var builder = WebApplication.CreateBuilder(args);
     if (string.IsNullOrEmpty(sentryDsn) && builder.Environment.IsProduction())
         Log.Warning("[Sentry] DSN not configured — telemetry disabled");
 
-    // Serilog — structured logging. Development: console + rolling files for offline triage.
-    // Production: console + OTLP sink (logs shipped to Grafana Cloud, unified with OTEL traces
-    // via TraceId enricher). Render's filesystem is ephemeral, so file sinks are Development-only
-    // (BE #12).
     var otlpLogsEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
         ?? "http://localhost:4318";
     var otlpHeadersRaw = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_HEADERS");
@@ -161,24 +145,17 @@ var builder = WebApplication.CreateBuilder(args);
         }
     });
 
-    // Kestrel on configurable port with request size limits.
-    // Default 10000 matches the Dockerfile + render.yaml contract. Local dev
-    // scripts set PORT=8000 in .env.local to override.
     var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
     builder.WebHost.ConfigureKestrel(options =>
     {
-        options.Limits.MaxRequestBodySize = 15 * 1024 * 1024; // 15 MB global limit
+        options.Limits.MaxRequestBodySize = 15 * 1024 * 1024;
     });
 
-    // Database
     var dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
         ?? throw new InvalidOperationException("DATABASE_URL is required");
     var connStr = ConvertPostgresUrl(dbUrl);
 
-    // Surface the parsed host:port at startup so prod can confirm which pooler
-    // tier is in use without leaking creds. Crucial when chasing 5432 vs 6543
-    // mismatches between Render env and what the runtime actually loads.
     try
     {
         var csb = new Npgsql.NpgsqlConnectionStringBuilder(connStr);
@@ -197,48 +174,30 @@ var builder = WebApplication.CreateBuilder(args);
             w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.FirstWithoutOrderByAndFilterWarning));
     });
 
-    // Redis
     var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL") ?? "redis://localhost:6379";
     var redisConfig = ConvertRedisUrl(redisUrl);
     var redisMux = ConnectionMultiplexer.Connect(redisConfig);
     builder.Services.AddSingleton<IConnectionMultiplexer>(redisMux);
 
-    // Persist DataProtection key ring to Redis so anti-forgery tokens, auth cookies,
-    // and IDataProtector payloads survive container recycles. Without this, every
-    // Render deploy wipes /home/app/.aspnet/DataProtection-Keys and invalidates every
-    // logged-in session. SetApplicationName isolates this app's keys from any other
-    // service that might share the same Redis instance.
     builder.Services
         .AddDataProtection()
         .PersistKeysToStackExchangeRedis(redisMux, "ep:dataprotection-keys")
         .SetApplicationName("EventPlatform");
 
-    // Health checks — /health/ready (deep), /health/live stays in HealthController
     builder.Services.AddHealthChecks()
         .AddNpgSql(connStr, name: "postgres")
         .AddRedis(redisConfig, name: "redis")
         .AddCheck<Api.HealthChecks.S3HealthCheck>("s3");
 
-    // Encryption (HashEmail only — secrets now come from env vars)
     builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
 
-    // Secrets from environment variables
     builder.Services.AddSingleton<ISecretsProvider, SecretsProvider>();
 
-    // Security headers / CSP — defaults are baked into SecurityHeadersOptions so that
-    // missing/empty appsettings cannot silently strip Stripe domains from the policy.
-    // Override in appsettings.*.json under "Security:Csp".
     builder.Services.Configure<SecurityHeadersOptions>(
         builder.Configuration.GetSection("Security:Csp"));
 
-    // Forwarded headers — rewrite Connection.RemoteIpAddress from X-Forwarded-For so
-    // rate limiting and audit logs see the real client IP when deployed behind a LB/CDN.
-    // Trusted proxy CIDRs come from the TRUSTED_PROXIES env var.
     var trustedProxies = Environment.GetEnvironmentVariable("TRUSTED_PROXIES");
 
-    // BE #102 — refuse to start outside Development without TRUSTED_PROXIES set. Without
-    // it, ForwardedHeadersConfig trusts nothing and every client appears to come from the
-    // platform load balancer, breaking per-IP rate limits and audit attribution.
     if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(trustedProxies))
         throw new InvalidOperationException(
             "TRUSTED_PROXIES must be set in non-Development environments");
@@ -249,8 +208,6 @@ var builder = WebApplication.CreateBuilder(args);
             builder.Environment.IsDevelopment(),
             trustedProxies));
 
-    // Fail-fast: Stripe is mandatory in every environment. No mock payment path exists.
-    // Read directly from Environment to honor .env files loaded above after CreateBuilder.
     var stripeSecret = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
     if (string.IsNullOrEmpty(stripeSecret))
         throw new InvalidOperationException(
@@ -259,12 +216,10 @@ var builder = WebApplication.CreateBuilder(args);
         throw new InvalidOperationException(
             "Production environment requires a live Stripe secret key (sk_live_*). Refusing to start with test keys.");
 
-    // Repositories
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IAppSettingRepository, AppSettingRepository>();
     builder.Services.AddScoped<ILogRepository, LogRepository>();
 
-    // SP Repositories
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IAuthProcedures, Db.Repositories.StoredProcedures.AuthProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IUserProcedures, Db.Repositories.StoredProcedures.UserProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IEventProcedures, Db.Repositories.StoredProcedures.EventProcedures>();
@@ -291,7 +246,6 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IOrganizationProcedures, Db.Repositories.StoredProcedures.OrganizationProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeEventProcedures, Db.Repositories.StoredProcedures.StripeEventProcedures>();
 
-    // Services
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IJwtService, JwtService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
@@ -310,23 +264,18 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
     builder.Services.AddScoped<IFinancialService, FinancialService>();
 
-    // Malware scanner: ClamAV when CLAMAV_HOST is set, no-op otherwise (local dev convenience).
-    // Production must set CLAMAV_HOST — see docs/runbooks/secret-rotation.md is not the place; deployment env config is.
     if (!string.IsNullOrEmpty(builder.Configuration["CLAMAV_HOST"]))
         builder.Services.AddSingleton<IMalwareScanner, ClamAvScanner>();
     else
         builder.Services.AddSingleton<IMalwareScanner, NoopMalwareScanner>();
 
-    // Conditional service registration: mock in dev, real in prod
-    // Payment service uses real Stripe when a valid key is configured, even in dev
     if (builder.Environment.IsDevelopment())
     {
         builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
     }
     else
     {
-        // Fail-fast: an empty access/secret/bucket would construct an AmazonS3Client that
-        // only fails at upload time, crashing user-facing requests instead of the process.
+
         var s3Access = Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
         var s3Secret = Environment.GetEnvironmentVariable("S3_SECRET_KEY");
         var s3Bucket = Environment.GetEnvironmentVariable("S3_BUCKET");
@@ -334,11 +283,6 @@ var builder = WebApplication.CreateBuilder(args);
             throw new InvalidOperationException(
                 "S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET are required outside Development. See .env.example.");
 
-        // Singleton so the AmazonS3Client (created lazily on first call)
-        // survives across requests. Reusing the client keeps TLS pools warm
-        // and avoids per-request init that previously cost ~400ms on the
-        // first upload variant. Safe because dependencies are themselves
-        // singletons.
         builder.Services.AddSingleton<IFileStorageService, S3FileStorageService>();
     }
 
@@ -356,31 +300,19 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IPaymentService, StripePaymentService>();
     builder.Services.AddScoped<ITaxService, StripeTaxService>();
     builder.Services.AddScoped<IPricingService, PricingService>();
-    // Shared post-confirmation enrich + tax-record path. Used by both the
-    // Stripe webhook handler AND PurchaseService.ConfirmAsync so dev (no
-    // public webhook URL) and prod (webhook fires) both land the data.
+
     builder.Services.AddScoped<IPaymentEnrichmentService, PaymentEnrichmentService>();
 
-    // Stripe Connect — Express account creation, onboarding-link generation,
-    // status fetch. Singleton because it depends on ISecretsProvider (also
-    // singleton); the Stripe key is read on every call so env-var rotation
-    // takes effect on the next request without restart of this service.
     builder.Services.AddSingleton<IStripeConnectService, StripeConnectService>();
 
-    // Alert fan-out abstraction. NoOp impl logs at Error severity via Serilog;
-    // production swaps in Sentry / Resend / PagerDuty without callers changing.
     builder.Services.AddSingleton<IAlertService, NoOpAlertService>();
 
-    // Organization CRUD + membership service. Scoped because it consumes the
-    // scoped IOrganizationProcedures (which holds the EF DbContext).
     builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 
-    // Background workers
     builder.Services.AddHostedService<LogCleanupWorker>();
     builder.Services.AddHostedService<HoldCleanupWorker>();
     builder.Services.AddHostedService<ScheduledPublishWorker>();
 
-    // JWT Authentication — signing key configured from JWT_SECRET env var after build
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
@@ -395,7 +327,6 @@ var builder = WebApplication.CreateBuilder(args);
                 ClockSkew = TimeSpan.FromMinutes(1)
             };
 
-            // Defer key resolution to allow reading from DB settings at runtime
             options.Events = new JwtBearerEvents
             {
                 OnMessageReceived = _ => Task.CompletedTask
@@ -403,9 +334,6 @@ var builder = WebApplication.CreateBuilder(args);
         });
     builder.Services.AddAuthorization();
 
-    // OpenTelemetry — traces + metrics via OTLP. Endpoint defaults to local Jaeger
-    // (docker-compose.observability.yml). Prod points at Grafana Cloud OTLP endpoint
-    // via OTEL_EXPORTER_OTLP_ENDPOINT + OTEL_EXPORTER_OTLP_HEADERS (basic auth token).
     var otlpBase = otlpLogsEndpoint.TrimEnd('/');
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("code829-api", serviceVersion: otelServiceVersion))
@@ -430,13 +358,9 @@ var builder = WebApplication.CreateBuilder(args);
                 if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
             }));
 
-    // Controllers + OpenAPI + Validation
-    // CSRF note: Antiforgery tokens are designed for server-rendered forms, not SPA + JWT APIs.
-    // This API is protected by JWT auth + SameSite cookies + CORS origin checks instead.
     builder.Services.AddControllers(options =>
         {
-            // Replaces AddFluentValidationAutoValidation() from the deprecated
-            // FluentValidation.AspNetCore package. See api/Filters/FluentValidationFilter.cs.
+
             options.Filters.Add<FluentValidationFilter>();
         })
         .AddJsonOptions(options =>
@@ -450,8 +374,7 @@ var builder = WebApplication.CreateBuilder(args);
         options.DefaultApiVersion = new Asp.Versioning.ApiVersion(1, 0);
         options.AssumeDefaultVersionWhenUnspecified = true;
         options.ReportApiVersions = true;
-        // URL-segment reader: clients call /v1/events. Header/query readers
-        // are intentionally omitted — we want one canonical shape.
+
         options.ApiVersionReader = new Asp.Versioning.UrlSegmentApiVersionReader();
     })
     .AddMvc()
@@ -499,10 +422,8 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Layout.CreateTableTemplateRequest>, CreateTableTemplateRequestValidator>();
     builder.Services.AddScoped<IValidator<PricingQuoteRequest>, PricingQuoteRequestValidator>();
 
-    // CORS — configured from settings, defaults to localhost:5173
     builder.Services.AddCors();
 
-    // Response compression (Brotli + gzip)
     builder.Services.AddResponseCompression(options =>
     {
         options.EnableForHttps = true;
@@ -514,32 +435,21 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // Schema is owned by the code829-db repo. Backend never migrates.
-    // Render preDeployCommand runs MigrationRunner once per deploy and gates
-    // the rollout — if migrations fail, the new image never serves traffic.
-    // No in-process schema probe: it forced a synchronous cold-pool DB round
-    // trip on every container start and added 5-15s to cold start without
-    // catching anything preDeployCommand doesn't already catch.
-
-    // Configure JWT signing key from DB settings
     await ConfigureJwtSigningKey(app);
 
-    // Pre-load CORS origins to avoid async deadlock (.Result anti-pattern)
     string[] corsOrigins;
     {
         using var scope = app.Services.CreateScope();
         var settingsSvc = scope.ServiceProvider.GetRequiredService<ISettingsService>();
         var defaultOrigins = app.Environment.IsDevelopment()
-            ? "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176"  // Dev: public, admin, staff, developer ports
+            ? "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176"
             : "http://localhost:5173";
-        var originsStr = Environment.GetEnvironmentVariable("CORS_ORIGINS") 
-            ?? await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins) 
+        var originsStr = Environment.GetEnvironmentVariable("CORS_ORIGINS")
+            ?? await settingsSvc.GetOrDefaultAsync("cors_origins", defaultOrigins)
             ?? defaultOrigins;
         corsOrigins = originsStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
-    // Security header sanity check — if an operator accidentally disabled CSP in Production,
-    // surface it in the logs instead of silently serving requests with weakened policy.
     if (app.Environment.IsProduction())
     {
         var securityOpts = app.Services
@@ -548,23 +458,13 @@ var builder = WebApplication.CreateBuilder(args);
             Log.Warning("[Security] HSTS+CSP disabled in Production — set Security:Csp:EnableHstsAndCsp=true");
     }
 
-    // Middleware pipeline
-    // CloudflareIpAllowlistMiddleware runs before UseForwardedHeaders so it
-    // inspects the raw TCP peer, not the X-Forwarded-For client IP. Gated
-    // behind CF_IP_ALLOWLIST_ENFORCE to avoid rejecting Render's internal LB
-    // until the service is fully fronted by Cloudflare.
     app.UseMiddleware<CloudflareIpAllowlistMiddleware>();
-    // Must run before any middleware that reads RemoteIpAddress (rate limiting, audit logs).
+
     app.UseForwardedHeaders();
 
     app.UseResponseCompression();
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
-    // CORS must run before rate limiting so that 429 responses still include CORS headers.
-    // Methods/headers are allow-listed rather than AllowAny* — we only ever serve the verbs
-    // below, and narrowing the preflight response limits damage if a future cookie-auth
-    // path is added without revisiting CORS. Retry-After is exposed so clients can read it
-    // from 429 responses.
     app.UseCors(policy =>
     {
         policy.WithOrigins(corsOrigins)
@@ -576,23 +476,12 @@ var builder = WebApplication.CreateBuilder(args);
     });
 
     app.UseMiddleware<CorrelationIdMiddleware>();
-    // Redirect legacy unversioned /foo → /v1/foo (301). 90-day grace window
-    // from 2026-04-23; remove after 2026-07-22 once FE baseURL + any remaining
-    // clients are confirmed updated. See api/Middleware/LegacyApiRedirectMiddleware.cs.
+
     app.UseMiddleware<LegacyApiRedirectMiddleware>();
     app.UseMiddleware<RateLimitingMiddleware>();
     app.UseMiddleware<IdempotencyMiddleware>();
     app.UseMiddleware<ErrorHandlingMiddleware>();
 
-    // HTTPS enforced upstream by Cloudflare ("Always Use HTTPS"). Removed
-    // app.UseHttpsRedirection() — backend only ever sees HTTP from CF, so the
-    // middleware logged "Failed to determine the https port for redirect" on
-    // every request without doing anything useful.
-
-    // Static files for uploads — Development only. Prod uses S3FileStorageService
-    // exclusively and does not write a writable `uploads/` dir to the filesystem
-    // (see Dockerfile runtime-stage comment). Attempting Directory.CreateDirectory
-    // against the read-only prod image crashes startup.
     if (app.Environment.IsDevelopment())
     {
         var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
@@ -630,8 +519,6 @@ var builder = WebApplication.CreateBuilder(args);
         },
     });
 
-    // OpenAPI: dev = open, prod = bearer-gated via OPENAPI_PUBLIC_TOKEN env var.
-    // 404 (not 401) on auth failure to avoid advertising endpoint existence.
     app.MapOpenApi().AddEndpointFilter(async (ctx, next) =>
     {
         if (app.Environment.IsDevelopment())
@@ -654,7 +541,6 @@ var builder = WebApplication.CreateBuilder(args);
         return await next(ctx);
     });
 
-    // Scalar interactive UI: dev only.
     if (app.Environment.IsDevelopment())
     {
         app.MapScalarApiReference();
@@ -665,7 +551,7 @@ var builder = WebApplication.CreateBuilder(args);
 }
 catch (HostAbortedException)
 {
-    // Expected when dotnet-ef spins up the host to resolve the DbContext then aborts it — not an error
+
 }
 catch (Exception ex)
 {
@@ -708,10 +594,9 @@ static string ConvertPostgresUrl(string url)
         $";Command Timeout={cmdTimeout};Timeout={connTimeout}" +
         ";No Reset On Close=true";
 
-    // If it's already an Npgsql connection string (contains "Host="), use it directly
     if (url.Contains("Host=", StringComparison.OrdinalIgnoreCase))
     {
-        // Ensure SslMode and pool settings are present
+
         if (!url.Contains("SslMode=", StringComparison.OrdinalIgnoreCase))
             url += $";SslMode={sslMode}";
         if (!url.Contains("Minimum Pool Size=", StringComparison.OrdinalIgnoreCase))
@@ -719,7 +604,6 @@ static string ConvertPostgresUrl(string url)
         return url;
     }
 
-    // Otherwise parse as a postgres:// URI
     var uri = new Uri(url);
     var userInfo = uri.UserInfo.Split(':');
     if (userInfo.Length < 2)
@@ -740,7 +624,7 @@ static string ResolveToIPv4(string host)
         var ipv4 = addresses.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
         if (ipv4 is not null) return ipv4.ToString();
     }
-    catch { /* Fall back to hostname */ }
+    catch {  }
     return host;
 }
 
@@ -757,7 +641,7 @@ static string ConvertRedisUrl(string url)
         if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
             config += $",password={parts[1]}";
     }
-    // Enable TLS for non-localhost connections (e.g., Upstash)
+
     if (!uri.Host.Contains("localhost") && !uri.Host.Contains("127.0.0.1"))
         config += ",ssl=true,abortConnect=false";
     return config;

@@ -18,7 +18,6 @@ public interface IUserProcedures
     Task<bool> SetUserActiveAsync(Guid userId, bool isActive, CancellationToken ct = default);
     Task<bool> DeleteUserAsync(Guid userId, CancellationToken ct = default);
 
-    // ── Email+password auth (Phase 1 DB foundation) ─────────────
     Task<User> SignupUserAsync(string email, string emailHash, string firstName, string lastName, string passwordHash, CancellationToken ct = default);
     Task<User?> GetByEmailForSigninAsync(string emailHash, CancellationToken ct = default);
     Task UpdateLastLoginAsync(Guid userId, CancellationToken ct = default);

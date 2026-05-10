@@ -111,8 +111,6 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
             .FirstAsync(ct);
     }
 
-    // ── Email+password auth (Phase 1 DB foundation) ─────────────
-
     public async Task<User> SignupUserAsync(string email, string emailHash, string firstName, string lastName,
         string passwordHash, CancellationToken ct = default)
     {

@@ -9,9 +9,9 @@ using Serilog;
 namespace Api.Services;
 
 /// <summary>
-/// Default implementation of <see cref="IOrganizationService"/>. Uses 
-/// <see cref="OrganizationView"/> for read operations (preferred pattern for 
-/// read-heavy API endpoints) and delegates mutations to 
+/// Default implementation of <see cref="IOrganizationService"/>. Uses
+/// <see cref="OrganizationView"/> for read operations (preferred pattern for
+/// read-heavy API endpoints) and delegates mutations to
 /// <see cref="IOrganizationProcedures"/>.
 /// </summary>
 public class OrganizationService(
@@ -49,7 +49,7 @@ public class OrganizationService(
         var org = await context.OrganizationViews
             .AsNoTracking()
             .FirstOrDefaultAsync(o => o.OrganizationId == id);
-            
+
         if (org is null) return null;
 
         var memberRows = await orgProc.GetMembersAsync(id);
@@ -61,8 +61,8 @@ public class OrganizationService(
             org.OrganizationId, org.Name, org.LegalName, org.CountryCode,
             org.StripeConnectedAccountId,
             org.StripeChargesEnabled, org.StripePayoutsEnabled, org.StripeDetailsSubmitted,
-            org.StripeOnboardedAt, null, // CurrentlyDue fetched live via stripe-status endpoint
-            org.ArchivedAt, org.CreatedAt, org.CreatedAt, // UpdatedAt not in view, using CreatedAt as placeholder or we could add it
+            org.StripeOnboardedAt, null,
+            org.ArchivedAt, org.CreatedAt, org.CreatedAt,
             members
         );
     }
@@ -88,9 +88,7 @@ public class OrganizationService(
 
     public async Task RemoveMemberAsync(Guid orgId, Guid businessUserId)
     {
-        // The SP scopes the detach to whatever org the BusinessUser is in;
-        // orgId is part of the public contract for symmetry + future-proofing
-        // (e.g., once a BusinessUser can belong to multiple orgs we'll need it).
+
         _ = orgId;
         await orgProc.RemoveBusinessUserAsync(businessUserId);
         Log.Information("[Organization] Removed BusinessUser {BusinessUserId} from {OrganizationId}",
@@ -110,8 +108,8 @@ public class OrganizationService(
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();
-            query = query.Where(o => 
-                o.Name.ToLower().Contains(term) || 
+            query = query.Where(o =>
+                o.Name.ToLower().Contains(term) ||
                 (o.LegalName != null && o.LegalName.ToLower().Contains(term)) ||
                 (o.StripeConnectedAccountId != null && o.StripeConnectedAccountId.ToLower().Contains(term)));
         }
@@ -128,7 +126,7 @@ public class OrganizationService(
             r.StripeConnectedAccountId,
             r.StripeChargesEnabled, r.StripePayoutsEnabled, r.StripeDetailsSubmitted,
             r.StripeOnboardedAt, r.ArchivedAt, r.MemberCount,
-            r.CreatedAt, r.CreatedAt, // UpdatedAt not in view
+            r.CreatedAt, r.CreatedAt,
             OrganizationStripeStateMapper.Derive(
                 r.StripeConnectedAccountId,
                 r.StripeDetailsSubmitted,
@@ -157,9 +155,6 @@ public class OrganizationService(
             throw new InvalidOperationException(
                 "Organization has no Stripe account yet — call POST /developer/organizations/{id}/stripe-account first");
 
-        // Resolve the email + greeting name. recipientEmail (when supplied) is
-        // the authoritative recipient; the BU lookup is only for the greeting
-        // name and only when the developer also passed an id.
         string toEmail;
         string greetingName;
         if (!string.IsNullOrWhiteSpace(recipientEmail))
@@ -187,14 +182,9 @@ public class OrganizationService(
             greetingName = member.FirstName;
         }
 
-        // Identity scope is the right starting point: a fresh recipient has
-        // never seen the onboarding flow, so we route them through the full
-        // KYC + bank capture rather than the bank-only resume link.
         var url = await stripeConnect.CreateOnboardingLinkAsync(
             organization.StripeConnectedAccountId, OnboardingLinkScope.Identity);
 
-        // Stripe AccountLink URLs expire ~5 minutes after creation; that's the
-        // "expiry" we surface in the email copy.
         var brandName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var subject = $"Finish setting up payouts for {organization.Name} | {brandName}";
         var body = EmailTemplates.OnboardingLinkEmail(
@@ -206,9 +196,6 @@ public class OrganizationService(
             "[Organization] Sent onboarding link to {Recipient} for org {OrganizationId} (bu={BusinessUserId})",
             toEmail, organization.Id, businessUserId);
 
-        // TODO: surface email_log id from sp_insert_email_log — IEmailService.SendAsync
-        // currently discards the row id returned by sp_create_email_log; when that
-        // signature is widened to surface it, plumb it through here.
         return new StripeOnboardingEmailResponse(Guid.Empty, toEmail);
     }
 
@@ -225,9 +212,6 @@ public class OrganizationService(
         var org = await orgProc.GetByIdAsync(organizationId);
         if (org is null) return null;
 
-        // Stripe-side delete first. If Stripe rejects (live-mode non-zero
-        // balance) we surface the exception and leave the DB row untouched
-        // so the admin can re-try or escalate without losing the acct id.
         if (!string.IsNullOrEmpty(org.StripeConnectedAccountId))
         {
             await stripeConnect.DeleteAccountAsync(org.StripeConnectedAccountId);
@@ -235,8 +219,6 @@ public class OrganizationService(
                 org.StripeConnectedAccountId, organizationId);
         }
 
-        // DB-side clear runs unconditionally so partial state (e.g. acct id
-        // present but charges/payouts stuck false) gets normalized.
         var rows = await orgProc.ClearStripeAccountAsync(organizationId);
         Log.Information("[Organization] Cleared Stripe columns on org {OrganizationId} (rows={Rows})",
             organizationId, rows);

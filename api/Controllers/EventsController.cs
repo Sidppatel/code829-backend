@@ -448,7 +448,7 @@ public class EventsController(
         var eventRemaining = Math.Max(0, (ev.TotalCapacity > 0 ? ev.TotalCapacity : ev.MaxCapacity ?? 0) - ev.TotalSold);
         var types = rawTypes.Select(tt =>
         {
-            // AvailableCount == -1 means MaxQuantity is NULL (unlimited per type) — cap by event remaining
+
             var available = tt.AvailableCount == -1 ? eventRemaining : tt.AvailableCount;
             return new EventTicketTypeDto(
                 tt.EventTicketTypeId, tt.Label, null, null,
