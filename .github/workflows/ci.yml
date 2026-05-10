@@ -156,8 +156,18 @@ jobs:
         timeout-minutes: 10
         env:
           DOCKER_HOST: unix:///var/run/docker.sock
-          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
-          REDIS_URL: "redis://localhost:6379"
+          # Real connection components are injected by DatabaseFixture from the
+          # Testcontainers Postgres + Redis instances; these placeholders just
+          # satisfy any pre-fixture boot path (e.g. WebApplicationFactory<T>
+          # construction in unit-style integration tests that bypass the fixture).
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_USER: placeholder
+          DB_NAME: placeholder
+          DB_PASSWORD: placeholder
+          REDIS_HOST: localhost
+          REDIS_PORT: "6379"
+          REDIS_TLS: "false"
 
       - name: Install ReportGenerator
         run: dotnet tool install -g dotnet-reportgenerator-globaltool

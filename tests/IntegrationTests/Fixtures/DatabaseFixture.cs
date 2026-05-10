@@ -46,8 +46,23 @@ public sealed class DatabaseFixture : IAsyncLifetime
         PostgresConnectionString = _postgres.GetConnectionString();
         RedisConnectionString = $"redis://localhost:{_redis.GetMappedPublicPort(6379)}";
 
-        Environment.SetEnvironmentVariable("DATABASE_URL", PostgresConnectionString);
-        Environment.SetEnvironmentVariable("REDIS_URL", RedisConnectionString);
+        // Backend reads components, not URLs. Decompose the Testcontainers Npgsql
+        // kv-form string and the Redis container port into the env-var schema
+        // Program.cs requires.
+        var pg = new NpgsqlConnectionStringBuilder(PostgresConnectionString);
+        Environment.SetEnvironmentVariable("DB_HOST", pg.Host);
+        Environment.SetEnvironmentVariable("DB_PORT", (pg.Port == 0 ? 5432 : pg.Port).ToString());
+        Environment.SetEnvironmentVariable("DB_USER", pg.Username);
+        Environment.SetEnvironmentVariable("DB_NAME", pg.Database);
+        Environment.SetEnvironmentVariable("DB_PASSWORD", pg.Password);
+        Environment.SetEnvironmentVariable("DATABASE_SSL_MODE", "Disable");
+
+        Environment.SetEnvironmentVariable("REDIS_HOST", "localhost");
+        Environment.SetEnvironmentVariable("REDIS_PORT", _redis.GetMappedPublicPort(6379).ToString());
+        Environment.SetEnvironmentVariable("REDIS_USER", null);
+        Environment.SetEnvironmentVariable("REDIS_PASSWORD", null);
+        Environment.SetEnvironmentVariable("REDIS_TLS", "false");
+
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
         Environment.SetEnvironmentVariable("JWT_SECRET", "integration-test-jwt-secret-must-be-32-chars!!");
 

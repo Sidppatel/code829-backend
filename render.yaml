@@ -42,13 +42,35 @@ services:
       - key: EXPECTED_MIGRATION_ID
         sync: false
 
-      # ─── Required secrets ───────────────────────────────────────
-      # Supabase transaction pooler URL (port 6543) — runtime queries.
-      - key: DATABASE_URL
+      # ─── Required secrets / DB components ──────────────────────
+      # Postgres connection components (Supabase transaction pooler for runtime).
+      # Backend builds the Npgsql connection string at boot from these — no URL
+      # is ever read or constructed in source. Migrations run via code829-db's
+      # migrate.yml using the session pooler (DB_PORT_SESSION=5432); runtime
+      # uses the transaction pooler (DB_PORT=6543).
+      - key: DB_HOST
         sync: false
-      # Upstash Redis TLS URL (rediss://…:6380)
-      - key: REDIS_URL
+      - key: DB_PORT
         sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+      # Redis connection components (Upstash TLS in prod).
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_USER
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_TLS
+        value: "true"
+
       # Generate via: openssl rand -hex 32
       - key: JWT_SECRET
         sync: false

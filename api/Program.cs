@@ -152,9 +152,7 @@ var builder = WebApplication.CreateBuilder(args);
         options.Limits.MaxRequestBodySize = 15 * 1024 * 1024;
     });
 
-    var dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
-        ?? throw new InvalidOperationException("DATABASE_URL is required");
-    var connStr = ConvertPostgresUrl(dbUrl);
+    var connStr = BuildPostgresConnectionString();
 
     try
     {
@@ -174,8 +172,7 @@ var builder = WebApplication.CreateBuilder(args);
             w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.FirstWithoutOrderByAndFilterWarning));
     });
 
-    var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL") ?? "redis://localhost:6379";
-    var redisConfig = ConvertRedisUrl(redisUrl);
+    var redisConfig = BuildRedisConfigString();
     var redisMux = ConnectionMultiplexer.Connect(redisConfig);
     builder.Services.AddSingleton<IConnectionMultiplexer>(redisMux);
 
@@ -601,21 +598,27 @@ finally
 }
 
 /// <summary>
-/// Converts a postgres:// URL to an ADO.NET connection string for Npgsql.
+/// Builds an ADO.NET connection string for Npgsql from individual env-var components.
+/// No URL parsing; no credentials in any single env var.
+///
+/// Required: DB_HOST, DB_PORT, DB_USER, DB_NAME, DB_PASSWORD.
+/// Optional: DATABASE_SSL_MODE, DB_MIN_POOL, DB_MAX_POOL, DB_IDLE_LIFETIME,
+///   DB_CMD_TIMEOUT, DB_CONN_TIMEOUT.
 ///
 /// Pool defaults are tuned for Supabase's pgbouncer transaction pooler (port 6543)
 /// where keeping many idle sessions is harmful — pgbouncer holds slots open per
 /// idle Npgsql connection and quickly exhausts the project quota across replicas.
-/// Override per-env via DB_MIN_POOL / DB_MAX_POOL / DB_IDLE_LIFETIME / DB_CMD_TIMEOUT
-/// / DB_CONN_TIMEOUT to tune for direct or session-pooler connections.
-///
 /// `No Reset On Close=true` is required when talking to pgbouncer in transaction
 /// mode because `DISCARD ALL` is not supported across pooled connections.
-/// `Max Auto Prepare=0` (Npgsql default) disables auto-prepare which pgbouncer's
-/// transaction pooler does not preserve between transactions.
 /// </summary>
-static string ConvertPostgresUrl(string url)
+static string BuildPostgresConnectionString()
 {
+    var host = RequireEnv("DB_HOST");
+    var port = RequireEnv("DB_PORT");
+    var user = RequireEnv("DB_USER");
+    var name = RequireEnv("DB_NAME");
+    var password = RequireEnv("DB_PASSWORD");
+
     var sslMode = Environment.GetEnvironmentVariable("DATABASE_SSL_MODE")
         ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ? "Disable" : "VerifyFull");
 
@@ -625,28 +628,21 @@ static string ConvertPostgresUrl(string url)
     var cmdTimeout = Environment.GetEnvironmentVariable("DB_CMD_TIMEOUT") ?? "30";
     var connTimeout = Environment.GetEnvironmentVariable("DB_CONN_TIMEOUT") ?? "15";
 
-    var poolSuffix =
-        $";Minimum Pool Size={minPool};Maximum Pool Size={maxPool}" +
-        $";Connection Idle Lifetime={idleLifetime}" +
-        $";Command Timeout={cmdTimeout};Timeout={connTimeout}" +
-        ";No Reset On Close=true";
+    var resolvedHost = ResolveToIPv4(host);
+    return $"Host={resolvedHost};Port={port};Database={name};Username={user};Password={password}" +
+           $";SslMode={sslMode}" +
+           $";Minimum Pool Size={minPool};Maximum Pool Size={maxPool}" +
+           $";Connection Idle Lifetime={idleLifetime}" +
+           $";Command Timeout={cmdTimeout};Timeout={connTimeout}" +
+           ";No Reset On Close=true";
+}
 
-    if (url.Contains("Host=", StringComparison.OrdinalIgnoreCase))
-    {
-
-        if (!url.Contains("SslMode=", StringComparison.OrdinalIgnoreCase))
-            url += $";SslMode={sslMode}";
-        if (!url.Contains("Minimum Pool Size=", StringComparison.OrdinalIgnoreCase))
-            url += poolSuffix;
-        return url;
-    }
-
-    var uri = new Uri(url);
-    var userInfo = uri.UserInfo.Split(':');
-    if (userInfo.Length < 2)
-        throw new InvalidOperationException("DATABASE_URL missing user:password");
-    var host = ResolveToIPv4(uri.Host);
-    return $"Host={host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SslMode={sslMode}{poolSuffix}";
+static string RequireEnv(string key)
+{
+    var v = Environment.GetEnvironmentVariable(key);
+    if (string.IsNullOrEmpty(v))
+        throw new InvalidOperationException($"{key} is required");
+    return v;
 }
 
 /// <summary>
@@ -666,20 +662,29 @@ static string ResolveToIPv4(string host)
 }
 
 /// <summary>
-/// Converts a redis:// URL to a StackExchange.Redis configuration string.
+/// Builds a StackExchange.Redis configuration string from individual env-var components.
+///
+/// Required: REDIS_HOST, REDIS_PORT.
+/// Optional: REDIS_USER, REDIS_PASSWORD, REDIS_TLS (defaults false).
+///
+/// Upstash uses TLS on port 6380 with user "default" — set REDIS_TLS=true.
+/// Local docker redis uses no TLS, no user, password from REDIS_PASSWORD.
 /// </summary>
-static string ConvertRedisUrl(string url)
+static string BuildRedisConfigString()
 {
-    var uri = new Uri(url);
-    var config = $"{uri.Host}:{uri.Port}";
-    if (!string.IsNullOrEmpty(uri.UserInfo))
-    {
-        var parts = uri.UserInfo.Split(':');
-        if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
-            config += $",password={parts[1]}";
-    }
+    var host = RequireEnv("REDIS_HOST");
+    var port = RequireEnv("REDIS_PORT");
+    var user = Environment.GetEnvironmentVariable("REDIS_USER");
+    var password = Environment.GetEnvironmentVariable("REDIS_PASSWORD");
+    var tls = string.Equals(Environment.GetEnvironmentVariable("REDIS_TLS"), "true",
+        StringComparison.OrdinalIgnoreCase);
 
-    if (!uri.Host.Contains("localhost") && !uri.Host.Contains("127.0.0.1"))
+    var config = $"{host}:{port}";
+    if (!string.IsNullOrEmpty(user))
+        config += $",user={user}";
+    if (!string.IsNullOrEmpty(password))
+        config += $",password={password}";
+    if (tls)
         config += ",ssl=true,abortConnect=false";
     return config;
 }
