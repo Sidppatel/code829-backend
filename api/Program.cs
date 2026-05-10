@@ -173,17 +173,24 @@ var builder = WebApplication.CreateBuilder(args);
     });
 
     var redisConfig = BuildRedisConfigString();
+    var redisOpts = StackExchange.Redis.ConfigurationOptions.Parse(redisConfig);
+    Log.Information("[Redis] Connecting to {Endpoints} ssl={Ssl} user={User} abortConnect={Abort}",
+        string.Join(",", redisOpts.EndPoints), redisOpts.Ssl, redisOpts.User ?? "<none>", redisOpts.AbortOnConnectFail);
+    ConnectionMultiplexer redisMux;
     try
     {
-        var rcb = StackExchange.Redis.ConfigurationOptions.Parse(redisConfig);
-        Log.Information("[Redis] Connecting to {Endpoints} ssl={Ssl} user={User} abortConnect={Abort}",
-            string.Join(",", rcb.EndPoints), rcb.Ssl, rcb.User ?? "<none>", rcb.AbortOnConnectFail);
+        redisMux = ConnectionMultiplexer.Connect(redisOpts);
     }
     catch (Exception ex)
     {
-        Log.Warning(ex, "[Redis] Failed to parse configuration string for startup log");
+        // abortConnect=false should make Connect return without throwing — but
+        // misconfigured TLS / DNS errors can still surface here. Log + rethrow
+        // so the operator sees the cause in Render logs instead of an opaque
+        // SIGSEGV from the native TLS path.
+        Log.Fatal(ex, "[Redis] Connect failed for {Endpoints} ssl={Ssl}",
+            string.Join(",", redisOpts.EndPoints), redisOpts.Ssl);
+        throw;
     }
-    var redisMux = ConnectionMultiplexer.Connect(redisConfig);
     builder.Services.AddSingleton<IConnectionMultiplexer>(redisMux);
 
     builder.Services

@@ -42,9 +42,19 @@ RUN dotnet publish api/api.csproj \
 # =========================
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:1201dde897ab436b7c6b386f6dbd4f9a3ca0245f9c5a8aac8f8bcdccb4c7d484 AS runtime
 
-# Pin krb5-libs to a concrete Alpine package version so the runtime image is
-# reproducible. Refresh this version together with the aspnet digest above.
-RUN apk add --no-cache krb5-libs=1.22.1-r0
+# Pin native dependencies to concrete Alpine package versions so the runtime
+# image is reproducible. Refresh these together with the aspnet digest above.
+#   krb5-libs       — Kerberos auth (Npgsql GSSAPI fallback path).
+#   ca-certificates — Mozilla root CA bundle. Required for TLS handshake
+#                     against Upstash Redis (rediss://) + Supabase Postgres
+#                     (sslmode=VerifyFull). Without it OpenSSL aborts the
+#                     handshake natively → SIGSEGV (exit 139).
+#   openssl        — keep in sync with libssl shipped by the base image.
+RUN apk add --no-cache \
+        krb5-libs=1.22.1-r0 \
+        ca-certificates \
+        openssl \
+ && update-ca-certificates
 
 WORKDIR /app
 
