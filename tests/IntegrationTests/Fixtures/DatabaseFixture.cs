@@ -11,16 +11,18 @@ namespace IntegrationTests.Fixtures;
 /// binary that runs against prod. Schema authority is single-sourced in code829-db.
 ///
 /// The runner DLL path comes from the MIGRATION_RUNNER_DLL env var (set by the CI
-/// workflow's pre-build step). When unset (local dev), the fixture clones code829-db
-/// at https://github.com/Sidppatel/code829-db and publishes MigrationRunner into the
-/// system temp dir on first use, then caches the path in MIGRATION_RUNNER_DLL for
-/// subsequent fixtures in the same process.
+/// workflow's pre-build step which uses actions/checkout with DB_REPO_TOKEN).
+/// When unset (local dev), the fixture clones code829-db over SSH and publishes
+/// MigrationRunner into the system temp dir on first use, then caches the path in
+/// MIGRATION_RUNNER_DLL for subsequent fixtures in the same process. The SSH default
+/// matches the post-private-repo workflow — devs use their GitHub SSH key, CI uses
+/// the PAT-authenticated checkout.
 ///
 /// Shared across all test classes in the "Database" collection to avoid cold-start overhead.
 /// </summary>
 public sealed class DatabaseFixture : IAsyncLifetime
 {
-    private const string DbRepoUrl = "https://github.com/Sidppatel/code829-db.git";
+    private const string DbRepoUrl = "git@github.com:Sidppatel/code829-db.git";
     private const string DbRef = "main";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")

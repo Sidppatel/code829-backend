@@ -1,21 +1,10 @@
 # Base images pinned by digest to prevent unreviewed image drift / supply-chain
 # substitution. Refresh digests with Dependabot/Renovate on a schedule; do not
 # bump blindly — validate the rebuilt image before promoting.
-
-# =========================
-# CODE829-DB BUILD STAGE
-# =========================
-# Clones the sibling code829-db repo and publishes MigrationRunner so the
-# runtime image can apply schema migrations on boot. Pin DB_REF to a specific
-# commit/tag for reproducible deploys; default 'main' pulls latest.
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:732cd42c6f659814c9804ad7b05c7f761e83ef8379c5b2fdc3af673353caff73 AS db-build
-RUN apk add --no-cache git
-WORKDIR /db
-ARG DB_REPO=https://github.com/Sidppatel/code829-db.git
-ARG DB_REF=main
-RUN git clone --depth 1 --branch "$DB_REF" "$DB_REPO" . \
-    && dotnet publish src/MigrationRunner -c Release -o /app/migrate \
-       -p:UseAppHost=false
+#
+# Schema migrations are NOT bundled into this image. They run via
+# .github/workflows/migrate-prod.yml against the Supabase session pooler
+# before the Render deploy. Program.cs verifies __EFMigrationsHistory at boot.
 
 # =========================
 # BACKEND BUILD STAGE
@@ -59,9 +48,6 @@ RUN apk add --no-cache krb5-libs=1.22.1-r0
 
 WORKDIR /app
 
-# Bundle MigrationRunner from code829-db into the image. entrypoint.sh runs
-# migrations first; if they fail the api never starts.
-COPY --from=db-build --chown=app:app /app/migrate /app/migrate
 COPY --from=build    --chown=app:app /app/publish /app
 COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

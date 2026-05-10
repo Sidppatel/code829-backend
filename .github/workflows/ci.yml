@@ -108,14 +108,23 @@ jobs:
       - name: Build integration tests
         run: dotnet build tests/IntegrationTests/IntegrationTests.csproj --no-restore --configuration Release
 
+      - name: Checkout code829-db
+        # Schema repo went private — use a fine-grained PAT (DB_REPO_TOKEN, contents:read)
+        # via actions/checkout instead of an unauthenticated git clone.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Sidppatel/code829-db
+          ref: main
+          token: ${{ secrets.DB_REPO_TOKEN }}
+          path: code829-db
+
       - name: Pre-build code829-db MigrationRunner
         # Single source of truth: integration tests apply the schema using the
         # same MigrationRunner that runs against prod. Pre-publishing here keeps
         # each Testcontainers Postgres bootstrap fast (no clone/build per test run).
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch main https://github.com/Sidppatel/code829-db.git /tmp/code829-db
-          dotnet publish /tmp/code829-db/src/MigrationRunner -c Release -o /tmp/code829-db-migrate -p:UseAppHost=false
+          dotnet publish code829-db/src/MigrationRunner -c Release -o /tmp/code829-db-migrate -p:UseAppHost=false
           test -f /tmp/code829-db-migrate/MigrationRunner.dll
           echo "MIGRATION_RUNNER_DLL=/tmp/code829-db-migrate/MigrationRunner.dll" >> "$GITHUB_ENV"
 

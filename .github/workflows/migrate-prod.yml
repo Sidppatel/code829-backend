@@ -17,8 +17,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Clone code829-db @ main
-        run: git clone --depth 1 --branch main https://github.com/Sidppatel/code829-db.git db
+      - name: Checkout code829-db
+        # Schema repo went private — use DB_REPO_TOKEN (fine-grained PAT, contents:read)
+        # via actions/checkout instead of an unauthenticated git clone.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Sidppatel/code829-db
+          ref: main
+          token: ${{ secrets.DB_REPO_TOKEN }}
+          path: db
 
       - name: Run MigrationRunner against prod (session pooler)
         working-directory: db

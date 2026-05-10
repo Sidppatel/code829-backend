@@ -435,6 +435,43 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
+    // Verify schema is initialized before serving traffic. Migrations are applied
+    // exclusively by .github/workflows/migrate-prod.yml; this check fails fast if
+    // that step was skipped. Optional EXPECTED_MIGRATION_ID env var pins the exact
+    // latest MigrationId — set on Render to assert "DB on latest" per release.
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
+        var conn = db.Database.GetDbConnection();
+        await conn.OpenAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText =
+            "SELECT \"MigrationId\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\" DESC LIMIT 1;";
+        string? latest;
+        try
+        {
+            latest = (await cmd.ExecuteScalarAsync()) as string;
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            throw new InvalidOperationException(
+                "Database schema not initialized: __EFMigrationsHistory table missing. " +
+                "Run the migrate-prod workflow before starting the API.", ex);
+        }
+        if (string.IsNullOrEmpty(latest))
+            throw new InvalidOperationException(
+                "Database schema not initialized: __EFMigrationsHistory is empty.");
+
+        var expected = Environment.GetEnvironmentVariable("EXPECTED_MIGRATION_ID");
+        if (!string.IsNullOrEmpty(expected) && !string.Equals(expected, latest, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"DB schema version mismatch. Expected '{expected}' but found '{latest}'. " +
+                "Run migrate-prod against this database before deploying this backend version.");
+
+        Log.Information("[DB] Schema version: {MigrationId} (expected: {Expected})",
+            latest, string.IsNullOrEmpty(expected) ? "<presence-only>" : expected);
+    }
+
     await ConfigureJwtSigningKey(app);
 
     string[] corsOrigins;
