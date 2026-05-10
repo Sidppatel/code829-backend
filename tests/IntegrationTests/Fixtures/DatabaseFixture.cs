@@ -35,7 +35,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
         .Build();
 
     public string PostgresConnectionString { get; private set; } = "";
-    public string RedisConnectionString { get; private set; } = "";
+    public string RedisConfig { get; private set; } = "";
 
     public TestApiFactory Factory { get; private set; } = null!;
 
@@ -44,7 +44,8 @@ public sealed class DatabaseFixture : IAsyncLifetime
         await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
 
         PostgresConnectionString = _postgres.GetConnectionString();
-        RedisConnectionString = $"redis://localhost:{_redis.GetMappedPublicPort(6379)}";
+        var redisPort = _redis.GetMappedPublicPort(6379);
+        RedisConfig = $"localhost:{redisPort}";
 
         // Backend reads components, not URLs. Decompose the Testcontainers Npgsql
         // kv-form string and the Redis container port into the env-var schema
@@ -58,7 +59,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("DATABASE_SSL_MODE", "Disable");
 
         Environment.SetEnvironmentVariable("REDIS_HOST", "localhost");
-        Environment.SetEnvironmentVariable("REDIS_PORT", _redis.GetMappedPublicPort(6379).ToString());
+        Environment.SetEnvironmentVariable("REDIS_PORT", redisPort.ToString());
         Environment.SetEnvironmentVariable("REDIS_USER", null);
         Environment.SetEnvironmentVariable("REDIS_PASSWORD", null);
         Environment.SetEnvironmentVariable("REDIS_TLS", "false");
@@ -73,7 +74,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
         await RunMigrationsAsync();
 
-        Factory = new TestApiFactory(PostgresConnectionString, RedisConnectionString);
+        Factory = new TestApiFactory(PostgresConnectionString, RedisConfig);
     }
 
     public async ValueTask DisposeAsync()

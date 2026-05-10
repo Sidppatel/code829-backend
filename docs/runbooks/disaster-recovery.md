@@ -15,12 +15,9 @@ These tighten to RTO 15 min / RPO 5 min on Supabase Pro (PITR) + Fly.io multi-re
 
 1. **Freeze writes.** Scale Render service to 0 instances (Render dashboard → Settings → Instance Count). Prevents partial data being written to a wounded DB.
 2. **Open Supabase → Project → Database → Backups.** Pick the most recent daily backup before corruption window.
-3. **Restore in place** (Supabase restores to the same project; DSN stays the same) OR **restore to new project** (DSN changes — update `DATABASE_URL` on Render afterwards).
-4. If restored to new project: update `DATABASE_URL` env var on Render. Do not restart yet.
-5. **Verify migrations match code.** Compare `__EFMigrationsHistory` count vs `db/Migrations/` files. If code is ahead of restored DB:
-   ```bash
-   dotnet ef database update --project db --startup-project api --connection "<new DATABASE_URL>"
-   ```
+3. **Restore in place** (Supabase restores to the same project; host/credentials stay the same) OR **restore to new project** (host/credentials change — update the `DB_HOST` / `DB_USER` / `DB_PASSWORD` env vars on Render afterwards).
+4. If restored to new project: update the affected `DB_*` env vars on Render. Do not restart yet.
+5. **Verify migrations match code.** Compare `__EFMigrationsHistory` count vs `code829-db/src/Db/Migrations/` files. If code is ahead of restored DB, run the migrate workflow in the `code829-db` repo (`.github/workflows/migrate.yml`) — manual `workflow_dispatch` is the path here, since the change isn't a normal push to master.
 6. **Scale Render back to 1 instance.** Watch logs — expect `Database migrations applied` and healthy `/health/live`.
 7. **Run ProdBootstrap if the restore was to an empty DB** (shouldn't happen if backup was valid, but the bootstrap is idempotent — safe to re-run).
 8. **Reconcile Stripe** (see section 4) for the RPO window between backup time and failure.

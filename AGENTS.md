@@ -30,8 +30,9 @@ backend.slnx
 dotnet build                          # Build entire solution (analyzer EP0001 fires here)
 dotnet test                           # Run xUnit tests
 dotnet run --project api              # Run API (listens on http://localhost:8000)
-dotnet ef migrations add <Name> --project db --startup-project api
-dotnet ef database update --project db --startup-project api
+
+# Migrations live in the code829-db repo, not here:
+#   cd ../code829-db && dotnet run --project src/MigrationRunner
 ```
 
 The boot scripts at the monorepo root (`..\start.ps1`, `..\start-backend.ps1`) handle Docker + secrets + migrations + run in one shot. Use them for normal dev — invoke `dotnet run` directly only when you need a debugger or detailed control.

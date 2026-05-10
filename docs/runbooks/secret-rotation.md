@@ -50,21 +50,24 @@ Each secret below has a trigger condition, generation command, deployment path, 
   4. Revoke the old token in R2 dashboard.
 - **Verify:** upload a small image via admin UI; confirm 200 + asset visible at CDN URL.
 
-## Supabase database password (`DATABASE_URL` password component)
+## Supabase database password (`DB_PASSWORD`)
 
 - **Trigger:** annually, or on suspected compromise.
 - **Generate:** `openssl rand -base64 24`
 - **Deploy:**
   1. Supabase Dashboard → Project Settings → Database → Reset database password.
-  2. Update `DATABASE_URL` env var (both Render and any local `.env` via Infisical).
+  2. Update `DB_PASSWORD` in:
+     - Render env vars (backend runtime),
+     - `code829-db` GitHub `production` Environment (migrate workflow),
+     - any local `.env.local` (dev only — production secrets never live in Infisical).
   3. Restart Render — connections will reconnect with new credentials. Existing pool connections drop and reconnect.
 - **Verify:** `/health/ready` returns 200; check for `Npgsql.NpgsqlException` errors in logs.
 
-## Upstash Redis password (`REDIS_URL` password component)
+## Upstash Redis password (`REDIS_PASSWORD`)
 
 - **Trigger:** annually, or on suspected compromise.
 - **Generate:** Upstash Console → Database → Reset password.
-- **Deploy:** update `REDIS_URL` → restart Render.
+- **Deploy:** update `REDIS_PASSWORD` on Render → restart.
 - **Verify:** `/health/ready` returns 200; confirm `RedisCacheService` does not log connection errors.
 
 ## CLAMAV_HOST / CLAMAV_PORT
@@ -74,5 +77,5 @@ Each secret below has a trigger condition, generation command, deployment path, 
 ## Audit cadence
 
 - Quarterly: `JWT_SECRET`.
-- Annually: `DATABASE_URL`, `REDIS_URL`, S3 keys.
+- Annually: `DB_PASSWORD`, `REDIS_PASSWORD`, S3 keys.
 - On-demand: any key on suspected compromise; revoke and rotate within 1h.

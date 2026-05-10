@@ -44,45 +44,39 @@ You will also need:
 3. Choose a region closest to your users (e.g. `us-east-1`)
 4. Wait ~2 minutes for provisioning
 
-### 2.2 Get Your Connection Strings
+### 2.2 Get Your Connection Components
 
-Go to **Project Settings → Database → Connection string**
+Go to **Project Settings → Database → Connection string** and decompose the
+pooler endpoint into the five env-var components the system uses everywhere.
+**No URL form is ever stored** — neither in source, env files, nor any single
+secret value.
 
-You need **two** connection strings:
+| Component | Migrations (Session pooler) | API runtime (Transaction pooler) |
+|---|---|---|
+| `DB_HOST` | `<host>.pooler.supabase.com` | same |
+| `DB_PORT` (this doc / runtime) / `DB_PORT_SESSION` (migrate workflow) | `5432` | `6543` |
+| `DB_USER` | `postgres.<project-ref>` | same |
+| `DB_NAME` | `postgres` | same |
+| `DB_PASSWORD` | (Supabase-issued) | same |
 
-| Use | Mode | Port | When to use |
-|---|---|---|---|
-| EF Core Migrations | Session | 5432 | Running `dotnet ef` locally |
-| API at runtime | Transaction (Pooler) | 6543 | Render env var |
+Concrete values live only in Supabase + Render env vars + the `code829-db` repo's `production` GitHub Environment + the runbook at `docs/deployment-internal.md` (untracked) — never in this document, this repo, or chat.
 
-Obtain both strings from the Supabase dashboard — never paste them into this document, a chat log, or a commit. The shapes are:
+### 2.3 Run Schema Migrations
 
-```
-# Session (migrations)
-postgresql://<user>:<password>@<host>.pooler.supabase.com:5432/postgres
-
-# Transaction Pooler (API runtime)
-postgresql://<user>:<password>@<host>.pooler.supabase.com:6543/postgres?pgbouncer=true
-```
-
-Concrete values (project ref, password, regional host) live only in Supabase + the Render env-var settings + the runbook at `docs/deployment-internal.md` (untracked).
-
-### 2.3 Run EF Core Migrations
-
-Run this **locally**, pointed at your Supabase **Session** connection string (port 5432). Obtain the string from the Supabase dashboard; never paste credentials into source control or chat:
+Migrations are **owned by the sibling `code829-db` repo**. The backend never
+applies schema. Production migrations run via that repo's
+`.github/workflows/migrate.yml`, gated on the `production` GitHub
+Environment's required-reviewer rule. To run locally against a dev DB:
 
 ```bash
-# From the repo root
-cd code829-backend
-
-# Source the string from Supabase (dashboard → Project Settings → Database)
-export DATABASE_URL="<supabase-session-connection-string>"
-
-# Run migrations
-dotnet ef database update --project db --startup-project api
+cd ../code829-db
+# Components (DB_HOST etc.) sourced from your local .env.local + Infisical;
+# DB_PORT_SESSION = 5432 for DDL.
+dotnet run --project src/MigrationRunner
 ```
 
-> ⚠️ Use port **5432** (session mode) for migrations — PgBouncer transaction mode doesn't support the `SET` commands EF Core uses.
+> ⚠️ The session pooler (port 5432) is required for DDL. Transaction-mode
+> pooling (port 6543) does not support the `SET` commands EF Core uses.
 
 ### 2.4 Create SQL Views Manually
 
@@ -136,15 +130,19 @@ Your API uses Redis (see `docker-compose.yml`). Upstash provides a **free server
 
 1. Go to [upstash.com](https://upstash.com) → **Create Database**
 2. Choose **Redis** → Region closest to your Render deployment
-3. Obtain the **Redis URL** from the Upstash dashboard. The shape is:
-   ```
-   redis://default:<password>@<host>.upstash.io:6379
-   ```
-   Or for TLS (recommended):
-   ```
-   rediss://default:<password>@<host>.upstash.io:6380
-   ```
-   Concrete host + password values live in Upstash + the Render env-var settings — never in this repo.
+3. From the Upstash dashboard, decompose the connection details into the five
+   component env vars the backend reads (no URL form anywhere):
+
+   | Component | TLS (recommended) | Plaintext |
+   |---|---|---|
+   | `REDIS_HOST` | `<host>.upstash.io` | same |
+   | `REDIS_PORT` | `6380` | `6379` |
+   | `REDIS_USER` | `default` | `default` |
+   | `REDIS_PASSWORD` | (Upstash token) | same |
+   | `REDIS_TLS` | `true` | `false` |
+
+   Concrete host + password values live only in Upstash + the Render env-var
+   settings — never in this repo or chat.
 
 > Free tier: 10,000 commands/day, 256MB storage — sufficient for session/cache usage.
 
@@ -183,7 +181,7 @@ Use this only if you don't want to use the Blueprint.
 
 4. Click **Advanced** → set the environment variables listed in [Section 7](#7-environment-variables-reference).
 
-> ⚠️ Use the Supabase **Transaction Pooler** connection string (port **6543**) in `DATABASE_URL` — NOT the session mode URL.
+> ⚠️ Set `DB_PORT=6543` (Transaction Pooler) on Render — NOT the session-mode 5432 port.
 
 ### 4.3 Deploy
 
@@ -274,7 +272,11 @@ Required (fail-fast — service won't start without these):
 
 | Variable | Example | Notes |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://...supabase.com:6543/postgres?pgbouncer=true` | Transaction pooler, port 6543 |
+| `DB_HOST` | `<host>.pooler.supabase.com` | Supabase pooler hostname |
+| `DB_PORT` | `6543` | Transaction pooler — runtime queries |
+| `DB_USER` | `postgres.<project-ref>` | |
+| `DB_NAME` | `postgres` | |
+| `DB_PASSWORD` | (Supabase-issued) | |
 | `JWT_SECRET` | 64-char hex string | Generate: `openssl rand -hex 32` |
 | `STRIPE_SECRET_KEY` | `sk_live_…` / `sk_test_…` | Live keys required in Production, blocked outside it |
 
@@ -292,7 +294,7 @@ Optional (set as needed):
 
 | Variable | Notes |
 |---|---|
-| `REDIS_URL` | Upstash `rediss://…:6380`. Omit to skip cache (not recommended for prod) |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_USER` / `REDIS_PASSWORD` / `REDIS_TLS` | Upstash components (host, `6380`, `default`, token, `true`). Omit to skip cache (not recommended for prod) |
 | `STRIPE_PUBLISHABLE_KEY` | Client-side key |
 | `STRIPE_WEBHOOK_SECRET` | Needed for `/webhooks/stripe` signature verification |
 | `RESEND_API_KEY` | Email sending |

@@ -12,8 +12,8 @@ If every step finds existing data, the process logs "already bootstrapped" lines
 
 ## Prerequisites
 
-- Production DB is provisioned and reachable via `DATABASE_URL`.
-- EF migrations from `db/Migrations/` match the schema the API expects.
+- Production DB is provisioned and reachable via the `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_NAME` / `DB_PASSWORD` components.
+- EF migrations from `code829-db/src/Db/Migrations/` match the schema the API expects.
 - You have shell/env access to the Render service.
 
 ## Procedure

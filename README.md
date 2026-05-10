@@ -97,15 +97,16 @@ Local dev sources secrets from Infisical (`infisical export --env=dev`) and non-
 | `REDIS_PASSWORD` | Dev Redis auth |
 | `EP_APP_PASSWORD` | Password for the runtime `ep_app` role provisioned by `docker-init/01-extensions-and-roles.sql` |
 | `EP_READONLY_PASSWORD` | Password for the reporting `ep_readonly` role |
-| `DATABASE_URL`, `REDIS_URL` | Connection strings consumed by the API |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_NAME` / `DB_PASSWORD` | Postgres connection components consumed by the API |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_USER` / `REDIS_PASSWORD` / `REDIS_TLS` | Redis connection components consumed by the API |
 
 `EP_APP_PASSWORD` and `EP_READONLY_PASSWORD` are read by the Postgres container on first boot via `psql \getenv` — the init SQL never hardcodes values. They must be present before `docker compose up` or init aborts. Rotate by resetting the volume (`stop-clear-start.ps1`) after updating `.env.local`.
 
 ### 3. Run Migrations and Start
 
 ```bash
-# Apply database migrations
-dotnet ef database update --project db --startup-project api
+# Apply database migrations (owned by the sibling code829-db repo)
+cd ../code829-db && dotnet run --project src/MigrationRunner && cd ../code829-backend
 
 # Run the API
 dotnet run --project api
@@ -157,12 +158,17 @@ dotnet run --project api  # Start API server
 
 ### EF Core Migrations
 
+Migrations live in the **sibling `code829-db` repo**, not in this repo. The
+backend never authors or applies migrations.
+
 ```bash
+cd ../code829-db
+
 # Add a new migration
-dotnet ef migrations add <MigrationName> --project db --startup-project api
+dotnet ef migrations add <MigrationName> --project src/Db --startup-project src/MigrationRunner
 
 # Apply pending migrations
-dotnet ef database update --project db --startup-project api
+dotnet run --project src/MigrationRunner
 ```
 
 ---
@@ -239,9 +245,17 @@ Redis is used for:
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string (use Supabase transaction pooler, port 6543) |
-| `DATABASE_SSL_MODE` | `Require` for Supabase |
-| `REDIS_URL` | Redis connection URL (`redis://` or `rediss://` for TLS) |
+| `DB_HOST` | Supabase pooler host (e.g. `<host>.pooler.supabase.com`) |
+| `DB_PORT` | `6543` for the transaction pooler (runtime) |
+| `DB_USER` | `postgres.<project-ref>` |
+| `DB_NAME` | `postgres` |
+| `DB_PASSWORD` | Supabase-issued password |
+| `DATABASE_SSL_MODE` | `Require` (or `VerifyFull`) for Supabase |
+| `REDIS_HOST` | Upstash host (`<host>.upstash.io`) |
+| `REDIS_PORT` | `6380` for TLS, `6379` for plaintext |
+| `REDIS_USER` | `default` (Upstash) |
+| `REDIS_PASSWORD` | Upstash token |
+| `REDIS_TLS` | `true` for Upstash, `false` for local docker redis |
 | `JWT_SECRET` | 64-char hex string for JWT signing. Generate: `openssl rand -hex 32` |
 | `RESEND_API_KEY` | Resend email API key (starts with `re_`) |
 | `EMAIL_FROM_ADDRESS` | Sender email (must match verified Resend domain) |

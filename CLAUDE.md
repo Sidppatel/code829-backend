@@ -24,7 +24,7 @@ backend.slnx
 └── tools/Analyzers/    # Roslyn analyzers (EP0001 enforces Data Access Rule)
 ```
 
-Schema (migrations, raw SQL artifacts for views/SPs/functions, MigrationRunner) lives in the sibling repo `D:\event-platform\code829-db`. Backend has no schema-authoring code and never runs migrations on startup. The two repos communicate exclusively via `DATABASE_URL`.
+Schema (migrations, raw SQL artifacts for views/SPs/functions, MigrationRunner) lives in the sibling repo `D:\event-platform\code829-db`. Backend has no schema-authoring code and never runs migrations on startup. The two repos communicate exclusively via the `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_NAME` / `DB_PASSWORD` env-var components — no URL form anywhere.
 
 ## Build & Run
 

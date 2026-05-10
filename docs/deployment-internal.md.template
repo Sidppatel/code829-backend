@@ -5,18 +5,25 @@
 > `deployment-internal.md` and fill in from the provider dashboards. Rotate the
 > moment it touches a chat thread or a commit diff.
 
-## Supabase
+## Supabase (component schema — no URL form anywhere)
 
 - **Project ref:** `<ref>` (from dashboard URL `app.supabase.com/project/<ref>`)
 - **Region:** `<e.g. aws-us-east-1>`
-- **Session connection string:** `postgresql://<user>:<password>@<host>:5432/postgres`
-- **Transaction pooler string:** `postgresql://<user>:<password>@<host>:6543/postgres?pgbouncer=true`
+- **`DB_HOST`:** `<host>.pooler.supabase.com`
+- **`DB_PORT_SESSION`:** `5432` (DDL — used only by `code829-db` migrate workflow)
+- **`DB_PORT`:** `6543` (transaction pooler — backend runtime)
+- **`DB_USER`:** `postgres.<ref>`
+- **`DB_NAME`:** `postgres`
+- **`DB_PASSWORD`:** `<value>`
 - **Password owner:** `<on-call>` — rotation cadence 90 days
 
-## Upstash Redis
+## Upstash Redis (component schema)
 
-- **Endpoint:** `<host>.upstash.io:6380`
-- **TLS URL:** `rediss://default:<password>@<host>.upstash.io:6380`
+- **`REDIS_HOST`:** `<host>.upstash.io`
+- **`REDIS_PORT`:** `6380`
+- **`REDIS_USER`:** `default`
+- **`REDIS_PASSWORD`:** `<token>`
+- **`REDIS_TLS`:** `true`
 - **Region:** `<e.g. us-east-1>`
 
 ## Render

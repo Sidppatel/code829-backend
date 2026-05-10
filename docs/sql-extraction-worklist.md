@@ -49,7 +49,7 @@ LINQ chain has `read → claims/role check → scoped read`. Flattening risks AC
 1. Author SQL → `db/Sql/Views/v_*.sql` or `db/Sql/Procedures/sp_*.sql`. Read-only fns marked `STABLE`. `LANGUAGE sql` preferred.
 2. (View) keyless entity → `db/Entities/Views/<Name>View.cs`. Register in `db/EventPlatformDbContext.OnModelCreating()` (lines 730–854) + DbSet (12–76).
 3. (Function) C# wrapper → `db/Repositories/StoredProcedures/<Domain>Procedures.cs` (interface + impl). DI in `api/Program.cs`.
-4. EF migration: `dotnet ef migrations add Extract_<Artifact> --project db --startup-project api`. Up: `migrationBuilder.Sql(MigrationSqlLoader.Load("file.sql"))`. Down: `DROP VIEW/FUNCTION ... IF EXISTS`.
+4. EF migration (in the sibling `code829-db` repo): `dotnet ef migrations add Extract_<Artifact> --project src/Db --startup-project src/MigrationRunner`. Up: `migrationBuilder.Sql(MigrationSqlLoader.Load("file.sql"))`. Down: `DROP VIEW/FUNCTION ... IF EXISTS`.
 5. Controller swap to `_ctx.<Views>.AsNoTracking().FirstOrDefaultAsync()` or `_procs.<Method>Async(...)`. EP0001 enforces.
 6. Update integration tests in `tests/`. Add SQL-level test for non-trivial fns.
 7. `dotnet build` clean → `dotnet test` → ApiDiff harness vs baseline → commit (one artifact per commit when feasible).

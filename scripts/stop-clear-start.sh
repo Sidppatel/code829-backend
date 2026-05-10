@@ -56,17 +56,12 @@ if ! check_docker_ready 60; then
     exit 1
 fi
 
-if ! dotnet tool list -g 2>/dev/null | grep -q dotnet-ef; then
-    log_step "Installing dotnet-ef global tool..."
-    dotnet tool install --global dotnet-ef
-fi
-
 log_step "Restoring NuGet packages..."
 dotnet restore "$BACKEND/backend.slnx"
 
-log_step "Running EF Core migrations..."
+log_step "Applying schema via code829-db MigrationRunner (single source of truth)..."
 export ASPNETCORE_ENVIRONMENT=Development
-dotnet ef database update --project "$BACKEND/db/db.csproj" --startup-project "$BACKEND/api/api.csproj"
+dotnet run --project "$ROOT/code829-db/src/MigrationRunner" --no-launch-profile -c Debug
 
 if [ ! -d "$FRONTEND/node_modules" ]; then
     log_step "Installing frontend dependencies (pnpm)..."
