@@ -92,6 +92,12 @@ jobs:
 
   integration-tests:
     needs: [build-and-scan]
+    # Dependabot PRs run in a restricted secret scope and cannot read
+    # DB_REPO_TOKEN from Actions secrets. Since Dependabot only bumps
+    # dependencies (no schema or behavior changes), build-and-scan + unit
+    # tests are sufficient coverage. Skip integration-tests for those PRs
+    # so we don't have to maintain DB_REPO_TOKEN in Dependabot secrets too.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     # Testcontainers needs Docker — ubuntu-latest runners include Docker Engine
     steps:
