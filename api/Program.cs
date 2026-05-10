@@ -173,6 +173,16 @@ var builder = WebApplication.CreateBuilder(args);
     });
 
     var redisConfig = BuildRedisConfigString();
+    try
+    {
+        var rcb = StackExchange.Redis.ConfigurationOptions.Parse(redisConfig);
+        Log.Information("[Redis] Connecting to {Endpoints} ssl={Ssl} user={User} abortConnect={Abort}",
+            string.Join(",", rcb.EndPoints), rcb.Ssl, rcb.User ?? "<none>", rcb.AbortOnConnectFail);
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "[Redis] Failed to parse configuration string for startup log");
+    }
     var redisMux = ConnectionMultiplexer.Connect(redisConfig);
     builder.Services.AddSingleton<IConnectionMultiplexer>(redisMux);
 
@@ -669,6 +679,11 @@ static string ResolveToIPv4(string host)
 ///
 /// Upstash uses TLS on port 6380 with user "default" — set REDIS_TLS=true.
 /// Local docker redis uses no TLS, no user, password from REDIS_PASSWORD.
+///
+/// abortConnect=false is forced for any non-loopback host so a transient
+/// network blip on first boot does not crash the container — the multiplexer
+/// retries forever in the background and the cache layer treats a
+/// not-yet-connected client as a miss.
 /// </summary>
 static string BuildRedisConfigString()
 {
@@ -685,7 +700,14 @@ static string BuildRedisConfigString()
     if (!string.IsNullOrEmpty(password))
         config += $",password={password}";
     if (tls)
-        config += ",ssl=true,abortConnect=false";
+        config += ",ssl=true";
+
+    var isLoopback = host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+        || host == "127.0.0.1"
+        || host == "::1";
+    if (!isLoopback)
+        config += ",abortConnect=false,connectTimeout=5000,syncTimeout=5000";
+
     return config;
 }
 
