@@ -371,6 +371,11 @@ public class EventsController(
                 ["name"] = appName,
                 ["url"] = frontendUrl
             },
+            ["performer"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "PerformingGroup",
+                ["name"] = ev.Title
+            },
             ["offers"] = new List<Dictionary<string, object?>>
             {
                 new()
