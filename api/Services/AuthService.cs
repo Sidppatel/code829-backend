@@ -202,7 +202,9 @@ public class AuthService(
         HasCompletedOnboarding: user.HasCompletedOnboarding,
         ImageUrl: user.Image?.StorageKey is not null
             ? fileStorage.GetPublicUrl($"{user.Image.StorageKey}.webp")
-            : null
+            : null,
+        HasPassword: !string.IsNullOrEmpty(user.PasswordHash),
+        HasGoogle: !string.IsNullOrEmpty(user.GoogleSubject)
     );
 
     private static string HashToken(string token)
@@ -459,5 +461,28 @@ public class AuthService(
 
         Log.Information("[Auth] Google sign-in for {EmailHash}", HashEmailForLog(normalizedEmail));
         return (userDto, sessionToken, jwt);
+    }
+
+    public async Task SetOrChangePasswordAsync(Guid userId, string? currentPassword, string newPassword, string? currentSessionHash)
+    {
+        var user = await userRepository.GetByIdAsync(userId)
+            ?? throw new KeyNotFoundException("User not found");
+
+        var hasExistingPassword = !string.IsNullOrEmpty(user.PasswordHash);
+
+        if (hasExistingPassword)
+        {
+            if (string.IsNullOrEmpty(currentPassword))
+                throw new InvalidOperationException("CURRENT_PASSWORD_REQUIRED");
+
+            if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+                throw new UnauthorizedAccessException("CURRENT_PASSWORD_INCORRECT");
+        }
+
+        var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await userProc.SetPasswordAsync(userId, newHash, true, currentSessionHash);
+
+        var db = redis.GetDatabase();
+        Log.Information("[Auth] Password set/changed for {EmailHash}", HashEmailForLog(user.Email));
     }
 }

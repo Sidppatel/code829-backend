@@ -264,6 +264,50 @@ public class AuthController(
     }
 #endif
 
+    [HttpPost("password")]
+    [Authorize]
+    [RequireRole(UserRole.User)]
+    public async Task<IActionResult> SetPassword(
+        [FromBody] SetPasswordRequest request,
+        [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized(new ApiError(401, "Invalid token", HttpContext.TraceIdentifier));
+
+        var ipKey = $"ratelimit:set-password:{HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+        var db = redis.GetDatabase();
+        var count = await db.StringIncrementAsync(ipKey);
+        if (count == 1) await db.KeyExpireAsync(ipKey, TimeSpan.FromMinutes(1));
+        if (count > 5)
+        {
+            var ttl = await db.KeyTimeToLiveAsync(ipKey);
+            var retryAfter = (int)Math.Ceiling((ttl ?? TimeSpan.FromMinutes(1)).TotalSeconds);
+            return StatusCode(429, new { statusCode = 429, message = "Too many requests. Please try again shortly.", retryAfterSeconds = retryAfter });
+        }
+
+        var sessionToken = Request.Cookies[SessionCookieName];
+        var currentHash = sessionToken is not null ? HashToken(sessionToken) : null;
+
+        try
+        {
+            await authService.SetOrChangePasswordAsync(userId.Value, request.CurrentPassword, request.NewPassword, currentHash);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "CURRENT_PASSWORD_REQUIRED")
+        {
+            return BadRequest(new ApiError(400, "Current password is required", HttpContext.TraceIdentifier));
+        }
+        catch (UnauthorizedAccessException ex) when (ex.Message == "CURRENT_PASSWORD_INCORRECT")
+        {
+            Log.Warning(ex, "[Auth] SetPassword wrong current");
+            return BadRequest(new ApiError(400, "Current password is incorrect", HttpContext.TraceIdentifier));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new ApiError(404, "User not found", HttpContext.TraceIdentifier));
+        }
+    }
+
     [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout()

@@ -27,4 +27,5 @@ public interface IUserProcedures
     Task<UserEmailVerificationToken> CreateEmailVerificationTokenAsync(Guid userId, string tokenHash, DateTime expiresAt, string? ipAddress, CancellationToken ct = default);
     Task<User> ConsumeEmailVerificationTokenAsync(string tokenHash, CancellationToken ct = default);
     Task<User> SignInUserGoogleAsync(string googleSubject, string email, string emailHash, string firstName, string lastName, CancellationToken ct = default);
+    Task SetPasswordAsync(Guid userId, string newPasswordHash, bool revokeOtherSessions, string? currentSessionHash, CancellationToken ct = default);
 }

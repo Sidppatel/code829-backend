@@ -203,6 +203,19 @@ public class UserProcedures(EventPlatformDbContext context) : IUserProcedures
         return user;
     }
 
+    public async Task SetPasswordAsync(Guid userId, string newPasswordHash, bool revokeOtherSessions, string? currentSessionHash, CancellationToken ct = default)
+    {
+        await context.Database
+            .ExecuteSqlRawAsync(
+                "SELECT sp_set_user_password(@p0, @p1, @p2, @p3)",
+                [
+                    new NpgsqlParameter("p0", userId),
+                    new NpgsqlParameter("p1", newPasswordHash),
+                    new NpgsqlParameter("p2", revokeOtherSessions),
+                    new NpgsqlParameter("p3", NpgsqlDbType.Text) { Value = (object?)currentSessionHash ?? DBNull.Value }
+                ], ct);
+    }
+
     private sealed class UserCountsRow
     {
         public int Total { get; set; }

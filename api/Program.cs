@@ -425,6 +425,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IValidator<SigninRequest>, SigninRequestValidator>();
     builder.Services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
     builder.Services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
+    builder.Services.AddScoped<IValidator<SetPasswordRequest>, SetPasswordRequestValidator>();
     builder.Services.AddScoped<IValidator<VerifyEmailRequest>, VerifyEmailRequestValidator>();
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationCreateRequest>, OrganizationCreateRequestValidator>();
     builder.Services.AddScoped<IValidator<Contracts.DTOs.Organizations.OrganizationUpdateRequest>, OrganizationUpdateRequestValidator>();

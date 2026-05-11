@@ -14,5 +14,7 @@ public record UserDto(
     string? Phone,
     bool OptInLocationEmail,
     bool HasCompletedOnboarding,
-    string? ImageUrl
+    string? ImageUrl,
+    bool HasPassword,
+    bool HasGoogle
 );
