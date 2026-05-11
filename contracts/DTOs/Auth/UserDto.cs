@@ -16,5 +16,6 @@ public record UserDto(
     bool HasCompletedOnboarding,
     string? ImageUrl,
     bool HasPassword,
-    bool HasGoogle
+    bool HasGoogle,
+    bool EmailVerified
 );

@@ -204,7 +204,8 @@ public class AuthService(
             ? fileStorage.GetPublicUrl($"{user.Image.StorageKey}.webp")
             : null,
         HasPassword: !string.IsNullOrEmpty(user.PasswordHash),
-        HasGoogle: !string.IsNullOrEmpty(user.GoogleSubject)
+        HasGoogle: !string.IsNullOrEmpty(user.GoogleSubject),
+        EmailVerified: user.EmailVerified
     );
 
     private static string HashToken(string token)
