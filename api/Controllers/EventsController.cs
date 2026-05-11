@@ -295,6 +295,101 @@ public class EventsController(
         return Ok(MapEventDto(ev, imageUrl, defaultOpenFee));
     }
 
+    [HttpGet("by-slug/{slug}/meta")]
+    public async Task<IActionResult> GetMetaBySlug(string slug)
+    {
+        var ev = await context.EventViews.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Slug == slug && e.Status == "Published");
+
+        if (ev is null) return NotFound();
+
+        var frontendUrl = await settings.GetOrDefaultAsync("frontend_url", "http://localhost:5173");
+        var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
+        var imageUrl = ev.ImagePath is not null
+            ? fileStorage.GetPublicUrl(ev.ImagePath)
+            : await ResolveEventImageUrlAsync(ev.EventId);
+
+        var dateStr = ev.StartDate.ToString("MMM d, yyyy");
+        var description = ev.Description?.Length > 160 ? ev.Description[..157] + "..." : ev.Description ?? "";
+        var canonicalUrl = $"{frontendUrl}/events/{ev.Slug}";
+        var pageTitle = $"{ev.Title} — {dateStr} — {ev.VenueCity} | {appName}";
+        var priceCents = ev.PricePerPersonCents ?? 0;
+
+        var seo = new Dictionary<string, object?>
+        {
+            ["title"] = pageTitle,
+            ["description"] = description,
+            ["canonicalUrl"] = canonicalUrl,
+            ["image"] = imageUrl,
+            ["og"] = new Dictionary<string, object?>
+            {
+                ["type"] = "website",
+                ["title"] = ev.Title,
+                ["description"] = description,
+                ["url"] = canonicalUrl,
+                ["site_name"] = appName,
+                ["image"] = imageUrl
+            },
+            ["twitter"] = new Dictionary<string, object?>
+            {
+                ["card"] = "summary_large_image",
+                ["title"] = ev.Title,
+                ["description"] = description,
+                ["image"] = imageUrl
+            }
+        };
+
+        var schema = new Dictionary<string, object?>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "Event",
+            ["name"] = ev.Title,
+            ["description"] = ev.Description,
+            ["startDate"] = ev.StartDate.ToString("o"),
+            ["endDate"] = ev.EndDate.ToString("o"),
+            ["eventStatus"] = "https://schema.org/EventScheduled",
+            ["eventAttendanceMode"] = "https://schema.org/OfflineEventAttendanceMode",
+            ["url"] = canonicalUrl,
+            ["image"] = imageUrl is not null ? new[] { imageUrl } : null,
+            ["location"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Place",
+                ["name"] = ev.VenueName,
+                ["address"] = new Dictionary<string, object?>
+                {
+                    ["@type"] = "PostalAddress",
+                    ["streetAddress"] = ev.VenueAddress,
+                    ["addressLocality"] = ev.VenueCity,
+                    ["addressRegion"] = ev.VenueState,
+                    ["postalCode"] = ev.VenueZipCode,
+                    ["addressCountry"] = "US"
+                }
+            },
+            ["organizer"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Organization",
+                ["name"] = appName,
+                ["url"] = frontendUrl
+            },
+            ["offers"] = new List<Dictionary<string, object?>>
+            {
+                new()
+                {
+                    ["@type"] = "Offer",
+                    ["price"] = (priceCents / 100.0).ToString("F2"),
+                    ["priceCurrency"] = "USD",
+                    ["availability"] = ev.TotalSold < ev.TotalCapacity
+                        ? "https://schema.org/InStock"
+                        : "https://schema.org/SoldOut",
+                    ["url"] = canonicalUrl,
+                    ["validFrom"] = ev.StartDate.AddDays(-30).ToString("o")
+                }
+            }
+        };
+
+        return Ok(new { seo, schema });
+    }
+
     [HttpGet("{id:guid}/images")]
     public async Task<IActionResult> GetPublicImages(Guid id)
     {
