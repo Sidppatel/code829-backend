@@ -28,4 +28,5 @@ public interface ISecretsProvider
     string FrontendUrlAdmin { get; }
 
     string GoogleOAuthClientId { get; }
+    string GoogleOAuthClientSecret { get; }
 }

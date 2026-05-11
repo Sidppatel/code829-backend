@@ -174,8 +174,8 @@ public class AuthController(
         [FromBody] GoogleSignInRequest request,
         [FromServices] StackExchange.Redis.IConnectionMultiplexer redis)
     {
-        if (string.IsNullOrWhiteSpace(request.Credential))
-            return BadRequest(new ApiError(400, "Credential is required", HttpContext.TraceIdentifier));
+        if (string.IsNullOrWhiteSpace(request.Credential) && string.IsNullOrWhiteSpace(request.Code))
+            return BadRequest(new ApiError(400, "Credential or code is required", HttpContext.TraceIdentifier));
 
         var ipKey = $"ratelimit:google:{HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
         var db = redis.GetDatabase();
@@ -192,7 +192,7 @@ public class AuthController(
         {
             var deviceName = ParseDeviceName(Request.Headers.UserAgent.ToString());
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var (user, sessionToken, _) = await authService.SignInWithGoogleAsync(request.Credential, deviceName, ip);
+            var (user, sessionToken, _) = await authService.SignInWithGoogleAsync(request.Credential, request.Code, deviceName, ip);
             SetSessionCookie(sessionToken);
             return Ok(new AuthResponse(user));
         }

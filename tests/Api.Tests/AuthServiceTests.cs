@@ -63,11 +63,12 @@ public class AuthServiceTests : IDisposable
         var userProc = new Mock<IUserProcedures>();
         var secretsProvider = new Mock<ISecretsProvider>();
         var imageService = new Mock<IImageService>();
+        var httpClientFactory = new Mock<IHttpClientFactory>();
         _service = new AuthService(
             _context, _userRepoMock.Object, _authProc.Object, userProc.Object, _settingsService.Object,
             _emailService.Object, _encryptionService.Object, _environment.Object,
             fileStorage.Object, _redis.Object, jwtService.Object,
-            secretsProvider.Object, imageService.Object);
+            secretsProvider.Object, imageService.Object, httpClientFactory.Object);
     }
 
     [Fact]

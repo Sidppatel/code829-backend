@@ -56,4 +56,5 @@ public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
         configuration["FRONTEND_URL_ADMIN"] ?? "http://localhost:5174";
 
     public string GoogleOAuthClientId => configuration["GOOGLE_OAUTH_CLIENT_ID"] ?? "";
+    public string GoogleOAuthClientSecret => configuration["GOOGLE_OAUTH_CLIENT_SECRET"] ?? "";
 }

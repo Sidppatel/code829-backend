@@ -25,7 +25,8 @@ public class AuthService(
     IConnectionMultiplexer redis,
     IJwtService jwtService,
     ISecretsProvider secretsProvider,
-    IImageService imageService
+    IImageService imageService,
+    IHttpClientFactory httpClientFactory
 ) : IAuthService
 {
     public async Task<MagicLinkResponse> SendMagicLinkAsync(string email, string? returnUrl = null, string? frontendOrigin = null)
@@ -395,16 +396,23 @@ public class AuthService(
         Log.Information("[Auth] Password reset successful for {EmailHash}", HashEmailForLog(user.Email));
     }
 
-    public async Task<(UserDto User, string SessionToken, string Jwt)> SignInWithGoogleAsync(string credential, string? deviceName, string? ip)
+    public async Task<(UserDto User, string SessionToken, string Jwt)> SignInWithGoogleAsync(string? credential, string? code, string? deviceName, string? ip)
     {
         var clientId = secretsProvider.GoogleOAuthClientId;
         if (string.IsNullOrWhiteSpace(clientId))
             throw new InvalidOperationException("Google sign-in is not configured");
 
+        var idToken = credential;
+        if (string.IsNullOrWhiteSpace(idToken) && !string.IsNullOrWhiteSpace(code))
+            idToken = await ExchangeGoogleCodeForIdTokenAsync(code, clientId);
+
+        if (string.IsNullOrWhiteSpace(idToken))
+            throw new UnauthorizedAccessException("Missing Google credential or code");
+
         Google.Apis.Auth.GoogleJsonWebSignature.Payload payload;
         try
         {
-            payload = await Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync(credential,
+            payload = await Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync(idToken,
                 new Google.Apis.Auth.GoogleJsonWebSignature.ValidationSettings
                 {
                     Audience = new[] { clientId }
@@ -462,6 +470,40 @@ public class AuthService(
 
         Log.Information("[Auth] Google sign-in for {EmailHash}", HashEmailForLog(normalizedEmail));
         return (userDto, sessionToken, jwt);
+    }
+
+    private async Task<string> ExchangeGoogleCodeForIdTokenAsync(string code, string clientId)
+    {
+        var clientSecret = secretsProvider.GoogleOAuthClientSecret;
+        if (string.IsNullOrWhiteSpace(clientSecret))
+            throw new InvalidOperationException("Google OAuth client secret not configured");
+
+        var http = httpClientFactory.CreateClient();
+        var form = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("code", code),
+            new KeyValuePair<string, string>("client_id", clientId),
+            new KeyValuePair<string, string>("client_secret", clientSecret),
+            new KeyValuePair<string, string>("redirect_uri", "postmessage"),
+            new KeyValuePair<string, string>("grant_type", "authorization_code"),
+        });
+
+        using var response = await http.PostAsync("https://oauth2.googleapis.com/token", form);
+        var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            Log.Warning("[Auth] Google code exchange failed status={Status} body={Body}", (int)response.StatusCode, body);
+            throw new UnauthorizedAccessException("Google code exchange failed");
+        }
+
+        using var doc = System.Text.Json.JsonDocument.Parse(body);
+        if (!doc.RootElement.TryGetProperty("id_token", out var idTokenEl))
+            throw new UnauthorizedAccessException("Google response missing id_token");
+
+        var idToken = idTokenEl.GetString();
+        if (string.IsNullOrWhiteSpace(idToken))
+            throw new UnauthorizedAccessException("Google response missing id_token");
+        return idToken;
     }
 
     public async Task SetOrChangePasswordAsync(Guid userId, string? currentPassword, string newPassword, string? currentSessionHash)
