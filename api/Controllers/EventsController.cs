@@ -309,11 +309,22 @@ public class EventsController(
             ? fileStorage.GetPublicUrl(ev.ImagePath)
             : await ResolveEventImageUrlAsync(ev.EventId);
 
+        var ticketTypes = await context.EventTicketTypeSummaryViews.AsNoTracking()
+            .Where(t => t.EventId == ev.EventId && t.IsActive)
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new { t.Label, t.TotalPriceCents })
+            .ToListAsync();
+
+        var tables = await context.EventTablesSummaryViews.AsNoTracking()
+            .Where(t => t.EventId == ev.EventId)
+            .Select(t => new { t.Label, Total = t.PriceCents + (t.PlatformFeeCents ?? 0) })
+            .ToListAsync();
+
         var dateStr = ev.StartDate.ToString("MMM d, yyyy");
         var description = ev.Description?.Length > 160 ? ev.Description[..157] + "..." : ev.Description ?? "";
         var canonicalUrl = $"{frontendUrl}/events/{ev.Slug}";
         var pageTitle = $"{ev.Title} — {dateStr} — {ev.VenueCity} | {appName}";
-        var priceCents = ev.PricePerPersonCents ?? 0;
+        var fallbackPriceCents = ev.PricePerPersonCents ?? 0;
 
         var seo = new Dictionary<string, object?>
         {
@@ -376,20 +387,9 @@ public class EventsController(
                 ["@type"] = "PerformingGroup",
                 ["name"] = ev.Title
             },
-            ["offers"] = new List<Dictionary<string, object?>>
-            {
-                new()
-                {
-                    ["@type"] = "Offer",
-                    ["price"] = (priceCents / 100.0).ToString("F2"),
-                    ["priceCurrency"] = "USD",
-                    ["availability"] = ev.TotalSold < ev.TotalCapacity
-                        ? "https://schema.org/InStock"
-                        : "https://schema.org/SoldOut",
-                    ["url"] = canonicalUrl,
-                    ["validFrom"] = ev.StartDate.AddDays(-30).ToString("o")
-                }
-            }
+            ["offers"] = BuildOffers(ticketTypes.Select(t => (t.Label, t.TotalPriceCents)).ToList(),
+                tables.Select(t => (t.Label, t.Total)).ToList(),
+                fallbackPriceCents, canonicalUrl, ev.StartDate, ev.TotalSold < ev.TotalCapacity)
         };
 
         return Ok(new { seo, schema });
@@ -613,5 +613,51 @@ public class EventsController(
     {
         var primary = await imageProc.GetPrimaryImageKeyAsync("event", eventId);
         return primary is not null ? fileStorage.GetPublicUrl($"{primary}_card.webp") : null;
+    }
+
+    private static object BuildOffers(
+        List<(string Label, int TotalPriceCents)> ticketTypes,
+        List<(string Label, int Total)> tables,
+        int fallbackPriceCents,
+        string canonicalUrl,
+        DateTime startDate,
+        bool inStock)
+    {
+        var validFrom = startDate.AddDays(-30).ToString("o");
+        var availability = inStock ? "https://schema.org/InStock" : "https://schema.org/SoldOut";
+
+        var items = new List<(string Label, int Cents)>();
+        items.AddRange(ticketTypes.Select(t => (t.Label, t.TotalPriceCents)));
+        items.AddRange(tables.Select(t => (t.Label, t.Total)));
+
+        if (items.Count == 0)
+        {
+            return new List<Dictionary<string, object?>>
+            {
+                new()
+                {
+                    ["@type"] = "Offer",
+                    ["price"] = (fallbackPriceCents / 100.0).ToString("F2"),
+                    ["priceCurrency"] = "USD",
+                    ["availability"] = availability,
+                    ["url"] = canonicalUrl,
+                    ["validFrom"] = validFrom
+                }
+            };
+        }
+
+        return items
+            .Select(i => new Dictionary<string, object?>
+            {
+                ["@type"] = "Offer",
+                ["name"] = i.Label,
+                ["price"] = (i.Cents / 100.0).ToString("F2"),
+                ["priceCurrency"] = "USD",
+                ["availability"] = availability,
+                ["url"] = canonicalUrl,
+                ["validFrom"] = validFrom
+            })
+            .Cast<object>()
+            .ToList();
     }
 }
