@@ -84,8 +84,11 @@ var builder = WebApplication.CreateBuilder(args);
     if (string.IsNullOrEmpty(sentryDsn) && builder.Environment.IsProduction())
         Log.Warning("[Sentry] DSN not configured — telemetry disabled");
 
-    var otlpLogsEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
-        ?? "http://localhost:4318";
+    var otlpEndpointRaw = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+    var otlpLogsEndpoint = string.IsNullOrWhiteSpace(otlpEndpointRaw) ? "http://localhost:4318" : otlpEndpointRaw;
+    var otlpExporterEnabled = !string.IsNullOrWhiteSpace(otlpEndpointRaw)
+        && !string.Equals(Environment.GetEnvironmentVariable("OTEL_SDK_DISABLED"), "true", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(Environment.GetEnvironmentVariable("OTEL_TRACES_EXPORTER"), "none", StringComparison.OrdinalIgnoreCase);
     var otlpHeadersRaw = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_HEADERS");
     var otelServiceVersion = Environment.GetEnvironmentVariable("SENTRY_RELEASE")
         ?? Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT")
@@ -105,28 +108,29 @@ var builder = WebApplication.CreateBuilder(args);
         lc.WriteTo.Console(
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [trace={TraceId}] {Message:lj}{NewLine}{Exception}");
 
-        lc.WriteTo.OpenTelemetry(o =>
-        {
-            o.Endpoint = $"{otlpLogsEndpoint.TrimEnd('/')}/v1/logs";
-            o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf;
-            o.ResourceAttributes = new Dictionary<string, object>
+        if (otlpExporterEnabled)
+            lc.WriteTo.OpenTelemetry(o =>
             {
-                ["service.name"] = "code829-api",
-                ["service.version"] = otelServiceVersion,
-                ["deployment.environment"] = ctx.HostingEnvironment.EnvironmentName,
-            };
-            if (!string.IsNullOrWhiteSpace(otlpHeadersRaw))
-            {
-                var headers = new Dictionary<string, string>();
-                foreach (var pair in otlpHeadersRaw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                o.Endpoint = $"{otlpLogsEndpoint.TrimEnd('/')}/v1/logs";
+                o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf;
+                o.ResourceAttributes = new Dictionary<string, object>
                 {
-                    var eq = pair.IndexOf('=');
-                    if (eq <= 0) continue;
-                    headers[pair[..eq].Trim()] = pair[(eq + 1)..].Trim();
+                    ["service.name"] = "code829-api",
+                    ["service.version"] = otelServiceVersion,
+                    ["deployment.environment"] = ctx.HostingEnvironment.EnvironmentName,
+                };
+                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw))
+                {
+                    var headers = new Dictionary<string, string>();
+                    foreach (var pair in otlpHeadersRaw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var eq = pair.IndexOf('=');
+                        if (eq <= 0) continue;
+                        headers[pair[..eq].Trim()] = pair[(eq + 1)..].Trim();
+                    }
+                    o.Headers = headers;
                 }
-                o.Headers = headers;
-            }
-        });
+            });
 
         if (isDevEnv)
         {
@@ -352,26 +356,32 @@ var builder = WebApplication.CreateBuilder(args);
     var otlpBase = otlpLogsEndpoint.TrimEnd('/');
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("code829-api", serviceVersion: otelServiceVersion))
-        .WithTracing(t => t
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddEntityFrameworkCoreInstrumentation()
-            .AddRedisInstrumentation()
-            .AddOtlpExporter(o =>
-            {
-                o.Endpoint = new Uri($"{otlpBase}/v1/traces");
-                o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
-            }))
-        .WithMetrics(m => m
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter(o =>
-            {
-                o.Endpoint = new Uri($"{otlpBase}/v1/metrics");
-                o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-                if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
-            }));
+        .WithTracing(t =>
+        {
+            t.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddRedisInstrumentation();
+            if (otlpExporterEnabled)
+                t.AddOtlpExporter(o =>
+                {
+                    o.Endpoint = new Uri($"{otlpBase}/v1/traces");
+                    o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                    if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
+                });
+        })
+        .WithMetrics(m =>
+        {
+            m.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation();
+            if (otlpExporterEnabled)
+                m.AddOtlpExporter(o =>
+                {
+                    o.Endpoint = new Uri($"{otlpBase}/v1/metrics");
+                    o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                    if (!string.IsNullOrWhiteSpace(otlpHeadersRaw)) o.Headers = otlpHeadersRaw;
+                });
+        });
 
     builder.Services.AddControllers(options =>
         {
