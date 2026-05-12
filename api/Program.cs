@@ -263,6 +263,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IBusinessUserEventProcedures, Db.Repositories.StoredProcedures.BusinessUserEventProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IOrganizationProcedures, Db.Repositories.StoredProcedures.OrganizationProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeEventProcedures, Db.Repositories.StoredProcedures.StripeEventProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.IPerformerProcedures, Db.Repositories.StoredProcedures.PerformerProcedures>();
 
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IJwtService, JwtService>();
@@ -280,6 +281,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddScoped<IEventImageService, EventImageService>();
     builder.Services.AddScoped<IVenueImageService, VenueImageService>();
     builder.Services.AddScoped<IPlatformImageService, PlatformImageService>();
+    builder.Services.AddScoped<IPerformerService, PerformerService>();
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
     builder.Services.AddScoped<IFinancialService, FinancialService>();
 

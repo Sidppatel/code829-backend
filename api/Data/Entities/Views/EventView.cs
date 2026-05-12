@@ -47,4 +47,6 @@ public class EventView
     public int? MinTicketTypePriceCents { get; set; }
     public int? DisplayMinTablePriceCents { get; set; }
     public int? DisplayMinTicketTypePriceCents { get; set; }
+
+    public string Performers { get; set; } = "[]";
 }

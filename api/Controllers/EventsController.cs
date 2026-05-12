@@ -23,7 +23,8 @@ public class EventsController(
     IFileStorageService fileStorage,
     ISettingsService settings,
     IConnectionMultiplexer redis,
-    IEventImageService eventImageService
+    IEventImageService eventImageService,
+    IPerformerService performerService
 ) : ControllerBase
 {
     private static readonly TimeSpan ListCacheTtl = TimeSpan.FromSeconds(30);
@@ -382,11 +383,7 @@ public class EventsController(
                 ["name"] = appName,
                 ["url"] = frontendUrl
             },
-            ["performer"] = new Dictionary<string, object?>
-            {
-                ["@type"] = "PerformingGroup",
-                ["name"] = ev.Title
-            },
+            ["performer"] = BuildPerformerSchema(ev, frontendUrl ?? string.Empty, appName),
             ["offers"] = BuildOffers(ticketTypes.Select(t => (t.Label, t.TotalPriceCents)).ToList(),
                 tables.Select(t => (t.Label, t.Total)).ToList(),
                 fallbackPriceCents, canonicalUrl, ev.StartDate, ev.TotalSold < ev.TotalCapacity)
@@ -659,5 +656,53 @@ public class EventsController(
             })
             .Cast<object>()
             .ToList();
+    }
+
+    private object BuildPerformerSchema(Db.Entities.Views.EventView ev, string frontendUrl, string appName)
+    {
+        var performers = performerService.ParseEventViewPerformersAsync(ev.Performers, includePrivateMeta: false).GetAwaiter().GetResult();
+        if (performers.Count == 0)
+        {
+            var organizer = $"{ev.OrganizerFirstName} {ev.OrganizerLastName}".Trim();
+            if (string.IsNullOrEmpty(organizer)) organizer = appName;
+            return new[]
+            {
+                new Dictionary<string, object?> { ["@type"] = "Person", ["name"] = organizer }
+            };
+        }
+
+        return performers.Select(p =>
+        {
+            var sameAs = p.EffectiveMeta
+                .Where(m => !string.IsNullOrWhiteSpace(m.Value)
+                            && !string.Equals(m.Key, "Website", StringComparison.OrdinalIgnoreCase)
+                            && !string.Equals(m.Key, "URL", StringComparison.OrdinalIgnoreCase)
+                            && !string.Equals(m.Key, "Bio", StringComparison.OrdinalIgnoreCase)
+                            && !string.Equals(m.Key, "Description", StringComparison.OrdinalIgnoreCase)
+                            && !string.Equals(m.Key, "Role", StringComparison.OrdinalIgnoreCase))
+                .Select(m => m.Value!)
+                .Where(v => Uri.TryCreate(v, UriKind.Absolute, out var u) && (u.Scheme == "http" || u.Scheme == "https"))
+                .ToArray();
+            var website = p.EffectiveMeta.FirstOrDefault(m =>
+                string.Equals(m.Key, "Website", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(m.Key, "URL", StringComparison.OrdinalIgnoreCase))?.Value;
+            var bio = p.EffectiveMeta.FirstOrDefault(m =>
+                string.Equals(m.Key, "Bio", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(m.Key, "Description", StringComparison.OrdinalIgnoreCase))?.Value;
+            var profileUrl = string.IsNullOrEmpty(website)
+                ? $"{frontendUrl.TrimEnd('/')}/performers/{p.Slug}"
+                : website;
+
+            var dict = new Dictionary<string, object?>
+            {
+                ["@type"] = "Person",
+                ["name"] = p.Name,
+                ["url"] = profileUrl,
+                ["image"] = p.PrimaryImageUrl,
+                ["description"] = bio,
+                ["sameAs"] = sameAs.Length > 0 ? sameAs : null,
+            };
+            return (object)dict.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key!, kv => kv.Value);
+        }).ToArray();
     }
 }

@@ -25,6 +25,8 @@ public class EventPlatformDbContext(
     public DbSet<TableTemplate> TableTemplates => Set<TableTemplate>();
 
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<Performer> Performers => Set<Performer>();
+    public DbSet<EventPerformer> EventPerformers => Set<EventPerformer>();
     public DbSet<BusinessUserEvent> BusinessUserEvents => Set<BusinessUserEvent>();
     public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<EventTicketType> EventTicketTypes => Set<EventTicketType>();
@@ -47,6 +49,7 @@ public class EventPlatformDbContext(
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     public DbSet<EventView> EventViews => Set<EventView>();
+    public DbSet<PerformerView> PerformerViews => Set<PerformerView>();
     public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
     public DbSet<TableView> TableViews => Set<TableView>();
     public DbSet<PurchaseView> PurchaseViews => Set<PurchaseView>();
@@ -718,6 +721,41 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_events");
             entity.HasKey(e => e.EventId);
+            entity.Property(e => e.Performers).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<Performer>(entity =>
+        {
+            entity.ToTable("performers");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.HasIndex(e => e.Name);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Slug).HasMaxLength(220).IsRequired();
+            entity.Property(e => e.PrimaryImagePath).HasMaxLength(512);
+            entity.Property(e => e.Meta).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
+        });
+
+        modelBuilder.Entity<EventPerformer>(entity =>
+        {
+            entity.ToTable("event_performers");
+            entity.HasKey(e => new { e.EventId, e.PerformerId });
+            entity.HasIndex(e => new { e.EventId, e.SortOrder });
+            entity.HasIndex(e => e.PerformerId);
+            entity.Property(e => e.SortOrder).HasDefaultValue(0);
+            entity.Property(e => e.EventMeta).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Performer).WithMany().HasForeignKey(e => e.PerformerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PerformerView>(entity =>
+        {
+            entity.ToView("v_performers");
+            entity.HasKey(e => e.PerformerId);
+            entity.Property(e => e.Meta).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<EventSummaryView>(entity =>
