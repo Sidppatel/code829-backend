@@ -33,6 +33,16 @@ public class AdminPerformersController(
         return Ok(dto);
     }
 
+    [HttpGet("slug-check")]
+    public async Task<IActionResult> SlugCheck([FromQuery] string slug, [FromQuery] Guid? excludeId = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(slug))
+            return BadRequest(new ApiError(400, "slug is required", HttpContext.TraceIdentifier));
+        var suggested = await performerService.ResolveAvailableSlugAsync(slug, excludeId, ct);
+        var available = string.Equals(suggested, slug.Trim().ToLowerInvariant(), StringComparison.Ordinal);
+        return Ok(new SlugCheckDto(available, suggested));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePerformerRequest request, CancellationToken ct = default)
     {

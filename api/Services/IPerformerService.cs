@@ -11,6 +11,7 @@ public interface IPerformerService
     Task<PerformerDto> CreateAsync(CreatePerformerRequest request, CancellationToken ct = default);
     Task<PerformerDto?> UpdateAsync(Guid id, UpdatePerformerRequest request, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<string> ResolveAvailableSlugAsync(string baseSlug, Guid? excludeId, CancellationToken ct = default);
     Task SetEventPerformersAsync(Guid eventId, SetEventPerformersRequest request, CancellationToken ct = default);
     Task<IReadOnlyList<EventPerformerDto>> GetEventPerformersAsync(Guid eventId, bool includePrivateMeta, CancellationToken ct = default);
     Task<IReadOnlyList<EventPerformerDto>> ParseEventViewPerformersAsync(string performersJson, bool includePrivateMeta);

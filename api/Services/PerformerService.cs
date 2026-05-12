@@ -7,6 +7,7 @@ using Db.Entities;
 using Db.Entities.Views;
 using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Api.Services;
 
@@ -61,11 +62,11 @@ public class PerformerService(
     public async Task<PerformerDto> CreateAsync(CreatePerformerRequest request, CancellationToken ct = default)
     {
         var name = (request.Name ?? string.Empty).Trim();
-        var slug = NormalizeSlug(string.IsNullOrWhiteSpace(request.Slug) ? Slugify(name) : request.Slug);
-        slug = await EnsureUniqueSlugAsync(slug, null, ct);
+        var baseSlug = NormalizeSlug(string.IsNullOrWhiteSpace(request.Slug) ? Slugify(name) : request.Slug);
+        var slug = await EnsureUniqueSlugAsync(baseSlug, null, ct);
         var metaJson = SerializeMeta(request.Meta);
 
-        var id = await performerProc.CreatePerformerAsync(name, slug, request.PrimaryImagePath, metaJson, ct);
+        var id = await CreateWithSlugRetryAsync(name, slug, baseSlug, request.PrimaryImagePath, metaJson, ct);
         var v = await context.PerformerViews.AsNoTracking().FirstAsync(p => p.PerformerId == id, ct);
         return MapView(v, true);
     }
@@ -77,21 +78,69 @@ public class PerformerService(
 
         var newName = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim();
         string? newSlug = null;
+        string? baseSlug = null;
         if (!string.IsNullOrWhiteSpace(request.Slug))
         {
-            newSlug = NormalizeSlug(request.Slug);
+            baseSlug = NormalizeSlug(request.Slug);
+            newSlug = baseSlug;
             if (newSlug != existing.Slug)
             {
-                newSlug = await EnsureUniqueSlugAsync(newSlug, id, ct);
+                newSlug = await EnsureUniqueSlugAsync(baseSlug, id, ct);
             }
         }
         var newMetaJson = request.Meta is null ? null : SerializeMeta(request.Meta);
 
-        await performerProc.UpdatePerformerAsync(id, newName, newSlug, request.PrimaryImagePath, newMetaJson, ct);
+        await UpdateWithSlugRetryAsync(id, newName, newSlug, baseSlug, request.PrimaryImagePath, newMetaJson, ct);
 
         var v = await context.PerformerViews.AsNoTracking().FirstAsync(p => p.PerformerId == id, ct);
         return MapView(v, true);
     }
+
+    public Task<string> ResolveAvailableSlugAsync(string baseSlug, Guid? excludeId, CancellationToken ct = default)
+    {
+        var normalized = NormalizeSlug(baseSlug);
+        return EnsureUniqueSlugAsync(normalized, excludeId, ct);
+    }
+
+    private async Task<Guid> CreateWithSlugRetryAsync(string name, string slug, string baseSlug, string? primaryImagePath, string metaJson, CancellationToken ct)
+    {
+        var attempt = 0;
+        var candidate = slug;
+        while (true)
+        {
+            try
+            {
+                return await performerProc.CreatePerformerAsync(name, candidate, primaryImagePath, metaJson, ct);
+            }
+            catch (PostgresException ex) when (IsSlugUniqueViolation(ex) && attempt < 10)
+            {
+                attempt++;
+                candidate = await EnsureUniqueSlugAsync(baseSlug, null, ct);
+            }
+        }
+    }
+
+    private async Task UpdateWithSlugRetryAsync(Guid id, string? name, string? slug, string? baseSlug, string? primaryImagePath, string? metaJson, CancellationToken ct)
+    {
+        var attempt = 0;
+        var candidate = slug;
+        while (true)
+        {
+            try
+            {
+                await performerProc.UpdatePerformerAsync(id, name, candidate, primaryImagePath, metaJson, ct);
+                return;
+            }
+            catch (PostgresException ex) when (IsSlugUniqueViolation(ex) && baseSlug is not null && attempt < 10)
+            {
+                attempt++;
+                candidate = await EnsureUniqueSlugAsync(baseSlug, id, ct);
+            }
+        }
+    }
+
+    private static bool IsSlugUniqueViolation(PostgresException ex) =>
+        ex.SqlState == "23505" && ex.ConstraintName == "IX_performers_Slug";
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
