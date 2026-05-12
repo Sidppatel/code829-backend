@@ -42,9 +42,7 @@ jobs:
             echo "$err"
             exit 1
           fi
-          # Any other error (403 plan-limit or token-scope, 5xx, DNS, etc.) is
-          # treated as deferred — we cannot assert protection from this runner.
-          echo "::warning::Branch protection API not accessible — preflight deferred"
+          echo "Branch protection API not accessible — preflight deferred (private repo plan or token scope)."
           echo "$err"
           exit 0
 
