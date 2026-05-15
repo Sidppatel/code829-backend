@@ -42,6 +42,10 @@ public class ErrorHandlingMiddleware(RequestDelegate next)
             });
             return;
         }
+        catch (OperationCanceledException)
+        {
+            Log.Information("Request was cancelled on {Method} {Path}", context.Request.Method, context.Request.Path);
+        }
         catch (Exception ex)
         {
             var correlationId = context.TraceIdentifier;

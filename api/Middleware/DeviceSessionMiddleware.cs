@@ -57,7 +57,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
             .FirstOrDefaultAsync(s =>
                 s.SessionHash == sessionHash &&
                 s.RevokedAt == null &&
-                s.ExpiresAt > DateTime.UtcNow);
+                s.ExpiresAt > DateTime.UtcNow, httpContext.RequestAborted);
 
         if (session is null)
         {
@@ -85,7 +85,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
 
         if (session.UserId.HasValue)
         {
-            var user = await userProc.GetByIdAsync(session.UserId.Value);
+            var user = await userProc.GetByIdAsync(session.UserId.Value, httpContext.RequestAborted);
             if (user is null || !user.IsActive)
             {
                 httpContext.Response.Cookies.Delete(cookieName);
@@ -96,7 +96,7 @@ public class DeviceSessionMiddleware(RequestDelegate next)
         }
         else if (session.BusinessUserId.HasValue)
         {
-            var admin = await businessUserProc.GetByIdAsync(session.BusinessUserId.Value);
+            var admin = await businessUserProc.GetByIdAsync(session.BusinessUserId.Value, httpContext.RequestAborted);
             if (admin is null || !admin.IsActive)
             {
                 httpContext.Response.Cookies.Delete(cookieName);

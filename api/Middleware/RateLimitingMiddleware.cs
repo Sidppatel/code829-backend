@@ -54,7 +54,7 @@ public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer
             return;
         }
 
-        var disabled = await settings.GetOrDefaultAsync("rate_limit_disabled", "false");
+        var disabled = await settings.GetOrDefaultAsync("rate_limit_disabled", "false", context.RequestAborted);
         if (string.Equals(disabled, "true", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);

@@ -5,15 +5,15 @@ namespace Db.Repositories;
 
 public class AppSettingRepository(EventPlatformDbContext context) : IAppSettingRepository
 {
-    public async Task<AppSetting?> GetByKeyAsync(string key)
-        => await context.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+    public async Task<AppSetting?> GetByKeyAsync(string key, CancellationToken ct = default)
+        => await context.AppSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
 
-    public async Task<List<AppSetting>> GetAllAsync()
-        => await context.AppSettings.OrderBy(s => s.Key).ToListAsync();
+    public async Task<List<AppSetting>> GetAllAsync(CancellationToken ct = default)
+        => await context.AppSettings.OrderBy(s => s.Key).ToListAsync(ct);
 
-    public async Task UpsertAsync(string key, string value, string? description = null)
+    public async Task UpsertAsync(string key, string value, string? description = null, CancellationToken ct = default)
     {
-        var existing = await GetByKeyAsync(key);
+        var existing = await GetByKeyAsync(key, ct);
         if (existing is not null)
         {
             existing.Value = value;
@@ -31,6 +31,6 @@ public class AppSettingRepository(EventPlatformDbContext context) : IAppSettingR
                 Description = description
             });
         }
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(ct);
     }
 }
