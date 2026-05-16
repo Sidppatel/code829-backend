@@ -41,7 +41,7 @@ services:
       # row in __EFMigrationsHistory equals this exact MigrationId. Leave unset
       # for presence-only enforcement. See api/Program.cs for the check.
       - key: EXPECTED_MIGRATION_ID
-        sync: false
+        value: 20260512091706_AddPerformers
 
       # ─── Required secrets / DB components ──────────────────────
       # Postgres connection components (Supabase transaction pooler for runtime).
