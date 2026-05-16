@@ -5,12 +5,6 @@ using IntegrationTests.Fixtures;
 
 namespace IntegrationTests.Controllers;
 
-/// <summary>
-/// Integration tests for <c>/v1/admin/organization/stripe-*</c> endpoints. These
-/// resolve the org from the authenticated admin's <c>BusinessUser.OrganizationId</c>
-/// claim — i.e. there's no <c>{orgId}</c> in the route, so admins can't probe other
-/// orgs. The tests verify that ownership boundary is enforced.
-/// </summary>
 [Collection("Database")]
 public sealed class AdminStripeControllerTests(DatabaseFixture db)
 {

@@ -5,22 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Rejects direct-to-origin traffic in Production: only peers whose TCP source
-/// IP falls within the Cloudflare IPv4 (<c>TRUSTED_PROXIES</c>) or IPv6
-/// (<c>CLOUDFLARE_IPV6_CIDRS</c>) allowlist are permitted. The <c>/health</c>
-/// probe path is exempt so Render's readiness check still reaches the service.
-///
-/// This middleware MUST be registered before <see cref="Microsoft.AspNetCore.Builder.ForwardedHeadersExtensions.UseForwardedHeaders(Microsoft.AspNetCore.Builder.IApplicationBuilder)"/>
-/// so the check runs against the raw TCP peer (<see cref="ConnectionInfo.RemoteIpAddress"/>)
-/// rather than the rewritten <c>X-Forwarded-For</c> value.
-///
-/// Enforcement is gated by the <c>CF_IP_ALLOWLIST_ENFORCE</c> env var. The gate
-/// exists because the Render → container peer is Render's internal load
-/// balancer by default, not Cloudflare. Flip the gate to <c>true</c> only once
-/// the Render service is reachable exclusively through a Cloudflare-fronted
-/// custom domain (and the Cloudflare Tunnel / origin-pull wiring is verified).
-/// </summary>
 public sealed class CloudflareIpAllowlistMiddleware
 {
     private readonly RequestDelegate _next;

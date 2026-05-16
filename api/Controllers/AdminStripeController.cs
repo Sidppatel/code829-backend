@@ -12,18 +12,6 @@ using Stripe;
 
 namespace Api.Controllers;
 
-/// <summary>
-/// Admin-facing Stripe Connect endpoints. Scoped to the authenticated admin's
-/// organization — admins never see another org's data.
-///
-/// <para>
-/// Ownership rule: every method resolves the org from
-/// <c>BusinessUser.OrganizationId</c> (authenticated user's claim → BU lookup).
-/// There is no <c>{organizationId}</c> in the route, so an admin can't probe
-/// for other orgs' acct ids. If the admin has no organization yet, the endpoint
-/// returns a structured 409 telling them to contact a developer.
-/// </para>
-/// </summary>
 [Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
 [Route("v{version:apiVersion}/admin/organization")]
@@ -35,12 +23,6 @@ public class AdminStripeController(
     IStripeConnectService stripeConnect
 ) : ControllerBase
 {
-    /// <summary>Stripe Connect status for the authenticated admin's org.</summary>
-    /// <remarks>
-    /// Live-fetches from Stripe and writes the snapshot back to the DB so other
-    /// readers (e.g., the developer dashboard) get fresh data without paying
-    /// the round-trip themselves.
-    /// </remarks>
     [HttpGet("stripe-status")]
     public async Task<IActionResult> GetStripeStatus()
     {
@@ -114,11 +96,6 @@ public class AdminStripeController(
         }
     }
 
-    /// <summary>
-    /// Generate a fresh onboarding link for the admin's org. Any admin in the
-    /// org can call this — they share the same Stripe account, so multiple
-    /// admins coordinating onboarding works out of the box.
-    /// </summary>
     [HttpPost("stripe-resume-link")]
     public async Task<IActionResult> CreateResumeLink([FromBody] StripeOnboardingLinkRequest? request)
     {
@@ -147,12 +124,6 @@ public class AdminStripeController(
         }
     }
 
-    /// <summary>
-    /// Resolves the authenticated admin's organization. Returns either the
-    /// <see cref="OrganizationDto"/> (boxed as object) or an <see cref="IActionResult"/>
-    /// pre-baked with the right error code — callers branch on the type.
-    /// Keeps every endpoint's first 3 lines identical without a base class.
-    /// </summary>
     private async Task<object?> ResolveOwningOrgAsync()
     {
         var businessUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

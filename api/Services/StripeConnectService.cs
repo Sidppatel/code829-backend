@@ -3,23 +3,6 @@ using Stripe;
 
 namespace Api.Services;
 
-/// <summary>
-/// Production implementation of <see cref="IStripeConnectService"/> using the
-/// Stripe.net SDK against the live Connect API.
-///
-/// <para>
-/// All Stripe interactions are logged at Info level with redacted IDs (account
-/// id is included in full because it is the join key on our side; no PII is
-/// emitted). Failures from the SDK are mapped to native exceptions so callers
-/// don't need to take a Stripe.net dependency.
-/// </para>
-///
-/// <para>
-/// Registered as a singleton because <see cref="ISecretsProvider"/> is a
-/// singleton — the secret key is read on every call rather than cached, so
-/// rotation via env-var change + restart picks up cleanly.
-/// </para>
-/// </summary>
 public class StripeConnectService(ISecretsProvider secrets) : IStripeConnectService
 {
 
@@ -222,10 +205,6 @@ public class StripeConnectService(ISecretsProvider secrets) : IStripeConnectServ
         return new StripeClient(key);
     }
 
-    /// <summary>
-    /// Translates Stripe SDK exceptions to runtime types callers can pattern-match
-    /// against without referencing Stripe.net.
-    /// </summary>
     private static Exception MapStripeException(StripeException ex)
     {
         return ex.StripeError?.Type switch

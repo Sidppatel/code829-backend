@@ -3,10 +3,6 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// CSP and HSTS configuration. Defaults include Stripe domains required for
-/// Stripe.js / Elements to load. Override via appsettings "Security:Csp".
-/// </summary>
 public class SecurityHeadersOptions
 {
     public bool EnableHstsAndCsp { get; set; } = true;
@@ -26,10 +22,6 @@ public class SecurityHeadersOptions
     public string[] FrameSrc { get; set; } = ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"];
 }
 
-/// <summary>
-/// Adds production security headers to all responses:
-/// HSTS, X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy.
-/// </summary>
 public class SecurityHeadersMiddleware(RequestDelegate next, IOptions<SecurityHeadersOptions> options)
 {
 

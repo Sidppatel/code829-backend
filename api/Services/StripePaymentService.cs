@@ -3,12 +3,6 @@ using Stripe;
 
 namespace Api.Services;
 
-/// <summary>
-/// Production Stripe payment service using destination charges (Stripe Connect).
-/// The total amount is charged to the customer. The organizer receives transferAmountCents
-/// via transfer_data.amount. The platform keeps everything else minus Stripe processing costs.
-/// When Stripe Tax is enabled, tax is calculated and added on top by Stripe.
-/// </summary>
 public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
 {
     public async Task<(string PaymentIntentId, string ClientSecret, string Status)> CreatePaymentIntentAsync(
@@ -167,11 +161,6 @@ public class StripePaymentService(ISecretsProvider secrets) : IPaymentService
         };
     }
 
-    /// <summary>
-    /// Strips characters Stripe rejects in <c>statement_descriptor_suffix</c>
-    /// (&lt;, &gt;, ", ', and *) and trims to the 22-char maximum. Letters,
-    /// digits, spaces, and most punctuation pass through.
-    /// </summary>
     private static string SanitizeStatementDescriptor(string value)
     {
         var cleaned = new string(value.Where(c => c is not ('<' or '>' or '"' or '\'' or '*')).ToArray()).Trim();

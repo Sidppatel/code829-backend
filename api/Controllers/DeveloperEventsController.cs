@@ -138,16 +138,10 @@ public class DeveloperEventsController(
         return Ok(new { message = "Table type fees updated" });
     }
 
-    /// <summary>
-    /// One-shot repair for events affected by the legacy delete-then-create bug
-    /// in <c>PUT /admin/events/{id}</c>. Walks the event's active ticket types and,
-    /// for each, finds the most recent inactive tier with the same label and
-    /// rewrites every <c>purchases.EventTicketTypeId</c> from old to new. Idempotent.
-    /// </summary>
     [HttpPost("{id:guid}/relink-orphan-tiers")]
     public async Task<IActionResult> RelinkOrphanTicketTypes(
-        Guid id,
-        [FromServices] IEventTicketTypeProcedures ticketTypeProc)
+    Guid id,
+    [FromServices] IEventTicketTypeProcedures ticketTypeProc)
     {
         var ev = await Context.EventViews.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == id);
         if (ev is null) return NotFound(new ApiError(404, "Event not found", HttpContext.TraceIdentifier));

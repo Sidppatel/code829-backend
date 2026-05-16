@@ -10,11 +10,6 @@ using Moq;
 
 namespace Api.Tests;
 
-/// <summary>
-/// PurchaseService tests. Note: Tests that depend on PostgreSQL views (EventViews, PurchaseViews, TableViews)
-/// cannot run against the in-memory SQLite test database. These tests focus on validation logic
-/// that occurs before view queries, or use mocked procedures.
-/// </summary>
 public class PurchaseServiceTests : IDisposable
 {
     private readonly EventPlatformDbContext _context;

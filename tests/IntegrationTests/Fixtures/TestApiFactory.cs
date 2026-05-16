@@ -8,19 +8,11 @@ using StackExchange.Redis;
 
 namespace IntegrationTests.Fixtures;
 
-/// <summary>
-/// WebApplicationFactory that replaces the real Postgres + Redis with Testcontainer instances.
-/// Component env vars are pre-set by DatabaseFixture before this factory's host is built.
-/// ConfigureTestServices provides belt-and-suspenders service override using the
-/// Testcontainer-supplied connection strings directly — no URL form anywhere.
-/// </summary>
 public sealed class TestApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _postgresConnectionString;
     private readonly string _redisConfig;
 
-    /// <param name="postgresConnectionString">Npgsql kv-form string from Testcontainers.</param>
-    /// <param name="redisConfig">StackExchange.Redis configuration string (host:port[,password=...][,ssl=true]).</param>
     public TestApiFactory(string postgresConnectionString, string redisConfig)
     {
         _postgresConnectionString = postgresConnectionString;

@@ -36,13 +36,10 @@ public class DeveloperController(
     IStripeConnectService stripeConnect
 ) : ControllerBase
 {
-    /// <summary>
-    /// Get paginated email logs.
-    /// </summary>
     [HttpGet("email-log")]
     public async Task<IActionResult> GetEmailLogs(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
-        [FromQuery] string? recipient = null)
+    [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+    [FromQuery] string? recipient = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
@@ -63,14 +60,11 @@ public class DeveloperController(
         return Ok(new PagedResponse<EmailLogDto>(items, totalCount, page, pageSize));
     }
 
-    /// <summary>
-    /// Developer logs: errors, exceptions, stack traces. Filterable by severity, date, path.
-    /// </summary>
     [HttpGet("logs")]
     public async Task<IActionResult> GetDevLogs(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
-        [FromQuery] string? severity = null, [FromQuery] string? path = null,
-        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
+    [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+    [FromQuery] string? severity = null, [FromQuery] string? path = null,
+    [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
@@ -102,16 +96,12 @@ public class DeveloperController(
         return Ok(new PagedResponse<DeveloperLogDto>(items, totalCount, page, pageSize));
     }
 
-    /// <summary>
-    /// System logs: complete audit trail with before/after JSON diffs.
-    /// Supports cursor-based pagination via 'after' parameter (timestamp).
-    /// </summary>
     [HttpGet("system-logs")]
     public async Task<IActionResult> GetSystemLogs(
-        [FromQuery] int pageSize = 20,
-        [FromQuery] DateTime? after = null,
-        [FromQuery] string? category = null,
-        [FromQuery] string? entityType = null)
+    [FromQuery] int pageSize = 20,
+    [FromQuery] DateTime? after = null,
+    [FromQuery] string? category = null,
+    [FromQuery] string? entityType = null)
     {
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
@@ -141,9 +131,6 @@ public class DeveloperController(
         return Ok(new { items, hasMore, nextCursor });
     }
 
-    /// <summary>
-    /// Get all settings (non-sensitive from DB) and secret configuration status (from env vars).
-    /// </summary>
     [HttpGet("settings")]
     public async Task<IActionResult> GetSettings()
     {
@@ -168,9 +155,6 @@ public class DeveloperController(
         return Ok(new SettingsResponse(settingDtos, secretDtos));
     }
 
-    /// <summary>
-    /// Update a non-sensitive setting value. Secrets are managed via environment variables.
-    /// </summary>
     private static readonly HashSet<string> MutableSettings = new(StringComparer.OrdinalIgnoreCase)
     {
         "app_name", "default_platform_fee_open_cents", "default_platform_fee_grid_cents",
@@ -188,9 +172,6 @@ public class DeveloperController(
         return Ok(new { message = $"Setting '{request.Key}' updated" });
     }
 
-    /// <summary>
-    /// Get Stripe integration status — verifies all keys by making a live API call.
-    /// </summary>
     [HttpGet("stripe/status")]
     public async Task<IActionResult> GetStripeStatus()
     {
@@ -253,10 +234,6 @@ public class DeveloperController(
         return Ok(dto);
     }
 
-    /// <summary>
-    /// Stripe keys are now managed via environment variables and cannot be updated via the API.
-    /// Only stripe_tax_enabled (a non-secret toggle) can still be changed.
-    /// </summary>
     [HttpPut("stripe/keys")]
     public async Task<IActionResult> UpdateStripeKeys([FromBody] UpdateStripeKeysRequest request)
     {
@@ -298,14 +275,11 @@ public class DeveloperController(
         return new StripeKeyStatus(Configured: true, Mode: mode, Masked: masked);
     }
 
-    /// <summary>
-    /// Get all users.
-    /// </summary>
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] string? search = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
@@ -343,9 +317,6 @@ public class DeveloperController(
         return Ok(new { items = users, totalCount = totalCount, page, pageSize });
     }
 
-    /// <summary>
-    /// Update a regular user's active status.
-    /// </summary>
     [HttpPut("users/{id:guid}/status")]
     public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] bool isActive)
     {
@@ -356,9 +327,6 @@ public class DeveloperController(
         return Ok(new { message = "User status updated" });
     }
 
-    /// <summary>
-    /// Permanently delete a regular user.
-    /// </summary>
     [HttpDelete("users/{id:guid}")]
     public async Task<IActionResult> DeleteUser(Guid id)
     {
@@ -369,15 +337,12 @@ public class DeveloperController(
         return Ok(new { message = "User deleted successfully" });
     }
 
-    /// <summary>
-    /// Get all admin users (paginated, searchable).
-    /// </summary>
     [HttpGet("admin-users")]
     public async Task<IActionResult> GetAdminUsers(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null,
-        [FromQuery] string? role = null)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] string? search = null,
+    [FromQuery] string? role = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
@@ -404,18 +369,21 @@ public class DeveloperController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.BusinessUserId, a.FirstName, a.LastName, a.Email,
+                a.BusinessUserId,
+                a.FirstName,
+                a.LastName,
+                a.Email,
                 Role = a.Role.ToString(),
-                a.IsActive, a.CreatedAt, a.LastLoginAt, a.Phone
+                a.IsActive,
+                a.CreatedAt,
+                a.LastLoginAt,
+                a.Phone
             })
             .ToListAsync();
 
         return Ok(new { items = admins, totalCount, page, pageSize });
     }
 
-    /// <summary>
-    /// Create a new admin user.
-    /// </summary>
     [HttpPost("admin-users")]
     public async Task<IActionResult> CreateAdminUser([FromBody] CreateBusinessUserRequest request)
     {
@@ -441,9 +409,6 @@ public class DeveloperController(
         return Created($"/developer/admin-users/{id}", new { id, message = $"{role} user created" });
     }
 
-    /// <summary>
-    /// Update an admin user (role, active status, profile).
-    /// </summary>
     [HttpPut("admin-users/{id:guid}")]
     public async Task<IActionResult> UpdateAdminUser(Guid id, [FromBody] UpdateBusinessUserRequest request)
     {
@@ -463,9 +428,6 @@ public class DeveloperController(
         return Ok(new { message = "Admin user updated" });
     }
 
-    /// <summary>
-    /// Reset an admin user's password (developer privilege, no current password needed).
-    /// </summary>
     [HttpPut("admin-users/{id:guid}/reset-password")]
     public async Task<IActionResult> ResetAdminPassword(Guid id, [FromBody] ResetBusinessUserPasswordRequest request)
     {
@@ -482,9 +444,6 @@ public class DeveloperController(
         return Ok(new { message = "Password reset" });
     }
 
-    /// <summary>
-    /// Deactivate an admin user.
-    /// </summary>
     [HttpDelete("admin-users/{id:guid}")]
     public async Task<IActionResult> DeactivateAdminUser(Guid id)
     {
@@ -498,9 +457,6 @@ public class DeveloperController(
         return Ok(new { message = "Admin user deactivated" });
     }
 
-    /// <summary>
-    /// Upload or replace the company/platform logo. Developer only.
-    /// </summary>
     [HttpPost("logo")]
     public async Task<IActionResult> UploadLogo(IFormFile file)
     {
@@ -519,9 +475,6 @@ public class DeveloperController(
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get the current company/platform logo.
-    /// </summary>
     [HttpGet("logo")]
     [AllowAnonymous]
     public async Task<IActionResult> GetLogo()
@@ -533,19 +486,17 @@ public class DeveloperController(
         return Ok(logo);
     }
 
-    /// <summary>List organizations with pagination + search.</summary>
     [HttpGet("organizations")]
     public async Task<IActionResult> ListOrganizations(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null,
-        [FromQuery] bool includeArchived = false)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] string? search = null,
+    [FromQuery] bool includeArchived = false)
     {
         var result = await organizationService.ListAsync(search, page, pageSize, includeArchived);
         return Ok(result);
     }
 
-    /// <summary>Create a blank organization. Optional initial member attaches an existing admin in one shot.</summary>
     [HttpPost("organizations")]
     public async Task<IActionResult> CreateOrganization([FromBody] OrganizationCreateRequest request)
     {
@@ -568,7 +519,6 @@ public class DeveloperController(
         return Created($"/v1/developer/organizations/{id}", dto);
     }
 
-    /// <summary>Get a single organization (active or archived). Returns <see cref="OrganizationDetailDto"/> with the live BusinessUser roster.</summary>
     [HttpGet("organizations/{id:guid}")]
     public async Task<IActionResult> GetOrganization(Guid id)
     {
@@ -577,7 +527,6 @@ public class DeveloperController(
         return Ok(org);
     }
 
-    /// <summary>Rename / update contact fields. Stripe-related fields are read-only.</summary>
     [HttpPut("organizations/{id:guid}")]
     public async Task<IActionResult> UpdateOrganization(Guid id, [FromBody] OrganizationUpdateRequest request)
     {
@@ -596,7 +545,6 @@ public class DeveloperController(
         return Ok(updated);
     }
 
-    /// <summary>Attach an existing BusinessUser to the organization.</summary>
     [HttpPost("organizations/{id:guid}/members")]
     public async Task<IActionResult> AddOrganizationMember(Guid id, [FromBody] OrganizationMemberRequest request)
     {
@@ -611,7 +559,7 @@ public class DeveloperController(
         {
             await organizationService.AddMemberAsync(id, request.BusinessUserId);
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "22023"  )
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "22023")
         {
             return BadRequest(new ApiError(400, ex.MessageText, HttpContext.TraceIdentifier));
         }
@@ -620,7 +568,6 @@ public class DeveloperController(
         return Ok(updated);
     }
 
-    /// <summary>Detach a BusinessUser from the organization. Refuses to remove the last member of an org with a Stripe account.</summary>
     [HttpDelete("organizations/{id:guid}/members/{businessUserId:guid}")]
     public async Task<IActionResult> RemoveOrganizationMember(Guid id, Guid businessUserId)
     {
@@ -631,7 +578,7 @@ public class DeveloperController(
         {
             await organizationService.RemoveMemberAsync(id, businessUserId);
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "23503"  )
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "23503")
         {
             return Conflict(new ApiError(409, ex.MessageText, HttpContext.TraceIdentifier));
         }
@@ -640,12 +587,6 @@ public class DeveloperController(
         return Ok(updated);
     }
 
-    /// <summary>
-    /// Idempotent: creates a Stripe Express account for the organization (if it
-    /// doesn't already have one) and returns a fresh identity-scope onboarding
-    /// link. Re-calling on an org that already has an account just returns a
-    /// new link.
-    /// </summary>
     [HttpPost("organizations/{id:guid}/stripe-account")]
     public async Task<IActionResult> CreateStripeAccount(Guid id, [FromBody] StartStripeOnboardingRequest? request = null)
     {
@@ -707,17 +648,6 @@ public class DeveloperController(
         }
     }
 
-    /// <summary>
-    /// Clean restart: delete the org's connected account at Stripe + null the
-    /// Stripe-related columns on the org row so a fresh
-    /// <see cref="CreateStripeAccount"/> call begins from zero. Idempotent —
-    /// safe to call on an org that has no connected account (just clears DB
-    /// columns; no-op at Stripe).
-    ///
-    /// <para>Test-mode accounts can always be deleted. Live-mode accounts
-    /// require zero balances; Stripe rejects with 502 otherwise (see
-    /// <see cref="IStripeConnectService.DeleteAccountAsync"/>).</para>
-    /// </summary>
     [HttpDelete("organizations/{id:guid}/stripe-account")]
     public async Task<IActionResult> ClearStripeAccount(Guid id)
     {
@@ -738,20 +668,9 @@ public class DeveloperController(
         }
     }
 
-    /// <summary>
-    /// Email a fresh Stripe onboarding link to a BusinessUser member of the
-    /// given organization. Useful when the developer creates the Connect
-    /// account on behalf of the organizer and wants them to finish KYC
-    /// without the developer having to forward the AccountLink URL manually.
-    ///
-    /// Body must reference a BusinessUser that belongs to the same org
-    /// (validated in the service via the organization-by-business-user
-    /// lookup) — the {id} on the route is part of the URL contract for
-    /// future-proofing but is not enforced beyond a 404 here.
-    /// </summary>
     [HttpPost("organizations/{id:guid}/stripe-onboarding-email")]
     public async Task<IActionResult> SendStripeOnboardingEmail(
-        Guid id, [FromBody] StripeOnboardingEmailRequest request)
+    Guid id, [FromBody] StripeOnboardingEmailRequest request)
     {
         var org = await organizationService.GetAsync(id);
         if (org is null) return NotFound(new ApiError(404, "Organization not found", HttpContext.TraceIdentifier));
@@ -777,7 +696,6 @@ public class DeveloperController(
         }
     }
 
-    /// <summary>Generate a new onboarding link (identity or bank scope) for an org with an existing Stripe account.</summary>
     [HttpPost("organizations/{id:guid}/stripe-onboarding-link")]
     public async Task<IActionResult> CreateStripeOnboardingLink(Guid id, [FromBody] StripeOnboardingLinkRequest request)
     {
@@ -805,11 +723,6 @@ public class DeveloperController(
         }
     }
 
-    /// <summary>
-    /// Live-fetches the Stripe account status (charges_enabled, payouts_enabled,
-    /// details_submitted, requirements.currently_due) AND persists the snapshot
-    /// to organizations.* so subsequent reads can come from DB.
-    /// </summary>
     [HttpGet("organizations/{id:guid}/stripe-status")]
     public async Task<IActionResult> GetStripeStatus(Guid id)
     {

@@ -8,11 +8,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace EventPlatform.Analyzers;
 
-/// <summary>
-/// EP0002: Forbid <c>PublicQuoteDto</c> construction outside
-/// <c>PricingService.CalculatePublicQuoteAsync</c>. Stops accidental drift where
-/// callers hand-build a public quote and skip the pricing-rule layer.
-/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PublicQuoteConstructionAnalyzer : DiagnosticAnalyzer
 {
@@ -62,12 +57,6 @@ public sealed class PublicQuoteConstructionAnalyzer : DiagnosticAnalyzer
     }
 }
 
-/// <summary>
-/// EP0003: Public controllers (in <c>api/Controllers/</c> not prefixed
-/// <c>Admin</c> or <c>Developer</c>) must not reference the admin breakdown
-/// surface — <c>AdminQuoteDto</c>, <c>PricingComputation</c>, or any property
-/// access whose name ends in <c>SubtotalCents</c> / <c>FeeCents</c>.
-/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PublicControllerBreakdownAnalyzer : DiagnosticAnalyzer
 {
@@ -131,12 +120,6 @@ public sealed class PublicControllerBreakdownAnalyzer : DiagnosticAnalyzer
     }
 }
 
-/// <summary>
-/// EP0004: Quote-DTO records (any record whose name ends in <c>QuoteDto</c>
-/// except <c>AdminQuoteDto</c>) must not declare properties whose names end
-/// in <c>SubtotalCents</c> / <c>FeeCents</c>. Catches breakdown leak at the
-/// DTO definition layer too.
-/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class QuoteDtoBreakdownAnalyzer : DiagnosticAnalyzer
 {

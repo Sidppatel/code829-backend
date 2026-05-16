@@ -3,10 +3,6 @@ using Serilog;
 
 namespace Api.Services;
 
-/// <summary>
-/// ClamAV TCP scanner. Reads CLAMAV_HOST + CLAMAV_PORT (default 3310).
-/// When CLAMAV_HOST is unset (typical local-dev), scanner is a no-op that returns clean — see DI registration.
-/// </summary>
 public class ClamAvScanner : IMalwareScanner
 {
     private readonly string _host;
@@ -40,9 +36,6 @@ public class ClamAvScanner : IMalwareScanner
     }
 }
 
-/// <summary>
-/// No-op scanner for local dev when ClamAV is unavailable. Always returns clean.
-/// </summary>
 public class NoopMalwareScanner : IMalwareScanner
 {
     public Task<ScanResult> ScanAsync(Stream content, CancellationToken ct = default)

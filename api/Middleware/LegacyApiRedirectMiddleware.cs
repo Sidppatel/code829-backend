@@ -2,13 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Redirects unversioned URLs to /v1/... with a 301. Grace window: 90 days from
-/// 2026-04-23 → remove by 2026-07-22 (tracked in BE #16 follow-up issue).
-///
-/// Paths that already start with /v{digit} or are infra paths (/health, /openapi,
-/// /scalar, /swagger, /metrics, static assets) pass through untouched.
-/// </summary>
 public partial class LegacyApiRedirectMiddleware(RequestDelegate next)
 {
 

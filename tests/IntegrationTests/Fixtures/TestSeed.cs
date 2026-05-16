@@ -2,10 +2,6 @@ using Npgsql;
 
 namespace IntegrationTests.Fixtures;
 
-/// <summary>
-/// Shared raw-SQL seed helpers for integration tests. tests/ is whitelisted from
-/// the Data Access Rule (see CLAUDE.md), so direct INSERTs are allowed here.
-/// </summary>
 public static class TestSeed
 {
     public record EventOptions(
@@ -85,18 +81,13 @@ public static class TestSeed
         return id;
     }
 
-    /// <summary>
-    /// Seeds an Organization. <paramref name="stripeAccountId"/> is optional —
-    /// supply one when the test wants to assert webhook handlers find the org
-    /// by acct id.
-    /// </summary>
     public static async Task<Guid> SeedOrganizationAsync(
-        DatabaseFixture db,
-        string? stripeAccountId = null,
-        bool chargesEnabled = false,
-        bool payoutsEnabled = false,
-        bool detailsSubmitted = false,
-        string countryCode = "US")
+    DatabaseFixture db,
+    string? stripeAccountId = null,
+    bool chargesEnabled = false,
+    bool payoutsEnabled = false,
+    bool detailsSubmitted = false,
+    string countryCode = "US")
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
@@ -116,16 +107,11 @@ public static class TestSeed
         return id;
     }
 
-    /// <summary>
-    /// Seeds an admin BusinessUser optionally attached to an Organization.
-    /// Returns the BusinessUser id; the caller can use it to mint a JWT via
-    /// AuthHelper.GenerateAdminJwt for endpoint-level auth tests.
-    /// </summary>
     public static async Task<Guid> SeedBusinessUserWithOrgAsync(
-        DatabaseFixture db,
-        Guid? organizationId = null,
-        string role = "Admin",
-        string? email = null)
+    DatabaseFixture db,
+    Guid? organizationId = null,
+    string role = "Admin",
+    string? email = null)
     {
         var id = Guid.NewGuid();
         var emailValue = email ?? $"bu-{id}@test.com";
@@ -167,7 +153,7 @@ public static class TestSeed
                 "QrToken","CreatedAt","UpdatedAt")
             VALUES (@id, @pid, 'Claimed', @tcode, 1, @qr, now(), now())
             """,
-            ("id", id), ("pid", purchaseId), 
+            ("id", id), ("pid", purchaseId),
             ("tcode", $"T-{id.ToString()[..8].ToUpper()}"),
             ("qr", qrToken ?? $"qr-{id.ToString()[..8]}"));
         return id;
@@ -193,7 +179,7 @@ public static class TestSeed
                 "RowSpan","ColSpan","SortOrder","IsActive","CreatedAt","UpdatedAt")
             VALUES (@id, @ev, @etid, @label, @status, 0, 0, 1, 1, 0, true, now(), now())
             """,
-            ("id", id), ("ev", eventId), ("etid", eventTableId), 
+            ("id", id), ("ev", eventId), ("etid", eventTableId),
             ("label", $"T-{id.ToString()[..4]}"), ("status", status));
         return id;
     }

@@ -22,14 +22,11 @@ public class AdminImagesController(
     IAdminLogService adminLog
 ) : ControllerBase
 {
-    /// <summary>
-    /// Upload an image for a venue or event.
-    /// </summary>
     [HttpPost("upload")]
     public async Task<IActionResult> Upload(
-        IFormFile file,
-        [FromQuery] string entityType,
-        [FromQuery] Guid entityId)
+    IFormFile file,
+    [FromQuery] string entityType,
+    [FromQuery] Guid entityId)
     {
         var (valid, error) = Helpers.FileUploadValidator.Validate(file);
         if (!valid) return BadRequest(new ApiError(400, error!, HttpContext.TraceIdentifier));
@@ -48,9 +45,6 @@ public class AdminImagesController(
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get all images for a venue or event.
-    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetByEntity([FromQuery] string entityType, [FromQuery] Guid entityId)
     {
@@ -58,9 +52,6 @@ public class AdminImagesController(
         return Ok(images);
     }
 
-    /// <summary>
-    /// Delete an image.
-    /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -71,9 +62,6 @@ public class AdminImagesController(
         return NoContent();
     }
 
-    /// <summary>
-    /// Set an image as primary.
-    /// </summary>
     [HttpPatch("{id:guid}/primary")]
     public async Task<IActionResult> SetPrimary(Guid id)
     {
@@ -81,14 +69,11 @@ public class AdminImagesController(
         return Ok(new { message = "Image set as primary" });
     }
 
-    /// <summary>
-    /// Reorder images for an entity.
-    /// </summary>
     [HttpPatch("reorder")]
     public async Task<IActionResult> Reorder(
-        [FromQuery] string entityType,
-        [FromQuery] Guid entityId,
-        [FromBody] ReorderImagesRequest request)
+    [FromQuery] string entityType,
+    [FromQuery] Guid entityId,
+    [FromBody] ReorderImagesRequest request)
     {
         await imageService.ReorderAsync(entityType, entityId, request.ImageIds);
         return Ok(new { message = "Images reordered" });

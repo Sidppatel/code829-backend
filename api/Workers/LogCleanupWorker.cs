@@ -4,10 +4,6 @@ using Serilog;
 
 namespace Api.Workers;
 
-/// <summary>
-/// Background worker that runs daily to clean up old logs and expired device sessions
-/// via stored procedures. Default retention: developer 90 days, admin 365 days, system 30 days.
-/// </summary>
 public class LogCleanupWorker(IServiceScopeFactory scopeFactory) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

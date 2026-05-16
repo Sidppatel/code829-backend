@@ -4,10 +4,6 @@ using Contracts.Enums;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Attribute to declare the minimum role required for an endpoint.
-/// Role hierarchy: Developer > Admin > Staff > User.
-/// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public class RequireRoleAttribute(UserRole minimumRole) : Attribute
 {

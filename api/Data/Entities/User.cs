@@ -7,16 +7,8 @@ public class User : BaseEntity
     public required string FirstName { get; set; }
     public required string LastName { get; set; }
 
-    /// <summary>
-    /// Bcrypt/argon password hash for traditional email+password auth.
-    /// Nullable because pre-existing magic-link-only users have no password set.
-    /// </summary>
     public string? PasswordHash { get; set; }
 
-    /// <summary>
-    /// True once the user has confirmed ownership of their email via verification link.
-    /// Default false for new email+password signups; magic-link flow may set this implicitly.
-    /// </summary>
     public bool EmailVerified { get; set; }
 
     public DateTime? EmailVerifiedAt { get; set; }

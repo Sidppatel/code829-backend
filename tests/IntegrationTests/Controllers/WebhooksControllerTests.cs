@@ -14,7 +14,7 @@ public sealed class WebhooksControllerTests(DatabaseFixture db)
         var content = new StringContent("{\"id\":\"evt_test\"}", Encoding.UTF8, "application/json");
         var resp = await client.PostAsync("/webhooks/stripe", content);
 
-resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.InternalServerError);
+        resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.InternalServerError);
     }
 
     [Fact]
@@ -26,6 +26,6 @@ resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unaut
         var req = new HttpRequestMessage(HttpMethod.Post, "/webhooks/stripe") { Content = content };
         var resp = await client.SendAsync(req);
 
-resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.InternalServerError);
+        resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.InternalServerError);
     }
 }

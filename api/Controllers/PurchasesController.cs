@@ -123,10 +123,6 @@ public class PurchasesController(
         catch (UnauthorizedAccessException ex) { Log.Warning(ex, "[Purchases] Cancel forbidden: {Message}", ex.Message); return StatusCode(403, new ApiError(403, "Access denied", HttpContext.TraceIdentifier)); }
     }
 
-    /// <summary>
-    /// Fire-and-forget purchase cancellation via navigator.sendBeacon.
-    /// sendBeacon sends cookies automatically; session cookie authenticates the request.
-    /// </summary>
     [HttpPost("cancel-beacon")]
     [Authorize]
     [RequireRole(UserRole.User)]

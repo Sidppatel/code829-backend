@@ -7,12 +7,6 @@ using StackExchange.Redis;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Idempotency for POST/PUT. Client-supplied Idempotency-Key is honored when present.
-/// Purchase-critical paths (POST /purchases, POST /purchases/{id}/confirm*) also get a
-/// server-generated fallback key derived from userId + path + body hash so double-tap
-/// without a client key can't create duplicate purchases.
-/// </summary>
 public class IdempotencyMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
 {
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);

@@ -13,9 +13,6 @@ public class SeoController(
     ISettingsService settings
 ) : ControllerBase
 {
-    /// <summary>
-    /// Dynamic sitemap.xml listing all published events.
-    /// </summary>
     [HttpGet("sitemap.xml")]
     [Produces("application/xml")]
     public async Task<IActionResult> Sitemap()
@@ -57,9 +54,6 @@ public class SeoController(
         return Content(sb.ToString(), "application/xml");
     }
 
-    /// <summary>
-    /// robots.txt allowing all crawlers, pointing to sitemap.
-    /// </summary>
     [HttpGet("robots.txt")]
     [Produces("text/plain")]
     public async Task<IActionResult> Robots()

@@ -11,19 +11,6 @@ using Moq;
 
 namespace Api.Tests.Services;
 
-/// <summary>
-/// Connect-enforcement-specific PurchaseService tests. Verifies the new
-/// guard added in <c>PurchaseService.EnsurePayoutReadyIfEnforcedAsync</c>
-/// behaves correctly under all four combinations of (flag-enabled,
-/// org-state).
-///
-/// <para>
-/// Uses the InMemory DbContext from <see cref="TestDbContextFactory"/>;
-/// EventViews is seeded directly because InMemory treats ToView entries the
-/// same as ToTable entries — perfectly fine for this scope where we don't
-/// exercise the real PG view definition.
-/// </para>
-/// </summary>
 public class PurchaseServiceStripeConnectTests : IDisposable
 {
     private readonly EventPlatformDbContext _context;
@@ -255,7 +242,7 @@ public class PurchaseServiceStripeConnectTests : IDisposable
             .ReturnsAsync(Guid.NewGuid());
 
         try { await _service.CreateAsync(_userId, OpenSeatRequest(_eventId)); }
-        catch (InvalidOperationException) {  }
+        catch (InvalidOperationException) { }
 
         capturedMetadata.Should().NotBeNull();
         capturedMetadata!.Should().ContainKey("purchase_number");

@@ -6,12 +6,6 @@ using StackExchange.Redis;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Redis-based rate limiting middleware for distributed deployments.
-/// Default: 30 requests per 15 minutes for general endpoints.
-/// Stricter limits for auth (5/min) and seat hold (20/min) endpoints.
-/// Set AppSetting "rate_limit_disabled" = "true" to bypass all limits (useful for testing).
-/// </summary>
 public class RateLimitingMiddleware(RequestDelegate next, IConnectionMultiplexer redis, IWebHostEnvironment env)
 {
     private const int DefaultLimit = 200;

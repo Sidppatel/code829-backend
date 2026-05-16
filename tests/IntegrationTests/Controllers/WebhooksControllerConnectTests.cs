@@ -5,19 +5,6 @@ using Npgsql;
 
 namespace IntegrationTests.Controllers;
 
-/// <summary>
-/// Integration tests for the four Stripe Connect event handlers added to
-/// <c>WebhooksController</c>: <c>account.updated</c>, <c>transfer.created</c>,
-/// <c>payout.created</c>, <c>payout.paid</c>.
-///
-/// <para>
-/// Each test seeds a real Organization in Postgres (via <see cref="TestSeed"/>),
-/// constructs a Stripe-event payload from the JSON fixtures in
-/// <c>Fixtures/StripeWebhookFixtures/</c>, signs it with the test webhook
-/// secret, and POSTs to <c>/webhooks/stripe</c>. Side effects are verified
-/// against the real DB.
-/// </para>
-/// </summary>
 [Collection("Database")]
 public sealed class WebhooksControllerConnectTests(DatabaseFixture db)
 {

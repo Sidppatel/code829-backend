@@ -197,16 +197,6 @@ public class WebhooksController(
         }
     }
 
-    /// <summary>
-    /// Mirror Stripe's account.charges_enabled / payouts_enabled / details_submitted
-    /// flags onto the corresponding Organization row. Also persists the
-    /// requirements.currently_due array so the admin dashboard can show "still
-    /// need: tax_id, ssn_last_4" without round-tripping Stripe on every render.
-    ///
-    /// First-time-completed onboarding (DetailsSubmitted flips to true) sets
-    /// Organization.StripeOnboardedAt — the SP guards the timestamp so subsequent
-    /// account.updated events can never overwrite it.
-    /// </summary>
     private async Task HandleAccountUpdated(Event stripeEvent)
     {
         var account = stripeEvent.Data.Object as Account;
@@ -230,7 +220,7 @@ public class WebhooksController(
                 "[Webhook] account.updated processed for {AccountId}: charges={Charges} payouts={Payouts} details={Details}",
                 account.Id, account.ChargesEnabled, account.PayoutsEnabled, account.DetailsSubmitted);
         }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002"  )
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "P0002")
         {
 
             Log.Warning(
@@ -239,11 +229,6 @@ public class WebhooksController(
         }
     }
 
-    /// <summary>
-    /// Append-only audit of platform → connected-account transfers. We resolve
-    /// the originating Purchase via the source charge's PaymentIntent (best-effort —
-    /// the row is still useful for the org dashboard even if PurchaseId is null).
-    /// </summary>
     private async Task HandleTransferCreated(Event stripeEvent)
     {
         var transfer = stripeEvent.Data.Object as Transfer;
@@ -363,13 +348,6 @@ public class WebhooksController(
         await UpsertPayoutAsync(stripeEvent, paidEvent: true);
     }
 
-    /// <summary>
-    /// Common path for payout.created + payout.paid. The Stripe Event's <c>Account</c>
-    /// property identifies the connected account that issued the payout — this is the
-    /// only canonical place to find it, since the Payout object itself doesn't carry
-    /// the parent account id. <paramref name="paidEvent"/> distinguishes which
-    /// timestamp to populate.
-    /// </summary>
     private async Task UpsertPayoutAsync(Event stripeEvent, bool paidEvent)
     {
         var payout = stripeEvent.Data.Object as Payout;

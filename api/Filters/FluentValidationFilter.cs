@@ -5,11 +5,6 @@ using Serilog;
 
 namespace Api.Filters;
 
-/// <summary>
-/// Replacement for the deprecated FluentValidation.AspNetCore auto-validation. For each action
-/// argument, resolves IValidator&lt;T&gt; from DI, runs validation, and short-circuits with the
-/// same 400 response shape used by InvalidModelStateResponseFactory when validation fails.
-/// </summary>
 public class FluentValidationFilter : IAsyncActionFilter
 {
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)

@@ -5,21 +5,6 @@ using Testcontainers.Redis;
 
 namespace IntegrationTests.Fixtures;
 
-/// <summary>
-/// Shared fixture that boots postgres:16-alpine + redis:7-alpine via Testcontainers
-/// and applies the schema by invoking the code829-db MigrationRunner — the same
-/// binary that runs against prod. Schema authority is single-sourced in code829-db.
-///
-/// The runner DLL path comes from the MIGRATION_RUNNER_DLL env var (set by the CI
-/// workflow's pre-build step which uses actions/checkout with DB_REPO_TOKEN).
-/// When unset (local dev), the fixture clones code829-db over SSH and publishes
-/// MigrationRunner into the system temp dir on first use, then caches the path in
-/// MIGRATION_RUNNER_DLL for subsequent fixtures in the same process. The SSH default
-/// matches the post-private-repo workflow — devs use their GitHub SSH key, CI uses
-/// the PAT-authenticated checkout.
-///
-/// Shared across all test classes in the "Database" collection to avoid cold-start overhead.
-/// </summary>
 public sealed class DatabaseFixture : IAsyncLifetime
 {
     private const string DbRepoUrl = "git@github.com:Sidppatel/code829-db.git";
@@ -47,9 +32,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
         var redisPort = _redis.GetMappedPublicPort(6379);
         RedisConfig = $"localhost:{redisPort}";
 
-        // Backend reads components, not URLs. Decompose the Testcontainers Npgsql
-        // kv-form string and the Redis container port into the env-var schema
-        // Program.cs requires.
+
+
+
         var pg = new NpgsqlConnectionStringBuilder(PostgresConnectionString);
         Environment.SetEnvironmentVariable("DB_HOST", pg.Host);
         Environment.SetEnvironmentVariable("DB_PORT", (pg.Port == 0 ? 5432 : pg.Port).ToString());
@@ -110,12 +95,6 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     }
 
-    /// <summary>
-    /// Returns the absolute path to a published MigrationRunner.dll. Honors
-    /// MIGRATION_RUNNER_DLL when set (CI workflow pre-builds it). Otherwise
-    /// clones code829-db@main into a process-cached temp dir and publishes
-    /// MigrationRunner once.
-    /// </summary>
     private static async Task<string> ResolveMigrationRunnerAsync()
     {
         var pre = Environment.GetEnvironmentVariable("MIGRATION_RUNNER_DLL");
@@ -160,10 +139,6 @@ public sealed class DatabaseFixture : IAsyncLifetime
                 $"{file} {args} exited {p.ExitCode}\nstdout:\n{await stdout}\nstderr:\n{await stderr}");
     }
 
-    /// <summary>
-    /// Converts the Testcontainers-style key/value Npgsql connection string into
-    /// the URL form that MigrationRunner expects: postgresql://user:pass@host:port/db.
-    /// </summary>
     private static string NpgsqlKvToUrl(string kv)
     {
         var b = new NpgsqlConnectionStringBuilder(kv);
@@ -175,7 +150,6 @@ public sealed class DatabaseFixture : IAsyncLifetime
         return $"postgresql://{user}:{pass}@{host}:{port}/{db}";
     }
 
-    /// <summary>Opens a raw Npgsql connection to the test database.</summary>
     public async Task<NpgsqlConnection> OpenConnectionAsync()
     {
         var conn = new NpgsqlConnection(PostgresConnectionString);
@@ -183,7 +157,6 @@ public sealed class DatabaseFixture : IAsyncLifetime
         return conn;
     }
 
-    /// <summary>Executes raw SQL against the test database and returns rows as dynamic.</summary>
     public async Task ExecuteSqlAsync(string sql, params (string name, object? value)[] parameters)
     {
         await using var conn = await OpenConnectionAsync();

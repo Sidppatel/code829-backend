@@ -112,7 +112,8 @@ public class AdminEventsController(
                 tableStats[stat.EventId] = (stat.TotalTables, stat.BookedTables);
         }
 
-        var dtos = items.Select(e => {
+        var dtos = items.Select(e =>
+        {
             var dto = MapToDto(e);
             if (e.LayoutMode == "Grid" && tableStats.TryGetValue(e.EventId, out var ts))
             {
@@ -142,7 +143,8 @@ public class AdminEventsController(
                 .OrderBy(tt => tt.SortOrder)
                 .ToListAsync();
 
-            dto = dto with {
+            dto = dto with
+            {
                 TicketTypes = ticketTypeViews.Select(tt => new EventTicketTypeDto(
                     tt.EventTicketTypeId, tt.Label, tt.PriceCents, tt.PlatformFeeCents,
                     tt.TotalPriceCents,
@@ -159,7 +161,8 @@ public class AdminEventsController(
                 .OrderBy(t => t.Label)
                 .ToListAsync();
 
-            dto = dto with {
+            dto = dto with
+            {
                 TableTypes = tableTypeViews.Select(t => new EventTableTypeSummaryDto(
                     t.EventTableId, t.Label, t.Capacity, t.Shape, t.Color,
                     t.PriceCents, t.PlatformFeeCents,
@@ -221,17 +224,6 @@ public class AdminEventsController(
     private Guid GetCurrentUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-    /// <summary>
-    /// True when the caller may read or modify an event owned by
-    /// <paramref name="organizerId"/>. Rules:
-    /// <list type="bullet">
-    ///   <item>Developer role bypasses (cross-org platform operator).</item>
-    ///   <item>Caller is the organizer themselves.</item>
-    ///   <item>Caller belongs to the same Organization as the organizer.</item>
-    /// </list>
-    /// Replaces the legacy <c>IsOwnerOrDeveloper</c> which let ANY Admin
-    /// pass — that broke tenant isolation across orgs.
-    /// </summary>
     private async Task<bool> IsOwnerOrSameOrgOrDeveloperAsync(Guid organizerId)
     {
         if (User.IsInRole(UserRole.Developer.ToString())) return true;

@@ -43,7 +43,7 @@ public class ImageProcessingService : IImageProcessingService
         using var skData = SKData.Create(input);
         using var codec = SKCodec.Create(skData);
         using var bitmap = SKBitmap.Decode(codec);
-        
+
         var loaded = sw.ElapsedMilliseconds;
 
         var variants = VariantsByEntity.GetValueOrDefault(entityType, VariantsByEntity["event"]);
@@ -52,7 +52,7 @@ public class ImageProcessingService : IImageProcessingService
         var tasks = variants.Select(variant =>
         {
             SKBitmap resizedBitmap;
-            
+
             if (bitmap.Width <= variant.MaxWidth && bitmap.Height <= variant.MaxHeight && !cropEntities)
             {
                 resizedBitmap = bitmap.Copy();
@@ -65,11 +65,11 @@ public class ImageProcessingService : IImageProcessingService
 
             var width = resizedBitmap.Width;
             var height = resizedBitmap.Height;
-            
+
             var ms = new MemoryStream();
             resizedBitmap.Encode(ms, SKEncodedImageFormat.Webp, 75);
             ms.Position = 0;
-            
+
             resizedBitmap.Dispose();
 
             return Task.FromResult(new ProcessedImage(ms, variant.Suffix, width, height, (int)ms.Length));

@@ -3,11 +3,6 @@ using IntegrationTests.Fixtures;
 
 namespace IntegrationTests.Controllers;
 
-/// <summary>
-/// Smoke tests for admin/developer/staff controllers: each endpoint gated by [Authorize]+[RequireRole]
-/// must return 401 for anonymous and 403 for insufficient role. Happy-path coverage lives in
-/// per-controller test files. These smoke tests guarantee AuthZ wiring for every ticket.
-/// </summary>
 [Collection("Database")]
 public sealed class AdminControllersSmokeTests(DatabaseFixture db)
 {

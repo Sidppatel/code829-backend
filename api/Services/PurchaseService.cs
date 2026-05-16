@@ -390,14 +390,6 @@ public class PurchaseService(
         return $"BK-{timestamp}-{random}";
     }
 
-    /// <summary>
-    /// Guard for Stripe Connect destination charges. When the
-    /// <c>connect_enforcement_enabled</c> setting is on, every paid purchase
-    /// must route through the organizer's onboarded Connect account; if the
-    /// org is missing or unverified we throw a typed exception that the
-    /// controller maps to 409 (so the FE can render a "ask the organizer to
-    /// finish onboarding" empty state instead of a generic 400).
-    /// </summary>
     private async Task EnsurePayoutReadyIfEnforcedAsync(Db.Entities.Organization? organization)
     {
         var enforced = await settings.GetBoolAsync(SettingsKeys.ConnectEnforcementEnabled);
@@ -449,23 +441,10 @@ public class PurchaseService(
     private static string Truncate(string value, int max) =>
         string.IsNullOrEmpty(value) || value.Length <= max ? value : value[..max];
 
-    /// <summary>
-    /// Human-readable PaymentIntent description. Propagates to the Charge and
-    /// (for destination charges) to the Transfer to the connected account, so
-    /// the organizer's Stripe Express dashboard line item reads
-    /// <c>"BK-260425-126825 — Test Event (2 tables)"</c> instead of a bare
-    /// dollar amount. Format lives in <see cref="PaymentDescriptions.Build"/>
-    /// so the webhook fallback path can reproduce it from PI metadata.
-    /// </summary>
     private static string BuildPaymentIntentDescription(
-        string purchaseNumber, EventView ev, int? tableCount = null, int? seats = null) =>
-        PaymentDescriptions.Build(purchaseNumber, ev.Title, tableCount, seats);
+    string purchaseNumber, EventView ev, int? tableCount = null, int? seats = null) =>
+    PaymentDescriptions.Build(purchaseNumber, ev.Title, tableCount, seats);
 
-    /// <summary>
-    /// 22-char-max statement-descriptor suffix shown on the customer's bank
-    /// statement after the platform's prefix. Built from the event title so
-    /// the customer recognises the charge.
-    /// </summary>
     private static string BuildStatementDescriptorSuffix(EventView ev)
     {
         var title = ev.Title ?? string.Empty;

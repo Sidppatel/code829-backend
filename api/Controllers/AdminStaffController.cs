@@ -26,14 +26,11 @@ public class AdminStaffController(
     IAdminAuthService adminAuthService
 ) : ControllerBase
 {
-    /// <summary>
-    /// List staff users. Admins can only see Staff; Developers see all.
-    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetStaff(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] string? search = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
@@ -61,18 +58,21 @@ public class AdminStaffController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.BusinessUserId, a.FirstName, a.LastName, a.Email,
+                a.BusinessUserId,
+                a.FirstName,
+                a.LastName,
+                a.Email,
                 Role = a.Role.ToString(),
-                a.IsActive, a.CreatedAt, a.LastLoginAt, a.Phone
+                a.IsActive,
+                a.CreatedAt,
+                a.LastLoginAt,
+                a.Phone
             })
             .ToListAsync();
 
         return Ok(new { items = staff, totalCount, page, pageSize });
     }
 
-    /// <summary>
-    /// Admin creates a Staff user.
-    /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateStaff([FromBody] CreateBusinessUserRequest request)
     {
@@ -103,9 +103,6 @@ public class AdminStaffController(
         return Created($"/admin/staff/{id}", new { id, message = $"{role} user created" });
     }
 
-    /// <summary>
-    /// Admin updates a Staff user (limited: no role promotion beyond Staff for non-Developers).
-    /// </summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateStaff(Guid id, [FromBody] UpdateBusinessUserRequest request)
     {
@@ -131,9 +128,6 @@ public class AdminStaffController(
         return Ok(new { message = "Staff user updated" });
     }
 
-    /// <summary>
-    /// Admin invites a Staff user via email. Developers can also invite Admin users.
-    /// </summary>
     [HttpPost("invite")]
     public async Task<IActionResult> InviteStaff([FromBody] CreateInvitationRequest request)
     {
@@ -158,12 +152,9 @@ public class AdminStaffController(
         }
     }
 
-    /// <summary>
-    /// List invitations sent by the current admin user.
-    /// </summary>
     [HttpGet("invitations")]
     public async Task<IActionResult> GetInvitations(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
+    [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
     {
         var isDeveloper = User.IsInRole(UserRole.Developer.ToString());
         var businessUserId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
@@ -175,15 +166,12 @@ public class AdminStaffController(
         return Ok(new { items = invitations });
     }
 
-    /// <summary>
-    /// List active Admin-role users. Accessible by Admins (read-only view) and Developers.
-    /// </summary>
     [HttpGet]
     [Route("~/admin/admins")]
     public async Task<IActionResult> GetAdmins(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] string? search = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
@@ -208,18 +196,20 @@ public class AdminStaffController(
             .Take(pageSize)
             .Select(a => new
             {
-                a.BusinessUserId, a.FirstName, a.LastName, a.Email,
+                a.BusinessUserId,
+                a.FirstName,
+                a.LastName,
+                a.Email,
                 Role = a.Role.ToString(),
-                a.IsActive, a.CreatedAt, a.LastLoginAt
+                a.IsActive,
+                a.CreatedAt,
+                a.LastLoginAt
             })
             .ToListAsync();
 
         return Ok(new { items = admins, totalCount, page, pageSize });
     }
 
-    /// <summary>
-    /// Revoke a pending invitation.
-    /// </summary>
     [HttpDelete("invitations/{id:guid}")]
     public async Task<IActionResult> RevokeInvitation(Guid id)
     {

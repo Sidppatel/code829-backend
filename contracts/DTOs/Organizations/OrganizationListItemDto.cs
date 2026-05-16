@@ -1,10 +1,5 @@
 namespace Contracts.DTOs.Organizations;
 
-/// <summary>
-/// Compact Organization row for list/grid endpoints. MemberCount is computed
-/// server-side so the developer UI can render a count column without a per-row
-/// roundtrip.
-/// </summary>
 public record OrganizationListItemDto(
     Guid Id,
     string Name,
@@ -19,19 +14,6 @@ public record OrganizationListItemDto(
     int MemberCount,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    /// <summary>
-    /// Coarse render state derived server-side via
-    /// <c>OrganizationStripeStateMapper.Derive</c>. Single source of truth so
-    /// list + detail endpoints stay in lock-step and the FE never has to
-    /// re-implement the booleans-to-state machine.
-    /// </summary>
-    string StripeState,
-    /// <summary>
-    /// True iff <c>StripeConnectedAccountId</c> is non-empty. Surfaced as a
-    /// dedicated boolean because the FE list type
-    /// (<c>OrganizationListItem.hasStripeAccount</c>) reads it directly —
-    /// without this field the "Account" column would render "Not Connected"
-    /// even after onboarding completes.
-    /// </summary>
-    bool HasStripeAccount
+        string StripeState,
+        bool HasStripeAccount
 );

@@ -8,12 +8,6 @@ using Serilog;
 
 namespace Api.Services;
 
-/// <summary>
-/// Default implementation of <see cref="IOrganizationService"/>. Uses
-/// <see cref="OrganizationView"/> for read operations (preferred pattern for
-/// read-heavy API endpoints) and delegates mutations to
-/// <see cref="IOrganizationProcedures"/>.
-/// </summary>
 public class OrganizationService(
     EventPlatformDbContext context,
     IOrganizationProcedures orgProc,

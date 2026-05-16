@@ -3,10 +3,6 @@ using StackExchange.Redis;
 
 namespace Api.Services;
 
-/// <summary>
-/// Reads/writes non-sensitive AppSettings with Redis caching (30s TTL).
-/// Sensitive secrets are handled by ISecretsProvider (env vars), not this service.
-/// </summary>
 public class SettingsService(
     IAppSettingRepository repository,
     IConnectionMultiplexer redis

@@ -1,9 +1,5 @@
 namespace Contracts.Enums;
 
-/// <summary>
-/// Canonical audit-log event type strings. String-backed (not a C# enum) to allow
-/// free-form values from legacy call sites while keeping constants for common flows.
-/// </summary>
 public static class AuditEventType
 {
 

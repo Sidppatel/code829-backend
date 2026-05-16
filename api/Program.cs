@@ -30,42 +30,42 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-var bootstrapEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
-if (bootstrapEnv == "Development")
-{
-
-    var envFiles = new[]
+    var bootstrapEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+    if (bootstrapEnv == "Development")
     {
+
+        var envFiles = new[]
+        {
         Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
         Path.Combine(Directory.GetCurrentDirectory(), ".env"),
         Path.Combine(Directory.GetCurrentDirectory(), "..", ".env.local"),
         Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env.local"),
         Path.Combine(Directory.GetCurrentDirectory(), ".env.local"),
     };
-    foreach (var envPath in envFiles)
-    {
-        if (!File.Exists(envPath)) continue;
-        Console.WriteLine($"[Bootstrap] Loading environment from {envPath}");
-        foreach (var line in File.ReadAllLines(envPath))
+        foreach (var envPath in envFiles)
         {
-            var trimmed = line.Trim();
-            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
-            var eqIndex = trimmed.IndexOf('=');
-            if (eqIndex <= 0) continue;
-            var key = trimmed[..eqIndex].Trim();
-            var value = trimmed[(eqIndex + 1)..].Trim();
-
-            if (value.Length >= 2 &&
-                ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
+            if (!File.Exists(envPath)) continue;
+            Console.WriteLine($"[Bootstrap] Loading environment from {envPath}");
+            foreach (var line in File.ReadAllLines(envPath))
             {
-                value = value[1..^1];
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
+                var eqIndex = trimmed.IndexOf('=');
+                if (eqIndex <= 0) continue;
+                var key = trimmed[..eqIndex].Trim();
+                var value = trimmed[(eqIndex + 1)..].Trim();
+
+                if (value.Length >= 2 &&
+                    ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
+                {
+                    value = value[1..^1];
+                }
+                Environment.SetEnvironmentVariable(key, value);
             }
-            Environment.SetEnvironmentVariable(key, value);
         }
     }
-}
 
-var builder = WebApplication.CreateBuilder(args);
+    var builder = WebApplication.CreateBuilder(args);
 
     var sentryDsn = Environment.GetEnvironmentVariable("SENTRY_DSN") ?? string.Empty;
     builder.WebHost.UseSentry(o =>
@@ -187,10 +187,10 @@ var builder = WebApplication.CreateBuilder(args);
     }
     catch (Exception ex)
     {
-        // abortConnect=false should make Connect return without throwing — but
-        // misconfigured TLS / DNS errors can still surface here. Log + rethrow
-        // so the operator sees the cause in Render logs instead of an opaque
-        // SIGSEGV from the native TLS path.
+
+
+
+
         Log.Fatal(ex, "[Redis] Connect failed for {Endpoints} ssl={Ssl}",
             string.Join(",", redisOpts.EndPoints), redisOpts.Ssl);
         throw;
@@ -463,10 +463,10 @@ var builder = WebApplication.CreateBuilder(args);
 
     var app = builder.Build();
 
-    // Verify schema is initialized before serving traffic. Migrations are applied
-    // exclusively by .github/workflows/migrate-prod.yml; this check fails fast if
-    // that step was skipped. Optional EXPECTED_MIGRATION_ID env var pins the exact
-    // latest MigrationId — set on Render to assert "DB on latest" per release.
+
+
+
+
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EventPlatformDbContext>();
@@ -628,20 +628,6 @@ finally
     await Log.CloseAndFlushAsync();
 }
 
-/// <summary>
-/// Builds an ADO.NET connection string for Npgsql from individual env-var components.
-/// No URL parsing; no credentials in any single env var.
-///
-/// Required: DB_HOST, DB_PORT, DB_USER, DB_NAME, DB_PASSWORD.
-/// Optional: DATABASE_SSL_MODE, DB_MIN_POOL, DB_MAX_POOL, DB_IDLE_LIFETIME,
-///   DB_CMD_TIMEOUT, DB_CONN_TIMEOUT.
-///
-/// Pool defaults are tuned for Supabase's pgbouncer transaction pooler (port 6543)
-/// where keeping many idle sessions is harmful — pgbouncer holds slots open per
-/// idle Npgsql connection and quickly exhausts the project quota across replicas.
-/// `No Reset On Close=true` is required when talking to pgbouncer in transaction
-/// mode because `DISCARD ALL` is not supported across pooled connections.
-/// </summary>
 static string BuildPostgresConnectionString()
 {
     var host = RequireEnv("DB_HOST");
@@ -676,10 +662,6 @@ static string RequireEnv(string key)
     return v;
 }
 
-/// <summary>
-/// Resolves a hostname to an IPv4 address to avoid IPv6 connectivity issues in CI.
-/// Falls back to the original hostname if resolution fails.
-/// </summary>
 static string ResolveToIPv4(string host)
 {
     try
@@ -688,24 +670,10 @@ static string ResolveToIPv4(string host)
         var ipv4 = addresses.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
         if (ipv4 is not null) return ipv4.ToString();
     }
-    catch {  }
+    catch { }
     return host;
 }
 
-/// <summary>
-/// Builds a StackExchange.Redis configuration string from individual env-var components.
-///
-/// Required: REDIS_HOST, REDIS_PORT.
-/// Optional: REDIS_USER, REDIS_PASSWORD, REDIS_TLS (defaults false).
-///
-/// Upstash uses TLS on port 6380 with user "default" — set REDIS_TLS=true.
-/// Local docker redis uses no TLS, no user, password from REDIS_PASSWORD.
-///
-/// abortConnect=false is forced for any non-loopback host so a transient
-/// network blip on first boot does not crash the container — the multiplexer
-/// retries forever in the background and the cache layer treats a
-/// not-yet-connected client as a miss.
-/// </summary>
 static string BuildRedisConfigString()
 {
     var host = RequireEnv("REDIS_HOST");
@@ -732,9 +700,6 @@ static string BuildRedisConfigString()
     return config;
 }
 
-/// <summary>
-/// Reads the JWT secret from environment variables and configures the JWT bearer middleware.
-/// </summary>
 static Task ConfigureJwtSigningKey(WebApplication app)
 {
     var secrets = app.Services.GetRequiredService<ISecretsProvider>();

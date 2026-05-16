@@ -10,11 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace IntegrationTests.Middleware;
 
-/// <summary>
-/// Unit tests for ErrorHandlingMiddleware — assert no stack traces leak outside Development
-/// and ProblemDetails/ApiError shape is correct. Writes go through IAuditLogService
-/// now (audit_logs) rather than the removed ILogRepository log-table path.
-/// </summary>
 public sealed class ErrorHandlingMiddlewareUnitTests
 {
     private static DefaultHttpContext BuildContext(IWebHostEnvironment env)

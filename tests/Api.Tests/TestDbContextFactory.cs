@@ -3,9 +3,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Tests;
 
-/// <summary>
-/// Creates an InMemory DbContext for testing, handling NpgsqlTsVector incompatibility.
-/// </summary>
 public static class TestDbContextFactory
 {
     public static EventPlatformDbContext Create()
@@ -20,9 +17,6 @@ public static class TestDbContextFactory
     }
 }
 
-/// <summary>
-/// Test DbContext that overrides OnModelCreating to skip PostgreSQL-specific features.
-/// </summary>
 public class TestDbContext : EventPlatformDbContext
 {
     public TestDbContext(DbContextOptions<EventPlatformDbContext> options)

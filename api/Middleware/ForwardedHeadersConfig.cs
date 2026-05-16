@@ -5,12 +5,6 @@ using Serilog;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Configures <see cref="ForwardedHeadersOptions"/> so rate limiting and audit logs see the
-/// real client IP behind a trusted proxy/CDN, while rejecting spoofed X-Forwarded-For from
-/// untrusted peers. Trusted proxies are supplied via the TRUSTED_PROXIES env var as a
-/// comma-separated list of CIDRs or plain IPs (e.g. "10.0.0.0/8,1.2.3.4").
-/// </summary>
 public static class ForwardedHeadersConfig
 {
     public static void Configure(ForwardedHeadersOptions options, bool isDevelopment, string? trustedProxies)

@@ -17,16 +17,13 @@ public class AdminFinancialsController(
     IFinancialService financialService,
     IBusinessUserProcedures businessUserProc) : ControllerBase
 {
-    /// <summary>
-    /// Get transaction history for the authenticated admin's organization.
-    /// </summary>
     [HttpGet("transactions")]
     public async Task<IActionResult> GetTransactions(
-        [FromQuery] string? search = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null)
+    [FromQuery] string? search = null,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] DateTime? fromDate = null,
+    [FromQuery] DateTime? toDate = null)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var user = await businessUserProc.GetByIdAsync(userId);
@@ -48,17 +45,14 @@ public class AdminFinancialsController(
 [RequireRole(UserRole.Developer)]
 public class DeveloperFinancialsController(IFinancialService financialService) : ControllerBase
 {
-    /// <summary>
-    /// Get global transaction history (all organizations).
-    /// </summary>
     [HttpGet("transactions")]
     public async Task<IActionResult> GetGlobalTransactions(
-        [FromQuery] string? search = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 25,
-        [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null,
-        [FromQuery] Guid? organizationId = null)
+    [FromQuery] string? search = null,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 25,
+    [FromQuery] DateTime? fromDate = null,
+    [FromQuery] DateTime? toDate = null,
+    [FromQuery] Guid? organizationId = null)
     {
         var result = await financialService.GetTransactionsAsync(
             organizationId, search, page, pageSize, fromDate, toDate);

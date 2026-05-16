@@ -9,10 +9,6 @@ using StackExchange.Redis;
 
 namespace Api.Controllers;
 
-/// <summary>
-/// Developer purchases routes inherit all admin purchase actions.
-/// Developers access purchases via role hierarchy (Developer > Admin).
-/// </summary>
 [Asp.Versioning.ApiVersion("1.0")]
 [ApiController]
 [Route("v{version:apiVersion}/developer/purchases")]

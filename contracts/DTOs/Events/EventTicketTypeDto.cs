@@ -15,7 +15,6 @@ public record EventTicketTypeDto(
     string? Description = null
 );
 
-/// <summary>Admin/developer variant — identical shape; use this type explicitly on admin endpoints.</summary>
 public record AdminEventTicketTypeDto(
     [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTicketTypeId,
     string Label,

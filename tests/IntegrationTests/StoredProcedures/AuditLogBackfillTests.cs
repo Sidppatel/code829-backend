@@ -3,13 +3,6 @@ using IntegrationTests.Fixtures;
 
 namespace IntegrationTests.StoredProcedures;
 
-/// <summary>
-/// Tests for sp_create_audit_log. The S7 backfill test was removed after BE #62
-/// dropped the legacy business_logs / developer_logs / system_logs tables — backfill
-/// is a historical one-shot migration and its fixtures would no longer compile.
-/// Read-path coverage now lives in v_business_logs / v_developer_logs / v_system_logs
-/// projections against audit_logs (exercised via controller integration tests).
-/// </summary>
 [Collection("Database")]
 public sealed class AuditLogBackfillTests(DatabaseFixture db)
 {

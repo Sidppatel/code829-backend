@@ -11,13 +11,6 @@ using Serilog;
 
 namespace Api.Middleware;
 
-/// <summary>
-/// Global exception handler. Catches unhandled exceptions, records them in audit_logs
-/// via IAuditLogService (actor_type='System', event_type='Exception'), and returns a
-/// structured ApiError response. Exception metadata (severity, message, stack, path,
-/// method, status) is packed into the metadata JSON so the v_developer_logs view can
-/// project it back to the legacy DeveloperLogDto shape.
-/// </summary>
 public class ErrorHandlingMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, IAuditLogService auditLog)

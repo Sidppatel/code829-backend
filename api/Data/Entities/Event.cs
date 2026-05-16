@@ -21,10 +21,6 @@ public class Event : BaseEntity
     public int? GridRows { get; set; }
     public int? GridCols { get; set; }
 
-    /// <summary>
-    /// PostgreSQL tsvector column for full-text search.
-    /// Auto-populated via a database trigger on title + description.
-    /// </summary>
     public NpgsqlTsVector? SearchVector { get; set; }
 
     public Guid VenueId { get; set; }

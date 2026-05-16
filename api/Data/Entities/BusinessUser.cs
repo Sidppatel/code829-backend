@@ -19,13 +19,7 @@ public class BusinessUser : BaseEntity
     public Image? Image { get; set; }
     public string? Phone { get; set; }
 
-    /// <summary>
-    /// FK to Organization this BusinessUser belongs to. Permanently nullable —
-    /// new BusinessUsers may exist without being attached to any organization
-    /// until a developer assigns them via the members UI.
-    /// </summary>
     public Guid? OrganizationId { get; set; }
 
-    /// <summary>Navigation property to the owning Organization.</summary>
     public Organization? Organization { get; set; }
 }

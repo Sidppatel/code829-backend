@@ -2,10 +2,6 @@ using System.Text;
 
 namespace Api.Services;
 
-/// <summary>
-/// Reads application secrets from IConfiguration (environment variables / .env).
-/// Registered as singleton — env vars do not change at runtime.
-/// </summary>
 public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
 {
     public string JwtSecret
@@ -20,11 +16,6 @@ public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
         }
     }
 
-    /// <summary>
-    /// Optional previous JWT secret kept for rotation grace window.
-    /// When set, tokens signed with the previous key still validate; new tokens always sign with JwtSecret.
-    /// Must meet the same 32-byte minimum length as JwtSecret.
-    /// </summary>
     public string? JwtSecretPrevious
     {
         get
@@ -47,13 +38,8 @@ public class SecretsProvider(IConfiguration configuration) : ISecretsProvider
     public string S3EndpointUrl => configuration["S3_ENDPOINT_URL"] ?? "";
     public string CdnBaseUrl => configuration["CDN_BASE_URL"] ?? "";
 
-    /// <summary>
-    /// Falls back to <c>http://localhost:5174</c> for local development so the
-    /// Stripe Connect flow works out of the box without an extra env var.
-    /// In Production this should be set explicitly to the deployed admin host.
-    /// </summary>
     public string FrontendUrlAdmin =>
-        configuration["FRONTEND_URL_ADMIN"] ?? "http://localhost:5174";
+    configuration["FRONTEND_URL_ADMIN"] ?? "http://localhost:5174";
 
     public string GoogleOAuthClientId => configuration["GOOGLE_OAUTH_CLIENT_ID"] ?? "";
     public string GoogleOAuthClientSecret => configuration["GOOGLE_OAUTH_CLIENT_SECRET"] ?? "";

@@ -4,23 +4,6 @@ using Moq;
 
 namespace Api.Tests.Services;
 
-/// <summary>
-/// Unit tests for <see cref="StripeConnectService"/>. The Stripe SDK validates
-/// keys lazily on the first network call, so these tests exercise the
-/// configuration + parameter-shaping branches that don't require a live API
-/// — the integration test suite covers the request shape end-to-end against
-/// Stripe's mock fixtures (out of scope for unit tests).
-///
-/// <para>
-/// Tests that need to assert the request payload shape (type=express, scope
-/// param keys, ExtraParams) construct the service and call into the public
-/// methods, then assert on the typed exception that bubbles up when the
-/// configured key is the test placeholder. Stripe.net throws a typed
-/// <c>StripeException</c> on auth failure, which our <c>MapStripeException</c>
-/// translates to <see cref="InvalidOperationException"/> — that's the
-/// observable for the "we sent the request" branch.
-/// </para>
-/// </summary>
 public class StripeConnectServiceTests
 {
     private readonly Mock<ISecretsProvider> _secrets;

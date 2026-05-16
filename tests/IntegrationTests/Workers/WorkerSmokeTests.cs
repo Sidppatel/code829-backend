@@ -4,11 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace IntegrationTests.Workers;
 
-/// <summary>
-/// Smoke tests — workers resolve from DI and start without crashing for one tick.
-/// Deep behaviour (locks expired, logs cleaned, events published) is exercised via
-/// the underlying SPs in StoredProcedures/*.
-/// </summary>
 [Collection("Database")]
 public sealed class WorkerSmokeTests(DatabaseFixture db)
 {

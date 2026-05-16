@@ -61,15 +61,11 @@ public class TableBookingController(ITableBookingService tableBookingService, Db
         }
     }
 
-    /// <summary>
-    /// Fire-and-forget table release via navigator.sendBeacon.
-    /// sendBeacon sends cookies automatically; session cookie authenticates the request.
-    /// </summary>
     [HttpPost("release-beacon")]
     [Authorize]
     [RequireRole(UserRole.User)]
     public async Task<IActionResult> ReleaseTableBeacon(
-        [FromBody] ReleaseBeaconRequest request)
+    [FromBody] ReleaseBeaconRequest request)
     {
         try
         {

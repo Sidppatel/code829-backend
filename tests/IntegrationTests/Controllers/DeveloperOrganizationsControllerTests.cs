@@ -5,18 +5,6 @@ using IntegrationTests.Fixtures;
 
 namespace IntegrationTests.Controllers;
 
-/// <summary>
-/// Integration tests for the developer-scoped Organization + Stripe Connect
-/// endpoints under <c>/v1/developer/organizations</c>.
-///
-/// <para>
-/// The Stripe-touching endpoints (<c>/stripe-account</c>, <c>/stripe-onboarding-link</c>,
-/// <c>/stripe-status</c>) cannot be exercised end-to-end in CI without a real Stripe
-/// API connection, so those cases assert on the upstream-Stripe-failure path
-/// (502 or BadRequest from our handler when no live Stripe is reachable). The
-/// CRUD + role-gating paths cover the controller logic 100%.
-/// </para>
-/// </summary>
 [Collection("Database")]
 public sealed class DeveloperOrganizationsControllerTests(DatabaseFixture db)
 {

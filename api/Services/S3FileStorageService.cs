@@ -7,10 +7,6 @@ using Serilog;
 
 namespace Api.Services;
 
-/// <summary>
-/// Production file storage using S3-compatible object storage (AWS S3, Cloudflare R2, etc.).
-/// Reads configuration from ISettingsService.
-/// </summary>
 public class S3FileStorageService(ISecretsProvider secrets, IMalwareScanner scanner) : IFileStorageService
 {
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];

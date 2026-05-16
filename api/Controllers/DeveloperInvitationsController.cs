@@ -19,9 +19,6 @@ public class DeveloperInvitationsController(
     IInvitationService invitationService
 ) : ControllerBase
 {
-    /// <summary>
-    /// Developer sends invitation to an admin or staff user.
-    /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateInvitation([FromBody] CreateInvitationRequest request)
     {
@@ -41,12 +38,9 @@ public class DeveloperInvitationsController(
         }
     }
 
-    /// <summary>
-    /// List all invitations across the platform.
-    /// </summary>
     [HttpGet]
     public async Task<IActionResult> ListInvitations(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
+    [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
     {
         var invitations = await invitationService.ListAsync(
             null, Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
@@ -54,9 +48,6 @@ public class DeveloperInvitationsController(
         return Ok(new { items = invitations });
     }
 
-    /// <summary>
-    /// Revoke a pending invitation.
-    /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> RevokeInvitation(Guid id)
     {

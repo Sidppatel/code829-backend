@@ -8,12 +8,6 @@ using Moq;
 
 namespace Api.Tests.Services;
 
-/// <summary>
-/// Unit tests for <see cref="OrganizationService"/>. All persistence is mocked
-/// at the <see cref="IOrganizationProcedures"/> + <see cref="IBusinessUserProcedures"/>
-/// boundary; integration tests cover the SP-side guarantees (last-member
-/// removal block, archive idempotency).
-/// </summary>
 public class OrganizationServiceTests : IDisposable
 {
     private readonly EventPlatformDbContext _context;

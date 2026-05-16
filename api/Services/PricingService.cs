@@ -14,10 +14,6 @@ public interface IPricingService
     Task<PricingComputation> ComputeForPurchaseAsync(PricingQuoteRequest request, CancellationToken ct = default);
 }
 
-/// <summary>
-/// Full pricing breakdown used during purchase creation. Carries the Stripe Tax calc id and
-/// the PaymentIntent amount (tax-inclusive) so the booking flow can charge the exact total.
-/// </summary>
 public record PricingComputation(
     int SubtotalCents,
     int FeeCents,

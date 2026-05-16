@@ -5,11 +5,6 @@ using Xunit;
 
 namespace Api.Tests;
 
-/// <summary>
-/// DTO contract tests — guarantee public quote shapes never leak admin breakdown fields.
-/// EP0004 (Roslyn analyzer) blocks declaring breakdown props on quote DTOs at compile time;
-/// these serialize-and-grep tests guard the runtime payload shape.
-/// </summary>
 public class PricingDtoShapeTests
 {
     private static readonly JsonSerializerOptions JsonOpts =

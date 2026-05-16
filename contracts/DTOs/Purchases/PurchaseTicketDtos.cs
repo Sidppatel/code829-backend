@@ -21,9 +21,6 @@ public record PurchaseTicketDto(
     bool CanClaimSelf
 );
 
-/// <summary>
-/// Stripped-down ticket view for guests — no payment info, no purchase owner details.
-/// </summary>
 public record GuestTicketDto(
     [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid PurchaseTicketId,
     string TicketCode,

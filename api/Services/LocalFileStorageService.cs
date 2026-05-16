@@ -3,10 +3,6 @@ using Serilog;
 
 namespace Api.Services;
 
-/// <summary>
-/// Development file storage that saves files to ./uploads/{entity}/{guid}.{ext}.
-/// Files are served via static file middleware.
-/// </summary>
 public class LocalFileStorageService(IMalwareScanner scanner) : IFileStorageService
 {
     private const string UploadsDir = "uploads";

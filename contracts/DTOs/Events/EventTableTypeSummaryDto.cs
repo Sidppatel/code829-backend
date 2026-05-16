@@ -14,7 +14,6 @@ public record EventTableTypeSummaryDto(
     int BookedTables
 );
 
-/// <summary>Admin/developer variant — identical shape; use this type explicitly on admin endpoints.</summary>
 public record AdminEventTableTypeSummaryDto(
     [property: System.Text.Json.Serialization.JsonPropertyName("id")] Guid EventTableId,
     string Label,

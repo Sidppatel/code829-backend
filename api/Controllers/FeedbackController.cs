@@ -21,9 +21,6 @@ public class FeedbackController(
 {
     private static readonly string[] ValidTypes = ["General", "Bug", "Suggestion", "Compliment", "Complaint"];
 
-    /// <summary>
-    /// Submit feedback — no auth required.
-    /// </summary>
     [HttpPost]
     [AllowAnonymous]
     public async Task<IActionResult> Submit([FromBody] SubmitFeedbackRequest request)
@@ -69,20 +66,13 @@ public class FeedbackController(
         return Ok(new { message = "Thank you for your feedback!" });
     }
 
-    /// <summary>
-    /// Admin: list all feedback with pagination.
-    /// Sets <c>X-Feedback-Storage-Format: raw-json</c> so the admin UI knows the
-    /// <c>diagnostics</c> field on each row is attacker-controlled raw JSON and
-    /// must be rendered as plain text (never as HTML or as a serialized JSON
-    /// string pasted into the DOM without escaping).
-    /// </summary>
     [HttpGet]
     [Authorize]
     [RequireRole(UserRole.Admin)]
     public async Task<IActionResult> List(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] string? type = null)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20,
+    [FromQuery] string? type = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
@@ -108,9 +98,6 @@ public class FeedbackController(
         return Ok(new PagedResponse<FeedbackDto>(items, total, page, pageSize));
     }
 
-    /// <summary>
-    /// Admin: delete feedback.
-    /// </summary>
     [HttpDelete("{id:guid}")]
     [Authorize]
     [RequireRole(UserRole.Admin)]

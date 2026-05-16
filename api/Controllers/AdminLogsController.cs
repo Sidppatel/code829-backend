@@ -16,15 +16,12 @@ namespace Api.Controllers;
 [RequireRole(UserRole.Admin)]
 public class AdminLogsController(EventPlatformDbContext context) : ControllerBase
 {
-    /// <summary>
-    /// Admin logs: business operations and user activity. Timeline-style.
-    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAdminLogs(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
-        [FromQuery] string? action = null,
-        [FromQuery] string? entityType = null,
-        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
+    [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+    [FromQuery] string? action = null,
+    [FromQuery] string? entityType = null,
+    [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;

@@ -4,13 +4,6 @@ using Contracts.Enums;
 
 namespace Api.Services;
 
-/// <summary>
-/// Thin wrapper over IAuditLogService that keeps the legacy call signature used by
-/// existing controllers/services. Writes to audit_logs only — the legacy business_logs
-/// table was dropped in the DropLegacyLogTables migration. Description + any caller-
-/// supplied metadata are merged into the audit_log metadata JSON so the v_business_logs
-/// view can re-project them as the "Description" column for AdminLogsController.
-/// </summary>
 public class AdminLogService(IAuditLogService audit) : IAdminLogService
 {
     public async Task LogAsync(string action, string? entityType, Guid? entityId, string description,

@@ -6,10 +6,6 @@ using IntegrationTests.Fixtures;
 
 namespace IntegrationTests.Middleware;
 
-/// <summary>
-/// Integration tests for the full middleware pipeline via WebApplicationFactory.
-/// Covers: CorrelationId, SecurityHeaders, ErrorHandling, RateLimiting.
-/// </summary>
 [Collection("Database")]
 public sealed class MiddlewareTests(DatabaseFixture db)
 {

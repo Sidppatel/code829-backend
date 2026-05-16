@@ -4,10 +4,6 @@ using Serilog;
 
 namespace Api.Workers;
 
-/// <summary>
-/// Checks every minute for Draft events with ScheduledPublishAt <= now,
-/// transitions them to Published via stored procedure.
-/// </summary>
 public class ScheduledPublishWorker(IServiceScopeFactory scopeFactory) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -4,12 +4,6 @@ using Stripe;
 
 namespace Api.Services;
 
-/// <summary>
-/// Default implementation. Lifted verbatim from the previous private helpers
-/// on <see cref="Api.Controllers.WebhooksController"/> so behaviour is
-/// unchanged — only the call site moved. See the interface XMLDoc for the
-/// idempotency contract.
-/// </summary>
 public class PaymentEnrichmentService(
     ISecretsProvider secrets,
     IStripeTransactionProcedures stripeTransactionProc,

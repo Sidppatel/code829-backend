@@ -2,11 +2,6 @@ using Serilog;
 
 namespace Api.Services;
 
-/// <summary>
-/// Default <see cref="IAlertService"/> that logs alerts at Error severity using
-/// the existing Serilog pipeline. Production replacements (Sentry / Resend /
-/// PagerDuty) implement the same interface so callers never change.
-/// </summary>
 public sealed class NoOpAlertService : IAlertService
 {
     public Task RaiseAsync(

@@ -1,8 +1,5 @@
 namespace Db.Entities;
 
-/// <summary>
-/// Shared address record referenced by users and venues.
-/// </summary>
 public class Address : BaseEntity
 {
     public required string Line1 { get; set; }
