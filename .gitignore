@@ -111,3 +111,8 @@ docs/deployment-internal.md
 test_output*.txt
 remote-data.sql
 
+# AI Assistant output & state
+.gemini/
+.antigravity/
+.claude/
+.cursor/
