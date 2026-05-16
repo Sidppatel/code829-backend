@@ -354,10 +354,10 @@
       },
       "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": {
         "type": "Transitive",
-        "resolved": "10.0.7",
-        "contentHash": "FRfw0AgR3zp9LQD6pVO2f3Y8VBkQ6QxCVB0B7xQe4u3P0WAjs72py2Z0wZfjSpyIcBFKS/Z/FwP/4qNyAASxzw==",
+        "resolved": "10.0.8",
+        "contentHash": "yscMyugxkZjBIpyYub0tcYSkkAiJLxORl45qD+lmTYLtr3w/VF/Pp/zKnwudN+yfBanAviZ6nIUoI8pYHUGqvw==",
         "dependencies": {
-          "Microsoft.AspNetCore.DataProtection": "10.0.7",
+          "Microsoft.AspNetCore.DataProtection": "10.0.8",
           "StackExchange.Redis": "2.7.27"
         }
       },
@@ -1109,8 +1109,11 @@
       },
       "SixLabors.ImageSharp": {
         "type": "Transitive",
-        "resolved": "2.1.9",
-        "contentHash": "VcjfKbOExie3RgZGrQL1jJMI4iZ3J9B6ifDo2QpDVJUYhTZKVcKnBhpNOHqbvNjHgadAks1jzhRjB7OZet1PJA=="
+        "resolved": "4.0.0",
+        "contentHash": "6Ft5sclM1t5bY+P0SsLLGwXIAgmDASFFD9hD0tlEcfFCU8Yj9nR7ZzaqCL/p+SIfqoe8jLKFHD7LFPRJPGXZ5w==",
+        "dependencies": {
+          "System.IO.Hashing": "8.0.0"
+        }
       },
       "SSH.NET": {
         "type": "Transitive",
@@ -1298,7 +1301,7 @@
           "MailKit": "[4.16.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.8, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.8, )",
-          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.7, )",
+          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.8, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.8, )",
           "Microsoft.EntityFrameworkCore": "[10.0.8, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.1, )",
@@ -1317,7 +1320,7 @@
           "Serilog.Sinks.Console": "[6.1.1, )",
           "Serilog.Sinks.File": "[7.0.0, )",
           "Serilog.Sinks.OpenTelemetry": "[4.2.0, )",
-          "SixLabors.ImageSharp": "[2.1.9, )",
+          "SixLabors.ImageSharp": "[4.0.0, )",
           "StackExchange.Redis": "[2.13.1, )",
           "Stripe.net": "[51.1.0, )",
           "contracts": "[1.0.0, )",

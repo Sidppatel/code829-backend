@@ -118,9 +118,9 @@
       },
       "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": {
         "type": "Direct",
-        "requested": "[10.0.7, )",
-        "resolved": "10.0.7",
-        "contentHash": "FRfw0AgR3zp9LQD6pVO2f3Y8VBkQ6QxCVB0B7xQe4u3P0WAjs72py2Z0wZfjSpyIcBFKS/Z/FwP/4qNyAASxzw==",
+        "requested": "[10.0.8, )",
+        "resolved": "10.0.8",
+        "contentHash": "yscMyugxkZjBIpyYub0tcYSkkAiJLxORl45qD+lmTYLtr3w/VF/Pp/zKnwudN+yfBanAviZ6nIUoI8pYHUGqvw==",
         "dependencies": {
           "StackExchange.Redis": "2.7.27"
         }
@@ -301,9 +301,12 @@
       },
       "SixLabors.ImageSharp": {
         "type": "Direct",
-        "requested": "[2.1.9, )",
-        "resolved": "2.1.9",
-        "contentHash": "VcjfKbOExie3RgZGrQL1jJMI4iZ3J9B6ifDo2QpDVJUYhTZKVcKnBhpNOHqbvNjHgadAks1jzhRjB7OZet1PJA=="
+        "requested": "[4.0.0, )",
+        "resolved": "4.0.0",
+        "contentHash": "6Ft5sclM1t5bY+P0SsLLGwXIAgmDASFFD9hD0tlEcfFCU8Yj9nR7ZzaqCL/p+SIfqoe8jLKFHD7LFPRJPGXZ5w==",
+        "dependencies": {
+          "System.IO.Hashing": "8.0.0"
+        }
       },
       "StackExchange.Redis": {
         "type": "Direct",
