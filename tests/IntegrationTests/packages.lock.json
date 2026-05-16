@@ -65,6 +65,15 @@
           "Microsoft.TestPlatform.TestHost": "18.5.1"
         }
       },
+      "SixLabors.ImageSharp": {
+        "type": "Direct",
+        "requested": "[4.0.0, )",
+        "resolved": "4.0.0",
+        "contentHash": "6Ft5sclM1t5bY+P0SsLLGwXIAgmDASFFD9hD0tlEcfFCU8Yj9nR7ZzaqCL/p+SIfqoe8jLKFHD7LFPRJPGXZ5w==",
+        "dependencies": {
+          "System.IO.Hashing": "8.0.0"
+        }
+      },
       "System.IdentityModel.Tokens.Jwt": {
         "type": "Direct",
         "requested": "[8.18.0, )",
@@ -1107,11 +1116,6 @@
         "resolved": "1.0.0",
         "contentHash": "LFQsCZlV0xlUyXAOMUo5kkSl+8zAQXXbbdwWchtk0B4o7zotZhQsQOcJUELGHdfPfm/xDAsz6hONAuV25bJaAg=="
       },
-      "SixLabors.ImageSharp": {
-        "type": "Transitive",
-        "resolved": "2.1.10",
-        "contentHash": "hk1E7U3RSlxrBVo6Gb6OjeM52fChpFYH+SZvyT/M2vzSGlzAaKE33hc3V/Pvnjcnn1opT8/Z+0QfqdM5HsIaeA=="
-      },
       "SSH.NET": {
         "type": "Transitive",
         "resolved": "2025.1.0",
@@ -1317,7 +1321,7 @@
           "Serilog.Sinks.Console": "[6.1.1, )",
           "Serilog.Sinks.File": "[7.0.0, )",
           "Serilog.Sinks.OpenTelemetry": "[4.2.0, )",
-          "SixLabors.ImageSharp": "[2.1.10, )",
+          "SixLabors.ImageSharp": "[4.0.0, )",
           "StackExchange.Redis": "[2.13.1, )",
           "Stripe.net": "[51.1.0, )",
           "contracts": "[1.0.0, )",
