@@ -19,6 +19,7 @@ The server-side API for the Code829 Event Platform. Handles authentication, even
 | MailKit / Resend | Email delivery |
 | AWSSDK.S3 | File storage (production) |
 | ClosedXML / CsvHelper | Data export (CSV, XLSX) |
+| SkiaSharp | Image processing & WebP conversion |
 | Scalar | OpenAPI documentation |
 
 ---
