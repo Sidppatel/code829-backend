@@ -9,6 +9,7 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
     {
         return await TestSeed.SeedEventAsync(db, new TestSeed.EventOptions(
             Status: "Draft",
+            IsPublished: false,
             ScheduledPublishAt: scheduledAt.UtcDateTime
         ));
     }

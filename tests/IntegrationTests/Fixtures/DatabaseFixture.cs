@@ -108,21 +108,6 @@ public sealed class DatabaseFixture : IAsyncLifetime
             throw new InvalidOperationException(
                 $"MigrationRunner exited {p.ExitCode}\nstdout:\n{await stdout}\nstderr:\n{await stderr}");
 
-        // DEBUG: Print tables and columns
-        using (var connection = new Npgsql.NpgsqlConnection(PostgresConnectionString))
-        {
-            await connection.OpenAsync();
-            using (var command = new Npgsql.NpgsqlCommand("SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE table_name IN ('users', 'business_users')", connection))
-            using (var reader = await command.ExecuteReaderAsync())
-            {
-                Console.WriteLine("DEBUG SCHEMA START");
-                while (await reader.ReadAsync())
-                {
-                    Console.WriteLine($"TABLE: {reader.GetString(0)}.{reader.GetString(1)} COLUMN: {reader.GetString(2)}");
-                }
-                Console.WriteLine("DEBUG SCHEMA END");
-            }
-        }
     }
 
     /// <summary>

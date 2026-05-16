@@ -108,4 +108,6 @@ docs/deployment-internal.md
 # graphify local interpreter pointer
 .graphify_python
 .claude/**
+test_output*.txt
+remote-data.sql
 

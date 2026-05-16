@@ -11,6 +11,7 @@ public static class TestSeed
     public record EventOptions(
         string LayoutMode = "Open",
         int? MaxCapacity = 100,
+        bool IsPublished = true,
         string Status = "Published",
         DateTime? StartDate = null,
         DateTime? EndDate = null,
@@ -21,8 +22,8 @@ public static class TestSeed
         var id = Guid.NewGuid();
         var email = $"admin-{id}@test.com";
         await db.ExecuteSqlAsync("""
-            INSERT INTO public.business_users ("Id","Email","EmailHash","FirstName","LastName","Role","IsActive","CreatedAt","UpdatedAt")
-            VALUES (@id, @email, @emailHash, 'Test', 'Admin', 'Admin', true, now(), now())
+            INSERT INTO public.business_users ("Id","Email","EmailHash","FirstName","LastName","Role","IsActive","PasswordHash","FailedLoginAttempts","CreatedAt","UpdatedAt")
+            VALUES (@id, @email, @emailHash, 'Test', 'Admin', 'Admin', true, 'bcrypt-hash', 0, now(), now())
             """,
             ("id", id), ("email", email), ("emailHash", email.GetHashCode().ToString()));
         return id;
@@ -32,41 +33,39 @@ public static class TestSeed
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
-            INSERT INTO public.venues ("Id","Name","Address","City","State","ZipCode","IsActive","CreatedAt","UpdatedAt")
-            VALUES (@id, 'Test Venue', '1 Test St', 'Testville', 'TS', '00000', true, now(), now())
+            INSERT INTO public.venues ("Id","Name","IsActive","CreatedAt","UpdatedAt")
+            VALUES (@id, @name, true, now(), now())
             """,
-            ("id", id));
+            ("id", id), ("name", $"Venue {id.ToString()[..4]}"));
         return id;
     }
 
     public static async Task<Guid> SeedEventAsync(DatabaseFixture db, EventOptions? opts = null)
     {
         opts ??= new EventOptions();
-        var venueId = await SeedVenueAsync(db);
-        var businessUserId = await SeedBusinessUserAsync(db);
-
         var id = Guid.NewGuid();
-        var start = opts.StartDate ?? DateTime.UtcNow.AddDays(7);
-        var end = opts.EndDate ?? DateTime.UtcNow.AddDays(8);
-        var publishedAt = opts.Status == "Published" ? (DateTime?)DateTime.UtcNow.AddMinutes(-5) : null;
+        var orgId = await SeedOrganizationAsync(db);
+        var venueId = await SeedVenueAsync(db);
+        var businessUserId = await SeedBusinessUserWithOrgAsync(db, orgId);
+        var publishedAt = opts.IsPublished ? DateTime.UtcNow : (DateTime?)null;
 
         await db.ExecuteSqlAsync("""
             INSERT INTO public.events (
-                "Id","Title","Slug","Description","Status","StartDate","EndDate",
-                "IsFeatured","LayoutMode","MaxCapacity","PublishedAt","ScheduledPublishAt",
-                "VenueId","BusinessUserId","CreatedAt","UpdatedAt")
-            VALUES (@id, @title, @slug, 'test', @status, @start, @end,
-                false, @layout, @maxCap, @publishedAt, @scheduledAt,
-                @venue, @business, now(), now())
+                "Id","Title","Slug","Status","Category","IsFeatured",
+                "StartDate","EndDate","MaxCapacity","LayoutMode",
+                "PublishedAt","ScheduledPublishAt","VenueId","BusinessUserId","CreatedAt","UpdatedAt")
+            VALUES (@id, @title, @slug, @status, 'Music', false,
+                    @start, @end, @max, @layout,
+                    @publishedAt, @scheduledAt, @venue, @business, now(), now())
             """,
             ("id", id),
-            ("title", $"Test Event {id}"),
-            ("slug", $"test-event-{id}"),
+            ("title", $"Event {id.ToString()[..4]}"),
+            ("slug", $"event-{id.ToString()[..4]}"),
             ("status", opts.Status),
-            ("start", start),
-            ("end", end),
+            ("start", DateTime.UtcNow.AddDays(1)),
+            ("end", DateTime.UtcNow.AddDays(1).AddHours(4)),
+            ("max", opts.MaxCapacity),
             ("layout", opts.LayoutMode),
-            ("maxCap", (object?)opts.MaxCapacity ?? DBNull.Value),
             ("publishedAt", (object?)publishedAt ?? DBNull.Value),
             ("scheduledAt", (object?)opts.ScheduledPublishAt ?? DBNull.Value),
             ("venue", venueId),
@@ -79,8 +78,8 @@ public static class TestSeed
         var id = Guid.NewGuid();
         var email = $"user-{id}@test.com";
         await db.ExecuteSqlAsync("""
-            INSERT INTO public.users ("Id","Email","EmailHash","FirstName","LastName","IsActive","CreatedAt","UpdatedAt")
-            VALUES (@id, @email, @emailHash, 'Test', 'User', true, now(), now())
+            INSERT INTO public.users ("Id","Email","EmailHash","FirstName","LastName","IsActive","CreatedAt","UpdatedAt","OptInLocationEmail","HasCompletedOnboarding")
+            VALUES (@id, @email, @emailHash, 'Test', 'User', true, now(), now(), false, true)
             """,
             ("id", id), ("email", email), ("emailHash", email.GetHashCode().ToString()));
         return id;
@@ -145,12 +144,12 @@ public static class TestSeed
         return id;
     }
 
-    public static async Task<Guid> SeedPurchaseAsync(DatabaseFixture db, Guid userId, Guid eventId, string status = "Confirmed")
+    public static async Task<Guid> SeedPurchaseAsync(DatabaseFixture db, Guid userId, Guid eventId, string status = "Paid")
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
             INSERT INTO public.purchases (
-                "Id","UserId","EventId","Status","Seats",
+                "Id","UserId","EventId","Status","SeatsReserved",
                 "SubtotalCents","FeeCents","TotalCents","PurchaseNumber","CreatedAt","UpdatedAt")
             VALUES (@id, @uid, @ev, @status, 1, 1000, 50, 1050, @pnum, now(), now())
             """,
@@ -163,24 +162,39 @@ public static class TestSeed
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
-            INSERT INTO public.tickets (
-                "Id","PurchaseId","EventId","BuyerUserId","Status",
+            INSERT INTO public.purchase_tickets (
+                "Id","PurchaseId","Status","TicketCode","SeatNumber",
                 "QrToken","CreatedAt","UpdatedAt")
-            VALUES (@id, @pid, @ev, @uid, 'Active', @qr, now(), now())
+            VALUES (@id, @pid, 'Claimed', @tcode, 1, @qr, now(), now())
             """,
-            ("id", id), ("pid", purchaseId), ("ev", eventId), ("uid", userId),
+            ("id", id), ("pid", purchaseId), 
+            ("tcode", $"T-{id.ToString()[..8].ToUpper()}"),
             ("qr", qrToken ?? $"qr-{id.ToString()[..8]}"));
         return id;
     }
 
-    public static async Task<Guid> SeedTableAsync(DatabaseFixture db, Guid eventId, string status = "Available")
+    public static async Task<Guid> SeedEventTableAsync(DatabaseFixture db, Guid eventId)
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
-            INSERT INTO public.tables ("Id","EventId","Name","Status","Capacity","CreatedAt","UpdatedAt")
-            VALUES (@id, @ev, @name, @status, 8, now(), now())
+            INSERT INTO public.event_tables ("Id","EventId","Label","Capacity","PriceCents","Shape","IsActive","CreatedAt","UpdatedAt")
+            VALUES (@id, @ev, 'Main Row', 8, 5000, 'Rectangle', true, now(), now())
             """,
-            ("id", id), ("ev", eventId), ("name", $"Table {id.ToString()[..4]}"), ("status", status));
+            ("id", id), ("ev", eventId));
+        return id;
+    }
+
+    public static async Task<Guid> SeedTableAsync(DatabaseFixture db, Guid eventId, Guid eventTableId, string status = "Available")
+    {
+        var id = Guid.NewGuid();
+        await db.ExecuteSqlAsync("""
+            INSERT INTO public.tables (
+                "Id","EventId","EventTableId","Label","Status","GridRow","GridCol",
+                "RowSpan","ColSpan","SortOrder","IsActive","CreatedAt","UpdatedAt")
+            VALUES (@id, @ev, @etid, @label, @status, 0, 0, 1, 1, 0, true, now(), now())
+            """,
+            ("id", id), ("ev", eventId), ("etid", eventTableId), 
+            ("label", $"T-{id.ToString()[..4]}"), ("status", status));
         return id;
     }
 
@@ -198,8 +212,8 @@ public static class TestSeed
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
             INSERT INTO public.event_ticket_types
-                ("Id","EventId","Name","PriceCents","Quota","SoldCount","CreatedAt","UpdatedAt")
-            VALUES (@id, @ev, 'General', 1000, @quota, 0, now(), now())
+                ("Id","EventId","Label","PriceCents","MaxQuantity","SortOrder","IsActive","CreatedAt","UpdatedAt")
+            VALUES (@id, @ev, 'General', 1000, @quota, 0, true, now(), now())
             """,
             ("id", id), ("ev", eventId), ("quota", quota));
         return id;

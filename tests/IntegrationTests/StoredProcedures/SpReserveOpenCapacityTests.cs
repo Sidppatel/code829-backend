@@ -72,7 +72,7 @@ public sealed class SpReserveOpenCapacityTests(DatabaseFixture db)
         var eventId = await SeedEventAsync(1);
         var (userId, ttId) = await SeedUserAndTicketTypeAsync(eventId, quota: 10);
 
-        await TestSeed.SeedPurchaseAsync(db, userId, eventId, status: "Confirmed");
+        await TestSeed.SeedPurchaseAsync(db, userId, eventId, status: "Paid");
 
         await using var conn = await db.OpenConnectionAsync();
         await using var cmd = conn.CreateCommand();

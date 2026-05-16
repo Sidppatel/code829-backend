@@ -8,8 +8,9 @@ public sealed class SpCancelPurchaseTests(DatabaseFixture db)
     private async Task<(Guid purchaseId, Guid tableId)> SeedPurchaseWithTableAsync()
     {
         var userId = await TestSeed.SeedUserAsync(db);
-        var eventId = await TestSeed.SeedEventAsync(db, new TestSeed.EventOptions(LayoutMode: "Seated", MaxCapacity: 200));
-        var tableId = await TestSeed.SeedTableAsync(db, eventId, status: "Booked");
+        var eventId = await TestSeed.SeedEventAsync(db, new TestSeed.EventOptions(LayoutMode: "Grid", MaxCapacity: 200));
+        var eventTableId = await TestSeed.SeedEventTableAsync(db, eventId);
+        var tableId = await TestSeed.SeedTableAsync(db, eventId, eventTableId, status: "Booked");
         var purchaseId = await TestSeed.SeedPurchaseAsync(db, userId, eventId);
 
         await TestSeed.SeedPurchaseTableAsync(db, purchaseId, tableId);
