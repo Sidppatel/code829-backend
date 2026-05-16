@@ -19,11 +19,12 @@ public static class TestSeed
     public static async Task<Guid> SeedBusinessUserAsync(DatabaseFixture db)
     {
         var id = Guid.NewGuid();
+        var email = $"admin-{id}@test.com";
         await db.ExecuteSqlAsync("""
-            INSERT INTO business_users ("Id","Email","FirstName","LastName","Role","IsActive","CreatedAt","UpdatedAt")
-            VALUES (@id, @email, 'Test', 'Admin', 'Admin', true, now(), now())
+            INSERT INTO public.business_users ("Id","Email","EmailHash","FirstName","LastName","Role","IsActive","CreatedAt","UpdatedAt")
+            VALUES (@id, @email, @emailHash, 'Test', 'Admin', 'Admin', true, now(), now())
             """,
-            ("id", id), ("email", $"admin-{id}@test.com"));
+            ("id", id), ("email", email), ("emailHash", email.GetHashCode().ToString()));
         return id;
     }
 
@@ -31,7 +32,7 @@ public static class TestSeed
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
-            INSERT INTO venues ("Id","Name","Address","City","State","ZipCode","IsActive","CreatedAt","UpdatedAt")
+            INSERT INTO public.venues ("Id","Name","Address","City","State","ZipCode","IsActive","CreatedAt","UpdatedAt")
             VALUES (@id, 'Test Venue', '1 Test St', 'Testville', 'TS', '00000', true, now(), now())
             """,
             ("id", id));
@@ -50,7 +51,7 @@ public static class TestSeed
         var publishedAt = opts.Status == "Published" ? (DateTime?)DateTime.UtcNow.AddMinutes(-5) : null;
 
         await db.ExecuteSqlAsync("""
-            INSERT INTO events (
+            INSERT INTO public.events (
                 "Id","Title","Slug","Description","Status","StartDate","EndDate",
                 "IsFeatured","LayoutMode","MaxCapacity","PublishedAt","ScheduledPublishAt",
                 "VenueId","BusinessUserId","CreatedAt","UpdatedAt")
@@ -76,11 +77,12 @@ public static class TestSeed
     public static async Task<Guid> SeedUserAsync(DatabaseFixture db)
     {
         var id = Guid.NewGuid();
+        var email = $"user-{id}@test.com";
         await db.ExecuteSqlAsync("""
-            INSERT INTO users ("Id","Email","FirstName","LastName","Role","IsActive","CreatedAt","UpdatedAt")
-            VALUES (@id, @email, 'Test', 'User', 'User', true, now(), now())
+            INSERT INTO public.users ("Id","Email","EmailHash","FirstName","LastName","IsActive","CreatedAt","UpdatedAt")
+            VALUES (@id, @email, @emailHash, 'Test', 'User', true, now(), now())
             """,
-            ("id", id), ("email", $"user-{id}@test.com"));
+            ("id", id), ("email", email), ("emailHash", email.GetHashCode().ToString()));
         return id;
     }
 
@@ -99,7 +101,7 @@ public static class TestSeed
     {
         var id = Guid.NewGuid();
         await db.ExecuteSqlAsync("""
-            INSERT INTO organizations (
+            INSERT INTO public.organizations (
                 "Id","Name","CountryCode","StripeConnectedAccountId",
                 "StripeChargesEnabled","StripePayoutsEnabled","StripeDetailsSubmitted",
                 "CreatedAt","UpdatedAt")
@@ -129,7 +131,7 @@ public static class TestSeed
         var id = Guid.NewGuid();
         var emailValue = email ?? $"bu-{id}@test.com";
         await db.ExecuteSqlAsync("""
-            INSERT INTO business_users (
+            INSERT INTO public.business_users (
                 "Id","Email","EmailHash","FirstName","LastName","Role","IsActive",
                 "PasswordHash","OrganizationId","FailedLoginAttempts","CreatedAt","UpdatedAt")
             VALUES (@id, @email, @emailHash, 'Test', 'Admin', @role, true,
@@ -140,6 +142,66 @@ public static class TestSeed
             ("emailHash", emailValue.GetHashCode().ToString()),
             ("role", role),
             ("orgId", (object?)organizationId ?? DBNull.Value));
+        return id;
+    }
+
+    public static async Task<Guid> SeedPurchaseAsync(DatabaseFixture db, Guid userId, Guid eventId, string status = "Confirmed")
+    {
+        var id = Guid.NewGuid();
+        await db.ExecuteSqlAsync("""
+            INSERT INTO public.purchases (
+                "Id","UserId","EventId","Status","Seats",
+                "SubtotalCents","FeeCents","TotalCents","PurchaseNumber","CreatedAt","UpdatedAt")
+            VALUES (@id, @uid, @ev, @status, 1, 1000, 50, 1050, @pnum, now(), now())
+            """,
+            ("id", id), ("uid", userId), ("ev", eventId), ("status", status),
+            ("pnum", $"PUR-{id.ToString()[..8].ToUpper()}"));
+        return id;
+    }
+
+    public static async Task<Guid> SeedTicketAsync(DatabaseFixture db, Guid purchaseId, Guid eventId, Guid userId, string? qrToken = null)
+    {
+        var id = Guid.NewGuid();
+        await db.ExecuteSqlAsync("""
+            INSERT INTO public.tickets (
+                "Id","PurchaseId","EventId","BuyerUserId","Status",
+                "QrToken","CreatedAt","UpdatedAt")
+            VALUES (@id, @pid, @ev, @uid, 'Active', @qr, now(), now())
+            """,
+            ("id", id), ("pid", purchaseId), ("ev", eventId), ("uid", userId),
+            ("qr", qrToken ?? $"qr-{id.ToString()[..8]}"));
+        return id;
+    }
+
+    public static async Task<Guid> SeedTableAsync(DatabaseFixture db, Guid eventId, string status = "Available")
+    {
+        var id = Guid.NewGuid();
+        await db.ExecuteSqlAsync("""
+            INSERT INTO public.tables ("Id","EventId","Name","Status","Capacity","CreatedAt","UpdatedAt")
+            VALUES (@id, @ev, @name, @status, 8, now(), now())
+            """,
+            ("id", id), ("ev", eventId), ("name", $"Table {id.ToString()[..4]}"), ("status", status));
+        return id;
+    }
+
+    public static async Task SeedPurchaseTableAsync(DatabaseFixture db, Guid purchaseId, Guid tableId)
+    {
+        await db.ExecuteSqlAsync("""
+            INSERT INTO public.purchase_tables ("PurchaseId","TableId")
+            VALUES (@pid, @tid)
+            """,
+            ("pid", purchaseId), ("tid", tableId));
+    }
+
+    public static async Task<Guid> SeedEventTicketTypeAsync(DatabaseFixture db, Guid eventId, int quota = 10)
+    {
+        var id = Guid.NewGuid();
+        await db.ExecuteSqlAsync("""
+            INSERT INTO public.event_ticket_types
+                ("Id","EventId","Name","PriceCents","Quota","SoldCount","CreatedAt","UpdatedAt")
+            VALUES (@id, @ev, 'General', 1000, @quota, 0, now(), now())
+            """,
+            ("id", id), ("ev", eventId), ("quota", quota));
         return id;
     }
 }

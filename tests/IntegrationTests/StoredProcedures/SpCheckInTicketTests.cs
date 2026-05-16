@@ -8,41 +8,17 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
 {
     private async Task<(Guid purchaseId, string qrToken)> SeedPurchaseWithTicketAsync()
     {
-        var eventId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        var purchaseId = Guid.NewGuid();
-        var ticketId = Guid.NewGuid();
+        var userId = await TestSeed.SeedUserAsync(db);
+        var eventId = await TestSeed.SeedEventAsync(db);
         var qrToken = $"test-qr-{Guid.NewGuid():N}";
 
-        await db.ExecuteSqlAsync("""
-            INSERT INTO events ("Id","Title","Slug","Description","StartDate","EndDate",
-                "LayoutMode","MaxCapacity","Status","BusinessUserId","CreatedAt","UpdatedAt")
-            VALUES (@ev, 'CheckIn Event', 'checkin-' || @ev::text, 'desc', now() - interval '1 hour', now() + interval '3 hours',
-                'Open', 100, 'Published', gen_random_uuid(), now(), now())
-            """, ("ev", eventId));
-
-        await db.ExecuteSqlAsync("""
-            INSERT INTO users ("Id","Email","FirstName","LastName","Role","CreatedAt","UpdatedAt")
-            VALUES (@id, @email, 'Jane','Doe','User', now(), now())
-            """, ("id", userId), ("email", $"checkin-{userId}@test.com"));
-
-        await db.ExecuteSqlAsync("""
-            INSERT INTO purchases ("Id","UserId","EventId","Status","Seats",
-                "SubtotalCents","FeeCents","TotalCents","PurchaseNumber","CreatedAt","UpdatedAt")
-            VALUES (@pid, @uid, @ev, 'Confirmed', 1, 1000, 50, 1050, 'CHK-001', now(), now())
-            """, ("pid", purchaseId), ("uid", userId), ("ev", eventId));
-
-        await db.ExecuteSqlAsync("""
-            INSERT INTO tickets ("Id","PurchaseId","EventId","BuyerUserId","Status",
-                "QrToken","CreatedAt","UpdatedAt")
-            VALUES (@tid, @pid, @ev, @uid, 'Active', @qr, now(), now())
-            """, ("tid", ticketId), ("pid", purchaseId), ("ev", eventId),
-               ("uid", userId), ("qr", qrToken));
+        var purchaseId = await TestSeed.SeedPurchaseAsync(db, userId, eventId);
+        await TestSeed.SeedTicketAsync(db, purchaseId, eventId, userId, qrToken);
 
         return (purchaseId, qrToken);
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task CheckIn_Succeeds_WithValidQrToken()
     {
         var (_, qrToken) = await SeedPurchaseWithTicketAsync();
@@ -59,7 +35,7 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
         ((bool)reader["Success"]).Should().BeTrue();
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task CheckIn_ReturnsFalse_WhenAlreadyCheckedIn()
     {
         var (_, qrToken) = await SeedPurchaseWithTicketAsync();
@@ -82,7 +58,7 @@ public sealed class SpCheckInTicketTests(DatabaseFixture db)
         ((bool)reader["Success"]).Should().BeFalse();
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task CheckIn_ReturnsNoRows_ForUnknownQrToken()
     {
         await using var conn = await db.OpenConnectionAsync();

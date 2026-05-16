@@ -7,19 +7,13 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
 {
     private async Task<Guid> SeedScheduledEventAsync(DateTimeOffset scheduledAt)
     {
-        var id = Guid.NewGuid();
-        await db.ExecuteSqlAsync("""
-            INSERT INTO events ("Id","Title","Slug","Description","StartDate","EndDate",
-                "LayoutMode","MaxCapacity","Status","ScheduledPublishAt","BusinessUserId","CreatedAt","UpdatedAt")
-            VALUES (@id, 'Scheduled Event', 'scheduled-' || @id::text, 'desc',
-                now() + interval '7 days', now() + interval '8 days',
-                'Open', 100, 'Draft', @sched, gen_random_uuid(), now(), now())
-            """,
-            ("id", id), ("sched", scheduledAt.UtcDateTime));
-        return id;
+        return await TestSeed.SeedEventAsync(db, new TestSeed.EventOptions(
+            Status: "Draft",
+            ScheduledPublishAt: scheduledAt.UtcDateTime
+        ));
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task PublishesEvents_WithPastScheduledPublishAt()
     {
         var pastScheduled = DateTimeOffset.UtcNow.AddHours(-1);
@@ -37,7 +31,7 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
         publishedIds.Should().Contain(eventId);
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task DoesNotPublish_EventsWithFutureScheduledPublishAt()
     {
         var futureScheduled = DateTimeOffset.UtcNow.AddDays(2);
@@ -55,7 +49,7 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
         publishedIds.Should().NotContain(eventId);
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task SetsEventStatusToPublished_AfterPublish()
     {
         var eventId = await SeedScheduledEventAsync(DateTimeOffset.UtcNow.AddMinutes(-5));
@@ -79,7 +73,7 @@ public sealed class SpPublishScheduledEventsTests(DatabaseFixture db)
         reader["ScheduledPublishAt"].Should().Be(DBNull.Value);
     }
 
-    [Fact(Skip = "S1 test seeds incomplete (missing IsFeatured + FK-valid VenueId/BusinessUserId); rewrite with TestSeed helper tracked as follow-up")]
+    [Fact]
     public async Task ReturnsEmptySet_WhenNoEventsAreDue()
     {
 
