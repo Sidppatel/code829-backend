@@ -97,12 +97,12 @@ public class PurchaseServiceStripeConnectTests : IDisposable
 
     private void SetEnforcement(bool enabled)
     {
-        _settingsService.Setup(s => s.GetOrDefaultAsync(SettingsKeys.ConnectEnforcementEnabled, It.IsAny<string?>()))
+        _settingsService.Setup(s => s.GetOrDefaultAsync(SettingsKeys.ConnectEnforcementEnabled, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(enabled ? "true" : "false");
 
         _settingsService.Setup(s => s.GetOrDefaultAsync(
-                It.Is<string>(k => k != SettingsKeys.ConnectEnforcementEnabled), It.IsAny<string?>()))
-            .ReturnsAsync((string _, string? def) => def ?? "10");
+                It.Is<string>(k => k != SettingsKeys.ConnectEnforcementEnabled), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string? def, CancellationToken _) => def ?? "10");
     }
 
     private void SetupPricing()

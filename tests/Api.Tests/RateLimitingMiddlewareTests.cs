@@ -26,7 +26,7 @@ public class RateLimitingMiddlewareTests
         _env.Setup(e => e.EnvironmentName).Returns(Environments.Production);
         _settings = new Mock<ISettingsService>();
 
-        _settings.Setup(s => s.GetOrDefaultAsync("rate_limit_disabled", "false")).ReturnsAsync("false");
+        _settings.Setup(s => s.GetOrDefaultAsync("rate_limit_disabled", "false", It.IsAny<CancellationToken>())).ReturnsAsync("false");
     }
 
     [Fact]

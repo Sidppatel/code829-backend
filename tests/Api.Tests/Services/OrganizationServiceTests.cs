@@ -33,8 +33,8 @@ public class OrganizationServiceTests : IDisposable
         _emailService = new Mock<IEmailService>();
         _settings = new Mock<ISettingsService>();
 
-        _settings.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
-            .ReturnsAsync((string _, string? def) => def);
+        _settings.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string? def, CancellationToken _) => def);
 
         _service = new OrganizationService(
             _context,

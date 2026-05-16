@@ -43,11 +43,11 @@ public class AuthServiceTests : IDisposable
 
         _userRepoMock = new Mock<IUserRepository>();
 
-        _settingsService.Setup(s => s.GetOrDefaultAsync("magic_link_expiry_minutes", "15"))
+        _settingsService.Setup(s => s.GetOrDefaultAsync("magic_link_expiry_minutes", "15", It.IsAny<CancellationToken>()))
             .ReturnsAsync("15");
-        _settingsService.Setup(s => s.GetOrDefaultAsync("frontend_url", "http://localhost:5173"))
+        _settingsService.Setup(s => s.GetOrDefaultAsync("frontend_url", "http://localhost:5173", It.IsAny<CancellationToken>()))
             .ReturnsAsync("http://localhost:5173");
-        _settingsService.Setup(s => s.GetOrDefaultAsync("app_name", "Code829"))
+        _settingsService.Setup(s => s.GetOrDefaultAsync("app_name", "Code829", It.IsAny<CancellationToken>()))
             .ReturnsAsync("Code829");
         _encryptionService.Setup(e => e.HashEmail(It.IsAny<string>()))
             .Returns((string email) => email.GetHashCode().ToString());

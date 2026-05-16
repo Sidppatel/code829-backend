@@ -43,7 +43,7 @@ public class PurchaseServiceTests : IDisposable
         _settingsService = new Mock<ISettingsService>();
         var orgProcMock = new Mock<IOrganizationProcedures>();
 
-        _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>()))
+        _settingsService.Setup(s => s.GetOrDefaultAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("10");
 
         var enrichmentMock = new Mock<IPaymentEnrichmentService>();
