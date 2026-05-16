@@ -1,4 +1,4 @@
-using SixLabors.ImageSharp;
+using SkiaSharp;
 
 namespace Api.Helpers;
 
@@ -41,8 +41,9 @@ public static class FileUploadValidator
         try
         {
             using var stream = file.OpenReadStream();
-            using var image = Image.Load(stream);
-            return image.Width > 0 && image.Height > 0;
+            using var skData = SKData.Create(stream);
+            using var codec = SKCodec.Create(skData);
+            return codec != null && codec.Info.Width > 0 && codec.Info.Height > 0;
         }
         catch
         {

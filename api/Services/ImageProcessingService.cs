@@ -1,6 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace Api.Services;
 
@@ -41,51 +39,65 @@ public class ImageProcessingService : IImageProcessingService
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         input.Position = 0;
-        using var image = await Image.LoadAsync(input);
+
+        using var skData = SKData.Create(input);
+        using var codec = SKCodec.Create(skData);
+        using var bitmap = SKBitmap.Decode(codec);
+        
         var loaded = sw.ElapsedMilliseconds;
 
         var variants = VariantsByEntity.GetValueOrDefault(entityType, VariantsByEntity["event"]);
         var cropEntities = entityType is "user" or "business_user";
-        var resizeMode = cropEntities ? ResizeMode.Crop : ResizeMode.Max;
 
-        var encoder = new WebpEncoder
+        var tasks = variants.Select(variant =>
         {
-            Quality = 75,
-            FileFormat = WebpFileFormatType.Lossy,
-            Method = WebpEncodingMethod.Fastest
-        };
+            SKBitmap resizedBitmap;
+            
+            if (bitmap.Width <= variant.MaxWidth && bitmap.Height <= variant.MaxHeight && !cropEntities)
+            {
+                resizedBitmap = bitmap.Copy();
+            }
+            else
+            {
+                var resizeInfo = CalculateResizeDimensions(bitmap.Width, bitmap.Height, variant.MaxWidth, variant.MaxHeight, cropEntities);
+                resizedBitmap = bitmap.Resize(resizeInfo, new SKSamplingOptions(SKFilterMode.Linear));
+            }
 
-        var tasks = variants.Select(async variant =>
-        {
-
-            using var clone = (image.Width <= variant.MaxWidth && image.Height <= variant.MaxHeight && resizeMode == ResizeMode.Max)
-                ? image.Clone(_ => { })
-                : image.Clone(ctx =>
-                    ctx.Resize(new ResizeOptions
-                    {
-                        Size = new Size(variant.MaxWidth, variant.MaxHeight),
-                        Mode = resizeMode
-                    }));
-
-            var width = clone.Width;
-            var height = clone.Height;
+            var width = resizedBitmap.Width;
+            var height = resizedBitmap.Height;
+            
             var ms = new MemoryStream();
-            await clone.SaveAsWebpAsync(ms, encoder);
+            resizedBitmap.Encode(ms, SKEncodedImageFormat.Webp, 75);
             ms.Position = 0;
+            
+            resizedBitmap.Dispose();
 
-            return new ProcessedImage(ms, variant.Suffix, width, height, (int)ms.Length);
+            return Task.FromResult(new ProcessedImage(ms, variant.Suffix, width, height, (int)ms.Length));
         });
 
         var result = await Task.WhenAll(tasks);
         Serilog.Log.Information("[ImgProc] entity={Entity} variants={Count} src={SrcW}x{SrcH} timing load={Load}ms encode={Encode}ms total={Total}ms",
-            entityType, result.Length, image.Width, image.Height, loaded, sw.ElapsedMilliseconds - loaded, sw.ElapsedMilliseconds);
+            entityType, result.Length, bitmap.Width, bitmap.Height, loaded, sw.ElapsedMilliseconds - loaded, sw.ElapsedMilliseconds);
         return [.. result];
     }
 
-    public async Task<(int Width, int Height)> GetDimensionsAsync(Stream input)
+    public Task<(int Width, int Height)> GetDimensionsAsync(Stream input)
     {
         input.Position = 0;
-        var info = await Image.IdentifyAsync(input);
-        return (info.Width, info.Height);
+        using var skData = SKData.Create(input);
+        using var codec = SKCodec.Create(skData);
+        return Task.FromResult((codec.Info.Width, codec.Info.Height));
+    }
+
+    private SKImageInfo CalculateResizeDimensions(int srcWidth, int srcHeight, int maxWidth, int maxHeight, bool isCrop)
+    {
+        float ratioX = (float)maxWidth / srcWidth;
+        float ratioY = (float)maxHeight / srcHeight;
+        float ratio = isCrop ? Math.Max(ratioX, ratioY) : Math.Min(ratioX, ratioY);
+
+        int newWidth = (int)(srcWidth * ratio);
+        int newHeight = (int)(srcHeight * ratio);
+
+        return new SKImageInfo(newWidth, newHeight);
     }
 }

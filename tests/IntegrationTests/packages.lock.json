@@ -65,15 +65,6 @@
           "Microsoft.TestPlatform.TestHost": "18.5.1"
         }
       },
-      "SixLabors.ImageSharp": {
-        "type": "Direct",
-        "requested": "[4.0.0, )",
-        "resolved": "4.0.0",
-        "contentHash": "6Ft5sclM1t5bY+P0SsLLGwXIAgmDASFFD9hD0tlEcfFCU8Yj9nR7ZzaqCL/p+SIfqoe8jLKFHD7LFPRJPGXZ5w==",
-        "dependencies": {
-          "System.IO.Hashing": "8.0.0"
-        }
-      },
       "System.IdentityModel.Tokens.Jwt": {
         "type": "Direct",
         "requested": "[8.18.0, )",
@@ -363,10 +354,10 @@
       },
       "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": {
         "type": "Transitive",
-        "resolved": "10.0.8",
-        "contentHash": "yscMyugxkZjBIpyYub0tcYSkkAiJLxORl45qD+lmTYLtr3w/VF/Pp/zKnwudN+yfBanAviZ6nIUoI8pYHUGqvw==",
+        "resolved": "10.0.7",
+        "contentHash": "FRfw0AgR3zp9LQD6pVO2f3Y8VBkQ6QxCVB0B7xQe4u3P0WAjs72py2Z0wZfjSpyIcBFKS/Z/FwP/4qNyAASxzw==",
         "dependencies": {
-          "Microsoft.AspNetCore.DataProtection": "10.0.8",
+          "Microsoft.AspNetCore.DataProtection": "10.0.7",
           "StackExchange.Redis": "2.7.27"
         }
       },
@@ -1116,6 +1107,30 @@
         "resolved": "1.0.0",
         "contentHash": "LFQsCZlV0xlUyXAOMUo5kkSl+8zAQXXbbdwWchtk0B4o7zotZhQsQOcJUELGHdfPfm/xDAsz6hONAuV25bJaAg=="
       },
+      "SkiaSharp": {
+        "type": "Transitive",
+        "resolved": "3.119.2",
+        "contentHash": "nmy2dOFWPvQKMglfpjz8+/xQQcSrL9jzul3cUyzCJVSwrmSAw+6B1sEgU7jt6NZBptwGq2k/V0kjyu2GizMFtg==",
+        "dependencies": {
+          "SkiaSharp.NativeAssets.Win32": "3.119.2",
+          "SkiaSharp.NativeAssets.macOS": "3.119.2"
+        }
+      },
+      "SkiaSharp.NativeAssets.Linux.NoDependencies": {
+        "type": "Transitive",
+        "resolved": "3.119.2",
+        "contentHash": "1rmveKZ8Cz7k4QJQdtKV6RFXYIEqYBiX450Bm0Bk41EE50MMPUyF81cRnASsuV0qCwdZuzjZTaFvoqS0Q2zVfA=="
+      },
+      "SkiaSharp.NativeAssets.macOS": {
+        "type": "Transitive",
+        "resolved": "3.119.2",
+        "contentHash": "I2jMGQ/26KOnc6iAoR+Mxh9vSJJ2vioJyj9aJ9OL5yEZyXothXJxf4vBMqnSaiXMqiiU1scG7KqtT0CLkmMmWA=="
+      },
+      "SkiaSharp.NativeAssets.Win32": {
+        "type": "Transitive",
+        "resolved": "3.119.2",
+        "contentHash": "uYe+da6+GXVgPKkCopzvIZ83DmC8SXXKeUAPrNcztJNsg0SjPQAxfKMOPZqmVjbzznrq/QUIjLUlJSZV/e0IPA=="
+      },
       "SSH.NET": {
         "type": "Transitive",
         "resolved": "2025.1.0",
@@ -1302,7 +1317,7 @@
           "MailKit": "[4.16.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.8, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.8, )",
-          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.8, )",
+          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.7, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.8, )",
           "Microsoft.EntityFrameworkCore": "[10.0.8, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.1, )",
@@ -1321,7 +1336,8 @@
           "Serilog.Sinks.Console": "[6.1.1, )",
           "Serilog.Sinks.File": "[7.0.0, )",
           "Serilog.Sinks.OpenTelemetry": "[4.2.0, )",
-          "SixLabors.ImageSharp": "[4.0.0, )",
+          "SkiaSharp": "[3.119.2, )",
+          "SkiaSharp.NativeAssets.Linux.NoDependencies": "[3.119.2, )",
           "StackExchange.Redis": "[2.13.1, )",
           "Stripe.net": "[51.1.0, )",
           "contracts": "[1.0.0, )",
