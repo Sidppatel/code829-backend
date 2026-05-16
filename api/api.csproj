@@ -31,7 +31,7 @@
     <PackageReference Include="Google.Apis.Auth" Version="1.71.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
-    <PackageReference Include="Sentry.AspNetCore" Version="6.4.1" />
+    <PackageReference Include="Sentry.AspNetCore" Version="6.5.0" />
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
