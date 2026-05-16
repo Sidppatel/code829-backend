@@ -374,3 +374,9 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) or the root-level [DEPLOYMENT_GUIDE.md](../
 - **HA strategy**: [docs/ha-strategy.md](./docs/ha-strategy.md)
 - **Runbooks**: [docs/runbooks/](./docs/runbooks/) — prod bootstrap, staging reset, disaster recovery, secret rotation.
 - **Observability**: [docs/observability.md](./docs/observability.md)
+
+---
+
+## Related Repositories
+- [code829-frontend](https://github.com/Sidppatel/code829-frontend)
+- [code829-db](https://github.com/Sidppatel/code829-db)
