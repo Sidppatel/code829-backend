@@ -1,0 +1,37 @@
+# Antigravity / Gemini Ignore File
+
+# Dependencies
+node_modules/
+jspm_packages/
+.npm/
+venv/
+.venv/
+__pycache__/
+
+# Build outputs
+dist/
+build/
+out/
+.cache/
+coverage/
+
+# Logs
+logs/
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Editor and IDE
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Project specific
+backups/
+.temp/
+.tmp/
