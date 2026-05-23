@@ -64,15 +64,25 @@ public class PerformersController(
             : query.OrderBy(e => e.StartDate);
 
         var total = await query.CountAsync(ct);
-        var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var pagedEventIds = await query.Select(e => e.EventId).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+
+        var summaries = await context.EventSummaryViews.AsNoTracking()
+            .Where(e => pagedEventIds.Contains(e.EventId))
+            .ToListAsync(ct);
+
+        var items = pagedEventIds.Select(id => summaries.First(s => s.EventId == id)).ToList();
 
         var dtos = items.Select(MapEventSummary).ToList();
         return Ok(new PagedResponse<EventSummaryDto>(dtos, total, page, pageSize));
     }
 
-    private EventSummaryDto MapEventSummary(EventView v)
+    private EventSummaryDto MapEventSummary(EventSummaryView v)
     {
-        var imageUrl = v.ImagePath is not null ? fileStorage.GetPublicUrl(v.ImagePath) : null;
+        var imageUrl = v.ImagePath != null 
+            ? fileStorage.GetPublicUrl(v.ImagePath) 
+            : v.PrimaryImageKey != null 
+                ? fileStorage.GetPublicUrl($"{v.PrimaryImageKey}_card.webp") 
+                : null;
         var displayFrom = v.DisplayMinTicketTypePriceCents ?? v.DisplayMinTablePriceCents ?? v.PricePerPersonCents;
         var displayFromFormatted = displayFrom.HasValue ? $"${displayFrom.Value / 100.0:F2}" : null;
         var isSoldOut = v.LayoutMode == "Grid"
