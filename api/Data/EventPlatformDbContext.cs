@@ -27,6 +27,8 @@ public class EventPlatformDbContext(
     public DbSet<Event> Events => Set<Event>();
     public DbSet<Performer> Performers => Set<Performer>();
     public DbSet<EventPerformer> EventPerformers => Set<EventPerformer>();
+    public DbSet<Sponsor> Sponsors => Set<Sponsor>();
+    public DbSet<EventSponsor> EventSponsors => Set<EventSponsor>();
     public DbSet<BusinessUserEvent> BusinessUserEvents => Set<BusinessUserEvent>();
     public DbSet<EventTable> EventTables => Set<EventTable>();
     public DbSet<EventTicketType> EventTicketTypes => Set<EventTicketType>();
@@ -50,6 +52,7 @@ public class EventPlatformDbContext(
 
     public DbSet<EventView> EventViews => Set<EventView>();
     public DbSet<PerformerView> PerformerViews => Set<PerformerView>();
+    public DbSet<SponsorView> SponsorViews => Set<SponsorView>();
     public DbSet<EventSummaryView> EventSummaryViews => Set<EventSummaryView>();
     public DbSet<TableView> TableViews => Set<TableView>();
     public DbSet<PurchaseView> PurchaseViews => Set<PurchaseView>();
@@ -722,6 +725,7 @@ public class EventPlatformDbContext(
             entity.ToView("v_events");
             entity.HasKey(e => e.EventId);
             entity.Property(e => e.Performers).HasColumnType("jsonb");
+            entity.Property(e => e.Sponsors).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<Performer>(entity =>
@@ -755,6 +759,40 @@ public class EventPlatformDbContext(
         {
             entity.ToView("v_performers");
             entity.HasKey(e => e.PerformerId);
+            entity.Property(e => e.Meta).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<Sponsor>(entity =>
+        {
+            entity.ToTable("sponsors");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.HasIndex(e => e.Name);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Slug).HasMaxLength(220).IsRequired();
+            entity.Property(e => e.PrimaryImagePath).HasMaxLength(512);
+            entity.Property(e => e.Meta).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
+        });
+
+        modelBuilder.Entity<EventSponsor>(entity =>
+        {
+            entity.ToTable("event_sponsors");
+            entity.HasKey(e => new { e.EventId, e.SponsorId });
+            entity.HasIndex(e => new { e.EventId, e.SortOrder });
+            entity.HasIndex(e => e.SponsorId);
+            entity.Property(e => e.SortOrder).HasDefaultValue(0);
+            entity.Property(e => e.EventMeta).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+            entity.HasOne(e => e.Event).WithMany().HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Sponsor).WithMany().HasForeignKey(e => e.SponsorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SponsorView>(entity =>
+        {
+            entity.ToView("v_sponsors");
+            entity.HasKey(e => e.SponsorId);
             entity.Property(e => e.Meta).HasColumnType("jsonb");
         });
 

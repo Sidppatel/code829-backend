@@ -49,4 +49,5 @@ public class EventView
     public int? DisplayMinTicketTypePriceCents { get; set; }
 
     public string Performers { get; set; } = "[]";
+    public string Sponsors { get; set; } = "[]";
 }

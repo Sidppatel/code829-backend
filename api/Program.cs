@@ -264,6 +264,7 @@ try
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IOrganizationProcedures, Db.Repositories.StoredProcedures.OrganizationProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IStripeEventProcedures, Db.Repositories.StoredProcedures.StripeEventProcedures>();
     builder.Services.AddScoped<Db.Repositories.StoredProcedures.IPerformerProcedures, Db.Repositories.StoredProcedures.PerformerProcedures>();
+    builder.Services.AddScoped<Db.Repositories.StoredProcedures.ISponsorProcedures, Db.Repositories.StoredProcedures.SponsorProcedures>();
 
     builder.Services.AddScoped<ISettingsService, SettingsService>();
     builder.Services.AddScoped<IJwtService, JwtService>();
@@ -282,6 +283,7 @@ try
     builder.Services.AddScoped<IVenueImageService, VenueImageService>();
     builder.Services.AddScoped<IPlatformImageService, PlatformImageService>();
     builder.Services.AddScoped<IPerformerService, PerformerService>();
+    builder.Services.AddScoped<ISponsorService, SponsorService>();
     builder.Services.AddScoped<ICacheService, RedisCacheService>();
     builder.Services.AddScoped<IFinancialService, FinancialService>();
 
