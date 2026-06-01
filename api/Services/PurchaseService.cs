@@ -273,19 +273,30 @@ public class PurchaseService(
         var appName = await settings.GetOrDefaultAsync("app_name", "Code829") ?? "Code829";
         var checkinLink = $"{frontendUrl}/purchases/{purchaseId}/tickets";
 
+        // Re-query the purchase view to ensure the enriched payment and tax details from paymentEnrichment are populated
+        var finalPurchase = await context.PurchaseViews.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.PurchaseId == purchaseId) ?? purchase;
+
         try
         {
             await emailService.SendAsync(
-                purchase.UserEmail,
-                $"Purchase Confirmed — {purchase.EventTitle} | {appName}",
+                finalPurchase.UserEmail,
+                $"Purchase Confirmed — {finalPurchase.EventTitle} | {appName}",
                 EmailTemplates.PurchaseConfirmed(
-                    appName, purchase.UserFirstName, purchase.PurchaseNumber,
-                    purchase.EventTitle, $"${purchase.TotalCents / 100.0:F2}", checkinLink)
+                    appName,
+                    finalPurchase.UserFirstName,
+                    finalPurchase.PurchaseNumber,
+                    finalPurchase.EventTitle,
+                    finalPurchase.TicketCount,
+                    finalPurchase.TotalCents,
+                    finalPurchase.TaxAmountCents ?? 0,
+                    finalPurchase.TotalChargedCents ?? finalPurchase.TotalCents,
+                    checkinLink)
             );
         }
         catch (Exception emailEx)
         {
-            Log.Warning(emailEx, "[Purchase] Confirmation email failed for {PurchaseNumber} — purchase still confirmed", purchase.PurchaseNumber);
+            Log.Warning(emailEx, "[Purchase] Confirmation email failed for {PurchaseNumber} — purchase still confirmed", finalPurchase.PurchaseNumber);
         }
 
         Log.Information(

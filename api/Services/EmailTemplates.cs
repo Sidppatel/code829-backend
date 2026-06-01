@@ -65,15 +65,18 @@ public static class EmailTemplates
 
     public static string PurchaseConfirmed(
         string brandName, string firstName, string purchaseNumber,
-        string eventTitle, string totalFormatted, string checkinLink) =>
+        string eventTitle, int ticketCount, int totalCents, int taxAmountCents, int totalChargedCents, string checkinLink) =>
         Wrap(brandName,
             $"""
             <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;">Purchase Confirmed!</h2>
             <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">Hi {firstName}, your purchase is all set.</p>
             {InfoTable(
-                InfoRow("Purchase #", purchaseNumber) +
+                InfoRow("Booking Number", purchaseNumber) +
                 InfoRow("Event", eventTitle) +
-                InfoRow("Total", totalFormatted)
+                InfoRow("Number of Tickets", ticketCount.ToString()) +
+                InfoRow("Total", $"${totalCents / 100.0:F2}") +
+                InfoRow("Tax", $"${taxAmountCents / 100.0:F2}") +
+                InfoRow("Total Paid", $"${totalChargedCents / 100.0:F2}")
             )}
             {Button("View Check-in QR Code", checkinLink)}
             """);

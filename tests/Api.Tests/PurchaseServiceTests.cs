@@ -207,6 +207,61 @@ public class PurchaseServiceTests : IDisposable
         result.Status.Should().Be("CheckedIn");
     }
 
+    [Fact]
+    public async Task ConfirmPaymentAsync_WhenPending_ConfirmsPaymentAndSendsDetailedEmail()
+    {
+        var purchaseId = Guid.NewGuid();
+        var purchaseView = new Db.Entities.Views.PurchaseView
+        {
+            PurchaseId = purchaseId,
+            PurchaseNumber = "BK-TEST-333333",
+            Status = "Pending",
+            UserId = _userId,
+            EventId = _eventId,
+            SubtotalCents = 14100,
+            FeeCents = 0,
+            TotalCents = 14100,
+            UserFirstName = "Test",
+            UserLastName = "User",
+            UserEmail = "test@example.com",
+            EventTitle = "Test Event",
+            EventStartDate = DateTime.UtcNow.AddDays(1),
+            EventEndDate = DateTime.UtcNow.AddDays(2),
+            VenueName = "Test Venue",
+            PaymentIntentId = "pi_test_123",
+            PaymentAmountCents = 14100,
+            TicketCount = 2,
+            TaxAmountCents = 776,
+            TotalChargedCents = 14876
+        };
+        _context.PurchaseViews.Add(purchaseView);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        _paymentService.Setup(p => p.GetPaymentIntentAsync("pi_test_123"))
+            .ReturnsAsync(new PaymentIntentDetails("pi_test_123", 14100, 14100, "succeeded"));
+
+        var result = await _service.ConfirmPaymentAsync(purchaseId, _userId);
+
+        result.Should().NotBeNull();
+        result.PurchaseId.Should().Be(purchaseId);
+
+        _stripeTransactionProc.Verify(s => s.UpdateStatusAsync("pi_test_123", "Succeeded", It.IsAny<CancellationToken>()), Times.Once);
+        _purchaseProc.Verify(p => p.ConfirmPurchaseAsync(purchaseId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        _emailService.Verify(e => e.SendAsync(
+            "test@example.com",
+            It.Is<string>(s => s.Contains("Purchase Confirmed")),
+            It.Is<string>(body => 
+                body.Contains("BK-TEST-333333") && 
+                body.Contains("Test Event") && 
+                body.Contains("2") && 
+                body.Contains("$141.00") && 
+                body.Contains("$7.76") && 
+                body.Contains("$148.76")
+            )
+        ), Times.Once);
+    }
+
     public void Dispose()
     {
         _context.Database.EnsureDeleted();
