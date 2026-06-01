@@ -155,7 +155,7 @@ public class WebhooksController(
         }
 
         await stripeTransactionProc.UpdateStatusAsync(paymentIntent.Id, "Succeeded");
-        await purchaseProc.ConfirmPurchaseAsync(txn.PurchaseId, "");
+        await purchaseProc.ConfirmPurchaseAsync(txn.PurchaseId, PurchaseService.GenerateQrToken());
         Log.Information("[Webhook] Payment confirmed for purchase {PurchaseId}", txn.PurchaseId);
 
         await paymentEnrichment.EnrichAndRecordAsync(paymentIntent.Id, txn.TaxCalculationId);

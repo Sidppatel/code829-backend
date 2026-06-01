@@ -473,7 +473,7 @@ public class PurchaseService(
         return ascii.Length > 22 ? ascii[..22] : ascii;
     }
 
-    private static string GenerateQrToken()
+    public static string GenerateQrToken()
     {
         var bytes = RandomNumberGenerator.GetBytes(24);
         return $"QR-{Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')}";
