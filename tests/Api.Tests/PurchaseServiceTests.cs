@@ -143,6 +143,70 @@ public class PurchaseServiceTests : IDisposable
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
 
+    [Fact]
+    public async Task ConfirmPaymentAsync_WhenPurchaseAlreadyPaid_ReturnsPurchaseDtoIdempotently()
+    {
+        var purchaseId = Guid.NewGuid();
+        var purchaseView = new Db.Entities.Views.PurchaseView
+        {
+            PurchaseId = purchaseId,
+            PurchaseNumber = "BK-TEST-111111",
+            Status = "Paid",
+            UserId = _userId,
+            EventId = _eventId,
+            SubtotalCents = 5000,
+            FeeCents = 0,
+            TotalCents = 5000,
+            UserFirstName = "Test",
+            UserLastName = "User",
+            UserEmail = "test@example.com",
+            EventTitle = "Test Event",
+            EventStartDate = DateTime.UtcNow.AddDays(1),
+            EventEndDate = DateTime.UtcNow.AddDays(2),
+            VenueName = "Test Venue"
+        };
+        _context.PurchaseViews.Add(purchaseView);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var result = await _service.ConfirmPaymentAsync(purchaseId, _userId);
+
+        result.Should().NotBeNull();
+        result.PurchaseId.Should().Be(purchaseId);
+        result.Status.Should().Be("Paid");
+    }
+
+    [Fact]
+    public async Task ConfirmPaymentAsync_WhenPurchaseAlreadyCheckedIn_ReturnsPurchaseDtoIdempotently()
+    {
+        var purchaseId = Guid.NewGuid();
+        var purchaseView = new Db.Entities.Views.PurchaseView
+        {
+            PurchaseId = purchaseId,
+            PurchaseNumber = "BK-TEST-222222",
+            Status = "CheckedIn",
+            UserId = _userId,
+            EventId = _eventId,
+            SubtotalCents = 5000,
+            FeeCents = 0,
+            TotalCents = 5000,
+            UserFirstName = "Test",
+            UserLastName = "User",
+            UserEmail = "test@example.com",
+            EventTitle = "Test Event",
+            EventStartDate = DateTime.UtcNow.AddDays(1),
+            EventEndDate = DateTime.UtcNow.AddDays(2),
+            VenueName = "Test Venue"
+        };
+        _context.PurchaseViews.Add(purchaseView);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var result = await _service.ConfirmPaymentAsync(purchaseId, _userId);
+
+        result.Should().NotBeNull();
+        result.PurchaseId.Should().Be(purchaseId);
+        result.Status.Should().Be("CheckedIn");
+    }
+
     public void Dispose()
     {
         _context.Database.EnsureDeleted();

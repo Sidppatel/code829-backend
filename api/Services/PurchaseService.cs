@@ -230,7 +230,13 @@ public class PurchaseService(
             throw new UnauthorizedAccessException("Not your purchase");
 
         if (purchase.Status != "Pending")
+        {
+            if (purchase.Status == "Paid" || purchase.Status == "CheckedIn")
+            {
+                return (await GetByIdAsync(purchaseId))!;
+            }
             throw new InvalidOperationException($"Cannot confirm purchase in {purchase.Status} status");
+        }
 
         if (purchase.TableId.HasValue)
         {
