@@ -872,28 +872,40 @@ public class DeveloperController(
             .Select(g => new VisitorChartPointDto(g.Date.ToString("yyyy-MM-dd"), g.Count))
             .ToList();
 
-        var visitsByBrowser = await baseQuery
+        var visitsByBrowserRaw = await baseQuery
             .Where(v => v.Timestamp >= thirtyDaysAgo)
-            .GroupBy(v => v.Browser ?? "Unknown")
-            .Select(g => new VisitorStatItemDto(g.Key, g.Count()))
+            .GroupBy(v => v.Browser)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
             .OrderByDescending(g => g.Count)
             .Take(5)
             .ToListAsync(ct);
 
-        var visitsByPortal = await baseQuery
+        var visitsByBrowser = visitsByBrowserRaw
+            .Select(x => new VisitorStatItemDto(x.Name ?? "Unknown", x.Count))
+            .ToList();
+
+        var visitsByPortalRaw = await baseQuery
             .Where(v => v.Timestamp >= thirtyDaysAgo)
-            .GroupBy(v => v.Portal ?? "Unknown")
-            .Select(g => new VisitorStatItemDto(g.Key, g.Count()))
+            .GroupBy(v => v.Portal)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
             .OrderByDescending(g => g.Count)
             .ToListAsync(ct);
 
-        var visitsByOs = await baseQuery
+        var visitsByPortal = visitsByPortalRaw
+            .Select(x => new VisitorStatItemDto(x.Name ?? "Unknown", x.Count))
+            .ToList();
+
+        var visitsByOsRaw = await baseQuery
             .Where(v => v.Timestamp >= thirtyDaysAgo)
-            .GroupBy(v => v.Os ?? "Unknown")
-            .Select(g => new VisitorStatItemDto(g.Key, g.Count()))
+            .GroupBy(v => v.Os)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
             .OrderByDescending(g => g.Count)
             .Take(5)
             .ToListAsync(ct);
+
+        var visitsByOs = visitsByOsRaw
+            .Select(x => new VisitorStatItemDto(x.Name ?? "Unknown", x.Count))
+            .ToList();
 
         return Ok(new VisitorStatsDto(
             totalPageViews,

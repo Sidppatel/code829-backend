@@ -20,6 +20,7 @@ public sealed class AdminControllersSmokeTests(DatabaseFixture db)
     [InlineData("GET", "/v1/developer/admin-logs")]
     [InlineData("GET", "/v1/developer/invitations")]
     [InlineData("GET", "/v1/developer/purchases")]
+    [InlineData("GET", "/v1/developer/visits/stats")]
     [InlineData("GET", "/v1/checkin/events")]
     public async Task Endpoint_NoAuth_Returns401(string method, string url)
     {
