@@ -11,6 +11,7 @@ using Serilog;
 using Stripe;
 using Db.Repositories;
 using Db.Repositories.StoredProcedures;
+using Db.Entities.Views;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -794,4 +795,146 @@ public class DeveloperController(
             return StatusCode(502, new ApiError(502, "Failed to fetch Stripe account status", HttpContext.TraceIdentifier));
         }
     }
+
+    [HttpGet("visits")]
+    public async Task<IActionResult> GetVisits(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? portal = null,
+        [FromQuery] string? search = null)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+        var query = context.SiteVisitViews.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(portal))
+        {
+            query = query.Where(v => v.Portal == portal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(v =>
+                v.Path.ToLower().Contains(term) ||
+                (v.IpAddress != null && v.IpAddress.ToLower().Contains(term)) ||
+                (v.UserEmail != null && v.UserEmail.ToLower().Contains(term)) ||
+                (v.UserFullName != null && v.UserFullName.ToLower().Contains(term)) ||
+                (v.Browser != null && v.Browser.ToLower().Contains(term)) ||
+                (v.Os != null && v.Os.ToLower().Contains(term))
+            );
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(v => v.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(v => new SiteVisitDto(
+                v.Id, v.Timestamp, v.Path, v.IpAddress, v.UserAgent, v.Referrer,
+                v.ScreenResolution, v.Portal, v.Browser, v.Os, v.UserId, v.BusinessUserId,
+                v.UserEmail, v.UserFullName, v.UserRole
+            ))
+            .ToListAsync();
+
+        return Ok(new PagedResponse<SiteVisitDto>(items, totalCount, page, pageSize));
+    }
+
+    [HttpGet("visits/stats")]
+    public async Task<IActionResult> GetVisitsStats(CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+        var yesterday = today.AddDays(-1);
+        var thirtyDaysAgo = today.AddDays(-30);
+
+        var baseQuery = context.SiteVisitViews.AsNoTracking();
+
+        var totalPageViews = await baseQuery.CountAsync(v => v.Timestamp >= thirtyDaysAgo, ct);
+        var uniqueVisitors = await baseQuery
+            .Where(v => v.Timestamp >= thirtyDaysAgo)
+            .Select(v => v.IpAddress)
+            .Distinct()
+            .CountAsync(ct);
+
+        var pageViewsToday = await baseQuery.CountAsync(v => v.Timestamp >= today, ct);
+        var pageViewsYesterday = await baseQuery.CountAsync(v => v.Timestamp >= yesterday && v.Timestamp < today, ct);
+
+        var visitsByDateRaw = await baseQuery
+            .Where(v => v.Timestamp >= thirtyDaysAgo)
+            .GroupBy(v => v.Timestamp.Date)
+            .Select(g => new { Date = g.Key, Count = g.Count() })
+            .OrderBy(g => g.Date)
+            .ToListAsync(ct);
+
+        var visitsByDate = visitsByDateRaw
+            .Select(g => new VisitorChartPointDto(g.Date.ToString("yyyy-MM-dd"), g.Count))
+            .ToList();
+
+        var visitsByBrowser = await baseQuery
+            .Where(v => v.Timestamp >= thirtyDaysAgo)
+            .GroupBy(v => v.Browser ?? "Unknown")
+            .Select(g => new VisitorStatItemDto(g.Key, g.Count()))
+            .OrderByDescending(g => g.Count)
+            .Take(5)
+            .ToListAsync(ct);
+
+        var visitsByPortal = await baseQuery
+            .Where(v => v.Timestamp >= thirtyDaysAgo)
+            .GroupBy(v => v.Portal ?? "Unknown")
+            .Select(g => new VisitorStatItemDto(g.Key, g.Count()))
+            .OrderByDescending(g => g.Count)
+            .ToListAsync(ct);
+
+        var visitsByOs = await baseQuery
+            .Where(v => v.Timestamp >= thirtyDaysAgo)
+            .GroupBy(v => v.Os ?? "Unknown")
+            .Select(g => new VisitorStatItemDto(g.Key, g.Count()))
+            .OrderByDescending(g => g.Count)
+            .Take(5)
+            .ToListAsync(ct);
+
+        return Ok(new VisitorStatsDto(
+            totalPageViews,
+            uniqueVisitors,
+            pageViewsToday,
+            pageViewsYesterday,
+            visitsByDate,
+            visitsByBrowser,
+            visitsByPortal,
+            visitsByOs
+        ));
+    }
 }
+
+public record SiteVisitDto(
+    Guid Id,
+    DateTime Timestamp,
+    string Path,
+    string? IpAddress,
+    string? UserAgent,
+    string? Referrer,
+    string? ScreenResolution,
+    string? Portal,
+    string? Browser,
+    string? Os,
+    Guid? UserId,
+    Guid? BusinessUserId,
+    string? UserEmail,
+    string? UserFullName,
+    string? UserRole
+);
+
+public record VisitorChartPointDto(string Date, int Count);
+public record VisitorStatItemDto(string Name, int Count);
+public record VisitorStatsDto(
+    int TotalPageViews,
+    int UniqueVisitors,
+    int PageViewsToday,
+    int PageViewsYesterday,
+    List<VisitorChartPointDto> VisitsByDate,
+    List<VisitorStatItemDto> VisitsByBrowser,
+    List<VisitorStatItemDto> VisitsByPortal,
+    List<VisitorStatItemDto> VisitsByOs
+);

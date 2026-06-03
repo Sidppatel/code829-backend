@@ -74,6 +74,7 @@ public class EventPlatformDbContext(
     public DbSet<BusinessLogView> BusinessLogViews => Set<BusinessLogView>();
     public DbSet<SystemLogView> SystemLogViews => Set<SystemLogView>();
     public DbSet<DeveloperLogView> DeveloperLogViews => Set<DeveloperLogView>();
+    public DbSet<SiteVisitView> SiteVisitViews => Set<SiteVisitView>();
 
     public DbSet<AdminDashboardStatsView> AdminDashboardStatsViews => Set<AdminDashboardStatsView>();
     public DbSet<TopEventRevenueView> TopEventRevenueViews => Set<TopEventRevenueView>();
@@ -927,6 +928,12 @@ public class EventPlatformDbContext(
             entity.ToView("v_developer_logs");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Severity).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<SiteVisitView>(entity =>
+        {
+            entity.ToView("v_site_visits");
+            entity.HasKey(e => e.Id);
         });
 
         modelBuilder.Entity<AdminDashboardStatsView>(entity =>

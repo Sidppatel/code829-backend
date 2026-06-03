@@ -95,6 +95,9 @@ try
         ?? "unknown";
     var isDevEnv = builder.Environment.IsDevelopment();
 
+    var dbLoggingService = new DbLoggingService();
+    builder.Services.AddSingleton<IDbLoggingService>(dbLoggingService);
+
     builder.Host.UseSerilog((ctx, lc) =>
     {
         lc.ReadFrom.Configuration(ctx.Configuration)
@@ -107,6 +110,10 @@ try
 
         lc.WriteTo.Console(
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] [trace={TraceId}] {Message:lj}{NewLine}{Exception}");
+
+        lc.WriteTo.Logger(lc2 => lc2
+            .Filter.ByIncludingOnly(le => le.Level >= Serilog.Events.LogEventLevel.Warning)
+            .WriteTo.Sink(new Api.Middleware.DbLoggingSink(dbLoggingService)));
 
         if (otlpExporterEnabled)
             lc.WriteTo.OpenTelemetry(o =>
@@ -335,6 +342,7 @@ try
     builder.Services.AddHostedService<LogCleanupWorker>();
     builder.Services.AddHostedService<HoldCleanupWorker>();
     builder.Services.AddHostedService<ScheduledPublishWorker>();
+    builder.Services.AddHostedService<DbLoggingWorker>();
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
