@@ -57,6 +57,20 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
         Environment.SetEnvironmentVariable("STRIPE_WEBHOOK_SECRET", "whsec_integration_test_secret");
 
+        // Create the authenticated role and auth schema/functions required by Supabase RLS policies
+        await ExecuteSqlAsync(@"
+            CREATE SCHEMA IF NOT EXISTS auth;
+            CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS 'SELECT null::uuid';
+            
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+                    CREATE ROLE authenticated;
+                END IF;
+            END
+            $$;
+        ");
+
         await RunMigrationsAsync();
 
         Factory = new TestApiFactory(PostgresConnectionString, RedisConfig);
