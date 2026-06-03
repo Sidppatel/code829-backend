@@ -117,6 +117,36 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
         var cacheDir = Path.Combine(Path.GetTempPath(), "ep-code829-db-migrate");
         var dll = Path.Combine(cacheDir, "MigrationRunner.dll");
+
+        // Try to find a local sibling code829-db folder to build and use.
+        // This is correct for local development/testing of local migration changes
+        // and bypasses the git SSH clone.
+        string? localDbDir = null;
+        var dir = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(dir))
+        {
+            var candidate = Path.Combine(dir, "code829-db");
+            if (Directory.Exists(candidate) && Directory.Exists(Path.Combine(candidate, "src", "MigrationRunner")))
+            {
+                localDbDir = candidate;
+                break;
+            }
+            var parent = Directory.GetParent(dir)?.FullName;
+            if (parent == dir) break;
+            dir = parent;
+        }
+
+        if (localDbDir != null)
+        {
+            var localProject = Path.Combine(localDbDir, "src", "MigrationRunner");
+            await RunAsync("dotnet", $"publish \"{localProject}\" -c Release -o \"{cacheDir}\" -p:UseAppHost=false");
+            if (File.Exists(dll))
+            {
+                Environment.SetEnvironmentVariable("MIGRATION_RUNNER_DLL", dll);
+                return dll;
+            }
+        }
+
         if (File.Exists(dll))
         {
             Environment.SetEnvironmentVariable("MIGRATION_RUNNER_DLL", dll);
