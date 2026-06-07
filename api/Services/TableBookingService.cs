@@ -1,5 +1,6 @@
 using Contracts.DTOs.Tables;
 using Db;
+using Db.Entities.Views;
 using Db.Repositories.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -16,6 +17,10 @@ public class TableBookingService(
     {
         var holdMinutes = int.Parse(
             await settings.GetOrDefaultAsync("hold_expiry_minutes", "10") ?? "10");
+
+        var userExists = await context.UserProfileViews.AsNoTracking().AnyAsync(u => u.UserId == userId);
+        if (!userExists)
+            throw new KeyNotFoundException("User not found");
 
         var ev = await context.EventViews.AsNoTracking()
             .FirstOrDefaultAsync(e => e.EventId == eventId)
