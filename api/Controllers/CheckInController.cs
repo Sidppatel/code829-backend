@@ -53,7 +53,8 @@ public class CheckInController(
             return BadRequest(new ApiError(400, "EventId is required", HttpContext.TraceIdentifier));
 
         var adminId = GetCurrentAdminId();
-        var canAccess = await businessUserEventProc.CanAccessEventAsync(adminId, request.EventId.Value);
+        var isAdminOrDev = User.IsInRole(UserRole.Admin.ToString()) || User.IsInRole(UserRole.Developer.ToString());
+        var canAccess = isAdminOrDev || await businessUserEventProc.CanAccessEventAsync(adminId, request.EventId.Value);
         if (!canAccess)
             return StatusCode(403, new ApiError(403,
                 "You are not assigned to this event or access has expired",
@@ -101,7 +102,8 @@ public class CheckInController(
     public async Task<IActionResult> GetStats(Guid eventId)
     {
         var adminId = GetCurrentAdminId();
-        var canAccess = await businessUserEventProc.CanAccessEventAsync(adminId, eventId);
+        var isAdminOrDev = User.IsInRole(UserRole.Admin.ToString()) || User.IsInRole(UserRole.Developer.ToString());
+        var canAccess = isAdminOrDev || await businessUserEventProc.CanAccessEventAsync(adminId, eventId);
         if (!canAccess)
             return StatusCode(403, new ApiError(403,
                 "You are not assigned to this event or access has expired",

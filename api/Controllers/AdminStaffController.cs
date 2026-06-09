@@ -167,7 +167,7 @@ public class AdminStaffController(
     }
 
     [HttpGet]
-    [Route("~/admin/admins")]
+    [Route("~/v{version:apiVersion}/admin/admins")]
     public async Task<IActionResult> GetAdmins(
     [FromQuery] int page = 1,
     [FromQuery] int pageSize = 25,
