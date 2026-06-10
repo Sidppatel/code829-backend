@@ -40,11 +40,11 @@
       },
       "AWSSDK.S3": {
         "type": "Direct",
-        "requested": "[4.0.23.3, )",
-        "resolved": "4.0.23.3",
-        "contentHash": "ASgWIoX8j6gG4plWXc22vGx0vVwDuqtjBwl3I2ICa2g6kqneSk47eYlGtRg61M/I8gvvtP8uDpIN73FsmlwqHg==",
+        "requested": "[4.0.24.3, )",
+        "resolved": "4.0.24.3",
+        "contentHash": "vexHQGHi1CYHceVl9cKlbmvLrV0vhDlLm5CSLHZBHGmQUrtoimUT/Jxcr4i1d1+Sx58eZt/X7B5CBL3GkSXvyQ==",
         "dependencies": {
-          "AWSSDK.Core": "[4.0.7.1, 5.0.0)"
+          "AWSSDK.Core": "[4.0.9, 5.0.0)"
         }
       },
       "BCrypt.Net-Next": {
@@ -350,8 +350,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "4.0.7.1",
-        "contentHash": "XA0GHLwEMkoVu3u8neKnLEDD9ViXpn26ie9UhKXZXYRzCRfSFrLWpBOhupWlf+cJEFBYCC5mx2NsN8h59Y+M2Q=="
+        "resolved": "4.0.9",
+        "contentHash": "++VT2Q80ieKgJaSkD4WsIB+lSwDbkOn45AJ89M4zMZyuogW3AeUG915ePy7hAcfpujTWnf39cUgNDA30c45IpA=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
